@@ -8,7 +8,15 @@ from django.views.decorators.csrf import csrf_exempt
 def redirect_view(request, short_code):
     link = get_object_or_404(RedirectLink, short_code = short_code)
     
-    response = HttpResponseRedirect(link.destination_url)
+    redirect_url = link.destination_url
+
+    if link.queryParam:
+        if  "?" in redirect_url:
+            redirect_url += "&" + link.queryParam
+        else:
+            redirect_url += "?" + link.queryParam
+
+    response = HttpResponseRedirect(redirect_url)
     response.set_cookie('click_id', short_code, max_age = 30*24*60*60)
     
     return response
