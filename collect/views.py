@@ -5,11 +5,13 @@ from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
 
+@csrf_exempt
 def redirect_view(request, short_code):
     link = get_object_or_404(RedirectLink, short_code = short_code)
     
     redirect_url = link.destination_url
 
+    #adds custom queryParam to redirected URL; custom link comes from redirected links in admin
     if link.queryParam:
         if  "?" in redirect_url:
             redirect_url += "&" + link.queryParam
@@ -21,21 +23,29 @@ def redirect_view(request, short_code):
     
     return response
 
+@csrf_exempt  #Understand this more: Disable CSRF for external POSTs (safe only in dev or if authenticated)
 def webhook_view(request):
+    print("webhook view hit")
+    
     if request.method == "POST":
-        data = json.loads(request.body)
-        ref = data.get("ref")
-        order_id = data.get("order_id")
-        amount = data.get("amount")
+        try:
+            data = json.loads(request.body)
+            ref = data.get("ref")
 
-        try: 
-            link = RedirectLink.objects.get(short_code=ref)
-            print(f"Purchase made from: {ref}, Amount: ${amount}, Order ID: {order_id}")
-            # Optionally create a Conversion object here
-            return JsonResponse({"status": "success"}, status=200)
-        
-        except RedirectLink.DoesNotExist:
-            return JsonResponse({"error": "Invalid referral code"}, status=404)
+            if not ref or not ref.startswith("badger:"):
+                return JsonResponse({"error": "Invalid or missing ref"}, status=400)
+
+            print(f"✅ Received webhook with ref: {ref}")
+
+            # You can split the code if needed:
+            code = ref.split(":")[1]
+
+            # Example: check in your DB
+            # link = RedirectLink.objects.get(short_code=ref)
+
+            return JsonResponse({"status": "success", "ref": ref}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     return JsonResponse({"error": "Invalid method"}, status=405)
-
