@@ -47,3 +47,15 @@ def delete_item(request):
                 item.delete()
         return redirect('merchant_dashboard')
     return HttpResponseForbidden()
+
+def delete_creators(request):
+    if request.method == "POST":
+        creator_ids = request.POST.getlist("selected_creators")
+        MerchantCreatorLink.objects.filter(
+            merchant=request.user, creator__id__in=creator_ids
+        ).delete()
+
+    return redirect("merchant_dashboard")
+
+def merchant_edit_creators(request):
+    return HttpResponse("Edit creators page (under construction)")

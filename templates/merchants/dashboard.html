@@ -3,64 +3,81 @@
 <head><title>Merchant Dashboard</title></head>
 <body>
   <h1>Welcome {{ merchant.username }}</h1>
+
   <h2>Your Content Creators</h2>
-  <ul>
-    {% for creator in creators %}
-      <li>{{ creator.username }} ({{ creator.email }})</li>
-    {% empty %}
-      <li>No creators have used your links yet.</li>
-    {% endfor %}
-  </ul>
-</body>
+  <form method="post" action="{% url 'delete_creators' %}">
+    {% csrf_token %}
+    <table border="1" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all-creators"></th>
+          <th>Username</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for creator in creators %}
+        <tr>
+          <td><input type="checkbox" name="selected_creators" value="{{ creator.id }}"></td>
+          <td>{{ creator.username }}</td>
+          <td>{{ creator.email }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3">No content creators found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="submit">Remove Selected Creators</button>
+  </form>
 
-<h2>Your Items</h2>
+  <h2>Your Items</h2>
+  <form method="post" action="{% url 'delete_items' %}">
+    {% csrf_token %}
+    <table style="width: 100%; border-collapse: collapse;" border="1">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all"></th>
+          <th>Title</th>
+          <th>Link</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td><input type="checkbox" name="selected_items" value="{{ item.id }}"></td>
+          <td>
+            <details>
+              <summary><strong>{{ item.title }}</strong></summary>
+              <p>ID: {{ item.id }}</p>
+              <p>Created: {{ item.created_at }}</p>
+            </details>
+          </td>
+          <td><a href="{{ item.link }}" target="_blank">{{ item.link }}</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4">No items added yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <br>
+    <button type="submit">Delete Selected</button>
+  </form>
 
-<form method="post" action="{% url 'delete_items' %}">
-  {% csrf_token %}
-  <table style="width: 100%; border-collapse: collapse;" border="1">
-    <thead>
-      <tr>
-        <th><input type="checkbox" id="select-all"></th>
-        <th>Title</th>
-        <th>Link</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-      <tr>
-        <td><input type="checkbox" name="selected_items" value="{{ item.id }}"></td>
-        <td>
-          <details>
-            <summary><strong>{{ item.title }}</strong></summary>
-            <!-- Add optional extra details -->
-            <p>ID: {{ item.id }}</p>
-            <p>Created: {{ item.created_at }}</p> <!-- if you have a timestamp -->
-          </details>
-        </td>
-        <td><a href="{{ item.link }}" target="_blank">{{ item.link }}</a></td>
+  <a href="{% url 'add_item' %}">Add New Item</a>
 
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="4">No items added yet.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <br>
-  <button type="submit">Delete Selected</button>
-</form>
-
-<a href="{% url 'add_item' %}">Add New Item</a>
-
-<script>
-  document.getElementById('select-all').addEventListener('change', function () {
-    document.querySelectorAll('input[name="selected_items"]').forEach(cb => {
-      cb.checked = this.checked;
+  <script>
+    document.getElementById('select-all').addEventListener('change', function () {
+      document.querySelectorAll('input[name="selected_items"]').forEach(cb => {
+        cb.checked = this.checked;
+      });
     });
-  });
-</script>
 
+    document.getElementById('select-all-creators').addEventListener('change', function () {
+      document.querySelectorAll('input[name="selected_creators"]').forEach(cb => {
+        cb.checked = this.checked;
+      });
+    });
+  </script>
+</body>
 </html>
