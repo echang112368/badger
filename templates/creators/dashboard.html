@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Creator Dashboard</title>
+</head>
+<body>
+    <h1>Welcome, {{ creator.get_full_name|default:creator.username }}!</h1>
+
+    <h2>Your Affiliate Companies:</h2>
+
+    {% if merchants %}
+        <ul>
+            {% for merchant in merchants %}
+                <li>
+                    <strong>{{ merchant.username }}</strong><br>
+                    {{ merchant.email }}<br>
+                    <!-- If you have extra fields like website, show it here -->
+                    {# <a href="{{ merchant.website }}" target="_blank">Visit Website</a> #}
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>You are not linked to any affiliate companies yet.</p>
+    {% endif %}
+</body>
+</html>

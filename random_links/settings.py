@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'collect',
     'accounts',
     'merchants',
+    'creators',
+    'links',
 ]
 
 MIDDLEWARE = [

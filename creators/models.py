@@ -1,8 +1,8 @@
 from django.db import models
 
-class MerchantMeta(models.Model):
+class CreatorMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
-    company_name = models.CharField(max_length=255)
+    bio = models.TextField(blank=True)
 
     def __str__(self):
-        return self.company_name
+        return self.user.username
