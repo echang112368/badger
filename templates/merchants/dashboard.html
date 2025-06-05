@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>Merchant Dashboard</title></head>
+<body>
+  <h1>Welcome {{ merchant.username }}</h1>
+  <h2>Your Content Creators</h2>
+  <ul>
+    {% for creator in creators %}
+      <li>{{ creator.username }} ({{ creator.email }})</li>
+    {% empty %}
+      <li>No creators have used your links yet.</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
