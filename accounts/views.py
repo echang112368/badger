@@ -12,7 +12,7 @@ def custom_login_view(request):
             login(request, user)
 
             if user.is_merchant:
-                return HttpResponse('merchant_dashboard')
+                return redirect('merchant_dashboard')
             elif user.is_creator:
                 return HttpResponse('creator_dashboard')
             else:
