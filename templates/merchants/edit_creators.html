@@ -1,0 +1,15 @@
+<h1>Edit Your Content Creators</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <table>
+        {% for form in formset %}
+        <tr>
+            <td>{{ form.creator }}</td>
+            <td>{{ form.status }}</td>
+            <td>{% if form.instance.pk %}{{ form.DELETE }} Delete{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <button type="submit">Save Changes</button>
+</form>
