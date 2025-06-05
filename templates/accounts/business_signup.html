@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>Business Sign Up</title></head>
+<body>
+  <h2>Register as Business</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Create Business Account</button>
+  </form>
+</body>
+</html>
