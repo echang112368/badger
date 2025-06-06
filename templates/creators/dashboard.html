@@ -18,7 +18,11 @@
                     {% if entry.items %}
                         <ul>
                             {% for item in entry.items %}
-                                <li><a href="{{ item.link }}" target="_blank">{{ item.title }}</a></li>
+                                <li>
+                                    <a href="{{ item.original_link }}" target="_blank">{{ item.title }}</a>
+                                    -
+                                    <a href="{{ item.redirect_link }}" target="_blank">{{ item.redirect_link }}</a>
+                                </li>
                             {% endfor %}
                         </ul>
                     {% else %}
