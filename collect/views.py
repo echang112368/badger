@@ -31,11 +31,24 @@ def webhook_view(request):
         try:
             data = json.loads(request.body)
             ref = data.get("ref")
+            amount = data.get("amount")
 
             if not ref or not ref.startswith("badger:"):
                 return JsonResponse({"error": "Invalid or missing ref"}, status=400)
 
-            print(f"✅ Received webhook with ref: {ref}")
+            # Log the reference as well as any provided sale amount
+            if amount is not None:
+                try:
+                    total_amount = float(amount)
+                except (TypeError, ValueError):
+                    total_amount = None
+            else:
+                total_amount = None
+
+            if total_amount is not None:
+                print(f"✅ Received webhook with ref: {ref} and amount: {total_amount}")
+            else:
+                print(f"✅ Received webhook with ref: {ref}")
 
             # You can split the code if needed:
             code = ref.split(":")[1]
@@ -43,7 +56,11 @@ def webhook_view(request):
             # Example: check in your DB
             # link = RedirectLink.objects.get(short_code=ref)
 
-            return JsonResponse({"status": "success", "ref": ref}, status=200)
+            response_payload = {"status": "success", "ref": ref}
+            if total_amount is not None:
+                response_payload["amount"] = total_amount
+
+            return JsonResponse(response_payload, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
