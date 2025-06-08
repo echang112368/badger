@@ -66,3 +66,22 @@ def webhook_view(request):
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     return JsonResponse({"error": "Invalid method"}, status=405)
+
+@csrf_exempt
+def stripe_webhook_view(request):
+    if request.method == "POST":
+        try:
+            event = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        data_object = event.get("data", {}).get("object", {}) if isinstance(event, dict) else {}
+        amount = data_object.get("amount_total") or data_object.get("amount")
+        if amount is not None:
+            print(f"✅ Stripe webhook amount: {amount}")
+        else:
+            print("⚠️  Stripe webhook received but no amount found")
+
+        return JsonResponse({"status": "received"}, status=200)
+
+    return JsonResponse({"error": "Invalid method"}, status=405)
