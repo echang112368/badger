@@ -1,4 +1,4 @@
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponseRedirect
 from .models import RedirectLink
 from django.http import JsonResponse
@@ -77,11 +77,15 @@ def stripe_webhook_view(request):
 
         data_object = event.get("data", {}).get("object", {}) if isinstance(event, dict) else {}
         amount = data_object.get("amount_total") or data_object.get("amount")
+        metadata = data_object.get("metadata", {}) if isinstance(data_object, dict) else {}
+        ref = metadata.get("ref")
+
         if amount is not None:
             print(f"✅ Stripe webhook amount: {amount}")
         else:
             print("⚠️  Stripe webhook received but no amount found")
 
-        return JsonResponse({"status": "received"}, status=200)
+        context = {"ref": ref, "amount": amount}
+        return render(request, "collect/stripe_webhook.html", context)
 
     return JsonResponse({"error": "Invalid method"}, status=405)
