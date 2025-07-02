@@ -25,38 +25,55 @@ def redirect_view(request, short_code):
 
 @csrf_exempt  #Understand this more: Disable CSRF for external POSTs (safe only in dev or if authenticated)
 def webhook_view(request):
-    print("webhook view hit")
-    
+    print("request entered")
     if request.method == "POST":
         try:
-            data = json.loads(request.body)
-            ref = data.get("ref")
-            amount = data.get("amount")
+            payload = json.loads(request.body)
 
-            if not ref or not ref.startswith("badger:"):
-                return JsonResponse({"error": "Invalid or missing ref"}, status=400)
+            data = payload.get("data", {}).get("object", {})
+            metadata = data.get("metadata", {})
+
+            buisID = metadata.get('buisID')
+            uuid = metadata.get("uuid")
+            amount = data.get("amount")
+            
+            if buisID is not None:
+                try:
+                    buisID = int(buisID)
+                except (TypeError, ValueError):
+                    buisID = None
+            else:
+                buisID = None
+
+            if uuid is not None:
+                try:
+                    uuid = int(uuid)
+                except (TypeError, ValueError):
+                    uuid = None
+            else:
+                uuid = None
 
             # Log the reference as well as any provided sale amount
+            print(amount)
             if amount is not None:
                 try:
-                    total_amount = float(amount)
+                    total_amount = float(amount) / 100  # Convert cents to dollars
+                    total_amount = round(total_amount, 2)  # Optional: round to 2 decimal places
                 except (TypeError, ValueError):
                     total_amount = None
-            else:
-                total_amount = None
+                
 
-            if total_amount is not None:
-                print(f"✅ Received webhook with ref: {ref} and amount: {total_amount}")
-            else:
-                print(f"✅ Received webhook with ref: {ref}")
+            
+            print(f"✅ Received webhook with uuid: {uuid} and amount: {total_amount} and buisID: {buisID}")
+           
 
             # You can split the code if needed:
-            code = ref.split(":")[1]
+            #code = ref.split(":")[1]
 
             # Example: check in your DB
             # link = RedirectLink.objects.get(short_code=ref)
 
-            response_payload = {"status": "success", "ref": ref}
+            response_payload = {"status": "success", "uuid": uuid}
             if total_amount is not None:
                 response_payload["amount"] = total_amount
 
