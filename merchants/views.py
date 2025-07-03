@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink
 from .addItem_forms import MerchantItemForm
-from .models import MerchantItem
+from .models import MerchantItem, MerchantMeta
 from django.http import HttpResponseForbidden
 
 
@@ -11,11 +11,13 @@ def merchant_dashboard(request):
     links = MerchantCreatorLink.objects.filter(merchant=request.user)
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
+    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
         'creators': creators,
         'items': items,
+        'merchant_meta': merchant_meta,
     })
 
 @login_required
