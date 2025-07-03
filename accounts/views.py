@@ -23,8 +23,10 @@ def custom_login_view(request):
 
     return render(request, 'accounts/login.html', {'form': form})
 
+
 def signup_choice_view(request):
     return render(request, 'accounts/signup_choice.html')
+
 
 def business_signup_view(request):
     if request.method == 'POST':
@@ -37,6 +39,7 @@ def business_signup_view(request):
     else:
         form = BusinessSignUpForm()
     return render(request, 'accounts/business_signup.html', {'form': form})
+
 
 def creator_signup_view(request):
     if request.method == 'POST':

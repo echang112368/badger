@@ -4,6 +4,7 @@ from links.models import MerchantCreatorLink
 from .addItem_forms import MerchantItemForm
 from .models import MerchantItem, MerchantMeta
 from django.http import HttpResponseForbidden
+import uuid
 
 
 @login_required
@@ -11,7 +12,15 @@ def merchant_dashboard(request):
     links = MerchantCreatorLink.objects.filter(merchant=request.user)
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
-    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    try:
+        merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    except ValueError:
+        raw_meta = MerchantMeta.objects.filter(user=request.user).values("id").first()
+        if raw_meta:
+            MerchantMeta.objects.filter(id=raw_meta["id"]).update(buisID=uuid.uuid4())
+            merchant_meta = MerchantMeta.objects.filter(id=raw_meta["id"]).first()
+        else:
+            merchant_meta = None
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
