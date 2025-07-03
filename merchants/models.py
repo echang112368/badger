@@ -1,15 +1,11 @@
 from django.db import models
 from accounts.models import CustomUser
+import uuid
 
 class MerchantMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
-    buisID = models.PositiveIntegerField(unique=True, editable=False, null=True)
-
-    def save(self, *args, **kwargs):
-        if self.buisID is None and self.user_id:
-            self.buisID = self.user_id
-        super().save(*args, **kwargs)
+    buisID = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     def __str__(self):
         return self.company_name
