@@ -3,6 +3,8 @@ from django.shortcuts import render
 from django.urls import reverse
 from uuid import uuid4
 
+from .models import CreatorMeta
+
 from links.models import MerchantCreatorLink
 from merchants.models import MerchantItem
 from collect.models import RedirectLink
@@ -10,6 +12,7 @@ from collect.models import RedirectLink
 @login_required
 def creator_dashboard(request):
     links = MerchantCreatorLink.objects.filter(creator=request.user)
+    creator_meta = CreatorMeta.objects.filter(user=request.user).first()
 
     merchants_with_items = []
     for link in links:
@@ -45,6 +48,7 @@ def creator_dashboard(request):
         'creators/dashboard.html',
         {
             'creator': request.user,
+            'creator_meta': creator_meta,
             'merchants_with_items': merchants_with_items,
         }
     )
