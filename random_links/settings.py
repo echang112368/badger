@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'merchants',
     'creators',
     'links',
+    "verify_email.apps.VerifyEmailConfig",
 ]
 
 MIDDLEWARE = [
