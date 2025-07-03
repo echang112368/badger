@@ -43,7 +43,7 @@ Pages for merchants and item management.
 - `CustomUser` – Extends Django’s user model with `is_merchant` and `is_creator` flags.
 - `RedirectLink` – Stores a short code, destination URL, and optional query parameters.
 - `CreatorMeta` – Extra information about creators, including a unique `uuid` assigned at signup.
- - `MerchantMeta` – Extra information about merchants such as company name and the auto-generated `buisID`.
+ - `MerchantMeta` – Extra information about merchants such as company name and the auto-generated `buisID` (a UUID).
 - `MerchantItem` – An item that a merchant wishes to promote.
 - `MerchantCreatorLink` – Relationship between a merchant and a creator with a status field.
 

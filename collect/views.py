@@ -4,6 +4,7 @@ from .models import RedirectLink
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
+import uuid
 
 @csrf_exempt
 def redirect_view(request, short_code):
@@ -34,24 +35,24 @@ def webhook_view(request):
             metadata = data.get("metadata", {})
 
             buisID = metadata.get('buisID')
-            uuid = metadata.get("uuid")
+            uuid_str = metadata.get("uuid")
             amount = data.get("amount")
-            
+
             if buisID is not None:
                 try:
-                    buisID = int(buisID)
-                except (TypeError, ValueError):
+                    buisID = uuid.UUID(str(buisID))
+                except (ValueError, AttributeError, TypeError):
                     buisID = None
             else:
                 buisID = None
 
-            if uuid is not None:
+            if uuid_str is not None:
                 try:
-                    uuid = int(uuid)
+                    uuid_val = int(uuid_str)
                 except (TypeError, ValueError):
-                    uuid = None
+                    uuid_val = None
             else:
-                uuid = None
+                uuid_val = None
 
             # Log the reference as well as any provided sale amount
             print(amount)
@@ -64,7 +65,7 @@ def webhook_view(request):
                 
 
             
-            print(f"✅ Received webhook with uuid: {uuid} and amount: {total_amount} and buisID: {buisID}")
+            print(f"✅ Received webhook with uuid: {uuid_val} and amount: {total_amount} and buisID: {buisID}")
            
 
             # You can split the code if needed:
@@ -73,7 +74,7 @@ def webhook_view(request):
             # Example: check in your DB
             # link = RedirectLink.objects.get(short_code=ref)
 
-            response_payload = {"status": "success", "uuid": uuid}
+            response_payload = {"status": "success", "uuid": uuid_val}
             if total_amount is not None:
                 response_payload["amount"] = total_amount
 
