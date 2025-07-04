@@ -2,8 +2,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink
 from .addItem_forms import MerchantItemForm
-from .models import MerchantItem
-from django.http import HttpResponseForbidden
+from .models import MerchantItem, MerchantMeta
+from django.http import HttpResponseForbidden, HttpResponse
 
 
 @login_required
@@ -11,9 +11,11 @@ def merchant_dashboard(request):
     links = MerchantCreatorLink.objects.filter(merchant=request.user)
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
+    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
+        'merchant_meta': merchant_meta,
         'creators': creators,
         'items': items,
     })
@@ -22,7 +24,7 @@ def merchant_dashboard(request):
 def add_item(request):
     if not request.user.is_merchant:
         return render(request, '403.html')
-    
+
     if request.method == 'POST':
         form = MerchantItemForm(request.POST)
         if form.is_valid():
@@ -32,8 +34,6 @@ def add_item(request):
             return redirect('merchant_dashboard')  # redirect after adding
     else:
         form = MerchantItemForm()
-
-    
 
     return render(request, 'merchants/add_item.html', {'form': form})
 
