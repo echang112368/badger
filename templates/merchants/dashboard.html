@@ -3,6 +3,9 @@
 <head><title>Merchant Dashboard</title></head>
 <body>
   <h1>Welcome {{ merchant.username }}</h1>
+  {% if merchant_meta %}
+  <p><strong>Business ID:</strong> {{ merchant_meta.business_ID }}</p>
+  {% endif %}
 
   <h2>Your Content Creators</h2>
   <form method="post" action="{% url 'delete_creators' %}">
