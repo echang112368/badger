@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, login
 from django.shortcuts import render, redirect
 from .forms import CustomLoginForm, BusinessSignUpForm, CreatorSignUpForm
-from verify_email.email_handler import ActivationMailManager
+
 from django.http import HttpResponse
 
 
@@ -32,7 +32,8 @@ def business_signup_view(request):
         if form.is_valid():
             user = form.save(commit=False)
             user.is_merchant = True
-            ActivationMailManager.send_verification_link(inactive_user=user, request=request)
+            user.is_active = True
+            user.save()
             return render(request, 'accounts/signup_success.html', {'user': user})
     else:
         form = BusinessSignUpForm()
@@ -44,7 +45,8 @@ def creator_signup_view(request):
         if form.is_valid():
             user = form.save(commit=False)
             user.is_creator = True
-            ActivationMailManager.send_verification_link(inactive_user=user, request=request)
+            user.is_active = True
+            user.save()
             return render(request, 'accounts/signup_success.html', {'user': user})
     else:
         form = CreatorSignUpForm()
