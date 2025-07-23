@@ -5,7 +5,7 @@ import uuid
 class MerchantMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
-    business_ID = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     def __str__(self):
         return self.company_name
