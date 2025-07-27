@@ -4,6 +4,9 @@ from .models import RedirectLink
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
+from merchants.models import MerchantMeta
+from creators.models import CreatorMeta
+from ledger.models import LedgerEntry
 
 @csrf_exempt
 def redirect_view(request, short_code):
@@ -65,6 +68,24 @@ def webhook_view(request):
 
             
             print(f"✅ Received webhook with uuid: {uuid} and amount: {total_amount} and buisID: {buisID}")
+
+            if total_amount is not None and uuid and buisID:
+                merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
+                creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
+                if merchant_meta and creator_meta:
+                    commission_rate = merchant_meta.affiliate_percent or 0
+                    commission = round(total_amount * float(commission_rate) / 100, 2)
+
+                    LedgerEntry.objects.create(
+                        creator=creator_meta.user,
+                        amount=commission,
+                        entry_type="commission",
+                    )
+                    LedgerEntry.objects.create(
+                        merchant=merchant_meta.user,
+                        amount=-commission,
+                        entry_type="commission",
+                    )
            
 
             # You can split the code if needed:

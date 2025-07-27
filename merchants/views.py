@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink
 from .addItem_forms import MerchantItemForm
 from .models import MerchantItem, MerchantMeta
+from ledger.models import LedgerEntry
 from django.http import HttpResponseForbidden, HttpResponse
 
 
@@ -12,12 +13,16 @@ def merchant_dashboard(request):
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
     merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    balance = LedgerEntry.merchant_balance(request.user)
+    entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
         'merchant_meta': merchant_meta,
         'creators': creators,
         'items': items,
+        'balance': balance,
+        'ledger_entries': entries,
     })
 
 @login_required

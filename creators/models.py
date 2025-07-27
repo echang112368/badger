@@ -8,3 +8,9 @@ class CreatorMeta(models.Model):
 
     def __str__(self):
         return self.user.username
+
+    @property
+    def balance(self):
+        from ledger.models import LedgerEntry
+        return LedgerEntry.creator_balance(self.user)
+
