@@ -13,7 +13,14 @@ from ledger.models import LedgerEntry
 @login_required
 def creator_dashboard(request):
     links = MerchantCreatorLink.objects.filter(creator=request.user)
-    creator_meta = CreatorMeta.objects.filter(user=request.user).first()
+    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        paypal_email = request.POST.get('paypal_email', '').strip()
+        if paypal_email:
+            creator_meta.paypal_email = paypal_email
+            creator_meta.save()
+
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by('-timestamp')
 

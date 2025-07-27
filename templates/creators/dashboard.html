@@ -10,6 +10,13 @@
     {% endif %}
     <p><strong>Current Balance:</strong> ${{ balance }}</p>
 
+    <form method="post">
+        {% csrf_token %}
+        <label for="paypal_email">PayPal Email:</label>
+        <input type="email" id="paypal_email" name="paypal_email" value="{{ creator_meta.paypal_email }}">
+        <button type="submit">Save</button>
+    </form>
+
     <h2>Your Affiliate Companies:</h2>
 
     {% if merchants_with_items %}
