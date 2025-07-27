@@ -39,13 +39,19 @@ Pages for merchants and item management.
 - `delete_creators(request)` – Removes selected creators from the merchant’s link list.
 - `merchant_edit_creators(request)` – Placeholder page for editing creators.
 
+### ledger
+Handles financial transactions for both merchants and creators.
+
+- `LedgerEntry` – Records commissions, payouts and payments. Utility methods allow balance calculations.
+
 ## Models Summary
 - `CustomUser` – Extends Django’s user model with `is_merchant` and `is_creator` flags.
 - `RedirectLink` – Stores a short code, destination URL, and optional query parameters.
 - `CreatorMeta` – Extra information about creators, including a unique `uuid` assigned at signup.
-- `MerchantMeta` – Extra information about merchants such as company name and a unique `uuid`.
+- `MerchantMeta` – Extra information about merchants such as company name, an affiliate percentage, and a unique `uuid`.
 - `MerchantItem` – An item that a merchant wishes to promote.
 - `MerchantCreatorLink` – Relationship between a merchant and a creator with a status field.
+- `LedgerEntry` – Financial ledger entry linked to either a creator or merchant.
 
 ## Project URLs
 The main URL configuration (`random_links/urls.py`) wires the apps together:
