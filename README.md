@@ -42,7 +42,9 @@ Pages for merchants and item management.
 ### ledger
 Handles financial transactions for both merchants and creators.
 
-- `LedgerEntry` – Records commissions, payouts and payments. Utility methods allow balance calculations.
+- `LedgerEntry` – Records commissions, payouts and payments. Each entry now has
+  a `paid` boolean to track whether it has been settled. Utility methods allow
+  balance calculations.
 
 ## Models Summary
 - `CustomUser` – Extends Django’s user model with `is_merchant` and `is_creator` flags.
@@ -52,6 +54,7 @@ Handles financial transactions for both merchants and creators.
 - `MerchantItem` – An item that a merchant wishes to promote.
 - `MerchantCreatorLink` – Relationship between a merchant and a creator with a status field.
 - `LedgerEntry` – Financial ledger entry linked to either a creator or merchant.
+  The `paid` field indicates if the entry has been settled.
 
 ## Project URLs
 The main URL configuration (`random_links/urls.py`) wires the apps together:
