@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
+from decimal import Decimal, ROUND_HALF_UP
 
 User = get_user_model()
 
@@ -40,11 +41,13 @@ class LedgerEntry(models.Model):
         result = (
             LedgerEntry.objects.filter(creator=user).aggregate(total=Sum("amount"))
         )
-        return result["total"] or 0
+        total = result["total"] if result["total"] is not None else Decimal("0")
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @staticmethod
     def merchant_balance(user):
         result = (
             LedgerEntry.objects.filter(merchant=user).aggregate(total=Sum("amount"))
         )
-        return result["total"] or 0
+        total = result["total"] if result["total"] is not None else Decimal("0")
+        return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
