@@ -8,11 +8,14 @@ from .models import CreatorMeta
 from links.models import MerchantCreatorLink
 from merchants.models import MerchantItem
 from collect.models import RedirectLink
+from ledger.models import LedgerEntry
 
 @login_required
 def creator_dashboard(request):
     links = MerchantCreatorLink.objects.filter(creator=request.user)
     creator_meta = CreatorMeta.objects.filter(user=request.user).first()
+    balance = LedgerEntry.creator_balance(request.user)
+    entries = LedgerEntry.objects.filter(creator=request.user).order_by('-timestamp')
 
     merchants_with_items = []
     for link in links:
@@ -50,5 +53,7 @@ def creator_dashboard(request):
             'creator': request.user,
             'creator_meta': creator_meta,
             'merchants_with_items': merchants_with_items,
+            'balance': balance,
+            'ledger_entries': entries,
         }
     )

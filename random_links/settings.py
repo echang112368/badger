@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'merchants',
     'creators',
     'links',
+    'ledger',
     "verify_email.apps.VerifyEmailConfig",
 ]
 
