@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink
-from .addItem_forms import MerchantItemForm
+from .forms import MerchantItemForm, MerchantMetaForm
 from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry
 from django.http import HttpResponseForbidden, HttpResponse
@@ -13,12 +13,14 @@ def merchant_dashboard(request):
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
     merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    commission_form = MerchantMetaForm(instance=merchant_meta)
     balance = LedgerEntry.merchant_balance(request.user)
     entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
         'merchant_meta': merchant_meta,
+        'commission_form': commission_form,
         'creators': creators,
         'items': items,
         'balance': balance,
@@ -59,6 +61,20 @@ def delete_creators(request):
         MerchantCreatorLink.objects.filter(
             merchant=request.user, creator__id__in=creator_ids
         ).delete()
+
+    return redirect("merchant_dashboard")
+
+
+@login_required
+def update_commission(request):
+    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    if not merchant_meta:
+        return redirect("merchant_dashboard")
+
+    if request.method == "POST":
+        form = MerchantMetaForm(request.POST, instance=merchant_meta)
+        if form.is_valid():
+            form.save()
 
     return redirect("merchant_dashboard")
 

@@ -5,6 +5,12 @@
   <h1>Welcome {{ merchant.username }}</h1>
   {% if merchant_meta %}
   <p><strong>Your UUID:</strong> {{ merchant_meta.uuid }}</p>
+  <p><strong>Commission Rate:</strong> {{ merchant_meta.affiliate_percent }}%</p>
+  <form method="post" action="{% url 'update_commission' %}">
+    {% csrf_token %}
+    {{ commission_form.affiliate_percent }}%
+    <button type="submit">Update Rate</button>
+  </form>
   {% endif %}
   <p><strong>Current Balance:</strong> ${{ balance }}</p>
 
