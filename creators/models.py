@@ -6,6 +6,14 @@ class CreatorMeta(models.Model):
     bio = models.TextField(blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
+    @property
+    def int_uuid(self):
+        """Return the UUID as an integer with dashes removed."""
+        try:
+            return int(str(self.uuid).replace("-", ""))
+        except (TypeError, ValueError):
+            return None
+
     def __str__(self):
         return self.user.username
 
