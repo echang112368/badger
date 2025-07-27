@@ -83,6 +83,7 @@
         <th>Date</th>
         <th>Type</th>
         <th>Amount</th>
+        <th>Paid</th>
       </tr>
     </thead>
     <tbody>
@@ -91,9 +92,10 @@
         <td>{{ entry.timestamp }}</td>
         <td>{{ entry.entry_type }}</td>
         <td>{{ entry.amount }}</td>
+        <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="3">No transactions.</td></tr>
+      <tr><td colspan="4">No transactions.</td></tr>
       {% endfor %}
     </tbody>
   </table>
