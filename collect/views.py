@@ -39,22 +39,17 @@ def webhook_view(request):
             buisID = metadata.get('buisID')
             uuid = metadata.get("uuid")
             amount = data.get("amount")
-            
-            if buisID is not None:
-                try:
-                    buisID = int(buisID)
-                except (TypeError, ValueError):
-                    buisID = None
-            else:
-                buisID = None
 
-            if uuid is not None:
+            def normalize_uuid(value):
+                if value is None:
+                    return None
                 try:
-                    uuid = int(uuid)
+                    return int(str(value).replace("-", ""))
                 except (TypeError, ValueError):
-                    uuid = None
-            else:
-                uuid = None
+                    return None
+
+            buisID = normalize_uuid(buisID)
+            uuid = normalize_uuid(uuid)
 
             # Log the reference as well as any provided sale amount
             print(amount)
@@ -70,8 +65,22 @@ def webhook_view(request):
             print(f"✅ Received webhook with uuid: {uuid} and amount: {total_amount} and buisID: {buisID}")
 
             if total_amount is not None and uuid and buisID:
-                merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
-                creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
+                merchant_meta = next(
+                    (
+                        m
+                        for m in MerchantMeta.objects.all()
+                        if m.int_uuid == buisID
+                    ),
+                    None,
+                )
+                creator_meta = next(
+                    (
+                        c
+                        for c in CreatorMeta.objects.all()
+                        if c.int_uuid == uuid
+                    ),
+                    None,
+                )
                 if merchant_meta and creator_meta:
                     commission_rate = merchant_meta.affiliate_percent or 0
                     commission = round(total_amount * float(commission_rate) / 100, 2)
