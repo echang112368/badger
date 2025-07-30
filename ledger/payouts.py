@@ -1,6 +1,7 @@
 import os
 import uuid
 from decimal import Decimal
+from datetime import date
 from typing import Dict, List
 
 import requests
@@ -35,7 +36,12 @@ def send_mass_payouts() -> Dict[str, str]:
     """Send PayPal payouts for all creators with unpaid ledger entries.
 
     Returns a mapping of creator IDs to payout batch IDs for reference.
+    The payouts are only executed on the 15th day of each month.
     """
+    # Only run payouts on the 15th of the month
+    if date.today().day != 15:
+        return {}
+
     access_token = _get_paypal_access_token()
 
     # Aggregate unpaid amounts per creator
