@@ -12,8 +12,15 @@ from django.contrib.auth import get_user_model
 from creators.models import CreatorMeta
 from .models import LedgerEntry
 
+"""Live production would be 
 PAYPAL_OAUTH_URL = "https://api-m.paypal.com/v1/oauth2/token"
 PAYPAL_PAYOUT_URL = "https://api-m.paypal.com/v1/payments/payouts"
+
+the one used now is for api sandbox
+"""
+
+PAYPAL_OAUTH_URL = "https://api-m.sandbox.paypal.com/v1/oauth2/token"
+PAYPAL_PAYOUT_URL = "https://api-m.sandbox.paypal.com/v1/payments/payouts"
 
 
 def _get_paypal_access_token() -> str:
