@@ -30,7 +30,7 @@ class LedgerEntryAdmin(admin.ModelAdmin):
 
     def send_payouts(self, request):
         if request.method == "POST":
-            result = send_mass_payouts()
+            result = send_mass_payouts(ignore_date=True)
             messages.success(request, f"Sent payouts for {len(result)} creators.")
         return redirect("../")
 

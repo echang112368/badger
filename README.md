@@ -71,5 +71,7 @@ The main URL configuration (`random_links/urls.py`) wires the apps together:
 ## Payouts
 `LedgerEntry` records can be settled through PayPal using the `send_mass_payouts` function. You can trigger a payout manually from the Django admin on the ledger entry list page. For automated payouts, run the management command `python manage.py send_payouts` on a schedule (e.g. via cron).
 
+The admin "Send PayPal Payouts" button bypasses the date check and will pay out immediately. The management command retains the monthly schedule, only executing on the 15th.
+
 This repository is a simple example and is not ready for production use without further security and feature work.
 
