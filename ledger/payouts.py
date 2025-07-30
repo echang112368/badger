@@ -32,14 +32,15 @@ def _get_paypal_access_token() -> str:
     return response.json()["access_token"]
 
 
-def send_mass_payouts() -> Dict[str, str]:
+def send_mass_payouts(ignore_date: bool = False) -> Dict[str, str]:
     """Send PayPal payouts for all creators with unpaid ledger entries.
 
     Returns a mapping of creator IDs to payout batch IDs for reference.
-    The payouts are only executed on the 15th day of each month.
+    The payouts are only executed on the 15th day of each month unless
+    ``ignore_date`` is ``True``.
     """
-    # Only run payouts on the 15th of the month
-    if date.today().day != 15:
+    # Only run payouts on the 15th of the month unless overridden
+    if not ignore_date and date.today().day != 15:
         return {}
 
     access_token = _get_paypal_access_token()
