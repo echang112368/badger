@@ -5,6 +5,24 @@ from decimal import Decimal, ROUND_HALF_UP
 
 User = get_user_model()
 
+
+class MerchantInvoice(models.Model):
+    merchant = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="invoices",
+        limit_choices_to={"is_merchant": True},
+    )
+    paypal_invoice_id = models.CharField(max_length=64, blank=True, null=True)
+    paypal_invoice_url = models.URLField(blank=True, null=True)
+    status = models.CharField(max_length=32, default="DRAFT")
+    created_at = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField()
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"Invoice {self.paypal_invoice_id or self.id} for {self.merchant}"
+
 class LedgerEntry(models.Model):
     ENTRY_TYPES = [
         ("commission", "Commission"),
@@ -32,6 +50,13 @@ class LedgerEntry(models.Model):
     entry_type = models.CharField(max_length=20, choices=ENTRY_TYPES)
     timestamp = models.DateTimeField(auto_now_add=True)
     paid = models.BooleanField(default=False)
+    invoice = models.ForeignKey(
+        'MerchantInvoice',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='entries',
+    )
 
     def __str__(self):
         target = self.creator if self.creator else self.merchant

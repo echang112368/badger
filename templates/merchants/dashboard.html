@@ -9,7 +9,8 @@
   <form method="post" action="{% url 'update_commission' %}">
     {% csrf_token %}
     {{ commission_form.affiliate_percent }}%
-    <button type="submit">Update Rate</button>
+    {{ commission_form.paypal_email }}
+    <button type="submit">Save</button>
   </form>
   {% endif %}
   <p><strong>Current Balance:</strong> ${{ balance }}</p>
@@ -75,6 +76,17 @@
   </form>
 
   <a href="{% url 'add_item' %}">Add New Item</a>
+
+  <h2>Latest Invoice</h2>
+  {% if latest_invoice %}
+    <p>Status: {{ latest_invoice.status }}</p>
+    <p>Total Due: ${{ latest_invoice.total_amount }}</p>
+    {% if latest_invoice.paypal_invoice_url %}
+      <a href="{{ latest_invoice.paypal_invoice_url }}" target="_blank">Pay Now</a>
+    {% endif %}
+  {% else %}
+    <p>No pending invoices.</p>
+  {% endif %}
 
   <h2>Transaction History</h2>
   <table border="1" style="width: 100%; border-collapse: collapse;">

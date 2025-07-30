@@ -11,6 +11,6 @@ class MerchantItemForm(forms.ModelForm):
 class MerchantMetaForm(forms.ModelForm):
     class Meta:
         model = MerchantMeta
-        fields = ["affiliate_percent"]
-        labels = {"affiliate_percent": "Commission Rate (%)"}
+        fields = ["affiliate_percent", "paypal_email"]
+        labels = {"affiliate_percent": "Commission Rate (%)", "paypal_email": "PayPal Email"}
 
