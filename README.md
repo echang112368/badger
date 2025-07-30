@@ -68,5 +68,8 @@ The main URL configuration (`random_links/urls.py`) wires the apps together:
 2. Apply migrations with `python manage.py migrate`.
 3. Start the server using `python manage.py runserver`.
 
+## Payouts
+`LedgerEntry` records can be settled through PayPal using the `send_mass_payouts` function. You can trigger a payout manually from the Django admin on the ledger entry list page. For automated payouts, run the management command `python manage.py send_payouts` on a schedule (e.g. via cron).
+
 This repository is a simple example and is not ready for production use without further security and feature work.
 
