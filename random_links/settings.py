@@ -59,7 +59,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'random_links.urls'
 
+
+from dotenv import load_dotenv
 import os
+load_dotenv()
 
 TEMPLATES = [
     {
