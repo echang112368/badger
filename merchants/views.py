@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink
 from .forms import MerchantItemForm, MerchantMetaForm
 from .models import MerchantItem, MerchantMeta
-from ledger.models import LedgerEntry
+from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, HttpResponse
 
 
@@ -16,6 +16,12 @@ def merchant_dashboard(request):
     commission_form = MerchantMetaForm(instance=merchant_meta)
     balance = LedgerEntry.merchant_balance(request.user)
     entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
+    latest_invoice = (
+        MerchantInvoice.objects.filter(merchant=request.user)
+        .exclude(status='PAID')
+        .order_by('-created_at')
+        .first()
+    )
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
@@ -25,6 +31,7 @@ def merchant_dashboard(request):
         'items': items,
         'balance': balance,
         'ledger_entries': entries,
+        'latest_invoice': latest_invoice,
     })
 
 @login_required
