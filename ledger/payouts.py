@@ -35,6 +35,8 @@ def _get_paypal_access_token() -> str:
         data={"grant_type": "client_credentials"},
         auth=(client_id, client_secret),
     )
+    print("🔐 Token response text:", response.text)
+    
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -51,6 +53,7 @@ def send_mass_payouts(ignore_date: bool = False) -> Dict[str, str]:
         return {}
 
     access_token = _get_paypal_access_token()
+   
 
     # Aggregate unpaid amounts per creator
     unpaid_entries = (
