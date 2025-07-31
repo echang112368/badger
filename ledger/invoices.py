@@ -32,7 +32,10 @@ def create_invoice_for_merchant(merchant):
     if not meta or not meta.paypal_email:
         return None
 
-    total = sum((e.amount for e in entries), Decimal("0"))
+    # Merchant ledger entries store commissions as negative amounts since the
+    # merchant owes money. PayPal invoices expect a positive value, so flip the
+    # sign when summing unpaid entries.
+    total = -sum((e.amount for e in entries), Decimal("0"))
     access_token = _get_paypal_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}",
