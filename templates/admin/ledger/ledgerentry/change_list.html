@@ -6,5 +6,9 @@
     {% csrf_token %}
     <input type="submit" class="button" value="{% trans 'Send PayPal Payouts' %}">
 </form>
+<form action="{% url 'admin:ledger_generate_invoices' %}" method="post" style="display:inline;margin-right:1em;">
+    {% csrf_token %}
+    <input type="submit" class="button" value="{% trans 'Generate Merchant Invoices' %}">
+</form>
 {{ block.super }}
 {% endblock %}

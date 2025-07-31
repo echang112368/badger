@@ -109,3 +109,25 @@ def generate_due_invoices():
         if invoice:
             created.append(invoice)
     return created
+
+
+def generate_all_invoices(ignore_date: bool = False):
+    """Generate invoices for all merchants with unpaid ledger entries.
+
+    By default this only runs on the first day of the month, mirroring the
+    scheduled cron behaviour. Set ``ignore_date`` to ``True`` to bypass this
+    restriction and create invoices immediately.
+    """
+    today = timezone.now().date()
+    if not ignore_date and today.day != 1:
+        return []
+
+    User = get_user_model()
+    merchants = User.objects.filter(is_merchant=True)
+
+    created = []
+    for merchant in merchants:
+        invoice = create_invoice_for_merchant(merchant)
+        if invoice:
+            created.append(invoice)
+    return created
