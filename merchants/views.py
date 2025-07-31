@@ -12,7 +12,7 @@ def merchant_dashboard(request):
     links = MerchantCreatorLink.objects.filter(merchant=request.user)
     creators = [link.creator for link in links]
     items = MerchantItem.objects.filter(merchant=request.user)
-    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
     commission_form = MerchantMetaForm(instance=merchant_meta)
     balance = LedgerEntry.merchant_balance(request.user)
     entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
@@ -74,9 +74,7 @@ def delete_creators(request):
 
 @login_required
 def update_commission(request):
-    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
-    if not merchant_meta:
-        return redirect("merchant_dashboard")
+    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
 
     if request.method == "POST":
         form = MerchantMetaForm(request.POST, instance=merchant_meta)
