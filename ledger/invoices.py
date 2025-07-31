@@ -25,6 +25,12 @@ PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
 PAYPAL_CURRENCY_CODE = "USD"
 
 
+def generate_invoice_number() -> str:
+    """Return a unique, 25-character invoice number for PayPal."""
+    date_str = timezone.now().strftime("%Y%m%d")
+    return f"{date_str}-{uuid.uuid4().hex[:16]}"
+
+
 
 
 def create_invoice_for_merchant(merchant):
@@ -56,7 +62,7 @@ def create_invoice_for_merchant(merchant):
 
     payload = {
         "detail": {
-            "invoice_number": str(uuid.uuid4()),
+            "invoice_number": generate_invoice_number(),
             "currency_code": PAYPAL_CURRENCY_CODE,
         },
         "invoicer": {
