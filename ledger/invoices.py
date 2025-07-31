@@ -21,6 +21,8 @@ PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
 # Email address of the PayPal account sending invoices. This should match
 # the business account configured in your PayPal settings.
 PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
+# All invoices are issued in a single currency.
+PAYPAL_CURRENCY_CODE = "USD"
 
 
 
@@ -37,10 +39,15 @@ def create_invoice_for_merchant(merchant):
     if not meta or not meta.paypal_email:
         return None
 
+    if not PAYPAL_INVOICER_EMAIL:
+        raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
+
     # Merchant ledger entries store commissions as negative amounts since the
     # merchant owes money. PayPal invoices expect a positive value, so flip the
     # sign when summing unpaid entries.
     total = -sum((e.amount for e in entries), Decimal("0"))
+    if total <= 0:
+        return None
     access_token = _get_paypal_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -48,8 +55,12 @@ def create_invoice_for_merchant(merchant):
     }
 
     payload = {
-        "detail": {"invoice_number": str(uuid.uuid4())},
+        "detail": {
+            "invoice_number": str(uuid.uuid4()),
+            "currency_code": PAYPAL_CURRENCY_CODE,
+        },
         "invoicer": {
+            "email_address": PAYPAL_INVOICER_EMAIL,
             "name": {"given_name": "Badger"},
         },
         "primary_recipients": [
@@ -60,15 +71,12 @@ def create_invoice_for_merchant(merchant):
                 "name": "Monthly charges",
                 "quantity": "1",
                 "unit_amount": {
-                    "currency_code": "USD",
+                    "currency_code": PAYPAL_CURRENCY_CODE,
                     "value": str(total.quantize(Decimal("0.01"))),
                 },
             }
         ],
     }
-
-    if PAYPAL_INVOICER_EMAIL:
-        payload["invoicer"]["email_address"] = PAYPAL_INVOICER_EMAIL
 
     response = requests.post(PAYPAL_INVOICE_URL, json=payload, headers=headers)
     response.raise_for_status()
