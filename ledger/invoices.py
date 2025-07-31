@@ -11,7 +11,13 @@ from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
 from .payouts import _get_paypal_access_token
 
-PAYPAL_INVOICE_URL = "https://api-m.paypal.com/v2/invoicing/invoices"
+"""
+for live website use https://api-m.paypal.com/v2/invoicing/invoices 
+Currently using sandbox url
+"""
+PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
+
+
 
 
 def create_invoice_for_merchant(merchant):
