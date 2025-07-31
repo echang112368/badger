@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+import os
 
 import requests
 from django.utils import timezone
@@ -16,6 +17,10 @@ for live website use https://api-m.paypal.com/v2/invoicing/invoices
 Currently using sandbox url
 """
 PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
+
+# Email address of the PayPal account sending invoices. This should match
+# the business account configured in your PayPal settings.
+PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
 
 
 
@@ -44,7 +49,9 @@ def create_invoice_for_merchant(merchant):
 
     payload = {
         "detail": {"invoice_number": str(uuid.uuid4())},
-        "invoicer": {"name": {"given_name": "Badger"}},
+        "invoicer": {
+            "name": {"given_name": "Badger"},
+        },
         "primary_recipients": [
             {"billing_info": {"email_address": meta.paypal_email}}
         ],
@@ -52,10 +59,16 @@ def create_invoice_for_merchant(merchant):
             {
                 "name": "Monthly charges",
                 "quantity": "1",
-                "unit_amount": {"currency_code": "USD", "value": str(total)},
+                "unit_amount": {
+                    "currency_code": "USD",
+                    "value": str(total.quantize(Decimal("0.01"))),
+                },
             }
         ],
     }
+
+    if PAYPAL_INVOICER_EMAIL:
+        payload["invoicer"]["email_address"] = PAYPAL_INVOICER_EMAIL
 
     response = requests.post(PAYPAL_INVOICE_URL, json=payload, headers=headers)
     response.raise_for_status()
