@@ -28,7 +28,11 @@ PAYPAL_CURRENCY_CODE = "USD"
 def generate_invoice_number() -> str:
     """Return a unique, 25-character invoice number for PayPal."""
     date_str = timezone.now().strftime("%Y%m%d")
-    return f"{date_str}-{uuid.uuid4().hex[:16]}"
+    uuid_part = uuid.uuid4().hex[:16]
+    print("called invoice number")
+    print(uuid_part)
+    return f"{date_str}-{uuid_part}"
+    
 
 
 
@@ -55,6 +59,8 @@ def create_invoice_for_merchant(merchant):
     if total <= 0:
         return None
     access_token = _get_paypal_access_token()
+    print("🛡️ Access token:", access_token)
+    
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
@@ -85,9 +91,20 @@ def create_invoice_for_merchant(merchant):
     }
 
     response = requests.post(PAYPAL_INVOICE_URL, json=payload, headers=headers)
+    if response.status_code >= 400:
+        print("❌ PayPal API error:")
+        print(response.text)  # Shows the exact validation error from PayPal
+        print("Payload sent:")
+        import json
+        print(json.dumps(payload, indent=2))
     response.raise_for_status()
     invoice_data = response.json()
+
+    print("📦 Full PayPal response body:")
+    print(response.text)
+
     invoice_id = invoice_data.get("id")
+    print(invoice_id)
 
     send_resp = requests.post(
         f"{PAYPAL_INVOICE_URL}/{invoice_id}/send", headers=headers
