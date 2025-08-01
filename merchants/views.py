@@ -18,10 +18,18 @@ def merchant_dashboard(request):
     entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
     latest_invoice = (
         MerchantInvoice.objects.filter(merchant=request.user)
-        .exclude(status='PAID')
         .order_by('-created_at')
         .first()
     )
+
+    invoice_url = None
+    invoice_paid = False
+    if latest_invoice:
+        from ledger.invoices import update_invoice_status
+        status = update_invoice_status(latest_invoice)
+        invoice_paid = status == 'PAID'
+        if latest_invoice.paypal_invoice_url and not invoice_paid:
+            invoice_url = latest_invoice.paypal_invoice_url
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
@@ -32,6 +40,8 @@ def merchant_dashboard(request):
         'balance': balance,
         'ledger_entries': entries,
         'latest_invoice': latest_invoice,
+        'invoice_url': invoice_url,
+        'invoice_paid': invoice_paid,
     })
 
 @login_required
