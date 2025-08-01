@@ -102,7 +102,9 @@ def create_invoice_for_merchant(merchant):
     send_resp = requests.post(f"{PAYPAL_INVOICE_URL}/{invoice_id}/send", headers=headers)
     send_resp.raise_for_status()
 
-    detail = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers).json()
+    detail_resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
+    detail_resp.raise_for_status()
+    detail = detail_resp.json()
     pay_url = None
     for link in detail.get("links", []):
         if link.get("rel") == "payer_view":
@@ -128,9 +130,11 @@ def update_invoice_status(invoice: MerchantInvoice):
         return invoice.status
     access_token = _get_paypal_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
-    data = requests.get(
+    resp = requests.get(
         f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers
-    ).json()
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
     status = data.get("status")
     pay_url = invoice.paypal_invoice_url
