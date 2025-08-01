@@ -103,7 +103,7 @@ def create_invoice_for_merchant(merchant):
     send_resp.raise_for_status()
 
     detail = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers).json()
-    pay_url = ""
+    pay_url = None
     for link in detail.get("links", []):
         if link.get("rel") == "payer_view":
             pay_url = link.get("href")
@@ -128,14 +128,32 @@ def update_invoice_status(invoice: MerchantInvoice):
         return invoice.status
     access_token = _get_paypal_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
-    data = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers).json()
+    data = requests.get(
+        f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers
+    ).json()
+
     status = data.get("status")
+    pay_url = invoice.paypal_invoice_url
+    for link in data.get("links", []):
+        if link.get("rel") == "payer_view":
+            pay_url = link.get("href")
+            break
+
+    update_fields = []
     if status and status != invoice.status:
         invoice.status = status
-        invoice.save(update_fields=["status"])
+        update_fields.append("status")
         if status == "PAID":
             LedgerEntry.objects.filter(invoice=invoice).update(paid=True)
-    return status
+
+    if pay_url and pay_url != invoice.paypal_invoice_url:
+        invoice.paypal_invoice_url = pay_url
+        update_fields.append("paypal_invoice_url")
+
+    if update_fields:
+        invoice.save(update_fields=update_fields)
+
+    return invoice.status
 
 
 def generate_due_invoices():
