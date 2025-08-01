@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.shortcuts import redirect
 from django.urls import path
 
-from .models import LedgerEntry
+from .models import LedgerEntry, MerchantInvoice
 from .payouts import send_mass_payouts
 from .invoices import generate_all_invoices
 
@@ -41,4 +41,23 @@ class LedgerEntryAdmin(admin.ModelAdmin):
             invoices = generate_all_invoices(ignore_date=True)
             messages.success(request, f"Generated {len(invoices)} invoice(s)")
         return redirect("../")
+
+
+@admin.register(MerchantInvoice)
+class MerchantInvoiceAdmin(admin.ModelAdmin):
+    """Admin interface for managing merchant invoices."""
+
+    list_display = (
+        "id",
+        "merchant",
+        "status",
+        "total_amount",
+        "due_date",
+        "paypal_invoice_id",
+        "created_at",
+    )
+    list_filter = ("status", "due_date", "created_at")
+    search_fields = ("merchant__username", "paypal_invoice_id")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
 
