@@ -59,6 +59,9 @@ def create_invoice_for_merchant(merchant):
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
+        # Ask PayPal to return the created invoice in the response body so we
+        # can immediately access the ID.
+        "Prefer": "return=representation",
     }
 
     payload = {
@@ -87,6 +90,14 @@ def create_invoice_for_merchant(merchant):
     response.raise_for_status()
     invoice_data = response.json()
     invoice_id = invoice_data.get("id")
+    if not invoice_id:
+        # When the Prefer header is not honoured, the ID may only be present in
+        # the Location header. Extract it as a fallback to avoid sending a
+        # request with "None" in the URL.
+        location = response.headers.get("Location", "")
+        invoice_id = location.rsplit("/", 1)[-1] if location else None
+    if not invoice_id:
+        raise RuntimeError("Failed to determine PayPal invoice id")
 
     send_resp = requests.post(f"{PAYPAL_INVOICE_URL}/{invoice_id}/send", headers=headers)
     send_resp.raise_for_status()
