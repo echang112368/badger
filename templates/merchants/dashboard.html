@@ -82,10 +82,13 @@
 
   <h2>Latest Invoice</h2>
   {% if latest_invoice %}
-    <p>Status: {{ latest_invoice.status }}</p>
     <p>Total Due: ${{ latest_invoice.total_amount }}</p>
-    {% if latest_invoice.paypal_invoice_url %}
-      <a href="{{ latest_invoice.paypal_invoice_url }}" target="_blank">Pay Now</a>
+    {% if invoice_url %}
+      <a href="{{ invoice_url }}" target="_blank">Pay Invoice</a>
+    {% elif invoice_paid %}
+      <p>Invoice already paid.</p>
+    {% else %}
+      <p>Invoice link unavailable.</p>
     {% endif %}
   {% else %}
     <p>No pending invoices.</p>
