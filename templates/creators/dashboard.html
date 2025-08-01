@@ -59,7 +59,7 @@
         <tbody>
             {% for entry in ledger_entries %}
             <tr>
-                <td>{{ entry.timestamp }}</td>
+                <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
                 <td>{{ entry.entry_type }}</td>
                 <td>{{ entry.amount }}</td>
                 <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
@@ -69,5 +69,17 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <script>
+      document.querySelectorAll('time.local-time').forEach(el => {
+        const iso = el.getAttribute('datetime');
+        if (iso) {
+          const date = new Date(iso);
+          if (!isNaN(date)) {
+            el.textContent = date.toLocaleString();
+          }
+        }
+      });
+    </script>
 </body>
 </html>

@@ -64,7 +64,7 @@
             <details>
               <summary><strong>{{ item.title }}</strong></summary>
               <p>ID: {{ item.id }}</p>
-              <p>Created: {{ item.created_at }}</p>
+              <p>Created: <time class="local-time" datetime="{{ item.created_at|date:'c' }}">{{ item.created_at }}</time></p>
             </details>
           </td>
           <td><a href="{{ item.link }}" target="_blank">{{ item.link }}</a></td>
@@ -93,7 +93,7 @@
     <tbody>
       {% for invoice in invoices %}
       <tr>
-        <td>{{ invoice.created_at }}</td>
+        <td><time class="local-time" datetime="{{ invoice.created_at|date:'c' }}">{{ invoice.created_at }}</time></td>
         <td>${{ invoice.total_amount }}</td>
         <td>{{ invoice.status }}</td>
         <td>
@@ -125,7 +125,7 @@
     <tbody>
       {% for entry in ledger_entries %}
       <tr>
-        <td>{{ entry.timestamp }}</td>
+        <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
         <td>{{ entry.entry_type }}</td>
         <td>{{ entry.amount }}</td>
         <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
@@ -147,6 +147,16 @@
       document.querySelectorAll('input[name="selected_creators"]').forEach(cb => {
         cb.checked = this.checked;
       });
+    });
+
+    document.querySelectorAll('time.local-time').forEach(el => {
+      const iso = el.getAttribute('datetime');
+      if (iso) {
+        const date = new Date(iso);
+        if (!isNaN(date)) {
+          el.textContent = date.toLocaleString();
+        }
+      }
     });
   </script>
 </body>
