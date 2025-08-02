@@ -12,21 +12,6 @@ from ledger.models import LedgerEntry
 
 
 @login_required
-def creator_dashboard(request):
-    balance = LedgerEntry.creator_balance(request.user)
-    entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
-    return render(
-        request,
-        "creators/dashboard.html",
-        {
-            "creator": request.user,
-            "balance": balance,
-            "ledger_entries": entries,
-        },
-    )
-
-
-@login_required
 def creator_earnings(request):
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
@@ -108,7 +93,7 @@ def respond_request(request, link_id):
     try:
         link = MerchantCreatorLink.objects.get(id=link_id, creator=request.user)
     except MerchantCreatorLink.DoesNotExist:
-        return redirect('creator_dashboard')
+        return redirect('creator_affiliate_companies')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -118,4 +103,4 @@ def respond_request(request, link_id):
         elif action == 'decline':
             link.delete()
 
-    return redirect('creator_dashboard')
+    return redirect('creator_affiliate_companies')
