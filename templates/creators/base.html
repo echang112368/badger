@@ -25,7 +25,6 @@
         <hr>
         {% with request.resolver_match.url_name as current_url %}
         <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item"><a href="{% url 'creator_dashboard' %}" class="nav-link {% if current_url == 'creator_dashboard' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
             <li><a href="{% url 'creator_earnings' %}" class="nav-link {% if current_url == 'creator_earnings' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-cash-stack me-2"></i>Earnings</a></li>
             <li><a href="{% url 'creator_affiliate_companies' %}" class="nav-link {% if current_url == 'creator_affiliate_companies' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-building me-2"></i>Affiliate Companies</a></li>
             <li><a href="{% url 'creator_my_links' %}" class="nav-link {% if current_url == 'creator_my_links' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-link-45deg me-2"></i>My Links</a></li>

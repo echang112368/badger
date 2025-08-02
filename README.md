@@ -22,7 +22,8 @@ Manages short links and incoming webhooks.
 ### creators
 Pages for content creators.
 
-- `creator_dashboard(request)` – Shows the creator a list of merchants they are linked to and builds unique redirect links for each merchant item.
+- `creator_earnings(request)` – Displays the creator's balance and transaction history.
+- `creator_affiliate_companies(request)` – Shows merchants the creator is linked to and provides unique redirect links for each item.
 
 ### links
 Utilities for linking creators and merchants.
