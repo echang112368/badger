@@ -5,14 +5,23 @@ from uuid import uuid4
 
 from .models import CreatorMeta
 
-from links.models import MerchantCreatorLink
+from links.models import (
+    MerchantCreatorLink,
+    STATUS_REQUESTED,
+    STATUS_ACTIVE,
+)
 from merchants.models import MerchantItem
 from collect.models import RedirectLink
 from ledger.models import LedgerEntry
 
 @login_required
 def creator_dashboard(request):
-    links = MerchantCreatorLink.objects.filter(creator=request.user)
+    active_links = MerchantCreatorLink.objects.filter(
+        creator=request.user, status=STATUS_ACTIVE
+    )
+    request_links = MerchantCreatorLink.objects.filter(
+        creator=request.user, status=STATUS_REQUESTED
+    )
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
 
     if request.method == 'POST':
@@ -25,7 +34,7 @@ def creator_dashboard(request):
     entries = LedgerEntry.objects.filter(creator=request.user).order_by('-timestamp')
 
     merchants_with_items = []
-    for link in links:
+    for link in active_links:
         merchant = link.merchant
         merchant_items = []
         for item in MerchantItem.objects.filter(merchant=merchant):
@@ -60,7 +69,26 @@ def creator_dashboard(request):
             'creator': request.user,
             'creator_meta': creator_meta,
             'merchants_with_items': merchants_with_items,
+            'request_links': request_links,
             'balance': balance,
             'ledger_entries': entries,
         }
     )
+
+
+@login_required
+def respond_request(request, link_id):
+    try:
+        link = MerchantCreatorLink.objects.get(id=link_id, creator=request.user)
+    except MerchantCreatorLink.DoesNotExist:
+        return redirect('creator_dashboard')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'accept':
+            link.status = STATUS_ACTIVE
+            link.save()
+        elif action == 'decline':
+            link.delete()
+
+    return redirect('creator_dashboard')
