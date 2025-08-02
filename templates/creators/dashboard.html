@@ -17,6 +17,22 @@
         <button type="submit">Save</button>
     </form>
 
+    {% if request_links %}
+    <h2>Requests</h2>
+    <ul>
+        {% for link in request_links %}
+        <li>
+            {{ link.merchant.username }} wants to work with you.
+            <form method="post" action="{% url 'respond_request' link.id %}">
+                {% csrf_token %}
+                <button type="submit" name="action" value="accept">Accept</button>
+                <button type="submit" name="action" value="decline">Decline</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
     <h2>Your Affiliate Companies:</h2>
 
     {% if merchants_with_items %}

@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from links.models import MerchantCreatorLink
+from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
+from creators.models import CreatorMeta
 from .forms import MerchantItemForm, MerchantMetaForm
 from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
@@ -9,8 +10,13 @@ from django.http import HttpResponseForbidden, HttpResponse
 
 @login_required
 def merchant_dashboard(request):
-    links = MerchantCreatorLink.objects.filter(merchant=request.user)
-    creators = [link.creator for link in links]
+    active_links = MerchantCreatorLink.objects.filter(
+        merchant=request.user, status=STATUS_ACTIVE
+    )
+    creators = [link.creator for link in active_links]
+    pending_links = MerchantCreatorLink.objects.filter(
+        merchant=request.user, status=STATUS_REQUESTED
+    )
     items = MerchantItem.objects.filter(merchant=request.user)
     merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
     commission_form = MerchantMetaForm(instance=merchant_meta)
@@ -30,6 +36,7 @@ def merchant_dashboard(request):
         'merchant_meta': merchant_meta,
         'commission_form': commission_form,
         'creators': creators,
+        'pending_links': pending_links,
         'items': items,
         'balance': balance,
         'ledger_entries': entries,
@@ -71,6 +78,26 @@ def delete_creators(request):
             merchant=request.user, creator__id__in=creator_ids
         ).delete()
 
+    return redirect("merchant_dashboard")
+
+
+@login_required
+def request_creator(request):
+    if request.method == "POST":
+        uuid = request.POST.get("creator_uuid", "").strip()
+        if uuid:
+            try:
+                creator_meta = CreatorMeta.objects.get(uuid=uuid)
+                link, created = MerchantCreatorLink.objects.get_or_create(
+                    merchant=request.user,
+                    creator=creator_meta.user,
+                    defaults={"status": STATUS_REQUESTED},
+                )
+                if not created and link.status != STATUS_ACTIVE:
+                    link.status = STATUS_REQUESTED
+                    link.save()
+            except CreatorMeta.DoesNotExist:
+                pass
     return redirect("merchant_dashboard")
 
 

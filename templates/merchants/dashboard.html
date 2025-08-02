@@ -15,6 +15,27 @@
     <small>This PayPal email will also be used for invoices.</small>
     <button type="submit">Save</button>
   </form>
+
+  <button id="open-add-creator">Add New Creator</button>
+
+  <dialog id="addCreatorModal">
+    <form method="post" action="{% url 'request_creator' %}">
+      {% csrf_token %}
+      <label for="creator_uuid">Creator UUID:</label>
+      <input type="text" name="creator_uuid" id="creator_uuid" required>
+      <button type="submit">Send Request</button>
+      <button type="button" id="close-add-creator">Cancel</button>
+    </form>
+  </dialog>
+
+  {% if pending_links %}
+  <h3>Pending Requests</h3>
+  <ul>
+    {% for link in pending_links %}
+      <li>{{ link.creator.username }} ({{ link.creator.email }}) - Pending</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
   {% endif %}
   <p><strong>Current Balance:</strong> ${{ balance }}</p>
 
@@ -157,6 +178,14 @@
           el.textContent = date.toLocaleString();
         }
       }
+    });
+
+    const dialog = document.getElementById('addCreatorModal');
+    document.getElementById('open-add-creator').addEventListener('click', () => {
+      dialog.showModal();
+    });
+    document.getElementById('close-add-creator').addEventListener('click', () => {
+      dialog.close();
     });
   </script>
 </body>
