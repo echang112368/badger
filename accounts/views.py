@@ -15,7 +15,7 @@ def custom_login_view(request):
             if user.is_merchant:
                 return redirect('merchant_dashboard')
             elif user.is_creator:
-                return redirect('creator_dashboard')
+                return redirect('creator_earnings')
             else:
                 return HttpResponse('default_dashboard')
     else:
