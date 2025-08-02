@@ -1,0 +1,38 @@
+{% extends 'creators/base.html' %}
+{% block title %}Affiliate Companies{% endblock %}
+{% block content %}
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">Affiliate Companies</h1>
+    {% if merchants_with_items %}
+    <div class="row g-3">
+        {% for entry in merchants_with_items %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title fw-semibold">{{ entry.merchant.username }}</h5>
+                    <p class="card-text fs-6 text-muted">{{ entry.merchant.email }}</p>
+                    {% if entry.items %}
+                    <ul class="list-unstyled mb-3">
+                        {% for item in entry.items %}
+                        <li><a href="{{ item.redirect_link }}" class="text-primary" target="_blank">{{ item.title }}</a></li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted fs-6">No items available.</p>
+                    {% endif %}
+                    {% if entry.stats %}
+                    <div class="mt-auto fs-6">
+                        <span class="me-2">Clicks: {{ entry.stats.clicks }}</span>
+                        <span>Conversions: {{ entry.stats.conversions }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">You are not linked to any affiliate companies yet.</p>
+    {% endif %}
+</section>
+{% endblock %}

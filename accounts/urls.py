@@ -1,5 +1,6 @@
 # accounts/urls.py
 from django.urls import path
+from django.contrib.auth.views import LogoutView
 from .views import custom_login_view, signup_choice_view, business_signup_view, creator_signup_view
 
 urlpatterns = [
@@ -7,4 +8,5 @@ urlpatterns = [
     path('signup/', signup_choice_view, name='signup_choice'),
     path('signup/business/', business_signup_view, name='business_signup'),
     path('signup/creator/', creator_signup_view, name='creator_signup'),
+    path('logout/', LogoutView.as_view(next_page='login'), name='logout'),
 ]
