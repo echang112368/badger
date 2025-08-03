@@ -19,12 +19,15 @@
             <h5 class="card-title">Existing Items</h5>
             <ul class="list-group">
                 {% for item in items %}
-                <li class="list-group-item d-flex justify-content-between align-items-center" data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-id="{{ item.id }}" data-item-title="{{ item.title }}" data-item-link="{{ item.link }}">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div class="me-2">
                         <div class="fw-bold">{{ item.title }}</div>
                         <a href="{{ item.link }}" target="_blank" class="text-decoration-none d-inline-block text-truncate" style="max-width: 250px;" title="{{ item.link }}">{{ item.link }}</a>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm copy-btn" data-url="{{ item.link }}">Copy</button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm copy-btn" data-url="{{ item.link }}">Copy</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editItemModal" data-item-id="{{ item.id }}" data-item-title="{{ item.title }}" data-item-link="{{ item.link }}">Edit</button>
+                    </div>
                 </li>
                 {% empty %}
                 <li class="list-group-item text-center">No items yet.</li>
@@ -71,10 +74,8 @@ document.getElementById('editItemModal').addEventListener('show.bs.modal', funct
 
 document.querySelectorAll('.copy-btn').forEach(function(btn) {
     btn.addEventListener('click', function(event) {
-        // Prevent the click from triggering the parent list item's modal
-        // and also avoid any default browser behaviour.
+        // Prevent any default browser behaviour.
         event.preventDefault();
-        event.stopPropagation();
 
         var url = this.getAttribute('data-url');
         navigator.clipboard.writeText(url);
