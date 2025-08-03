@@ -2,24 +2,14 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
 from creators.models import CreatorMeta
-from .forms import MerchantItemForm, MerchantMetaForm
+from .forms import MerchantItemForm, MerchantSettingsForm
 from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
-from django.http import HttpResponseForbidden, HttpResponse
+from django.http import HttpResponseForbidden
 
 
 @login_required
 def merchant_dashboard(request):
-    active_links = MerchantCreatorLink.objects.filter(
-        merchant=request.user, status=STATUS_ACTIVE
-    )
-    creators = [link.creator for link in active_links]
-    pending_links = MerchantCreatorLink.objects.filter(
-        merchant=request.user, status=STATUS_REQUESTED
-    )
-    items = MerchantItem.objects.filter(merchant=request.user)
-    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
-    commission_form = MerchantMetaForm(instance=merchant_meta)
     balance = LedgerEntry.merchant_balance(request.user)
     entries = LedgerEntry.objects.filter(merchant=request.user).order_by('-timestamp')
     invoices = (
@@ -33,11 +23,6 @@ def merchant_dashboard(request):
 
     return render(request, 'merchants/dashboard.html', {
         'merchant': request.user,
-        'merchant_meta': merchant_meta,
-        'commission_form': commission_form,
-        'creators': creators,
-        'pending_links': pending_links,
-        'items': items,
         'balance': balance,
         'ledger_entries': entries,
         'invoices': invoices,
@@ -71,6 +56,7 @@ def delete_item(request):
         return redirect('merchant_dashboard')
     return HttpResponseForbidden()
 
+@login_required
 def delete_creators(request):
     if request.method == "POST":
         creator_ids = request.POST.getlist("selected_creators")
@@ -78,7 +64,7 @@ def delete_creators(request):
             merchant=request.user, creator__id__in=creator_ids
         ).delete()
 
-    return redirect("merchant_dashboard")
+    return redirect("merchant_creators")
 
 
 @login_required
@@ -98,19 +84,39 @@ def request_creator(request):
                     link.save()
             except CreatorMeta.DoesNotExist:
                 pass
-    return redirect("merchant_dashboard")
+    return redirect("merchant_creators")
 
 
 @login_required
-def update_commission(request):
-    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
+def merchant_creators(request):
+    active_links = MerchantCreatorLink.objects.filter(
+        merchant=request.user, status=STATUS_ACTIVE
+    )
+    creators = [link.creator for link in active_links]
+    pending_links = MerchantCreatorLink.objects.filter(
+        merchant=request.user, status=STATUS_REQUESTED
+    )
 
+    return render(request, 'merchants/creators.html', {
+        'merchant': request.user,
+        'creators': creators,
+        'pending_links': pending_links,
+    })
+
+
+@login_required
+def merchant_settings(request):
+    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        form = MerchantMetaForm(request.POST, instance=merchant_meta)
+        form = MerchantSettingsForm(request.POST, instance=merchant_meta)
         if form.is_valid():
             form.save()
+            return redirect('merchant_settings')
+    else:
+        form = MerchantSettingsForm(instance=merchant_meta)
 
-    return redirect("merchant_dashboard")
-
-def merchant_edit_creators(request):
-    return HttpResponse("Edit creators page (under construction)")
+    return render(request, 'merchants/settings.html', {
+        'merchant': request.user,
+        'merchant_meta': merchant_meta,
+        'settings_form': form,
+    })

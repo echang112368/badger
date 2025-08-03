@@ -26,6 +26,8 @@
         {% with request.resolver_match.url_name as current_url %}
         <ul class="nav nav-pills flex-column mb-auto">
             <li><a href="{% url 'merchant_dashboard' %}" class="nav-link {% if current_url == 'merchant_dashboard' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+            <li><a href="{% url 'merchant_creators' %}" class="nav-link {% if current_url == 'merchant_creators' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-people me-2"></i>Creators</a></li>
+            <li><a href="{% url 'merchant_settings' %}" class="nav-link {% if current_url == 'merchant_settings' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-gear me-2"></i>Settings</a></li>
             <li><a href="{% url 'add_item' %}" class="nav-link {% if current_url == 'add_item' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-plus-square me-2"></i>Add Item</a></li>
             <li><a href="{% url 'logout' %}" class="nav-link text-dark"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
         </ul>
