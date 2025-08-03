@@ -1,0 +1,27 @@
+{% extends 'merchants/base.html' %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">Settings</h1>
+
+    <div class="card shadow-sm rounded">
+        <div class="card-body">
+            <p class="mb-3"><strong>Your UUID:</strong> {{ merchant_meta.uuid }}</p>
+            <form method="post" action="{% url 'merchant_settings' %}" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-4">
+                    <label class="form-label">{{ settings_form.paypal_email.label }}</label>
+                    {{ settings_form.paypal_email }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ settings_form.contact_email.label }}</label>
+                    {{ settings_form.contact_email }}
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary mt-4">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}
