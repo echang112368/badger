@@ -29,21 +29,32 @@ def merchant_dashboard(request):
     })
 
 @login_required
-def add_item(request):
+def merchant_items(request):
     if not request.user.is_merchant:
-        return render(request, '403.html')
+        return render(request, "403.html")
 
-    if request.method == 'POST':
-        form = MerchantItemForm(request.POST)
+    if request.method == "POST":
+        item_id = request.POST.get("item_id")
+        if item_id:
+            item = MerchantItem.objects.filter(id=item_id, merchant=request.user).first()
+            form = MerchantItemForm(request.POST, instance=item, prefix="edit")
+        else:
+            form = MerchantItemForm(request.POST)
         if form.is_valid():
             item = form.save(commit=False)
-            item.merchant = request.user  # attach item to the merchant
+            item.merchant = request.user
             item.save()
-            return redirect('merchant_dashboard')  # redirect after adding
+            return redirect("merchant_items")
     else:
         form = MerchantItemForm()
 
-    return render(request, 'merchants/add_item.html', {'form': form})
+    items = MerchantItem.objects.filter(merchant=request.user)
+    edit_form = MerchantItemForm(prefix="edit")
+    return render(
+        request,
+        "merchants/items.html",
+        {"form": form, "items": items, "edit_form": edit_form},
+    )
 
 @login_required
 def delete_item(request):
