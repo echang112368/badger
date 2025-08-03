@@ -14,6 +14,6 @@ class MerchantSettingsForm(forms.ModelForm):
         fields = ["paypal_email", "contact_email"]
         labels = {
             "paypal_email": "PayPal Email (for invoices)",
-            "contact_email": "Contact Email",
+            "contact_email": "Business Email",
         }
 
