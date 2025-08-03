@@ -8,6 +8,7 @@ class MerchantMeta(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     affiliate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     paypal_email = models.EmailField(blank=True)
+    contact_email = models.EmailField(blank=True)
 
 
     def __str__(self):
