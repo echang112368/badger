@@ -71,7 +71,11 @@ document.getElementById('editItemModal').addEventListener('show.bs.modal', funct
 
 document.querySelectorAll('.copy-btn').forEach(function(btn) {
     btn.addEventListener('click', function(event) {
+        // Prevent the click from triggering the parent list item's modal
+        // and also avoid any default browser behaviour.
+        event.preventDefault();
         event.stopPropagation();
+
         var url = this.getAttribute('data-url');
         navigator.clipboard.writeText(url);
     });
