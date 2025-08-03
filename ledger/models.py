@@ -65,7 +65,9 @@ class LedgerEntry(models.Model):
     @staticmethod
     def creator_balance(user):
         result = (
-            LedgerEntry.objects.filter(creator=user).aggregate(total=Sum("amount"))
+            LedgerEntry.objects.filter(creator=user, paid=False).aggregate(
+                total=Sum("amount")
+            )
         )
         total = result["total"] if result["total"] is not None else Decimal("0")
         return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
