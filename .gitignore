@@ -17,6 +17,7 @@ db.sqlite3
 *.pyo
 *.pyd
 migrations/
+!merchants/migrations/
 
 # Environment
 .env
