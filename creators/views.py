@@ -19,22 +19,22 @@ def creator_earnings(request):
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
     monthly_data = (
-        LedgerEntry.objects.filter(creator=request.user, entry_type="payout")
+        LedgerEntry.objects.filter(creator=request.user, entry_type="commission")
         .annotate(month=TruncMonth("timestamp"))
         .values("month")
         .annotate(total=Sum("amount"))
         .order_by("month")
     )
-    payout_labels = [d["month"].strftime("%b %Y") for d in monthly_data]
-    payout_totals = [float(-d["total"]) for d in monthly_data]
+    earnings_labels = [d["month"].strftime("%b %Y") for d in monthly_data]
+    earnings_totals = [float(d["total"]) for d in monthly_data]
     return render(
         request,
         "creators/earnings.html",
         {
             "balance": balance,
             "ledger_entries": entries,
-            "payout_labels": json.dumps(payout_labels),
-            "payout_totals": json.dumps(payout_totals),
+            "earnings_labels": json.dumps(earnings_labels),
+            "earnings_totals": json.dumps(earnings_totals),
         },
     )
 
