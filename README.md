@@ -35,7 +35,7 @@ Utilities for linking creators and merchants.
 Pages for merchants and item management.
 
 - `merchant_dashboard(request)` – Displays the merchant’s items and the creators they work with.
-- `add_item(request)` – Allows a merchant to add a new item (title and URL).
+- `merchant_items(request)` – Lists existing items and lets merchants add or edit them.
 - `delete_item(request)` – Deletes selected items owned by the merchant.
 - `delete_creators(request)` – Removes selected creators from the merchant’s link list.
 - `merchant_edit_creators(request)` – Placeholder page for editing creators.
