@@ -4,24 +4,31 @@
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">Settings</h1>
 
-    <div class="card shadow-sm rounded">
+    <div class="card shadow-sm rounded mb-3">
         <div class="card-body">
-            <p class="mb-3"><strong>Your UUID:</strong> {{ merchant_meta.uuid }}</p>
-            <form method="post" action="{% url 'merchant_settings' %}" class="row g-3 align-items-end">
-                {% csrf_token %}
-                <div class="col-md-4">
-                    <label class="form-label">{{ settings_form.paypal_email.label }}</label>
-                    {{ settings_form.paypal_email }}
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">{{ settings_form.contact_email.label }}</label>
-                    {{ settings_form.contact_email }}
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary mt-4">Save</button>
-                </div>
-            </form>
+            <p class="mb-1 fw-bold">Your UUID</p>
+            <p class="mb-0">{{ merchant_meta.uuid }}</p>
         </div>
     </div>
+
+    <form method="post" action="{% url 'merchant_settings' %}">
+        {% csrf_token %}
+
+        <div class="card shadow-sm rounded mb-3">
+            <div class="card-body">
+                <label class="form-label">{{ settings_form.paypal_email.label }}</label>
+                {{ settings_form.paypal_email }}
+            </div>
+        </div>
+
+        <div class="card shadow-sm rounded mb-3">
+            <div class="card-body">
+                <label class="form-label">{{ settings_form.contact_email.label }}</label>
+                {{ settings_form.contact_email }}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
 </section>
 {% endblock %}
