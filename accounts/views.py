@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 from .forms import CustomLoginForm, BusinessSignUpForm, CreatorSignUpForm
 
@@ -51,3 +51,9 @@ def creator_signup_view(request):
     else:
         form = CreatorSignUpForm()
     return render(request, 'accounts/creator_signup.html', {'form': form})
+
+
+def logout_view(request):
+    """Log out the current user and redirect to the login page."""
+    logout(request)
+    return redirect('login')
