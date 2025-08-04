@@ -4,14 +4,13 @@ from django.urls import reverse
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from uuid import uuid4
 from datetime import date
 import json
 
 from .models import CreatorMeta
 
 from links.models import MerchantCreatorLink, STATUS_ACTIVE
-from merchants.models import MerchantItem
+from merchants.models import MerchantItem, MerchantMeta
 from collect.models import RedirectLink
 from ledger.models import LedgerEntry
 
@@ -59,29 +58,34 @@ def creator_affiliate_companies(request):
         creator=request.user, status=STATUS_ACTIVE
     )
 
+    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
+
     merchants_with_items = []
     for link in active_links:
         merchant = link.merchant
+        merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant)
         merchant_items = []
         for item in MerchantItem.objects.filter(merchant=merchant):
             short_code = f"{request.user.id}-{item.id}"
+            query_param = f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
             redirect_obj, _ = RedirectLink.objects.get_or_create(
                 short_code=short_code,
                 defaults={
                     "destination_url": item.link,
-                    "queryParam": f"ref=badger:{uuid4()}",
+                    "queryParam": query_param,
                 },
             )
+            if (
+                redirect_obj.destination_url != item.link
+                or redirect_obj.queryParam != query_param
+            ):
+                redirect_obj.destination_url = item.link
+                redirect_obj.queryParam = query_param
+                redirect_obj.save()
             redirect_url = request.build_absolute_uri(
                 reverse("redirect_view", args=[redirect_obj.short_code])
             )
-            merchant_items.append(
-                {
-                    "title": item.title,
-                    "original_link": item.link,
-                    "redirect_link": redirect_url,
-                }
-            )
+            merchant_items.append({"title": item.title, "redirect_link": redirect_url})
 
         merchants_with_items.append({"merchant": merchant, "items": merchant_items})
 
