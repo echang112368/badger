@@ -1,0 +1,23 @@
+{% extends 'merchants/base.html' %}
+{% block title %}Shopify Settings{% endblock %}
+{% block content %}
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">Shopify Settings</h1>
+    <form method="post" action="{% url 'shopify_settings' %}">
+        {% csrf_token %}
+        <div class="card shadow-sm rounded mb-3">
+            <div class="card-body">
+                <label class="form-label fw-bold d-block">{{ form.api_key.label }}</label>
+                {{ form.api_key }}
+            </div>
+        </div>
+        <div class="card shadow-sm rounded mb-3">
+            <div class="card-body">
+                <label class="form-label fw-bold d-block">{{ form.api_password.label }}</label>
+                {{ form.api_password }}
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+</section>
+{% endblock %}
