@@ -10,6 +10,7 @@ class MerchantMeta(models.Model):
     paypal_email = models.EmailField(blank=True)
     shopify_api_key = models.CharField(max_length=255, blank=True)
     shopify_api_password = models.CharField(max_length=255, blank=True)
+    shopify_store_domain = models.CharField(max_length=255, blank=True)
 
 
     def __str__(self):
