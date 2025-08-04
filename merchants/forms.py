@@ -19,10 +19,12 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email",
             "shopify_api_key",
             "shopify_api_password",
+            "shopify_store_domain",
         ]
         labels = {
             "paypal_email": "PayPal Email (for invoices)",
             "shopify_api_key": "Key",
             "shopify_api_password": "Password",
+            "shopify_store_domain": "Shopify URL",
         }
 
