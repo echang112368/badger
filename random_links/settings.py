@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     'creators',
     'links',
     'ledger',
-    'shopify_app',
     "verify_email.apps.VerifyEmailConfig",
     
 ]
