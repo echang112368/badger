@@ -61,7 +61,6 @@ class Migration(migrations.Migration):
                     models.DecimalField(decimal_places=2, default=0, max_digits=5),
                 ),
                 ("paypal_email", models.EmailField(blank=True, max_length=254)),
-                ("contact_email", models.EmailField(blank=True, max_length=254)),
                 (
                     "user",
                     models.OneToOneField(
