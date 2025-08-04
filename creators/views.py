@@ -3,7 +3,9 @@ from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
+from django.utils import timezone
 from uuid import uuid4
+from datetime import date
 import json
 
 from .models import CreatorMeta
@@ -23,10 +25,22 @@ def creator_earnings(request):
         .annotate(month=TruncMonth("timestamp"))
         .values("month")
         .annotate(total=Sum("amount"))
-        .order_by("month")
     )
-    earnings_labels = [d["month"].strftime("%b %Y") for d in monthly_data]
-    earnings_totals = [float(d["total"]) for d in monthly_data]
+    monthly_totals = {d["month"].date(): float(d["total"]) for d in monthly_data}
+    now = timezone.now()
+    year = now.year
+    month = now.month
+    months = []
+    for _ in range(12):
+        months.append(date(year, month, 1))
+        if month == 1:
+            month = 12
+            year -= 1
+        else:
+            month -= 1
+    months.reverse()
+    earnings_labels = [m.strftime("%b %Y") for m in months]
+    earnings_totals = [monthly_totals.get(m, 0.0) for m in months]
     return render(
         request,
         "creators/earnings.html",
