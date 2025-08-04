@@ -4,27 +4,28 @@
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">Affiliate Companies</h1>
     {% if merchants_with_items %}
-    <div class="row g-3">
+    <div class="accordion" id="companiesAccordion">
         {% for entry in merchants_with_items %}
-        <div class="col-md-6 col-lg-4">
-            <div class="card shadow-sm rounded h-100">
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title fw-semibold">{{ entry.merchant.username }}</h5>
-                    <p class="card-text fs-6 text-muted">{{ entry.merchant.email }}</p>
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                    {{ entry.merchant.username }}
+                </button>
+            </h2>
+            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#companiesAccordion">
+                <div class="accordion-body">
+                    <p class="fs-6 text-muted">{{ entry.merchant.email }}</p>
                     {% if entry.items %}
-                    <ul class="list-unstyled mb-3">
+                    <ul class="list-unstyled mb-0">
                         {% for item in entry.items %}
-                        <li><a href="{{ item.redirect_link }}" class="text-primary" target="_blank">{{ item.title }}</a></li>
+                        <li class="mb-3">
+                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.title }}" data-url="{{ item.redirect_link }}">{{ item.title }}</a>
+                            <div class="text-muted small">{{ item.redirect_link|truncatechars:60 }}</div>
+                        </li>
                         {% endfor %}
                     </ul>
                     {% else %}
                     <p class="text-muted fs-6">No items available.</p>
-                    {% endif %}
-                    {% if entry.stats %}
-                    <div class="mt-auto fs-6">
-                        <span class="me-2">Clicks: {{ entry.stats.clicks }}</span>
-                        <span>Conversions: {{ entry.stats.conversions }}</span>
-                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -35,4 +36,40 @@
     <p class="text-muted">You are not linked to any affiliate companies yet.</p>
     {% endif %}
 </section>
+
+<!-- Link Modal -->
+<div class="modal fade" id="linkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="modal-url" readonly>
+                    <button class="btn btn-outline-secondary" type="button" id="copy-modal-url"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const linkModal = document.getElementById('linkModal');
+        linkModal.addEventListener('show.bs.modal', event => {
+            const trigger = event.relatedTarget;
+            const title = trigger.getAttribute('data-title');
+            const url = trigger.getAttribute('data-url');
+            linkModal.querySelector('.modal-title').textContent = title;
+            document.getElementById('modal-url').value = url;
+        });
+
+        document.getElementById('copy-modal-url').addEventListener('click', () => {
+            const input = document.getElementById('modal-url');
+            navigator.clipboard.writeText(input.value);
+        });
+    });
+</script>
 {% endblock %}
