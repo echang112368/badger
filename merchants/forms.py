@@ -11,11 +11,9 @@ class MerchantItemForm(forms.ModelForm):
 class MerchantSettingsForm(forms.ModelForm):
     class Meta:
         model = MerchantMeta
-        fields = ["paypal_email", "contact_email", "shopify_api_key", "shopify_api_password"]
+        fields = ["paypal_email", "contact_email"]
         labels = {
             "paypal_email": "PayPal Email (for invoices)",
             "contact_email": "Business Email",
-            "shopify_api_key": "API Key",
-            "shopify_api_password": "API Password",
         }
 
