@@ -10,7 +10,8 @@ class MerchantItemForm(forms.ModelForm):
 
 class MerchantSettingsForm(forms.ModelForm):
     shopify_api_password = forms.CharField(
-        widget=forms.PasswordInput, required=False
+        widget=forms.PasswordInput(render_value=True),
+        required=False,
     )
     class Meta:
         model = MerchantMeta

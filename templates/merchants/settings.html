@@ -27,11 +27,31 @@
                 <label class="form-label d-block mt-2 mb-1">Key:</label>
                 {{ settings_form.shopify_api_key }}
                 <label class="form-label d-block mt-3 mb-1">Password:</label>
-                {{ settings_form.shopify_api_password }}
+                <div class="input-group mb-1">
+                    {{ settings_form.shopify_api_password }}
+                    <button type="button" class="btn btn-outline-secondary" id="toggleShopifyPassword">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+                {% if merchant_meta.shopify_api_password %}
+                <small class="text-success">Saved</small>
+                {% endif %}
             </div>
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>
     </form>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('toggleShopifyPassword');
+        const passwordField = document.getElementById('{{ settings_form.shopify_api_password.id_for_label }}');
+        toggle.addEventListener('click', function () {
+            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordField.setAttribute('type', type);
+            this.querySelector('i').classList.toggle('bi-eye');
+            this.querySelector('i').classList.toggle('bi-eye-slash');
+        });
+    });
+    </script>
 </section>
 {% endblock %}
