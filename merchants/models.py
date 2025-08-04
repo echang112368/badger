@@ -9,8 +9,6 @@ class MerchantMeta(models.Model):
     affiliate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     paypal_email = models.EmailField(blank=True)
     contact_email = models.EmailField(blank=True)
-    shopify_api_key = models.CharField(max_length=255, blank=True)
-    shopify_api_password = models.CharField(max_length=255, blank=True)
 
 
     def __str__(self):
