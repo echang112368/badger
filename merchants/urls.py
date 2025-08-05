@@ -3,6 +3,7 @@ from .views import merchant_dashboard
 from . import views
 
 urlpatterns = [
+    path('store-id/', views.store_id_lookup, name='merchant_store_id'),
     path('delete-creators/', views.delete_creators, name='delete_creators'),
     path('request-creator/', views.request_creator, name='request_creator'),
     path('delete-item/', views.delete_item, name='delete_items'),
