@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from merchants.models import MerchantMeta
 from shopify_app.shopify_client import ShopifyClient
 
-SCRIPT_SRC = "https://YOUR_NGROK_OR_DOMAIN/static/js/referral_tracker.js"
+SCRIPT_SRC = "https://d9c1fdbdb8b1.ngrok-free.app"
 
 
 class Command(BaseCommand):
