@@ -1,9 +1,16 @@
 (function() {
   const params = new URLSearchParams(window.location.search);
-  const ref = params.get('ref');
+  let ref = params.get('ref');
   if (!ref) {
     console.log('Referral parameter missing. Exiting referral tracker.');
     return;
+  }
+
+  // Handle URL-encoded values such as ref=badger%3A123%3BbuisID%3A55
+  try {
+    ref = decodeURIComponent(ref);
+  } catch (e) {
+    console.log('Failed to decode referral parameter:', ref, e);
   }
 
   const match = ref.match(/^badger:([^;]+);buisID:([^;]+)$/);
