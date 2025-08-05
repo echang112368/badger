@@ -1,22 +1,4 @@
 (function() {
-  const cookieOptions = 'path=/; max-age=31536000; Secure; SameSite=None';
-
-  // Set merchant UUID cookie from the script tag's src parameter
-  let merchantUUID = null;
-  try {
-    const scriptSrc = document.currentScript.src;
-    merchantUUID = new URL(scriptSrc).searchParams.get('merchant_uuid');
-  } catch (e) {
-    console.log('Failed to parse merchant UUID from script src:', e);
-  }
-  if (merchantUUID) {
-    document.cookie = `buisID=${encodeURIComponent(merchantUUID)}; ${cookieOptions}`;
-    console.log('Merchant cookie set.');
-  } else {
-    console.log('Merchant UUID missing. Unable to set buisID cookie.');
-  }
-
-  // Parse creator UUID from referral query parameter
   const params = new URLSearchParams(window.location.search);
   const refs = params.getAll('ref');
 
@@ -26,9 +8,10 @@
   }
 
   let creatorUUID = null;
+  let merchantUUID = null;
 
   for (let ref of refs) {
-    // Handle URL-encoded values such as ref=badger%3A123
+    // Handle URL-encoded values such as ref=badger%3A123%3BbuisID%3A55
     try {
       ref = decodeURIComponent(ref);
     } catch (e) {
@@ -36,21 +19,26 @@
       continue;
     }
 
-    const match = ref.match(/^badger:([^;]+)$/);
+    const match = ref.match(/^badger:([^;]+);buisID:([^;]+)$/);
     if (match) {
       creatorUUID = match[1];
+      merchantUUID = match[2];
       break;
     }
   }
 
-  if (!creatorUUID) {
+  if (!creatorUUID || !merchantUUID) {
     console.log('Referral parameter invalid:', refs);
     return;
   }
 
   console.log('Parsed creator UUID:', creatorUUID);
+  console.log('Parsed merchant UUID:', merchantUUID);
+
+  const cookieOptions = 'path=/; max-age=31536000; Secure; SameSite=None';
 
   document.cookie = `uuid=${encodeURIComponent(creatorUUID)}; ${cookieOptions}`;
+  document.cookie = `buisID=${encodeURIComponent(merchantUUID)}; ${cookieOptions}`;
 
-  console.log('Referral cookie set.');
+  console.log('Referral cookies set.');
 })();
