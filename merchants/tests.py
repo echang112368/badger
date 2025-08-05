@@ -26,3 +26,23 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(meta.shopify_access_token, "token")
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
+
+class StoreIdLookupTests(TestCase):
+    def test_returns_uuid_for_domain(self):
+        user = CustomUser.objects.create_user(
+            username="merchant2", password="pass", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.shopify_store_domain = "example.myshopify.com"
+        meta.save()
+
+        url = reverse("merchant_store_id") + "?domain=example.myshopify.com"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"storeID": str(meta.uuid)})
+
+    def test_returns_404_for_unknown_domain(self):
+        url = reverse("merchant_store_id") + "?domain=unknown.com"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
