@@ -9,22 +9,21 @@ class MerchantItemForm(forms.ModelForm):
 
 
 class MerchantSettingsForm(forms.ModelForm):
-    shopify_api_password = forms.CharField(
+    shopify_access_token = forms.CharField(
         widget=forms.PasswordInput(render_value=True),
         required=False,
     )
+
     class Meta:
         model = MerchantMeta
         fields = [
             "paypal_email",
-            "shopify_api_key",
-            "shopify_api_password",
+            "shopify_access_token",
             "shopify_store_domain",
         ]
         labels = {
             "paypal_email": "PayPal Email (for invoices)",
-            "shopify_api_key": "Key",
-            "shopify_api_password": "Password",
+            "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
         }
 

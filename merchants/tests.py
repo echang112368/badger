@@ -6,7 +6,7 @@ from .models import MerchantMeta
 
 
 class MerchantSettingsTests(TestCase):
-    def test_saves_shopify_credentials(self):
+    def test_saves_shopify_token(self):
         user = CustomUser.objects.create_user(
             username="merchant", password="pass", is_merchant=True
         )
@@ -15,8 +15,7 @@ class MerchantSettingsTests(TestCase):
             reverse("merchant_settings"),
             {
                 "paypal_email": "merchant@example.com",
-                "shopify_api_key": "key",
-                "shopify_api_password": "password",
+                "shopify_access_token": "token",
                 "shopify_store_domain": "example.myshopify.com",
             },
         )
@@ -24,7 +23,6 @@ class MerchantSettingsTests(TestCase):
         self.assertRedirects(response, reverse("merchant_settings"))
 
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_api_key, "key")
-        self.assertEqual(meta.shopify_api_password, "password")
+        self.assertEqual(meta.shopify_access_token, "token")
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
