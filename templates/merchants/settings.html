@@ -23,19 +23,16 @@
 
         <div class="card shadow-sm rounded mb-3">
             <div class="card-body">
-                <label class="form-label fw-bold d-block">Shopify Key and Password</label>
-                <label class="form-label d-block mt-2 mb-1">Key:</label>
-                {{ settings_form.shopify_api_key }}
-                <label class="form-label d-block mt-3 mb-1">Password:</label>
+                <label class="form-label fw-bold d-block">Shopify Admin API Access Token</label>
                 <div class="input-group mb-1">
-                    {{ settings_form.shopify_api_password }}
-                    <button type="button" class="btn btn-outline-secondary" id="toggleShopifyPassword">
+                    {{ settings_form.shopify_access_token }}
+                    <button type="button" class="btn btn-outline-secondary" id="toggleShopifyToken">
                         <i class="bi bi-eye"></i>
                     </button>
                 </div>
                 <label class="form-label d-block mt-3 mb-1">Shopify URL:</label>
                 {{ settings_form.shopify_store_domain }}
-                {% if merchant_meta.shopify_api_password %}
+                {% if merchant_meta.shopify_access_token %}
                 <small class="text-success">Saved</small>
                 {% endif %}
             </div>
@@ -45,11 +42,11 @@
     </form>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const toggle = document.getElementById('toggleShopifyPassword');
-        const passwordField = document.getElementById('{{ settings_form.shopify_api_password.id_for_label }}');
+        const toggle = document.getElementById('toggleShopifyToken');
+        const tokenField = document.getElementById('{{ settings_form.shopify_access_token.id_for_label }}');
         toggle.addEventListener('click', function () {
-            const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordField.setAttribute('type', type);
+            const type = tokenField.getAttribute('type') === 'password' ? 'text' : 'password';
+            tokenField.setAttribute('type', type);
             this.querySelector('i').classList.toggle('bi-eye');
             this.querySelector('i').classList.toggle('bi-eye-slash');
         });
