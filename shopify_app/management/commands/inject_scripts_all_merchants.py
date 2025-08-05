@@ -11,20 +11,19 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for merchant in MerchantMeta.objects.all():
-            api_key = merchant.shopify_api_key
-            password = merchant.shopify_api_password
+            access_token = merchant.shopify_access_token
             store_domain = getattr(merchant, "shopify_store_domain", None)
 
-            if not (api_key and password and store_domain):
+            if not (access_token and store_domain):
                 self.stdout.write(
                     f"Skipping merchant {merchant.id}: missing Shopify credentials"
                 )
                 continue
 
-            client = ShopifyClient(api_key, password, store_domain)
+            client = ShopifyClient(access_token, store_domain)
             try:
                 existing = client.get("/admin/api/2023-07/script_tags.json")
-                tags = existing.json().get("script_tags", [])
+                tags = existing.get("script_tags", [])
                 if any(tag.get("src") == SCRIPT_SRC for tag in tags):
                     self.stdout.write(
                         f"Script already present for {store_domain}, skipping"
