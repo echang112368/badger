@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from merchants.models import MerchantMeta
 from shopify_app.shopify_client import ShopifyClient
 
-SCRIPT_SRC = "https://d9c1fdbdb8b1.ngrok-free.app/static/js/referral_tracker.js"
+SCRIPT_SRC_BASE = "https://d9c1fdbdb8b1.ngrok-free.app/static/js/referral_tracker.js"
 
 
 class Command(BaseCommand):
@@ -24,7 +24,7 @@ class Command(BaseCommand):
             try:
                 existing = client.get("/admin/api/2023-07/script_tags.json")
                 tags = existing.get("script_tags", [])
-                if any(tag.get("src") == SCRIPT_SRC for tag in tags):
+                if any(tag.get("src", "").startswith(SCRIPT_SRC_BASE) for tag in tags):
                     self.stdout.write(
                         f"Script already present for {store_domain}, skipping"
                     )
@@ -33,7 +33,7 @@ class Command(BaseCommand):
                 payload = {
                     "script_tag": {
                         "event": "onload",
-                        "src": SCRIPT_SRC,
+                        "src": f"{SCRIPT_SRC_BASE}?merchant_uuid={merchant.uuid}",
                     }
                 }
                 client.post("/admin/api/2023-07/script_tags.json", json=payload)
