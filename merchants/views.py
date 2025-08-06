@@ -7,15 +7,31 @@ from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from urllib.parse import urlparse
+
+
+def _normalize_domain(domain: str) -> str:
+    if not domain:
+        return ""
+    parsed = urlparse(domain if "://" in domain else f"//{domain}")
+    host = parsed.netloc or parsed.path
+    host = host.lower().strip()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
 
 
 @csrf_exempt
 def store_id_lookup(request):
-    domain = request.GET.get("domain", "").strip()
+    domain = _normalize_domain(request.GET.get("domain", "").strip())
     if not domain:
         response = JsonResponse({"error": "domain parameter required"}, status=400)
     else:
-        meta = MerchantMeta.objects.filter(shopify_store_domain=domain).first()
+        meta = None
+        for m in MerchantMeta.objects.all():
+            if _normalize_domain(m.shopify_store_domain) == domain:
+                meta = m
+                break
         if meta:
             store_id = str(meta.uuid)
             print(f"Debug: retrieved storeID {store_id} for domain {domain}")

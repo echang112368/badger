@@ -27,3 +27,18 @@ class MerchantSettingsForm(forms.ModelForm):
             "shopify_store_domain": "Shopify URL",
         }
 
+    def clean_shopify_store_domain(self):
+        """Normalize the Shopify domain to its hostname."""
+        domain = self.cleaned_data.get("shopify_store_domain", "").strip()
+        if not domain:
+            return domain
+
+        from urllib.parse import urlparse
+
+        parsed = urlparse(domain if "://" in domain else f"//{domain}")
+        host = parsed.netloc or parsed.path
+        host = host.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+
