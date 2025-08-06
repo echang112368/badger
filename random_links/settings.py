@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", 'd9c1fdbdb8b1.ngrok-free.app']
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", '42063a3c7da8.ngrok-free.app']
 
 
 # Application definition
@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'ledger',
     'shopify_app',
     "verify_email.apps.VerifyEmailConfig",
+    'corsheaders',
     
 ]
 
@@ -56,6 +57,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'random_links.urls'
@@ -142,6 +145,17 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'webmaster@localhost'
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://d9c1fdbdb8b1.ngrok-free.app"
+    "https://42063a3c7da8.ngrok-free.app"
 
 ]
+#change url in shoplify_app/management/commands/inject_scripts_all_merchants.py if you change the ngrok URL
+
+CORS_ALLOW_ALL_ORIGINS = True  # For development only, change for production
+
+from corsheaders.defaults import default_headers
+
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'ngrok-skip-browser-warning',
+]
+

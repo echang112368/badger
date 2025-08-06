@@ -1,10 +1,34 @@
 (function () {
   const domain = window.location.hostname;
   try {
+  
+    console.log("try ran")
     const origin = new URL(document.currentScript.src).origin;
-    fetch(`${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`)
+    const headers = {
+      'ngrok-skip-browser-warning': 'true'
+    };
+
+    console.log("origin", origin);
+    console.log("domain", domain);
+  
+    console.log("fetching:", `${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`);
+
+    fetch(`${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`,{headers})
+      .then(response => {
+      console.log("Raw response:", response);
+      return response.text();
+    })
+    .then(data => {
+      console.log("Parsed data:", data);
+    })
+      .catch(error => {
+      console.error("Fetch failed:", error);
+    });
+
+    fetch(`${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`, {headers})
       .then(r => r.json())
       .then(data => {
+        console.log(data.storeID);
         if (data.storeID) {
           const secure = window.location.protocol === 'https:' ? '; Secure' : '';
           document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=31536000; SameSite=Lax${secure}`;

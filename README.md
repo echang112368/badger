@@ -76,3 +76,5 @@ The admin "Send PayPal Payouts" button bypasses the date check and will pay out 
 
 This repository is a simple example and is not ready for production use without further security and feature work.
 
+## Ngrok Issues
+For referral_tracker.js, I am using a header to avoid ngrok warning from poping up and in development I am using a CORS_ALLOW_ALL_ORIGINS = true for all however that should be changed during final production as that is not secure. In referral_tracker for fetch it also incldues the header 'ngrok-skip-browser-warning': 'true' that can be removed before deployment. 
