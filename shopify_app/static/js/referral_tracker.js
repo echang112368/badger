@@ -6,7 +6,8 @@
       .then(r => r.json())
       .then(data => {
         if (data.storeID) {
-          document.cookie = `storeID=${encodeURIComponent(data.storeID)}; domain=${domain}; path=/; max-age=31536000; Secure; SameSite=None`;
+          const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+          document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
         }
       })
       .catch(() => {});
