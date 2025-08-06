@@ -7,6 +7,7 @@ from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from urllib.parse import urlparse
 
 
@@ -22,26 +23,17 @@ def _normalize_domain(domain: str) -> str:
 
 
 @csrf_exempt
+@require_GET
 def store_id_lookup(request):
-    raw_domain = request.GET.get("domain", "").strip()
-    print(f"Debug: store_id_lookup called with domain parameter '{raw_domain}'")
-    domain = _normalize_domain(raw_domain)
-    if not domain:
-        print("Debug: no valid domain provided after normalization")
-        response = JsonResponse({"error": "domain parameter required"}, status=400)
-    else:
-        meta = None
-        for m in MerchantMeta.objects.all():
-            if _normalize_domain(m.shopify_store_domain) == domain:
-                meta = m
+    domain = _normalize_domain(request.GET.get("domain", ""))
+    store_id = None
+    if domain:
+        for meta in MerchantMeta.objects.all():
+            if _normalize_domain(meta.shopify_store_domain) == domain:
+                store_id = str(meta.uuid)
                 break
-        if meta:
-            store_id = str(meta.uuid)
-            print(f"Debug: retrieved storeID {store_id} for domain {domain}")
-            response = JsonResponse({"storeID": store_id})
-        else:
-            print(f"Debug: storeID not found for domain {domain}")
-            response = JsonResponse({"error": "merchant not found"}, status=404)
+
+    response = JsonResponse({"storeID": store_id})
     response["Access-Control-Allow-Origin"] = "*"
     return response
 
