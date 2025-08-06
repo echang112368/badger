@@ -5,7 +5,23 @@ from creators.models import CreatorMeta
 from .forms import MerchantItemForm, MerchantSettingsForm
 from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
+def store_id_lookup(request):
+    domain = request.GET.get("domain", "").strip()
+    if not domain:
+        response = JsonResponse({"error": "domain parameter required"}, status=400)
+    else:
+        meta = MerchantMeta.objects.filter(shopify_store_domain=domain).first()
+        if meta:
+            response = JsonResponse({"storeID": str(meta.uuid)})
+        else:
+            response = JsonResponse({"error": "merchant not found"}, status=404)
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 @login_required
