@@ -8,6 +8,7 @@
       .then((r) => r.json())
       .then((data) => {
         if (data.storeID) {
+          console.log('Fetched store ID:', data.storeID);
           document.cookie = `storeID=${encodeURIComponent(data.storeID)}; ${cookieOptions}`;
           console.log('Store ID cookie set.');
         } else {

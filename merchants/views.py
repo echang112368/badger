@@ -17,8 +17,11 @@ def store_id_lookup(request):
     else:
         meta = MerchantMeta.objects.filter(shopify_store_domain=domain).first()
         if meta:
-            response = JsonResponse({"storeID": str(meta.uuid)})
+            store_id = str(meta.uuid)
+            print(f"Debug: retrieved storeID {store_id} for domain {domain}")
+            response = JsonResponse({"storeID": store_id})
         else:
+            print(f"Debug: storeID not found for domain {domain}")
             response = JsonResponse({"error": "merchant not found"}, status=404)
     response["Access-Control-Allow-Origin"] = "*"
     return response
