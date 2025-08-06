@@ -1,9 +1,8 @@
 (function() {
-  const cookieOptions = 'path=/; max-age=31536000; Secure; SameSite=None';
+  const domain = window.location.hostname;
+  const cookieOptions = `domain=${domain}; path=/; max-age=31536000; Secure; SameSite=None`;
 
   try {
-    
-    const domain = window.location.hostname;
     const scriptOrigin = new URL(document.currentScript.src).origin;
     fetch(`${scriptOrigin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`)
       .then((r) => r.json())

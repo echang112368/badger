@@ -16,7 +16,7 @@ class MerchantSettingsTests(TestCase):
             {
                 "paypal_email": "merchant@example.com",
                 "shopify_access_token": "token",
-                "shopify_store_domain": "example.myshopify.com",
+                "shopify_store_domain": "https://Example.myshopify.com/",
             },
         )
 
@@ -33,7 +33,7 @@ class StoreIdLookupTests(TestCase):
             username="merchant2", password="pass", is_merchant=True
         )
         meta = MerchantMeta.objects.get(user=user)
-        meta.shopify_store_domain = "example.myshopify.com"
+        meta.shopify_store_domain = "https://Example.myshopify.com/"
         meta.save()
 
         url = reverse("merchant_store_id") + "?domain=example.myshopify.com"
