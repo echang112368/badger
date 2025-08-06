@@ -41,8 +41,9 @@ class StoreIdLookupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"storeID": str(meta.uuid)})
 
-    def test_returns_404_for_unknown_domain(self):
+    def test_returns_null_for_unknown_domain(self):
         url = reverse("merchant_store_id") + "?domain=unknown.com"
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"storeID": None})
 
