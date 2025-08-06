@@ -2,17 +2,24 @@
   const domain = window.location.hostname;
   const cookieOptions = `domain=${domain}; path=/; max-age=31536000; Secure; SameSite=None`;
 
+  console.log('Referral tracker initializing for domain:', domain);
+  console.log('Cookie options:', cookieOptions);
+  console.log('Cookies enabled:', navigator.cookieEnabled);
+  console.log('Existing cookies at load:', document.cookie);
+
   try {
     const scriptOrigin = new URL(document.currentScript.src).origin;
+    console.log('Script origin for store ID lookup:', scriptOrigin);
     fetch(`${scriptOrigin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`)
       .then((r) => r.json())
       .then((data) => {
+        console.log('Store ID lookup response:', data);
         if (data.storeID) {
           console.log('Fetched store ID:', data.storeID);
           document.cookie = `storeID=${encodeURIComponent(data.storeID)}; ${cookieOptions}`;
-          console.log('Store ID cookie set.');
+          console.log('Store ID cookie set; current cookies:', document.cookie);
         } else {
-          console.log('Store ID lookup failed for domain:', domain);
+          console.log('Store ID lookup failed for domain:', domain, 'response:', data);
         }
       })
       .catch((e) => console.log('Failed to fetch store ID:', e));
