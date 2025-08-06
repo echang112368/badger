@@ -23,8 +23,11 @@ def _normalize_domain(domain: str) -> str:
 
 @csrf_exempt
 def store_id_lookup(request):
-    domain = _normalize_domain(request.GET.get("domain", "").strip())
+    raw_domain = request.GET.get("domain", "").strip()
+    print(f"Debug: store_id_lookup called with domain parameter '{raw_domain}'")
+    domain = _normalize_domain(raw_domain)
     if not domain:
+        print("Debug: no valid domain provided after normalization")
         response = JsonResponse({"error": "domain parameter required"}, status=400)
     else:
         meta = None
