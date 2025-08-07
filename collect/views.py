@@ -120,3 +120,24 @@ def stripe_webhook_view(request):
         return render(request, "collect/stripe_webhook.html", context)
 
     return JsonResponse({"error": "Invalid method"}, status=405)
+
+
+@csrf_exempt
+def orders_create_webhook(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    amount = payload.get("total_price")
+    note_attributes = {
+        attr.get("name"): attr.get("value") for attr in payload.get("note_attributes", [])
+    }
+    uuid = note_attributes.get("uuid")
+    buis_id = note_attributes.get("buisID")
+
+    print(f"received amount={amount} uuid={uuid} buisID={buis_id}")
+    return JsonResponse({"status": "received"}, status=200)
