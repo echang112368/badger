@@ -62,3 +62,46 @@
     // Ignore errors
   }
 })();
+
+(function () {
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()\\[\\]\\/+^]/g, '\\$1') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  try {
+    var uuid = getCookie('uuid');
+    var buisID = getCookie('buisID');
+
+    if (!uuid || !buisID) {
+      console.warn('Missing uuid or buisID cookie');
+      return;
+    }
+
+    fetch('/cart.js', { credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (cart) {
+        var attributes = cart && cart.attributes ? cart.attributes : {};
+        attributes.uuid = uuid;
+        attributes.buisID = buisID;
+
+        return fetch('/cart/update.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ attributes: attributes })
+        });
+      })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .catch(function (error) {
+        console.error('Failed to update cart', error);
+      });
+  } catch (error) {
+    console.error('Failed to update cart', error);
+  }
+})();
