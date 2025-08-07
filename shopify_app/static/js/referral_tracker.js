@@ -71,10 +71,10 @@
 
   try {
     var uuid = getCookie('uuid');
-    var buisID = getCookie('buisID');
+    var storeID = getCookie('storeID');
 
-    if (!uuid || !buisID) {
-      console.warn('Missing uuid or buisID cookie');
+    if (!uuid || !storeID) {
+      console.warn('Missing uuid or storeID cookie');
       return;
     }
 
@@ -83,7 +83,7 @@
       .then(function (cart) {
         var attributes = cart && cart.attributes ? cart.attributes : {};
         attributes.uuid = uuid;
-        attributes.buisID = buisID;
+        attributes.storeID = storeID;
 
         return fetch('/cart/update.js', {
           method: 'POST',
