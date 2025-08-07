@@ -27,3 +27,5 @@ def register_orders_create_webhook(shop_domain: str, access_token: str,
         if hasattr(exc, 'response') and exc.response is not None:
             print(exc.response.status_code)
             print(exc.response.text)
+        return False
+    return True
