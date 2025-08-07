@@ -1,7 +1,30 @@
 (function () {
   const domain = window.location.hostname;
   try {
-  
+    const search = window.location.search;
+    let params = new URLSearchParams(search);
+    let ref = params.get('ref');
+
+    if (!ref) {
+      try {
+        const decodedSearch = decodeURIComponent(search);
+        params = new URLSearchParams(decodedSearch);
+        ref = params.get('ref');
+      } catch (err) {}
+    }
+
+    if (ref) {
+      try {
+        ref = decodeURIComponent(ref);
+      } catch (err) {}
+      const match = ref.match(/^badger:([0-9a-fA-F-]{36})$/);
+      if (match) {
+        const uuid = match[1];
+        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+      }
+    }
+
     console.log("try ran")
     const origin = new URL(document.currentScript.src).origin;
     const headers = {
