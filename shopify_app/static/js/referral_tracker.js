@@ -1,5 +1,43 @@
 (function () {
   const domain = window.location.hostname;
+
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\/\\+^])/g, '\\$1') + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function updateCartAttributes() {
+    try {
+      var uuid = getCookie('uuid');
+      var storeID = getCookie('storeID');
+
+      if (!uuid || !storeID) {
+        console.warn('Missing uuid or storeID cookie');
+        return;
+      }
+
+      fetch('/cart.js', { credentials: 'same-origin' })
+        .then(function (res) { return res.json(); })
+        .then(function (cart) {
+          var attributes = cart && cart.attributes ? cart.attributes : {};
+          attributes.uuid = uuid;
+          attributes.storeID = storeID;
+
+          return fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ attributes: attributes })
+          });
+        })
+        .catch(function (error) {
+          console.error('Failed to update cart', error);
+        });
+    } catch (error) {
+      console.error('Failed to update cart', error);
+    }
+  }
+
   try {
     const search = window.location.search;
     let params = new URLSearchParams(search);
@@ -55,53 +93,11 @@
         if (data.storeID) {
           const secure = window.location.protocol === 'https:' ? '; Secure' : '';
           document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+          updateCartAttributes();
         }
       })
       .catch(() => {});
   } catch (e) {
     // Ignore errors
-  }
-})();
-
-(function () {
-  function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\]\/\+^])/g, '\\$1') + '=([^;]*)'));
-    return match ? decodeURIComponent(match[1]) : null;
-  }
-
-  try {
-    var uuid = getCookie('uuid');
-    var storeID = getCookie('storeID');
-
-    if (!uuid || !storeID) {
-      console.warn('Missing uuid or storeID cookie');
-      return;
-    }
-
-    fetch('/cart.js', { credentials: 'same-origin' })
-      .then(function (res) { return res.json(); })
-      .then(function (cart) {
-        var attributes = cart && cart.attributes ? cart.attributes : {};
-        attributes.uuid = uuid;
-        attributes.storeID = storeID;
-
-        return fetch('/cart/update.js', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ attributes: attributes })
-        });
-      })
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        return response.json();
-      })
-      .catch(function (error) {
-        console.error('Failed to update cart', error);
-      });
-  } catch (error) {
-    console.error('Failed to update cart', error);
   }
 })();
