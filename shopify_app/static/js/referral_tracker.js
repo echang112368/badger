@@ -70,13 +70,8 @@
   }
 
   try {
-    console.log("second try ran")
-    
     var uuid = getCookie('uuid');
     var storeID = getCookie('storeID');
-
-    console.log("uuid:", uuid);
-    console.log("storeID:", storeID);
 
     if (!uuid || !storeID) {
       console.warn('Missing uuid or storeID cookie');

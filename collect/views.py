@@ -133,11 +133,12 @@ def orders_create_webhook(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     amount = payload.get("total_price")
+    print('These are the note attributes:', payload.get("note_attributes", []))
     note_attributes = {
         attr.get("name"): attr.get("value") for attr in payload.get("note_attributes", [])
     }
     uuid = note_attributes.get("uuid")
-    buis_id = note_attributes.get("buisID")
+    storeID = note_attributes.get("storeID")
 
-    print(f"received amount={amount} uuid={uuid} buisID={buis_id}")
+    print(f"received amount={amount} uuid={uuid} storeID={storeID}")
     return JsonResponse({"status": "received"}, status=200)
