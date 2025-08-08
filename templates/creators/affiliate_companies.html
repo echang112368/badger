@@ -19,8 +19,11 @@
                     <ul class="list-unstyled mb-0">
                         {% for item in entry.items %}
                         <li class="mb-3">
-                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.title }}" data-url="{{ item.redirect_link }}">{{ item.title }}</a>
-                            <div class="text-muted small">{{ item.redirect_link|truncatechars:60 }}</div>
+                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.title }}" data-url="{{ item.custom_url }}">{{ item.title }}</a>
+                            <div class="text-muted small d-flex align-items-center">
+                                <span class="flex-grow-1">{{ item.custom_url|truncatechars:60 }}</span>
+                                <button class="btn btn-outline-secondary btn-sm ms-2 copy-url" type="button" data-url="{{ item.custom_url }}"><i class="bi bi-clipboard"></i></button>
+                            </div>
                         </li>
                         {% endfor %}
                     </ul>
@@ -69,6 +72,13 @@
         document.getElementById('copy-modal-url').addEventListener('click', () => {
             const input = document.getElementById('modal-url');
             navigator.clipboard.writeText(input.value);
+        });
+
+        document.querySelectorAll('.copy-url').forEach(button => {
+            button.addEventListener('click', () => {
+                const url = button.getAttribute('data-url');
+                navigator.clipboard.writeText(url);
+            });
         });
     });
 </script>

@@ -1,6 +1,5 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from django.urls import reverse
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -11,7 +10,7 @@ from .models import CreatorMeta
 
 from links.models import MerchantCreatorLink, STATUS_ACTIVE
 from merchants.models import MerchantItem, MerchantMeta
-from collect.models import RedirectLink
+from urllib.parse import urlparse, urlunparse
 from ledger.models import LedgerEntry
 
 
@@ -66,26 +65,18 @@ def creator_affiliate_companies(request):
         merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant)
         merchant_items = []
         for item in MerchantItem.objects.filter(merchant=merchant):
-            short_code = f"{request.user.id}-{item.id}"
-            query_param = f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
-            redirect_obj, _ = RedirectLink.objects.get_or_create(
-                short_code=short_code,
-                defaults={
-                    "destination_url": item.link,
-                    "queryParam": query_param,
-                },
+            base_url = item.link
+            parsed = urlparse(base_url)
+            existing_query = parsed.query
+            query_param = (
+                f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
             )
-            if (
-                redirect_obj.destination_url != item.link
-                or redirect_obj.queryParam != query_param
-            ):
-                redirect_obj.destination_url = item.link
-                redirect_obj.queryParam = query_param
-                redirect_obj.save()
-            redirect_url = request.build_absolute_uri(
-                reverse("redirect_view", args=[redirect_obj.short_code])
-            )
-            merchant_items.append({"title": item.title, "redirect_link": redirect_url})
+            if existing_query:
+                new_query = existing_query + "&" + query_param
+            else:
+                new_query = query_param
+            full_url = urlunparse(parsed._replace(query=new_query))
+            merchant_items.append({"title": item.title, "custom_url": full_url})
 
         merchants_with_items.append({"merchant": merchant, "items": merchant_items})
 
