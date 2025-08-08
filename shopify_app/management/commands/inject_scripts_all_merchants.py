@@ -3,11 +3,14 @@ from django.core.management.base import BaseCommand
 from merchants.models import MerchantMeta
 from shopify_app.shopify_client import ShopifyClient
 
-SCRIPT_SRC = "https://42063a3c7da8.ngrok-free.app/static/js/referral_tracker.js"
+SCRIPT_SRCS = [
+    "https://42063a3c7da8.ngrok-free.app/static/js/referral_tracker.js",
+    "https://42063a3c7da8.ngrok-free.app/static/js/cart_attributes.js",
+]
 
 
 class Command(BaseCommand):
-    help = "Inject referral tracking script into all merchants' Shopify stores"
+    help = "Inject tracking scripts into all merchants' Shopify stores"
 
     def handle(self, *args, **options):
         for merchant in MerchantMeta.objects.all():
@@ -24,20 +27,21 @@ class Command(BaseCommand):
             try:
                 existing = client.get("/admin/api/2023-07/script_tags.json")
                 tags = existing.get("script_tags", [])
-                if any(tag.get("src") == SCRIPT_SRC for tag in tags):
-                    self.stdout.write(
-                        f"Script already present for {store_domain}, skipping"
-                    )
-                    continue
+                for src in SCRIPT_SRCS:
+                    if any(tag.get("src") == src for tag in tags):
+                        self.stdout.write(
+                            f"Script {src} already present for {store_domain}, skipping"
+                        )
+                        continue
 
-                payload = {
-                    "script_tag": {
-                        "event": "onload",
-                        "src": SCRIPT_SRC,
+                    payload = {
+                        "script_tag": {
+                            "event": "onload",
+                            "src": src,
+                        }
                     }
-                }
-                client.post("/admin/api/2023-07/script_tags.json", json=payload)
-                self.stdout.write(f"Injected script for {store_domain}")
+                    client.post("/admin/api/2023-07/script_tags.json", json=payload)
+                    self.stdout.write(f"Injected script {src} for {store_domain}")
             except Exception as exc:
                 self.stderr.write(
                     f"Failed to inject script for {store_domain}: {exc}"
