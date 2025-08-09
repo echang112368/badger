@@ -28,23 +28,24 @@
     form.submit();
   }
 
-  function handleCheckout(event) {
-    event.preventDefault();
-    var form = event.currentTarget.form;
-    console.log('Checkout button clicked');
+  function navigateTo(url) {
+    console.log('Navigating to', url);
+    window.location.href = url;
+  }
 
+  function ensureAttributesThen(proceed) {
     var uuid = getCookie('uuid');
     var storeID = getCookie('storeID');
     if (!uuid || !storeID) {
       console.log('Missing uuid or storeID cookie, proceeding without update');
-      return submitCheckout(form);
+      return proceed();
     }
 
     fetchCartAttributes()
       .then(function(attrs) {
         if (attrs.uuid === uuid && attrs.storeID === storeID) {
           console.log('Cart attributes already up to date');
-          return submitCheckout(form);
+          return proceed();
         }
 
         attrs.uuid = uuid;
@@ -54,13 +55,29 @@
             console.warn('Failed to update cart attributes', err);
           })
           .finally(function() {
-            submitCheckout(form);
+            proceed();
           });
       })
       .catch(function(err) {
         console.warn('Failed to load cart attributes', err);
-        submitCheckout(form);
+        proceed();
       });
+  }
+
+  function handleCheckout(event) {
+    event.preventDefault();
+    var form = event.currentTarget.form;
+    console.log('Checkout button clicked');
+    ensureAttributesThen(function() {
+      submitCheckout(form);
+    });
+  }
+
+  function handleCheckoutUrl(url) {
+    console.log('Intercepted checkout navigation');
+    ensureAttributesThen(function() {
+      navigateTo(url);
+    });
   }
 
   function warnDynamicCheckout(form) {
@@ -82,6 +99,14 @@
     checkoutButtons.forEach(function(btn) {
       btn.addEventListener('click', handleCheckout);
     });
+
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a[href*="/checkout"]');
+      if (link) {
+        e.preventDefault();
+        handleCheckoutUrl(link.href);
+      }
+    }, true);
   }
 
   if (document.readyState === 'loading') {
