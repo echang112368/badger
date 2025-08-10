@@ -90,6 +90,12 @@
   }
 
   function init() {
+    if (window.location.pathname === PRE_CHECKOUT_URL ||
+        window.location.pathname === PRE_CHECKOUT_URL + '/') {
+      handleCheckoutUrl();
+      return;
+    }
+
     var form = document.querySelector('form[action="/cart"]');
     if (!form) {
       return;
@@ -101,14 +107,6 @@
     checkoutButtons.forEach(function(btn) {
       btn.addEventListener('click', handleCheckout);
     });
-
-    document.addEventListener('click', function(e) {
-      var link = e.target.closest('a[href*="' + PRE_CHECKOUT_URL + '"]');
-      if (link) {
-        e.preventDefault();
-        handleCheckoutUrl();
-      }
-    }, true);
   }
 
   if (document.readyState === 'loading') {
