@@ -73,10 +73,12 @@
     });
   }
 
-  function handleCheckoutUrl(url) {
-    console.log('Intercepted checkout navigation');
+  var PRE_CHECKOUT_URL = '/pre-checkout';
+
+  function handleCheckoutUrl() {
+    console.log('Intercepted pre-checkout navigation');
     ensureAttributesThen(function() {
-      navigateTo(url);
+      navigateTo('/checkout');
     });
   }
 
@@ -101,10 +103,10 @@
     });
 
     document.addEventListener('click', function(e) {
-      var link = e.target.closest('a[href*="/checkout"]');
+      var link = e.target.closest('a[href*="' + PRE_CHECKOUT_URL + '"]');
       if (link) {
         e.preventDefault();
-        handleCheckoutUrl(link.href);
+        handleCheckoutUrl();
       }
     }, true);
   }
