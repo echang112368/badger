@@ -1,19 +1,24 @@
-# accounts/urls.py
 from django.urls import path
-from .views import (
-    custom_login_view,
-    signup_choice_view,
-    business_signup_view,
-    creator_signup_view,
-    user_signup_view,
-    logout_view,
-)
+from .views import LoginView, MeView, TokenRefreshView, logout_view
 
 urlpatterns = [
-    path('login/', custom_login_view, name='login'),
-    path('signup/', signup_choice_view, name='signup_choice'),
-    path('signup/business/', business_signup_view, name='business_signup'),
-    path('signup/creator/', creator_signup_view, name='creator_signup'),
-    path('signup/user/', user_signup_view, name='user_signup'),
-    path('logout/', logout_view, name='logout'),
+    path("auth/login/", LoginView.as_view(), name="auth-login"),
+    path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
+    path("me/", MeView.as_view(), name="me"),
+    path("logout/", logout_view, name="logout"),
 ]
+
+# Example cURL
+# Login with email
+# curl -X POST http://localhost:8000/api/auth/login/ \
+#   -H "Content-Type: application/json" \
+#   -d '{"email":"user@demo.com","password":"demo123"}'
+#
+# Login with username
+# curl -X POST http://localhost:8000/api/auth/login/ \
+#   -H "Content-Type: application/json" \
+#   -d '{"username":"demo","password":"demo123"}'
+#
+# Use access token to fetch profile
+# curl http://localhost:8000/api/me/ \
+#   -H "Authorization: Bearer <ACCESS>"
