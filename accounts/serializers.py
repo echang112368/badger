@@ -9,32 +9,23 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ["id", "email", "username"]
 
 
-class EmailOrUsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
-    email = serializers.EmailField(required=False)
-    username = serializers.CharField(required=False)
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    email = serializers.EmailField()
 
     def validate(self, attrs):
         email = attrs.get("email")
-        username = attrs.get("username")
         password = attrs.get("password")
 
-        if not password or not (email or username):
+        if not email or not password:
             raise exceptions.AuthenticationFailed("invalid_credentials")
 
         User = get_user_model()
-        user = None
-        if email:
-            try:
-                user = User.objects.get(email__iexact=email)
-            except User.DoesNotExist:
-                pass
-        elif username:
-            try:
-                user = User.objects.get(username=username)
-            except User.DoesNotExist:
-                pass
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            raise exceptions.AuthenticationFailed("invalid_credentials")
 
-        if not user or not user.check_password(password):
+        if not user.check_password(password):
             raise exceptions.AuthenticationFailed("invalid_credentials")
 
         refresh = self.get_token(user)
