@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,10 +48,11 @@ INSTALLED_APPS = [
     'shopify_app',
     "verify_email.apps.VerifyEmailConfig",
     'corsheaders',
-    
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -58,8 +60,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'random_links.urls'
@@ -151,12 +151,23 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 #change url in shoplify_app/management/commands/inject_scripts_all_merchants.py if you change the ngrok URL
 
-CORS_ALLOW_ALL_ORIGINS = True  # For development only, change for production
+CORS_ALLOWED_ORIGINS = [
+    "https://your-site.com",
+    "chrome-extension://<DEV_EXTENSION_ID>",  # TODO: replace with dev extension ID
+    "chrome-extension://<PROD_EXTENSION_ID>",  # TODO: replace with prod extension ID
+]
 
 from corsheaders.defaults import default_headers
-
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'ngrok-skip-browser-warning',
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    )
+}
+
+SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=15)}
 
