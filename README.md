@@ -65,7 +65,7 @@ The main URL configuration (`random_links/urls.py`) wires the apps together:
 - `/` handles short links and webhooks from the `collect` app.
 
 ## Running the Project
-1. Install dependencies from `requirements.txt`.
+1. Install project dependencies.
 2. Apply migrations with `python manage.py migrate`.
 3. Start the server using `python manage.py runserver`.
 
