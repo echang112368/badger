@@ -1,9 +1,11 @@
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
-from .forms import CustomLoginForm, BusinessSignUpForm, CreatorSignUpForm
-
-from django.http import HttpResponse
-
+from .forms import (
+    CustomLoginForm,
+    BusinessSignUpForm,
+    CreatorSignUpForm,
+    UserSignUpForm,
+)
 
 def custom_login_view(request):
     if request.method == 'POST':
@@ -17,7 +19,7 @@ def custom_login_view(request):
             elif user.is_creator:
                 return redirect('creator_earnings')
             else:
-                return HttpResponse('default_dashboard')
+                return redirect('user_dashboard')
     else:
         form = CustomLoginForm()
 
@@ -51,6 +53,19 @@ def creator_signup_view(request):
     else:
         form = CreatorSignUpForm()
     return render(request, 'accounts/creator_signup.html', {'form': form})
+
+
+def user_signup_view(request):
+    if request.method == 'POST':
+        form = UserSignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = True
+            user.save()
+            return render(request, 'accounts/signup_success.html', {'user': user})
+    else:
+        form = UserSignUpForm()
+    return render(request, 'accounts/user_signup.html', {'form': form})
 
 
 def logout_view(request):
