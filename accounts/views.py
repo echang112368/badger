@@ -1,31 +1,74 @@
-from rest_framework import permissions, status, exceptions
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from django.contrib.auth import logout
+from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import render, redirect
+from .forms import (
+    CustomLoginForm,
+    BusinessSignUpForm,
+    CreatorSignUpForm,
+    UserSignUpForm,
+)
 
-from .serializers import EmailOrUsernameTokenObtainPairSerializer, UserSerializer
+def custom_login_view(request):
+    if request.method == 'POST':
+        form = CustomLoginForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+
+            if user.is_merchant:
+                return redirect('merchant_dashboard')
+            elif user.is_creator:
+                return redirect('creator_earnings')
+            else:
+                return redirect('user_dashboard')
+    else:
+        form = CustomLoginForm()
+
+    return render(request, 'accounts/login.html', {'form': form})
+
+def signup_choice_view(request):
+    return render(request, 'accounts/signup_choice.html')
+
+def business_signup_view(request):
+    if request.method == 'POST':
+        form = BusinessSignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_merchant = True
+            user.is_active = True
+            user.save()
+            return render(request, 'accounts/signup_success.html', {'user': user})
+    else:
+        form = BusinessSignUpForm()
+    return render(request, 'accounts/business_signup.html', {'form': form})
+
+def creator_signup_view(request):
+    if request.method == 'POST':
+        form = CreatorSignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_creator = True
+            user.is_active = True
+            user.save()
+            return render(request, 'accounts/signup_success.html', {'user': user})
+    else:
+        form = CreatorSignUpForm()
+    return render(request, 'accounts/creator_signup.html', {'form': form})
 
 
-class LoginView(TokenObtainPairView):
-    serializer_class = EmailOrUsernameTokenObtainPairSerializer
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        try:
-            return super().post(request, *args, **kwargs)
-        except exceptions.AuthenticationFailed:
-            return Response({'error': 'invalid_credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-
-
-class MeView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
+def user_signup_view(request):
+    if request.method == 'POST':
+        form = UserSignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = True
+            user.save()
+            return render(request, 'accounts/signup_success.html', {'user': user})
+    else:
+        form = UserSignUpForm()
+    return render(request, 'accounts/user_signup.html', {'form': form})
 
 
 def logout_view(request):
+    """Log out the current user and redirect to the login page."""
     logout(request)
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    return redirect('login')

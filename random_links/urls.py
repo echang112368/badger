@@ -22,7 +22,6 @@ urlpatterns = [
     path('merchant/', include('merchants.urls')),
     path('user/', include('users.urls')),
     path('admin/', admin.site.urls),
-    path('api/', include('accounts.urls')),
     path('accounts/', include('accounts.urls')),
     path('', include('collect.urls')),
     path('verification/', include('verify_email.urls')),
