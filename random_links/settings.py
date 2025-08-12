@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     'shopify_app',
     "verify_email.apps.VerifyEmailConfig",
     'corsheaders',
-    
+    'rest_framework',
+
 ]
 
 MIDDLEWARE = [
