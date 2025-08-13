@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
+from .models import CustomerMeta
 
 
 @login_required
@@ -19,9 +20,10 @@ def user_dashboard(request):
         'since_year': since_year,
         'transactions': transactions,
     }
-    return render(request, 'users/dashboard.html', context)
+    return render(request, 'customer/dashboard.html', context)
 
 
 @login_required
 def user_settings(request):
-    return render(request, 'users/settings.html')
+    customer_meta, _ = CustomerMeta.objects.get_or_create(user=request.user)
+    return render(request, 'customer/settings.html', {'customer_meta': customer_meta})
