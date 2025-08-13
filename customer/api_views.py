@@ -5,11 +5,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from rest_framework.authtoken.models import Token
+
+from .models import CustomerMeta
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class VerifyAccountView(APIView):
-    """API endpoint to verify a user's credentials."""
+class LoginView(APIView):
+    """Authenticate a user and return an auth token with profile data."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -27,8 +30,18 @@ class VerifyAccountView(APIView):
         user = authenticate(username=username, password=password)
         if user is None:
             return Response(
-                {"verified": False}, status=status.HTTP_401_UNAUTHORIZED
+                {"detail": "Invalid credentials"},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        return Response({"verified": True, "user_id": user.id})
+        token, _ = Token.objects.get_or_create(user=user)
+        customer, _ = CustomerMeta.objects.get_or_create(user=user)
+
+        return Response(
+            {
+                "token": token.key,
+                "uuid": str(customer.uuid),
+                "points": customer.points,
+            }
+        )
 
