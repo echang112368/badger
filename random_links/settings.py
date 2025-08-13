@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'accounts',
     'merchants',
     'creators',
-    'users',
+    'customer',
     'links',
     'ledger',
     'shopify_app',
