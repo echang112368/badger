@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "verify_email.apps.VerifyEmailConfig",
     'corsheaders',
     'rest_framework',
+    'rest_framework.authtoken',
 
 ]
 
