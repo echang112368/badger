@@ -6,7 +6,9 @@ from .models import CustomerMeta
 
 class CustomerSettingsTests(TestCase):
     def test_settings_displays_uuid(self):
-        user = CustomUser.objects.create_user(username='tester', password='pass123')
+        user = CustomUser.objects.create_user(
+            username='tester', password='pass123', email='uuidtester@example.com'
+        )
         self.client.login(username='tester', password='pass123')
         response = self.client.get(reverse('user_settings'))
         self.assertEqual(response.status_code, 200)
@@ -23,7 +25,7 @@ class CustomerSettingsTests(TestCase):
 
     def test_settings_displays_password(self):
         user = CustomUser.objects.create_user(
-            username='tester2', password='secret'
+            username='tester2', password='secret', email='tester2@example.com'
         )
         self.client.login(username='tester2', password='secret')
         response = self.client.get(reverse('user_settings'))
@@ -33,13 +35,13 @@ class CustomerSettingsTests(TestCase):
 class LoginAPITests(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(
-            username="tester", password="pass123"
+            username="tester", password="pass123", email="tester@example.com"
         )
 
     def test_valid_login_returns_token_uuid_points(self):
         url = reverse("api_login")
         response = self.client.post(url, {
-            "username": "tester",
+            "email": "tester@example.com",
             "password": "pass123",
         })
         self.assertEqual(response.status_code, 200)
@@ -52,7 +54,7 @@ class LoginAPITests(TestCase):
     def test_invalid_login_returns_401(self):
         url = reverse("api_login")
         response = self.client.post(url, {
-            "username": "tester",
+            "email": "tester@example.com",
             "password": "wrong",
         })
         self.assertEqual(response.status_code, 401)
