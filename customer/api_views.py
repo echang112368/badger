@@ -24,12 +24,12 @@ class LoginView(APIView):
             json_package = json_package.dict()
         print("LoginView received JSON package:", json_package)
 
-        email = json_package.get("email")
+        email = json_package.get("email") or json_package.get("username")
         password = json_package.get("password")
 
         if not email or not password:
             return Response(
-                {"detail": "Email and password required."},
+                {"detail": "Username and password required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
