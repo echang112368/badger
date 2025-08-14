@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import get_user_model
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -18,17 +18,22 @@ class LoginView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        username = request.data.get("username")
+        email = request.data.get("email")
         password = request.data.get("password")
 
-        if not username or not password:
+        if not email or not password:
             return Response(
-                {"detail": "Username and password required."},
+                {"detail": "Email and password required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = authenticate(username=username, password=password)
-        if user is None:
+        User = get_user_model()
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            user = None
+
+        if user is None or not user.check_password(password):
             return Response(
                 {"detail": "Invalid credentials"},
                 status=status.HTTP_401_UNAUTHORIZED,
