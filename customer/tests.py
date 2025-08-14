@@ -48,7 +48,11 @@ class CustomerSettingsTests(TestCase):
 class LoginAPITests(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(
-            username="tester", password="pass123", email="tester@example.com"
+            username="tester",
+            password="pass123",
+            email="tester@example.com",
+            first_name="Test",
+            last_name="User",
         )
 
     def test_valid_login_returns_token_uuid_name_points(self):
@@ -62,7 +66,7 @@ class LoginAPITests(TestCase):
         self.assertIn("token", data)
         self.assertIn("uuid", data)
         self.assertIn("name", data)
-        self.assertEqual(data["name"], "tester")
+        self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
         self.assertEqual(data["points"], 0)
 
