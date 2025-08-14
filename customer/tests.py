@@ -21,6 +21,14 @@ class CustomerSettingsTests(TestCase):
         response = self.client.get(reverse('user_settings'))
         self.assertContains(response, user.email)
 
+    def test_settings_displays_password(self):
+        user = CustomUser.objects.create_user(
+            username='tester2', password='secret'
+        )
+        self.client.login(username='tester2', password='secret')
+        response = self.client.get(reverse('user_settings'))
+        self.assertContains(response, user.password)
+
 
 class LoginAPITests(TestCase):
     def setUp(self):
