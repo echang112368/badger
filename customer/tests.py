@@ -59,3 +59,39 @@ class LoginAPITests(TestCase):
         })
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json().get("detail"), "Invalid credentials")
+
+    def test_merchant_login_returns_401(self):
+        CustomUser.objects.create_user(
+            username="merchant",
+            password="pass123",
+            email="merchant@example.com",
+            is_merchant=True,
+        )
+        url = reverse("api_login")
+        response = self.client.post(
+            url,
+            {
+                "username": "merchant@example.com",
+                "password": "pass123",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json().get("detail"), "Invalid credentials")
+
+    def test_creator_login_returns_401(self):
+        CustomUser.objects.create_user(
+            username="creator",
+            password="pass123",
+            email="creator@example.com",
+            is_creator=True,
+        )
+        url = reverse("api_login")
+        response = self.client.post(
+            url,
+            {
+                "username": "creator@example.com",
+                "password": "pass123",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json().get("detail"), "Invalid credentials")
