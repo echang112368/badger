@@ -16,3 +16,13 @@ class CreatorSettingsTests(TestCase):
         response = self.client.get(reverse("creator_settings"))
         self.assertContains(response, user.email)
 
+    def test_settings_displays_password(self):
+        user = CustomUser.objects.create_user(
+            username="creator2",
+            password="pass123",
+            is_creator=True,
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("creator_settings"))
+        self.assertContains(response, user.password)
+
