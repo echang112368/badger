@@ -41,7 +41,7 @@ class LoginAPITests(TestCase):
     def test_valid_login_returns_token_uuid_points(self):
         url = reverse("api_login")
         response = self.client.post(url, {
-            "email": "tester@example.com",
+            "username": "tester@example.com",
             "password": "pass123",
         })
         self.assertEqual(response.status_code, 200)
@@ -54,7 +54,7 @@ class LoginAPITests(TestCase):
     def test_invalid_login_returns_401(self):
         url = reverse("api_login")
         response = self.client.post(url, {
-            "email": "tester@example.com",
+            "username": "tester@example.com",
             "password": "wrong",
         })
         self.assertEqual(response.status_code, 401)
