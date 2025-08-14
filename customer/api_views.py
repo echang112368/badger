@@ -13,7 +13,10 @@ from .models import CustomerMeta
 
 @method_decorator(csrf_exempt, name="dispatch")
 class LoginView(APIView):
-    """Authenticate a user and return an auth token with profile data."""
+    """Authenticate a user and return an auth token with profile data.
+
+    The response includes the user's name and current points balance.
+    """
 
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -54,6 +57,7 @@ class LoginView(APIView):
             {
                 "token": token.key,
                 "uuid": str(customer.uuid),
+                "name": user.username,
                 "points": customer.points,
                 "json_package": json_package,
             }
