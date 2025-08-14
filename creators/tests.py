@@ -20,6 +20,7 @@ class CreatorSettingsTests(TestCase):
         user = CustomUser.objects.create_user(
             username="creator2",
             password="pass123",
+            email="creator2@example.com",
             is_creator=True,
         )
         self.client.force_login(user)
