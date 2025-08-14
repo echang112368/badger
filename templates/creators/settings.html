@@ -20,6 +20,14 @@
     <form method="post" class="row g-3">
         {% csrf_token %}
         <div class="col-md-6">
+            <label class="form-label">{{ user_form.first_name.label }}</label>
+            {{ user_form.first_name }}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">{{ user_form.last_name.label }}</label>
+            {{ user_form.last_name }}
+        </div>
+        <div class="col-md-6">
             <label for="paypal_email" class="form-label">PayPal Email</label>
             <input type="email" id="paypal_email" name="paypal_email" class="form-control" value="{{ creator_meta.paypal_email }}">
         </div>

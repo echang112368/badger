@@ -3,6 +3,7 @@ from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
 from creators.models import CreatorMeta
 from .forms import MerchantItemForm, MerchantSettingsForm
+from accounts.forms import UserNameForm
 from .models import MerchantItem, MerchantMeta
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse
@@ -150,14 +151,18 @@ def merchant_settings(request):
     merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
         form = MerchantSettingsForm(request.POST, instance=merchant_meta)
-        if form.is_valid():
+        user_form = UserNameForm(request.POST, instance=request.user)
+        if form.is_valid() and user_form.is_valid():
             form.save()
+            user_form.save()
             return redirect('merchant_settings')
     else:
         form = MerchantSettingsForm(instance=merchant_meta)
+        user_form = UserNameForm(instance=request.user)
 
     return render(request, 'merchants/settings.html', {
         'merchant': request.user,
         'merchant_meta': merchant_meta,
         'settings_form': form,
+        'user_form': user_form,
     })
