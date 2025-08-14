@@ -27,3 +27,19 @@ class CreatorSettingsTests(TestCase):
         response = self.client.get(reverse("creator_settings"))
         self.assertContains(response, user.password)
 
+    def test_settings_updates_name(self):
+        user = CustomUser.objects.create_user(
+            username="creator3",
+            password="pass123",
+            email="creator3@example.com",
+            is_creator=True,
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("creator_settings"),
+            {"first_name": "New", "last_name": "Name", "paypal_email": ""},
+        )
+        self.assertRedirects(response, reverse("creator_settings"))
+        user.refresh_from_db()
+        self.assertEqual(user.last_name, "Name")
+

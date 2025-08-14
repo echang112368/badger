@@ -8,6 +8,7 @@ from datetime import date
 import json
 
 from .models import CreatorMeta
+from accounts.forms import UserNameForm
 
 from links.models import MerchantCreatorLink, STATUS_ACTIVE
 from merchants.models import MerchantItem, MerchantMeta
@@ -105,15 +106,21 @@ def creator_my_links(request):
 def creator_settings(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
+        user_form = UserNameForm(request.POST, instance=request.user)
         paypal_email = request.POST.get("paypal_email", "").strip()
-        if paypal_email:
-            creator_meta.paypal_email = paypal_email
-            creator_meta.save()
+        if user_form.is_valid():
+            user_form.save()
+            if paypal_email:
+                creator_meta.paypal_email = paypal_email
+                creator_meta.save()
+            return redirect("creator_settings")
+    else:
+        user_form = UserNameForm(instance=request.user)
 
     return render(
         request,
         "creators/settings.html",
-        {"creator_meta": creator_meta, "creator": request.user},
+        {"creator_meta": creator_meta, "creator": request.user, "user_form": user_form},
     )
 
 

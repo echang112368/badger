@@ -42,6 +42,25 @@ class MerchantSettingsTests(TestCase):
         response = self.client.get(reverse("merchant_settings"))
         self.assertContains(response, user.password)
 
+    def test_settings_updates_name(self):
+        user = CustomUser.objects.create_user(
+            username="merchant4", password="pass123", email="merchant4@example.com", is_merchant=True
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_settings"),
+            {
+                "first_name": "New",
+                "last_name": "Name",
+                "paypal_email": "",
+                "shopify_access_token": "",
+                "shopify_store_domain": "",
+            },
+        )
+        self.assertRedirects(response, reverse("merchant_settings"))
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "New")
+
 
 class StoreIdLookupTests(TestCase):
     def test_returns_uuid_for_domain(self):

@@ -13,16 +13,22 @@ class CustomLoginForm(AuthenticationForm):
 class BusinessSignUpForm(UserCreationForm):
     class Meta:
         model = User
-        fields = ("username", 'email', 'password1', 'password2')
+        fields = ("username", "first_name", "last_name", 'email', 'password1', 'password2')
 
 class CreatorSignUpForm(UserCreationForm):
     class Meta:
         model = User
-        fields = ('username', 'email', 'password1', 'password2')
+        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
 
 
 class UserSignUpForm(UserCreationForm):
     class Meta:
         model = User
-        fields = ("username", "email", "password1", "password2")
+        fields = ("username", "first_name", "last_name", "email", "password1", "password2")
+
+
+class UserNameForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name")
 
