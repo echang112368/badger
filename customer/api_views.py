@@ -35,7 +35,9 @@ class LoginView(APIView):
 
         User = get_user_model()
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(
+                email=email, is_merchant=False, is_creator=False
+            )
         except User.DoesNotExist:
             user = None
 
