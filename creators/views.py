@@ -111,7 +111,9 @@ def creator_settings(request):
             creator_meta.save()
 
     return render(
-        request, "creators/settings.html", {"creator_meta": creator_meta}
+        request,
+        "creators/settings.html",
+        {"creator_meta": creator_meta, "creator": request.user},
     )
 
 

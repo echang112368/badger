@@ -26,6 +26,14 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(meta.shopify_access_token, "token")
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
+    def test_settings_displays_email(self):
+        user = CustomUser.objects.create_user(
+            username="merchant", password="pass", email="merchant@example.com", is_merchant=True
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+        self.assertContains(response, user.email)
+
 
 class StoreIdLookupTests(TestCase):
     def test_returns_uuid_for_domain(self):
