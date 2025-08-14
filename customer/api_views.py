@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.http import QueryDict
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,8 +19,13 @@ class LoginView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        email = request.data.get("email")
-        password = request.data.get("password")
+        json_package = request.data
+        if isinstance(json_package, QueryDict):
+            json_package = json_package.dict()
+        print("LoginView received JSON package:", json_package)
+
+        email = json_package.get("email")
+        password = json_package.get("password")
 
         if not email or not password:
             return Response(
@@ -47,6 +53,7 @@ class LoginView(APIView):
                 "token": token.key,
                 "uuid": str(customer.uuid),
                 "points": customer.points,
+                "json_package": json_package,
             }
         )
 
