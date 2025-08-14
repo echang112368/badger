@@ -26,4 +26,8 @@ def user_dashboard(request):
 @login_required
 def user_settings(request):
     customer_meta, _ = CustomerMeta.objects.get_or_create(user=request.user)
-    return render(request, 'customer/settings.html', {'customer_meta': customer_meta})
+    return render(
+        request,
+        'customer/settings.html',
+        {'customer_meta': customer_meta, 'customer': request.user},
+    )

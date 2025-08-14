@@ -3,6 +3,13 @@
 {% block content %}
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">Settings</h1>
+    <div class="card shadow-sm rounded mb-3">
+        <div class="card-body">
+            <p class="mb-1 fw-bold">Your Email</p>
+            <p class="mb-0">{{ creator.email }}</p>
+        </div>
+    </div>
+
     <form method="post" class="row g-3">
         {% csrf_token %}
         <div class="col-md-6">
