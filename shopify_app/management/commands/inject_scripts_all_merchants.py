@@ -4,8 +4,8 @@ from merchants.models import MerchantMeta
 from shopify_app.shopify_client import ShopifyClient
 
 SCRIPT_SRCS = [
-    "https://c3e03559195a.ngrok-free.app/static/js/referral_tracker.js",
-    "https://c3e03559195a.ngrok-free.app/static/js/cart_attributes.js",
+    "https://6f26ddd568cc.ngrok-free.app/static/js/referral_tracker.js",
+    "https://6f26ddd568cc.ngrok-free.app/static/js/cart_attributes.js",
 ]
 
 

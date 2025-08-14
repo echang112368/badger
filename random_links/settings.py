@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", 'c3e03559195a.ngrok-free.app']
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", '6f26ddd568cc.ngrok-free.app']
 
 
 # Application definition
@@ -148,7 +148,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'webmaster@localhost'
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://c3e03559195a.ngrok-free.app"
+    "https://6f26ddd568cc.ngrok-free.app"
 
 ]
 #change url in shoplify_app/management/commands/inject_scripts_all_merchants.py if you change the ngrok URL
