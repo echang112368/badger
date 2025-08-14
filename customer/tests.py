@@ -31,6 +31,19 @@ class CustomerSettingsTests(TestCase):
         response = self.client.get(reverse('user_settings'))
         self.assertContains(response, user.password)
 
+    def test_settings_updates_name(self):
+        user = CustomUser.objects.create_user(
+            username='tester3', password='pass123', email='tester3@example.com'
+        )
+        self.client.login(username='tester3', password='pass123')
+        response = self.client.post(
+            reverse('user_settings'),
+            {'first_name': 'New', 'last_name': 'Name'},
+        )
+        self.assertRedirects(response, reverse('user_settings'))
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, 'New')
+
 
 class LoginAPITests(TestCase):
     def setUp(self):

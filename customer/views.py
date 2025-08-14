@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from .models import CustomerMeta
+from accounts.forms import UserNameForm
 
 
 @login_required
@@ -26,8 +27,15 @@ def user_dashboard(request):
 @login_required
 def user_settings(request):
     customer_meta, _ = CustomerMeta.objects.get_or_create(user=request.user)
+    if request.method == 'POST':
+        user_form = UserNameForm(request.POST, instance=request.user)
+        if user_form.is_valid():
+            user_form.save()
+            return redirect('user_settings')
+    else:
+        user_form = UserNameForm(instance=request.user)
     return render(
         request,
         'customer/settings.html',
-        {'customer_meta': customer_meta, 'customer': request.user},
+        {'customer_meta': customer_meta, 'customer': request.user, 'user_form': user_form},
     )
