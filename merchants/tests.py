@@ -34,6 +34,14 @@ class MerchantSettingsTests(TestCase):
         response = self.client.get(reverse("merchant_settings"))
         self.assertContains(response, user.email)
 
+    def test_settings_displays_password(self):
+        user = CustomUser.objects.create_user(
+            username="merchant3", password="pass123", is_merchant=True
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+        self.assertContains(response, user.password)
+
 
 class StoreIdLookupTests(TestCase):
     def test_returns_uuid_for_domain(self):
