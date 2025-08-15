@@ -46,21 +46,32 @@
     var storeID = getCookie('storeID');
     var cusID = getCookie('cusID');
     console.log('cusID cookie', cusID);
-    if (!uuid || !storeID || !cusID) {
-      console.log('Missing uuid, storeID, or cusID cookie, proceeding without update');
+
+    if (!uuid && !storeID && !cusID) {
+      console.log('No tracking cookies, proceeding without update');
       return proceed();
     }
 
     fetchCartAttributes()
       .then(function(attrs) {
-        if (attrs.uuid === uuid && attrs.storeID === storeID && attrs.cusID === cusID) {
+        var needsUpdate = false;
+        if (uuid && attrs.uuid !== uuid) {
+          attrs.uuid = uuid;
+          needsUpdate = true;
+        }
+        if (storeID && attrs.storeID !== storeID) {
+          attrs.storeID = storeID;
+          needsUpdate = true;
+        }
+        if (cusID && attrs.cusID !== cusID) {
+          attrs.cusID = cusID;
+          needsUpdate = true;
+        }
+        if (!needsUpdate) {
           console.log('Cart attributes already up to date');
           return proceed();
         }
 
-        attrs.uuid = uuid;
-        attrs.storeID = storeID;
-        attrs.cusID = cusID;
         return updateCartAttributes(attrs)
           .catch(function(err) {
             console.warn('Failed to update cart attributes', err);
