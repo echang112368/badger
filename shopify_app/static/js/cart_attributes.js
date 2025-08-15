@@ -9,7 +9,10 @@
     return fetch('/cart.js', { credentials: 'same-origin' })
       .then(function(res) { return res.json(); })
       .then(function(cart) {
-        return cart && cart.attributes ? cart.attributes : {};
+        var attrs = cart && cart.attributes ? cart.attributes : {};
+        console.log(attrs.uuid ? 'uuid found' : 'uuid not found');
+        console.log(attrs.storeID ? 'storeID found' : 'storeID not found');
+        return attrs;
       });
   }
 
