@@ -44,23 +44,20 @@
   function ensureAttributesThen(proceed) {
     var uuid = getCookie('uuid');
     var storeID = getCookie('storeID');
-    var cusID = getCookie('cusID');
-    console.log('cusID cookie', cusID);
-    if (!uuid || !storeID || !cusID) {
-      console.log('Missing uuid, storeID, or cusID cookie, proceeding without update');
+    if (!uuid || !storeID) {
+      console.log('Missing uuid or storeID cookie, proceeding without update');
       return proceed();
     }
 
     fetchCartAttributes()
       .then(function(attrs) {
-        if (attrs.uuid === uuid && attrs.storeID === storeID && attrs.cusID === cusID) {
+        if (attrs.uuid === uuid && attrs.storeID === storeID) {
           console.log('Cart attributes already up to date');
           return proceed();
         }
 
         attrs.uuid = uuid;
         attrs.storeID = storeID;
-        attrs.cusID = cusID;
         return updateCartAttributes(attrs)
           .catch(function(err) {
             console.warn('Failed to update cart attributes', err);

@@ -10,11 +10,9 @@
     try {
       var uuid = getCookie('uuid');
       var storeID = getCookie('storeID');
-      var cusID = getCookie('cusID');
-      console.log('cusID cookie', cusID);
 
-      if (!uuid || !storeID || !cusID) {
-        console.warn('Missing uuid, storeID, or cusID cookie');
+      if (!uuid || !storeID) {
+        console.warn('Missing uuid or storeID cookie');
         return;
       }
 
@@ -24,7 +22,6 @@
           var attributes = cart && cart.attributes ? cart.attributes : {};
           attributes.uuid = uuid;
           attributes.storeID = storeID;
-          attributes.cusID = cusID;
 
           return fetch('/cart/update.js', {
             method: 'POST',

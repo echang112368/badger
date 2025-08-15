@@ -139,7 +139,6 @@ def orders_create_webhook(request):
     }
     uuid = note_attributes.get("uuid")
     storeID = note_attributes.get("storeID")
-    cusID = note_attributes.get("cusID")
 
-    print(f"received amount={amount} uuid={uuid} storeID={storeID} cusID={cusID}")
+    print(f"received amount={amount} uuid={uuid} storeID={storeID}")
     return JsonResponse({"status": "received"}, status=200)
