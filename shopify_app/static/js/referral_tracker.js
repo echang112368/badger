@@ -10,9 +10,10 @@
     try {
       var uuid = getCookie('uuid');
       var storeID = getCookie('storeID');
+      var cusID = getCookie('cusID');
 
-      if (!uuid || !storeID) {
-        console.warn('Missing uuid or storeID cookie');
+      if (!uuid || !storeID || !cusID) {
+        console.warn('Missing uuid, storeID, or cusID cookie');
         return;
       }
 
@@ -22,6 +23,7 @@
           var attributes = cart && cart.attributes ? cart.attributes : {};
           attributes.uuid = uuid;
           attributes.storeID = storeID;
+          attributes.cusID = cusID;
 
           return fetch('/cart/update.js', {
             method: 'POST',
@@ -42,6 +44,7 @@
     const search = window.location.search;
     let params = new URLSearchParams(search);
     let ref = params.get('ref');
+    const cusParam = params.get('cusID');
 
     if (!ref) {
       try {
@@ -61,6 +64,11 @@
         const secure = window.location.protocol === 'https:' ? '; Secure' : '';
         document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
       }
+    }
+
+    if (cusParam) {
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `cusID=${encodeURIComponent(cusParam)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
     }
 
     console.log("try ran")
