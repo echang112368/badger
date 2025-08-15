@@ -12,9 +12,8 @@
       var storeID = getCookie('storeID');
       var cusID = getCookie('cusID');
       console.log('cusID cookie', cusID);
-
-      if (!uuid || !storeID || !cusID) {
-        console.warn('Missing uuid, storeID, or cusID cookie');
+      if (!uuid && !storeID && !cusID) {
+        console.warn('No tracking cookies');
         return;
       }
 
@@ -22,9 +21,15 @@
         .then(function (res) { return res.json(); })
         .then(function (cart) {
           var attributes = cart && cart.attributes ? cart.attributes : {};
-          attributes.uuid = uuid;
-          attributes.storeID = storeID;
-          attributes.cusID = cusID;
+          if (uuid) {
+            attributes.uuid = uuid;
+          }
+          if (storeID) {
+            attributes.storeID = storeID;
+          }
+          if (cusID) {
+            attributes.cusID = cusID;
+          }
 
           return fetch('/cart/update.js', {
             method: 'POST',
