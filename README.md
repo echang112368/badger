@@ -81,3 +81,6 @@ For referral_tracker.js, I am using a header to avoid ngrok warning from poping 
 
 ## Run Ngrok
 Run with ngrok http 8000 --request-header-remove "ngrok-skip-browser-warning"
+
+## Debugging issues
+1. Issue where it seems that the injectiosn are not being applied run python manage.py inject_scripts_all_merchants

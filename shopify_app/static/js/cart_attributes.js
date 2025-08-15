@@ -1,4 +1,5 @@
 (function() {
+  
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\/\\+^])/g, '\\$1') + '=([^;]*)'));
     return match ? decodeURIComponent(match[1]) : null;
@@ -121,7 +122,7 @@
       if (!link) return;
       if (isCheckoutPath(link.getAttribute('href'))) {
         event.preventDefault();
-        window.print();
+        print();
         var href = link.href;
         ensureAttributesThen(function() { rawNavigate(href); });
       }
@@ -134,7 +135,7 @@
       var action = form.getAttribute('action') || '';
       if (isCheckoutPath(action)) {
         event.preventDefault();
-        window.print();
+        print();
         ensureAttributesThen(function() { submitCheckout(form); });
       }
     });
@@ -149,7 +150,7 @@
       var button = wrapper.querySelector('button');
       if (!button) return;
       event.preventDefault();
-      window.print();
+      print();
       bypass = true;
       ensureAttributesThen(function() {
         button.click();
