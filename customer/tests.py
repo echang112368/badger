@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.urls import reverse
 from accounts.models import CustomUser
+from decimal import Decimal
+from ledger.models import LedgerEntry
 from .models import CustomerMeta
 
 
@@ -56,6 +58,11 @@ class LoginAPITests(TestCase):
         )
 
     def test_valid_login_returns_token_uuid_name_points(self):
+        LedgerEntry.objects.create(
+            creator=self.user,
+            amount=Decimal("1.23"),
+            entry_type="commission",
+        )
         url = reverse("api_login")
         response = self.client.post(url, {
             "username": "tester@example.com",
@@ -68,7 +75,7 @@ class LoginAPITests(TestCase):
         self.assertIn("name", data)
         self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
-        self.assertEqual(data["points"], 0)
+        self.assertEqual(data["points"], 123)
 
     def test_invalid_login_returns_401(self):
         url = reverse("api_login")
