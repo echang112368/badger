@@ -1,13 +1,14 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from .models import CustomerMeta
+from .utils import get_points_balance
 from accounts.forms import UserNameForm
 
 
 @login_required
 def user_dashboard(request):
     user = request.user
-    points_balance = 0
+    points_balance = get_points_balance(user)
     redemption_value = points_balance / 100
     lifetime_points = points_balance
     lifetime_savings = 0

@@ -9,13 +9,14 @@ from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
 
 from .models import CustomerMeta
+from .utils import get_points_balance
 
 
 @method_decorator(csrf_exempt, name="dispatch")
 class LoginView(APIView):
     """Authenticate a user and return an auth token with profile data.
 
-    The response includes the user's full name and current points balance.
+    The response includes the user's full name.
     """
 
     permission_classes = [AllowAny]
@@ -58,7 +59,7 @@ class LoginView(APIView):
                 "token": token.key,
                 "uuid": str(customer.uuid),
                 "name": f"{user.first_name} {user.last_name}".strip(),
-                "points": customer.points,
+                "points": get_points_balance(user),
                 "json_package": json_package,
             }
         )
