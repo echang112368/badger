@@ -15,7 +15,7 @@ from .models import CustomerMeta
 class LoginView(APIView):
     """Authenticate a user and return an auth token with profile data.
 
-    The response includes the user's full name and current points balance.
+    The response includes the user's full name.
     """
 
     permission_classes = [AllowAny]
@@ -58,7 +58,6 @@ class LoginView(APIView):
                 "token": token.key,
                 "uuid": str(customer.uuid),
                 "name": f"{user.first_name} {user.last_name}".strip(),
-                "points": customer.points,
                 "json_package": json_package,
             }
         )
