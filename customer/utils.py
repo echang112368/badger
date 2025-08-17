@@ -2,12 +2,15 @@ from django.contrib.auth import get_user_model
 
 
 def get_points_balance(user: get_user_model()) -> int:
-    """Return the current points balance for the given user.
+    """Return the current rewards points for ``user``.
 
-    The dashboard currently displays a placeholder value. Centralising
-    the logic here keeps the login API and dashboard in sync and makes it
-    easy to implement real point tracking later.
+    Points are derived from the creator ledger balance. Each dollar of
+    unpaid commission equates to 100 points. Using this helper keeps the
+    login API and dashboard in sync with the ledger.
     """
 
-    return 0
+    from ledger.models import LedgerEntry
+
+    balance = LedgerEntry.creator_balance(user)
+    return int(balance * 100)
 
