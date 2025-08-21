@@ -2,9 +2,22 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import CustomUser
+from .models import CreatorMeta
 
 
 class CreatorSettingsTests(TestCase):
+    def test_settings_displays_uuid(self):
+        user = CustomUser.objects.create_user(
+            username="creator_uuid",
+            password="pass",
+            email="creator_uuid@example.com",
+            is_creator=True,
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("creator_settings"))
+        creator_meta = CreatorMeta.objects.get(user=user)
+        self.assertContains(response, str(creator_meta.uuid))
+
     def test_settings_displays_email(self):
         user = CustomUser.objects.create_user(
             username="creator",
