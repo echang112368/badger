@@ -17,6 +17,13 @@
         </div>
     </div>
 
+    <div class="card shadow-sm rounded mb-3">
+        <div class="card-body">
+            <p class="mb-1 fw-bold">Your UUID</p>
+            <p class="mb-0">{{ creator_meta.uuid }}</p>
+        </div>
+    </div>
+
     <form method="post" class="row g-3">
         {% csrf_token %}
         <div class="col-md-6">
