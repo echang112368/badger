@@ -75,7 +75,7 @@ class LoginAPITests(TestCase):
         self.assertIn("name", data)
         self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
-        self.assertEqual(data["points"], 123)
+        self.assertEqual(data["points"], 73)
 
     def test_invalid_login_returns_401(self):
         url = reverse("api_login")

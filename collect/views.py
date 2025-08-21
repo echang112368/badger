@@ -6,7 +6,9 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 from merchants.models import MerchantMeta
 from creators.models import CreatorMeta
+from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
+from decimal import Decimal, InvalidOperation
 
 @csrf_exempt
 def redirect_view(request, short_code):
@@ -132,16 +134,45 @@ def orders_create_webhook(request):
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    amount = payload.get("total_price")
-    print('These are the note attributes:', payload.get("note_attributes", []))
+    amount_str = payload.get("total_price")
     note_attributes = {
         attr.get("name"): attr.get("value") for attr in payload.get("note_attributes", [])
     }
-    uuid = note_attributes.get("uuid")
-    storeID = note_attributes.get("storeID")
-    cusID = note_attributes.get("cusID")
+    uuid = note_attributes.get("uuid")  # creator uuid
+    buisID = note_attributes.get("storeID")  # merchant uuid
+    cusID = note_attributes.get("cusID")  # customer uuid
 
     print(
-        f"received amount={amount} uuid={uuid} storeID={storeID} cusID={cusID}"
+        f"received amount={amount_str} uuid={uuid} buisID={buisID} cusID={cusID}"
     )
+
+    try:
+        amount = Decimal(amount_str)
+    except (TypeError, InvalidOperation):
+        return JsonResponse({"error": "Invalid amount"}, status=400)
+
+    merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
+    creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
+    customer_meta = CustomerMeta.objects.filter(uuid=cusID).first()
+
+    if merchant_meta and creator_meta and customer_meta:
+        commission_rate = merchant_meta.affiliate_percent or 0
+        commission = (amount * Decimal(commission_rate) / 100).quantize(Decimal("0.01"))
+
+        LedgerEntry.objects.create(
+            creator=creator_meta.user,
+            amount=commission,
+            entry_type="commission",
+        )
+        LedgerEntry.objects.create(
+            merchant=merchant_meta.user,
+            amount=-commission,
+            entry_type="commission",
+        )
+        LedgerEntry.objects.create(
+            creator=customer_meta.user,
+            amount=commission,
+            entry_type="commission",
+        )
+
     return JsonResponse({"status": "received"}, status=200)

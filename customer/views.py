@@ -9,7 +9,7 @@ from accounts.forms import UserNameForm
 def user_dashboard(request):
     user = request.user
     points_balance = get_points_balance(user)
-    redemption_value = points_balance / 100
+    redemption_value = points_balance / 60
     lifetime_points = points_balance
     lifetime_savings = 0
     since_year = user.date_joined.year
