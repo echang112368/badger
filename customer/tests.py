@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from accounts.models import CustomUser
+from merchants.models import MerchantMeta
 from decimal import Decimal
 from ledger.models import LedgerEntry
 from .models import CustomerMeta
@@ -121,3 +122,34 @@ class LoginAPITests(TestCase):
         )
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json().get("detail"), "Invalid credentials")
+
+
+class DashboardViewTests(TestCase):
+    def test_rewards_history_displays_company_and_points(self):
+        merchant = CustomUser.objects.create_user(
+            username="merchant",
+            email="merchant@example.com",
+            password="pass123",
+            is_merchant=True,
+        )
+        merchant_meta = MerchantMeta.objects.get(user=merchant)
+        merchant_meta.company_name = "StoreCo"
+        merchant_meta.save()
+
+        customer = CustomUser.objects.create_user(
+            username="customer",
+            email="customer@example.com",
+            password="pass123",
+        )
+        LedgerEntry.objects.create(
+            creator=customer,
+            merchant=merchant,
+            amount=Decimal("120"),
+            entry_type="points",
+        )
+
+        self.client.login(username="customer", password="pass123")
+        response = self.client.get(reverse("user_dashboard"))
+        self.assertContains(response, "StoreCo")
+        self.assertContains(response, "+120 pts")
+        self.assertContains(response, "+$2.00")

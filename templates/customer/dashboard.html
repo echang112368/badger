@@ -102,19 +102,15 @@
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h2 class="h5 mb-0">Rewards history</h2>
-        <div class="text-primary">Filters ▾</div>
     </div>
     <div class="table-responsive">
         <table class="table table-bordered align-middle">
             <thead class="text-uppercase">
                 <tr>
-                    <th scope="col">Transaction Date</th>
-                    <th scope="col">Store</th>
-                    <th scope="col">Description</th>
-                    <th scope="col" class="text-center">Status</th>
-                    <th scope="col">Posted Date</th>
-                    <th scope="col" class="text-end">Amount (Redemption Value)</th>
-                    <th scope="col"></th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Company</th>
+                    <th scope="col" class="text-end">Points</th>
+                    <th scope="col" class="text-end">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -122,25 +118,14 @@
                     {% for t in transactions %}
                         <tr>
                             <td>{{ t.transaction_date }}</td>
-                            <td>{{ t.store }}</td>
-                            <td>{{ t.description }}</td>
-                            <td class="text-center"><span class="badge bg-secondary status-pill">{{ t.status }}</span></td>
-                            <td>{{ t.posted_date }}</td>
-                            <td class="text-end">
-                                {% if t.points < 0 %}
-                                    <span class="amount-negative d-block">{{ t.points }} pts</span>
-                                    <small class="text-muted">(${{ t.amount_usd|floatformat:2 }})</small>
-                                {% else %}
-                                    <span class="amount-positive d-block">{{ t.points }} pts</span>
-                                    <small class="text-muted">${{ t.amount_usd|floatformat:2 }}</small>
-                                {% endif %}
-                            </td>
-                            <td class="text-end"><i class="bi bi-chevron-down"></i></td>
+                            <td>{{ t.company }}</td>
+                            <td class="text-end amount-positive">+{{ t.points }} pts</td>
+                            <td class="text-end amount-positive">+${{ t.amount_usd|floatformat:2 }}</td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-4">No rewards yet</td>
+                        <td colspan="4" class="text-center py-4">No rewards yet</td>
                     </tr>
                 {% endif %}
             </tbody>
