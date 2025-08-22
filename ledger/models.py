@@ -28,6 +28,7 @@ class LedgerEntry(models.Model):
         ("commission", "Commission"),
         ("payout", "Payout"),
         ("payment", "Payment"),
+        ("points", "Points"),
     ]
 
     creator = models.ForeignKey(
