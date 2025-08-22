@@ -1,16 +1,21 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Sum
+from decimal import Decimal
+
+from ledger.models import LedgerEntry
 
 
 def get_points_balance(user: get_user_model()) -> int:
     """Return the current rewards points for ``user``.
 
-    Points are derived from the creator ledger balance. Each dollar of
-    unpaid commission equates to 60 points. Using this helper keeps the
-    login API and dashboard in sync with the ledger.
+    Points are stored as ledger entries with ``entry_type="points"``.
     """
 
-    from ledger.models import LedgerEntry
-
-    balance = LedgerEntry.creator_balance(user)
-    return int(balance * 60)
+    total = (
+        LedgerEntry.objects.filter(creator=user, entry_type="points")
+        .aggregate(total=Sum("amount"))
+        .get("total")
+        or Decimal("0")
+    )
+    return int(total)
 
