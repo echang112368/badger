@@ -147,7 +147,7 @@ def orders_create_webhook(request):
     )
 
     try:
-        amount = Decimal(amount_str)
+        amount = Decimal(amount_str).quantize(Decimal("0.01"))
     except (TypeError, InvalidOperation):
         return JsonResponse({"error": "Invalid amount"}, status=400)
 
@@ -155,24 +155,34 @@ def orders_create_webhook(request):
     creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
     customer_meta = CustomerMeta.objects.filter(uuid=cusID).first()
 
-    if merchant_meta and creator_meta and customer_meta:
-        commission_rate = merchant_meta.affiliate_percent or 0
-        commission = (amount * Decimal(commission_rate) / 100).quantize(Decimal("0.01"))
+    if merchant_meta and creator_meta:
+        commission_rate = Decimal(merchant_meta.affiliate_percent or 0)
+        commission = (amount * commission_rate / Decimal("100")).quantize(
+            Decimal("0.01")
+        )
 
-        LedgerEntry.objects.create(
-            creator=creator_meta.user,
-            amount=commission,
-            entry_type="commission",
-        )
-        LedgerEntry.objects.create(
-            merchant=merchant_meta.user,
-            amount=-commission,
-            entry_type="commission",
-        )
-        LedgerEntry.objects.create(
-            creator=customer_meta.user,
-            amount=commission,
-            entry_type="commission",
-        )
+        if commission > 0:
+            # Credit the content creator with the commission
+            LedgerEntry.objects.create(
+                creator=creator_meta.user,
+                amount=commission,
+                entry_type="commission",
+            )
+
+            # Charge the merchant for the commission
+            LedgerEntry.objects.create(
+                merchant=merchant_meta.user,
+                amount=-commission,
+                entry_type="commission",
+            )
+
+            # Reward the customer with points (60 points = $1)
+            if customer_meta:
+                points = int(commission * 60)
+                LedgerEntry.objects.create(
+                    creator=customer_meta.user,
+                    amount=Decimal(points),
+                    entry_type="points",
+                )
 
     return JsonResponse({"status": "received"}, status=200)
