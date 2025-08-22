@@ -51,6 +51,13 @@
 
         <div class="card shadow-sm rounded mb-3">
             <div class="card-body">
+                <label class="form-label fw-bold d-block">{{ settings_form.affiliate_percent.label }}</label>
+                {{ settings_form.affiliate_percent }}
+            </div>
+        </div>
+
+        <div class="card shadow-sm rounded mb-3">
+            <div class="card-body">
                 <label class="form-label fw-bold d-block">Shopify Admin API Access Token</label>
                 <div class="input-group mb-1">
                     {{ settings_form.shopify_access_token }}
