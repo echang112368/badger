@@ -60,8 +60,8 @@ class LoginAPITests(TestCase):
     def test_valid_login_returns_token_uuid_name_points(self):
         LedgerEntry.objects.create(
             creator=self.user,
-            amount=Decimal("1.23"),
-            entry_type="commission",
+            amount=Decimal("73"),
+            entry_type="points",
         )
         url = reverse("api_login")
         response = self.client.post(url, {
