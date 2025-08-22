@@ -78,6 +78,7 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(creator_entry.amount, Decimal("2.63"))
         self.assertEqual(merchant_entry.amount, Decimal("-2.63"))
         self.assertEqual(points_entry.amount, Decimal("157"))
+        self.assertEqual(points_entry.merchant, merchant)
 
     def test_missing_customer_skips_points(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
