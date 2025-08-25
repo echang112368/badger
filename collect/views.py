@@ -181,6 +181,7 @@ def orders_create_webhook(request):
                 points = int(commission * 60)
                 LedgerEntry.objects.create(
                     creator=customer_meta.user,
+                    merchant=merchant_meta.user,
                     amount=Decimal(points),
                     entry_type="points",
                 )
