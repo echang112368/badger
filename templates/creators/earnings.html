@@ -1,0 +1,94 @@
+{% extends 'creators/base.html' %}
+{% block title %}Earnings{% endblock %}
+{% block content %}
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">Earnings</h1>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <h6 class="text-muted">Unpaid Earnings</h6>
+                    <p class="fs-4 fw-semibold mb-0">${{ balance }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <h2 class="fw-bold fs-4 mb-3">Ledger</h2>
+        <div class="card shadow-sm rounded">
+            <div class="card-body p-0">
+                <table class="table table-striped table-bordered mb-0 w-100">
+                    <thead class="table-light">
+                        <tr class="fs-5">
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fs-6">
+                        {% for entry in ledger_entries %}
+                        <tr>
+                            <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
+                            <td>{{ entry.entry_type }}</td>
+                            <td>{{ entry.amount }}</td>
+                            <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">No transactions.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="mb-4">
+        <h2 class="fw-bold fs-4 mb-3">Analytics</h2>
+        <div class="card shadow-sm rounded">
+            <div class="card-body">
+                <canvas id="earningsChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const earningsLabels = {{ earnings_labels|safe }};
+        const earningsData = {{ earnings_totals|safe }};
+        const usdFormatter = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        });
+        const ctx = document.getElementById('earningsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: earningsLabels,
+                datasets: [{
+                    label: 'Earnings',
+                    data: earningsData,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => usdFormatter.format(value),
+                        },
+                        title: {
+                            display: true,
+                            text: 'USD',
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</section>
+{% endblock %}
