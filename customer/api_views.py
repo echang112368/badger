@@ -64,3 +64,27 @@ class LoginView(APIView):
             }
         )
 
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PointsView(APIView):
+    """Return the current points balance for a customer by UUID."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, uuid):
+        try:
+            customer = CustomerMeta.objects.get(uuid=uuid)
+        except CustomerMeta.DoesNotExist:
+            return Response(
+                {"detail": "Customer not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "uuid": str(customer.uuid),
+                "points": get_points_balance(customer.user),
+            }
+        )
+
