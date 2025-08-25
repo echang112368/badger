@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+Lib/
+Include/
+Scripts/
+pyvenv.cfg
+
+# Django
+db.sqlite3
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+migrations/
+!merchants/migrations/
+
+# Environment
+.env
+
+# Static files
+staticfiles/
+afilink/
