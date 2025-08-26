@@ -1,0 +1,6 @@
+{
+  "python.analysis.extraPaths": [
+    "./badger"
+  ],
+  "python.defaultInterpreterPath": "./network/Scripts/python.exe"
+}
