@@ -83,12 +83,9 @@ For referral_tracker.js, I am using a header to avoid ngrok warning from poping 
 Run with ngrok http 8000 --request-header-remove "ngrok-skip-browser-warning"
 
 ## Debugging issues
-1. Issue where it seems that the injectiosn are not being applied run python manage.py inject_scripts_all_merchants
-2. CSRF verification failed. Request aborted.
-"
-Help
-Reason given for failure:
+1. Issue where it seems that the injectiosn are not being applied 
+- run python manage.py inject_scripts_all_merchants
+- make sure you have turned on ngrok, entre the ngrok http url and approve it to turn it on
 
-    CSRF token from POST incorrect."
 
 
