@@ -135,6 +135,10 @@ def orders_create_webhook(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     amount_str = payload.get("total_price")
+
+    #testing and getting the entire note attribute
+    print(payload.get("note_attributes", []))
+
     note_attributes = {
         attr.get("name"): attr.get("value") for attr in payload.get("note_attributes", [])
     }
