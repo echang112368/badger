@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/', include('customer.api_urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
+    path('shopify/', include('shopify_app.urls')),
     path('', include('collect.urls')),
     path('verification/', include('verify_email.urls')),
     ]
