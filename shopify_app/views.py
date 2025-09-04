@@ -1,11 +1,14 @@
 import uuid
-from django.http import JsonResponse, HttpResponseBadRequest
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
 from merchants.models import MerchantMeta
 from .shopify_client import ShopifyClient
 
-@require_POST
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def create_discount(request, merchant_uuid):
     """Create a unique 3% discount code valid for 24 hours.
 
@@ -14,10 +17,13 @@ def create_discount(request, merchant_uuid):
     try:
         meta = MerchantMeta.objects.get(uuid=merchant_uuid)
     except MerchantMeta.DoesNotExist:
-        return HttpResponseBadRequest("Invalid merchant")
+        return Response({"error": "Invalid merchant"}, status=status.HTTP_400_BAD_REQUEST)
 
     if not meta.shopify_access_token or not meta.shopify_store_domain:
-        return HttpResponseBadRequest("Missing Shopify credentials")
+        return Response(
+            {"error": "Missing Shopify credentials"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     client = ShopifyClient(meta.shopify_access_token, meta.shopify_store_domain)
 
@@ -42,7 +48,10 @@ def create_discount(request, merchant_uuid):
     price_rule_id = response.json()["price_rule"]["id"]
 
     discount_payload = {"discount_code": {"code": coupon_code}}
-    client.post(f"/admin/api/2024-07/price_rules/{price_rule_id}/discount_codes.json", json=discount_payload)
+    client.post(
+        f"/admin/api/2024-07/price_rules/{price_rule_id}/discount_codes.json",
+        json=discount_payload,
+    )
 
     print(coupon_code)
-    return JsonResponse({"coupon_code": coupon_code})
+    return Response({"coupon_code": coupon_code})

@@ -5,15 +5,21 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 import uuid
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class CreateDiscountViewTests(TestCase):
     def setUp(self):
-        user = CustomUser.objects.create_user(username="merchant", password="pass")
+        user = CustomUser.objects.create_user(
+            username="merchant",
+            password="pass",
+            email="merchant@example.com",
+        )
         self.meta = MerchantMeta.objects.create(
             user=user,
             shopify_access_token="token",
             shopify_store_domain="example.myshopify.com",
         )
+        self.token = str(RefreshToken.for_user(user).access_token)
 
     @patch("shopify_app.views.uuid.uuid4")
     @patch("shopify_app.views.ShopifyClient")
@@ -29,7 +35,9 @@ class CreateDiscountViewTests(TestCase):
 
         with patch("shopify_app.views.print") as mock_print:
             url = reverse("create_discount", args=[self.meta.uuid])
-            response = self.client.post(url)
+            response = self.client.post(
+                url, HTTP_AUTHORIZATION=f"Bearer {self.token}"
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"coupon_code": "BADGER-12345678"})
