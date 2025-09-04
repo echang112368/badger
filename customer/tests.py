@@ -58,7 +58,7 @@ class LoginAPITests(TestCase):
             last_name="User",
         )
 
-    def test_valid_login_returns_token_uuid_name_points(self):
+    def test_valid_login_returns_tokens_uuid_name_points(self):
         LedgerEntry.objects.create(
             creator=self.user,
             amount=Decimal("73"),
@@ -71,23 +71,24 @@ class LoginAPITests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIn("token", data)
+        self.assertIn("access", data)
+        self.assertIn("refresh", data)
         self.assertIn("uuid", data)
         self.assertIn("name", data)
         self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
         self.assertEqual(data["points"], 73)
 
-    def test_invalid_login_returns_401(self):
+    def test_invalid_login_returns_400(self):
         url = reverse("api_login")
         response = self.client.post(url, {
             "username": "tester@example.com",
             "password": "wrong",
         })
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json().get("detail"), "Invalid credentials")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json().get("error"), "Invalid credentials")
 
-    def test_merchant_login_returns_401(self):
+    def test_merchant_login_returns_400(self):
         CustomUser.objects.create_user(
             username="merchant",
             password="pass123",
@@ -102,10 +103,10 @@ class LoginAPITests(TestCase):
                 "password": "pass123",
             },
         )
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json().get("detail"), "Invalid credentials")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json().get("error"), "Invalid credentials")
 
-    def test_creator_login_returns_401(self):
+    def test_creator_login_returns_400(self):
         CustomUser.objects.create_user(
             username="creator",
             password="pass123",
@@ -120,8 +121,8 @@ class LoginAPITests(TestCase):
                 "password": "pass123",
             },
         )
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json().get("detail"), "Invalid credentials")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json().get("error"), "Invalid credentials")
 
 
 class DashboardViewTests(TestCase):
