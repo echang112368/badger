@@ -6,14 +6,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from merchants.models import MerchantMeta
 from .shopify_client import ShopifyClient
+from .discounts import select_discount_percentage
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_discount(request, merchant_uuid):
-    """Create a unique 3% discount code valid for 24 hours.
-
-    Returns JSON with the generated coupon code.
-    """
+    """Create a discount code based on lottery probabilities."""
     try:
         meta = MerchantMeta.objects.get(uuid=merchant_uuid)
     except MerchantMeta.DoesNotExist:
@@ -24,6 +23,10 @@ def create_discount(request, merchant_uuid):
             {"error": "Missing Shopify credentials"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    percentage = select_discount_percentage()
+    if percentage is None:
+        return Response({"discount": None, "message": "No discount awarded"})
 
     client = ShopifyClient(meta.shopify_access_token, meta.shopify_store_domain)
 
@@ -36,7 +39,7 @@ def create_discount(request, merchant_uuid):
             "target_selection": "all",
             "allocation_method": "across",
             "value_type": "percentage",
-            "value": "-3.0",
+            "value": f"-{float(percentage):.1f}",
             "customer_selection": "all",
             "starts_at": now.isoformat(),
             "ends_at": (now + timezone.timedelta(days=1)).isoformat(),
@@ -53,5 +56,4 @@ def create_discount(request, merchant_uuid):
         json=discount_payload,
     )
 
-    print(coupon_code)
-    return Response({"coupon_code": coupon_code})
+    return Response({"coupon_code": coupon_code, "discount": percentage})
