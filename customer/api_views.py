@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import CustomerMeta
 from .utils import get_points_balance
@@ -47,16 +47,17 @@ class LoginView(APIView):
 
         if user is None or not user.check_password(password):
             return Response(
-                {"detail": "Invalid credentials"},
-                status=status.HTTP_401_UNAUTHORIZED,
+                {"error": "Invalid credentials"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        token, _ = Token.objects.get_or_create(user=user)
+        refresh = RefreshToken.for_user(user)
         customer, _ = CustomerMeta.objects.get_or_create(user=user)
 
         return Response(
             {
-                "token": token.key,
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
                 "uuid": str(customer.uuid),
                 "name": f"{user.first_name} {user.last_name}".strip(),
                 "points": get_points_balance(user),
