@@ -62,13 +62,13 @@
       if (match) {
         const uuid = match[1];
         const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-        document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+        document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
       }
     }
 
     if (cusParam) {
       const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `cusID=${encodeURIComponent(cusParam)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+      document.cookie = `cusID=${encodeURIComponent(cusParam)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
     }
 
     console.log("try ran")
@@ -100,7 +100,7 @@
         console.log(data.storeID);
         if (data.storeID) {
           const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-          document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=31536000; SameSite=Lax${secure}`;
+          document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
           updateCartAttributes();
         }
       })
