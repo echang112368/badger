@@ -3,6 +3,24 @@
 {% block content %}
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">Affiliate Companies</h1>
+    {% if pending_links %}
+    <h2 class="fs-4 mb-3">Pending Requests</h2>
+    <ul class="list-group mb-4">
+        {% for link in pending_links %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-semibold">{{ link.merchant.username }}</div>
+                <div class="text-muted small">{{ link.merchant.email }}</div>
+            </div>
+            <form method="post" action="{% url 'respond_request' link.id %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <button name="action" value="accept" class="btn btn-success btn-sm">Accept</button>
+                <button name="action" value="decline" class="btn btn-outline-danger btn-sm">Decline</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
     {% if merchants_with_items %}
     <div class="accordion" id="companiesAccordion">
         {% for entry in merchants_with_items %}

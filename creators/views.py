@@ -10,7 +10,7 @@ import json
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
 
-from links.models import MerchantCreatorLink, STATUS_ACTIVE
+from links.models import MerchantCreatorLink, STATUS_ACTIVE, STATUS_REQUESTED
 from merchants.models import MerchantItem, MerchantMeta
 from collect.models import RedirectLink
 from ledger.models import LedgerEntry
@@ -58,6 +58,9 @@ def creator_affiliate_companies(request):
     active_links = MerchantCreatorLink.objects.filter(
         creator=request.user, status=STATUS_ACTIVE
     )
+    pending_links = MerchantCreatorLink.objects.filter(
+        creator=request.user, status=STATUS_REQUESTED
+    )
 
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
 
@@ -93,7 +96,7 @@ def creator_affiliate_companies(request):
     return render(
         request,
         "creators/affiliate_companies.html",
-        {"merchants_with_items": merchants_with_items},
+        {"merchants_with_items": merchants_with_items, "pending_links": pending_links},
     )
 
 
