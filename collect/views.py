@@ -126,6 +126,7 @@ def stripe_webhook_view(request):
 
 @csrf_exempt
 def orders_create_webhook(request):
+    print('orders_create_webhook called' )
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
 
