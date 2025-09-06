@@ -151,6 +151,13 @@ def orders_create_webhook(request):
         f"received amount={amount_str} uuid={uuid} buisID={buisID} cusID={cusID}"
     )
 
+    # Print details for each product in the order
+    for item in payload.get("line_items", []):
+        product_id = item.get("product_id")
+        quantity = item.get("quantity")
+        price = item.get("price")
+        print(f"product_id={product_id} amount={price} quantity={quantity}")
+
     try:
         amount = Decimal(amount_str).quantize(Decimal("0.01"))
     except (TypeError, InvalidOperation):
