@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import CreatorMeta
+from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
@@ -81,4 +82,60 @@ class CreatorNameAPITests(TestCase):
         response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {self.token}")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json().get("name"), "Api Tester")
+
+
+class CreatorRequestTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(
+            username="creator_req",
+            password="pass",
+            email="creator_req@example.com",
+            is_creator=True,
+        )
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant_req",
+            password="pass",
+            email="merchant_req@example.com",
+            is_merchant=True,
+        )
+
+    def test_pending_request_displayed(self):
+        MerchantCreatorLink.objects.create(
+            merchant=self.merchant,
+            creator=self.creator,
+            status=STATUS_REQUESTED,
+        )
+        self.client.force_login(self.creator)
+        response = self.client.get(reverse("creator_affiliate_companies"))
+        self.assertContains(response, self.merchant.username)
+        self.assertContains(response, "Accept")
+
+    def test_accept_request(self):
+        link = MerchantCreatorLink.objects.create(
+            merchant=self.merchant,
+            creator=self.creator,
+            status=STATUS_REQUESTED,
+        )
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("respond_request", args=[link.id]), {"action": "accept"}
+        )
+        self.assertRedirects(response, reverse("creator_affiliate_companies"))
+        link.refresh_from_db()
+        self.assertEqual(link.status, STATUS_ACTIVE)
+
+    def test_decline_request(self):
+        link = MerchantCreatorLink.objects.create(
+            merchant=self.merchant,
+            creator=self.creator,
+            status=STATUS_REQUESTED,
+        )
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("respond_request", args=[link.id]), {"action": "decline"}
+        )
+        self.assertRedirects(response, reverse("creator_affiliate_companies"))
+        self.assertFalse(
+            MerchantCreatorLink.objects.filter(id=link.id).exists()
+        )
 
