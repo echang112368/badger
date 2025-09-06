@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import CreatorMeta
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 class CreatorSettingsTests(TestCase):
@@ -55,4 +56,29 @@ class CreatorSettingsTests(TestCase):
         self.assertRedirects(response, reverse("creator_settings"))
         user.refresh_from_db()
         self.assertEqual(user.last_name, "Name")
+
+
+class CreatorNameAPITests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="creator_api",
+            password="pass123",
+            email="creator_api@example.com",
+            first_name="Api",
+            last_name="Tester",
+            is_creator=True,
+        )
+        self.meta = CreatorMeta.objects.get(user=self.user)
+        self.token = str(RefreshToken.for_user(self.user).access_token)
+
+    def test_requires_authentication(self):
+        url = reverse("creator_name_api", kwargs={"uuid": self.meta.uuid})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_returns_creator_name(self):
+        url = reverse("creator_name_api", kwargs={"uuid": self.meta.uuid})
+        response = self.client.get(url, HTTP_AUTHORIZATION=f"Bearer {self.token}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get("name"), "Api Tester")
 
