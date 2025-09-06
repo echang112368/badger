@@ -10,6 +10,11 @@ from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from decimal import Decimal, InvalidOperation
 
+# Purchases made with this creator UUID should always incur a
+# 5% commission regardless of the merchant's configured rate.
+SPECIAL_CREATOR_UUID = "f5b545d4-5229-467f-8ddb-30dbb307d1ce"
+SPECIAL_COMMISSION_RATE = Decimal("5")
+
 @csrf_exempt
 def redirect_view(request, short_code):
     link = get_object_or_404(RedirectLink, short_code = short_code)
@@ -68,7 +73,11 @@ def webhook_view(request):
                 merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
                 creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
                 if merchant_meta and creator_meta:
-                    commission_rate = merchant_meta.affiliate_percent or 0
+                    commission_rate = (
+                        SPECIAL_COMMISSION_RATE
+                        if uuid == SPECIAL_CREATOR_UUID
+                        else merchant_meta.affiliate_percent or 0
+                    )
                     commission = round(total_amount * float(commission_rate) / 100, 2)
 
                     LedgerEntry.objects.create(
@@ -161,7 +170,11 @@ def orders_create_webhook(request):
     customer_meta = CustomerMeta.objects.filter(uuid=cusID).first()
 
     if merchant_meta and creator_meta:
-        commission_rate = Decimal(merchant_meta.affiliate_percent or 0)
+        commission_rate = (
+            SPECIAL_COMMISSION_RATE
+            if uuid == SPECIAL_CREATOR_UUID
+            else Decimal(merchant_meta.affiliate_percent or 0)
+        )
         commission = (amount * commission_rate / Decimal("100")).quantize(
             Decimal("0.01")
         )

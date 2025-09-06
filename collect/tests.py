@@ -1,13 +1,14 @@
 from django.test import TestCase, RequestFactory
 from decimal import Decimal
 import json
+import uuid
 
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
-from .views import orders_create_webhook
+from .views import orders_create_webhook, SPECIAL_CREATOR_UUID
 
 
 class OrdersWebhookTests(TestCase):
@@ -112,3 +113,19 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
         )
+
+    def test_special_creator_uuid_overrides_commission_rate(self):
+        merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
+            self._setup_users(percent=Decimal("1.00"))
+        )
+        creator_meta.uuid = uuid.UUID(SPECIAL_CREATOR_UUID)
+        creator_meta.save()
+
+        response = self._call_webhook(merchant_meta, creator_meta, customer_meta)
+        self.assertEqual(response.status_code, 200)
+
+        creator_entry = LedgerEntry.objects.get(creator=creator, entry_type="commission")
+        merchant_entry = LedgerEntry.objects.get(merchant=merchant, entry_type="commission")
+
+        self.assertEqual(creator_entry.amount, Decimal("1.32"))
+        self.assertEqual(merchant_entry.amount, Decimal("-1.32"))
