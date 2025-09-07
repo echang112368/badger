@@ -85,7 +85,11 @@ def merchant_items(request):
     if request.method == "POST":
         if request.POST.get("form_type") == "group":
             group_id = request.POST.get("group_id")
-            group = ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
+            group = (
+                ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
+                if group_id
+                else None
+            )
             group_form = ItemGroupForm(
                 request.POST, instance=group, merchant=request.user, prefix="group"
             )
