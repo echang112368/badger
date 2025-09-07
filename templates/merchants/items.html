@@ -38,6 +38,33 @@
 
     <div class="card shadow-sm rounded mt-4">
         <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Groups</h5>
+                <button type="button" class="btn btn-sm btn-primary" id="create-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal">Create New Group</button>
+            </div>
+            <ul class="list-group">
+                {% for group in groups %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="me-2">
+                        <div class="fw-bold">{{ group.name }}</div>
+                        <small>Affiliate: {{ group.affiliate_percent }}%</small>
+                        <div><small>
+                            {% for gitem in group.items.all %}
+                                {{ gitem.title }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}No items{% endfor %}
+                        </small></div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.id }}{% if not forloop.last %},{% endif %}{% endfor %}">Edit</button>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-center">No groups yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded mt-4">
+        <div class="card-body">
             <h5 class="card-title">Shopify Store Items</h5>
             <ul class="list-group">
                 {% for product in shopify_items %}
@@ -73,6 +100,48 @@
           <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
       </form>
+  </div>
+  </div>
+  </div>
+
+<div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="groupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="group">
+        <input type="hidden" name="group_id" id="group-id">
+        <div class="modal-header">
+          <h5 class="modal-title" id="groupModalLabel">Create Group</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_group-name" class="form-label">Name of group</label>
+            {{ group_form.name }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Select items</label>
+            <input type="text" class="form-control mb-2" id="item-search" placeholder="Search items">
+            <div id="items-container" class="border p-2" style="max-height:200px; overflow-y:auto;">
+              {% for checkbox in group_form.items %}
+              <div class="form-check">
+                {{ checkbox.tag }}
+                <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="id_group-affiliate_percent" class="form-label">Affiliate Percentage</label>
+            {{ group_form.affiliate_percent }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Done</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -97,6 +166,43 @@ document.querySelectorAll('.copy-btn').forEach(function(btn) {
 
         var url = this.getAttribute('data-url');
         navigator.clipboard.writeText(url);
+    });
+});
+
+document.getElementById('item-search').addEventListener('input', function() {
+    var filter = this.value.toLowerCase();
+    document.querySelectorAll('#items-container .form-check').forEach(function(el) {
+        var text = el.innerText.toLowerCase();
+        el.style.display = text.indexOf(filter) > -1 ? '' : 'none';
+    });
+});
+
+document.querySelectorAll('.edit-group-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(event) {
+        var modal = document.getElementById('groupModal');
+        modal.querySelector('#groupModalLabel').textContent = 'Edit Group';
+        modal.querySelector('#group-id').value = this.getAttribute('data-group-id');
+        modal.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
+        modal.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
+        var items = this.getAttribute('data-group-items').split(',');
+        modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
+            cb.checked = items.includes(cb.value);
+        });
+    });
+});
+
+document.getElementById('create-group-btn').addEventListener('click', function() {
+    var modal = document.getElementById('groupModal');
+    modal.querySelector('#groupModalLabel').textContent = 'Create Group';
+    modal.querySelector('#group-id').value = '';
+    modal.querySelector('#id_group-name').value = '';
+    modal.querySelector('#id_group-affiliate_percent').value = '';
+    modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
+        cb.checked = false;
+    });
+    document.getElementById('item-search').value = '';
+    document.querySelectorAll('#items-container .form-check').forEach(function(el){
+        el.style.display = '';
     });
 });
 </script>

@@ -2,9 +2,9 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
 from creators.models import CreatorMeta
-from .forms import MerchantItemForm, MerchantSettingsForm
+from .forms import MerchantItemForm, MerchantSettingsForm, ItemGroupForm
 from accounts.forms import UserNameForm
-from .models import MerchantItem, MerchantMeta
+from .models import MerchantItem, MerchantMeta, ItemGroup
 from shopify_app.shopify_client import ShopifyClient
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse
@@ -66,22 +66,39 @@ def merchant_items(request):
         return render(request, "403.html")
 
     if request.method == "POST":
-        item_id = request.POST.get("item_id")
-        if item_id:
-            item = MerchantItem.objects.filter(id=item_id, merchant=request.user).first()
-            form = MerchantItemForm(request.POST, instance=item, prefix="edit")
+        if request.POST.get("form_type") == "group":
+            group_id = request.POST.get("group_id")
+            group = ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
+            group_form = ItemGroupForm(
+                request.POST, instance=group, merchant=request.user, prefix="group"
+            )
+            if group_form.is_valid():
+                group = group_form.save(commit=False)
+                group.merchant = request.user
+                group.save()
+                group_form.save_m2m()
+                return redirect("merchant_items")
+            form = MerchantItemForm()
         else:
-            form = MerchantItemForm(request.POST)
-        if form.is_valid():
-            item = form.save(commit=False)
-            item.merchant = request.user
-            item.save()
-            return redirect("merchant_items")
+            item_id = request.POST.get("item_id")
+            if item_id:
+                item = MerchantItem.objects.filter(id=item_id, merchant=request.user).first()
+                form = MerchantItemForm(request.POST, instance=item, prefix="edit")
+            else:
+                form = MerchantItemForm(request.POST)
+            if form.is_valid():
+                item = form.save(commit=False)
+                item.merchant = request.user
+                item.save()
+                return redirect("merchant_items")
+            group_form = ItemGroupForm(merchant=request.user, prefix="group")
     else:
         form = MerchantItemForm()
+        group_form = ItemGroupForm(merchant=request.user, prefix="group")
 
     items = MerchantItem.objects.filter(merchant=request.user)
     edit_form = MerchantItemForm(prefix="edit")
+    groups = ItemGroup.objects.filter(merchant=request.user).prefetch_related("items")
     shopify_items = []
     shopify_domain = ""
     merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
@@ -105,6 +122,8 @@ def merchant_items(request):
             "form": form,
             "items": items,
             "edit_form": edit_form,
+            "groups": groups,
+            "group_form": group_form,
             "shopify_items": shopify_items,
             "shopify_domain": shopify_domain,
         },

@@ -28,3 +28,13 @@ class MerchantItem(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ItemGroup(models.Model):
+    merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    items = models.ManyToManyField(MerchantItem, related_name="groups", blank=True)
+    affiliate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    def __str__(self):
+        return self.name

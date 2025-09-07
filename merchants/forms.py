@@ -1,5 +1,6 @@
 from django import forms
-from .models import MerchantItem, MerchantMeta
+from django.db.models import Q
+from .models import MerchantItem, MerchantMeta, ItemGroup
 
 
 class MerchantItemForm(forms.ModelForm):
@@ -50,4 +51,46 @@ class MerchantSettingsForm(forms.ModelForm):
         if host.startswith("www."):
             host = host[4:]
         return host
+
+
+class ItemGroupForm(forms.ModelForm):
+    items = forms.ModelMultipleChoiceField(
+        queryset=MerchantItem.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+
+    affiliate_percent = forms.DecimalField(
+        required=False,
+        min_value=0,
+        max_value=100,
+        label="Affiliate Percentage (%)",
+    )
+
+    class Meta:
+        model = ItemGroup
+        fields = ["name", "items", "affiliate_percent"]
+
+    def __init__(self, *args, merchant=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if merchant is not None:
+            qs = MerchantItem.objects.filter(merchant=merchant)
+            if self.instance.pk:
+                qs = qs.filter(Q(groups__isnull=True) | Q(groups=self.instance))
+            else:
+                qs = qs.filter(groups__isnull=True)
+            self.fields["items"].queryset = qs
+
+    def clean_items(self):
+        items = self.cleaned_data.get("items")
+        if not items:
+            return items
+        conflict = ItemGroup.objects.filter(items__in=items)
+        if self.instance.pk:
+            conflict = conflict.exclude(pk=self.instance.pk)
+        if conflict.exists():
+            raise forms.ValidationError(
+                "Some selected items already belong to another group."
+            )
+        return items
 
