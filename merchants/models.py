@@ -24,6 +24,7 @@ class MerchantItem(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     link = models.URLField()
+    shopify_product_id = models.CharField(max_length=64, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
