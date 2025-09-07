@@ -35,6 +35,24 @@
             </ul>
         </div>
     </div>
+
+    <div class="card shadow-sm rounded mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Shopify Store Items</h5>
+            <ul class="list-group">
+                {% for product in shopify_items %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div class="me-2">
+                        <div class="fw-bold">{{ product.title }}</div>
+                        <a href="https://{{ shopify_domain }}/products/{{ product.handle }}" target="_blank" class="text-decoration-none d-inline-block text-truncate" style="max-width: 250px;" title="{{ product.title }}">View on store</a>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="list-group-item text-center">No Shopify items.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
 </section>
 
 <div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">

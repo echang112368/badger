@@ -5,6 +5,7 @@ from creators.models import CreatorMeta
 from .forms import MerchantItemForm, MerchantSettingsForm
 from accounts.forms import UserNameForm
 from .models import MerchantItem, MerchantMeta
+from shopify_app.shopify_client import ShopifyClient
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -81,10 +82,32 @@ def merchant_items(request):
 
     items = MerchantItem.objects.filter(merchant=request.user)
     edit_form = MerchantItemForm(prefix="edit")
+    shopify_items = []
+    shopify_domain = ""
+    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    if (
+        merchant_meta
+        and merchant_meta.shopify_access_token
+        and merchant_meta.shopify_store_domain
+    ):
+        shopify_domain = merchant_meta.shopify_store_domain
+        client = ShopifyClient(
+            merchant_meta.shopify_access_token, merchant_meta.shopify_store_domain
+        )
+        try:
+            shopify_items = client.get_all_products()
+        except Exception:
+            shopify_items = []
     return render(
         request,
         "merchants/items.html",
-        {"form": form, "items": items, "edit_form": edit_form},
+        {
+            "form": form,
+            "items": items,
+            "edit_form": edit_form,
+            "shopify_items": shopify_items,
+            "shopify_domain": shopify_domain,
+        },
     )
 
 @login_required
