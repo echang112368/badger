@@ -22,3 +22,21 @@ class ShopifyClient:
 
     def post(self, path: str, **kwargs):
         return self.request("POST", path, **kwargs)
+
+    def get_all_products(self):
+        """Fetch all products in the store catalog."""
+        products = []
+        params = {"limit": 250}
+        since_id = None
+        while True:
+            if since_id:
+                params["since_id"] = since_id
+            data = self.get("/admin/api/2024-07/products.json", params=params)
+            batch = data.get("products", [])
+            if not batch:
+                break
+            products.extend(batch)
+            if len(batch) < 250:
+                break
+            since_id = batch[-1]["id"]
+        return products
