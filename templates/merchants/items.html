@@ -54,7 +54,7 @@
                             {% empty %}No items{% endfor %}
                         </small></div>
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.id }}{% if not forloop.last %},{% endif %}{% endfor %}">Edit</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.shopify_product_id }}{% if not forloop.last %},{% endif %}{% endfor %}">Edit</button>
                 </li>
                 {% empty %}
                 <li class="list-group-item text-center">No groups yet.</li>
@@ -124,10 +124,10 @@
             <label class="form-label">Select items</label>
             <input type="text" class="form-control mb-2" id="item-search" placeholder="Search items">
             <div id="items-container" class="border p-2" style="max-height:200px; overflow-y:auto;">
-              {% for checkbox in group_form.items %}
+              {% for product in shopify_items %}
               <div class="form-check">
-                {{ checkbox.tag }}
-                <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}">
+                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }}</label>
               </div>
               {% endfor %}
             </div>
