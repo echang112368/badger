@@ -34,8 +34,21 @@ class MerchantItem(models.Model):
 class ItemGroup(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    items = models.ManyToManyField(MerchantItem, related_name="groups", blank=True)
+    items = models.ManyToManyField(
+        MerchantItem,
+        related_name="groups",
+        blank=True,
+        through="ItemGroupItem",
+    )
     affiliate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     def __str__(self):
         return self.name
+
+
+class ItemGroupItem(models.Model):
+    item = models.OneToOneField(MerchantItem, on_delete=models.CASCADE)
+    group = models.ForeignKey(ItemGroup, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.item} -> {self.group}"
