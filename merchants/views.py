@@ -65,6 +65,23 @@ def merchant_items(request):
     if not request.user.is_merchant:
         return render(request, "403.html")
 
+    shopify_items = []
+    shopify_domain = ""
+    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
+    if (
+        merchant_meta
+        and merchant_meta.shopify_access_token
+        and merchant_meta.shopify_store_domain
+    ):
+        shopify_domain = merchant_meta.shopify_store_domain
+        client = ShopifyClient(
+            merchant_meta.shopify_access_token, merchant_meta.shopify_store_domain
+        )
+        try:
+            shopify_items = client.get_all_products()
+        except Exception:
+            shopify_items = []
+
     if request.method == "POST":
         if request.POST.get("form_type") == "group":
             group_id = request.POST.get("group_id")
@@ -76,7 +93,21 @@ def merchant_items(request):
                 group = group_form.save(commit=False)
                 group.merchant = request.user
                 group.save()
-                group_form.save_m2m()
+                group.items.clear()
+                product_map = {str(p["id"]): p for p in shopify_items}
+                for pid in request.POST.getlist("shopify_items"):
+                    product = product_map.get(pid)
+                    if product:
+                        item, _ = MerchantItem.objects.get_or_create(
+                            merchant=request.user,
+                            shopify_product_id=str(product["id"]),
+                            defaults={
+                                "title": product["title"],
+                                "link": f"https://{shopify_domain}/products/{product['handle']}",
+                            },
+                        )
+                        if not item.groups.exclude(pk=group.pk).exists():
+                            group.items.add(item)
                 return redirect("merchant_items")
             form = MerchantItemForm()
         else:
@@ -99,22 +130,6 @@ def merchant_items(request):
     items = MerchantItem.objects.filter(merchant=request.user)
     edit_form = MerchantItemForm(prefix="edit")
     groups = ItemGroup.objects.filter(merchant=request.user).prefetch_related("items")
-    shopify_items = []
-    shopify_domain = ""
-    merchant_meta = MerchantMeta.objects.filter(user=request.user).first()
-    if (
-        merchant_meta
-        and merchant_meta.shopify_access_token
-        and merchant_meta.shopify_store_domain
-    ):
-        shopify_domain = merchant_meta.shopify_store_domain
-        client = ShopifyClient(
-            merchant_meta.shopify_access_token, merchant_meta.shopify_store_domain
-        )
-        try:
-            shopify_items = client.get_all_products()
-        except Exception:
-            shopify_items = []
     return render(
         request,
         "merchants/items.html",
