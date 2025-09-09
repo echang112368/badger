@@ -110,9 +110,9 @@
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="form_type" value="group">
-        <input type="hidden" name="group_id" id="group-id">
+        <input type="hidden" name="group_id" id="group-id" value="{{ group_form.instance.pk|default:'' }}">
         <div class="modal-header">
-          <h5 class="modal-title" id="groupModalLabel">Create Group</h5>
+          <h5 class="modal-title" id="groupModalLabel">{% if group_form.instance.pk %}Edit Group{% else %}Create Group{% endif %}</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -126,7 +126,7 @@
             <div id="items-container" class="border p-2" style="max-height:200px; overflow-y:auto;">
               {% for product in shopify_items %}
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}">
+                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}" {% if product.id|stringformat:"s" in selected_shopify_items %}checked{% endif %}>
                 <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }}</label>
               </div>
               {% endfor %}
@@ -136,6 +136,15 @@
             <label for="id_group-affiliate_percent" class="form-label">Affiliate Percentage</label>
             {{ group_form.affiliate_percent }}
           </div>
+          {% if group_form.non_field_errors %}
+          <div id="group-error" class="text-danger mb-3">
+            {% for error in group_form.non_field_errors %}
+            <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div id="group-error" class="text-danger mb-3"></div>
+          {% endif %}
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -184,6 +193,7 @@ document.querySelectorAll('.edit-group-btn').forEach(function(btn) {
         modal.querySelector('#group-id').value = this.getAttribute('data-group-id');
         modal.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
         modal.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
+        modal.querySelector('#group-error').innerHTML = '';
         var items = this.getAttribute('data-group-items').split(',');
         modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
             cb.checked = items.includes(cb.value);
@@ -197,6 +207,7 @@ document.getElementById('create-group-btn').addEventListener('click', function()
     modal.querySelector('#group-id').value = '';
     modal.querySelector('#id_group-name').value = '';
     modal.querySelector('#id_group-affiliate_percent').value = '';
+    modal.querySelector('#group-error').innerHTML = '';
     modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
         cb.checked = false;
     });
@@ -205,6 +216,11 @@ document.getElementById('create-group-btn').addEventListener('click', function()
         el.style.display = '';
     });
 });
+
+{% if group_modal_open %}
+var modal = new bootstrap.Modal(document.getElementById('groupModal'));
+modal.show();
+{% endif %}
 </script>
 {% endblock %}
 
