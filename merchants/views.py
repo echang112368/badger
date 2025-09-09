@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
 from creators.models import CreatorMeta
-from .forms import MerchantItemForm, MerchantSettingsForm, ItemGroupForm
+from .forms import MerchantSettingsForm, ItemGroupForm
 from accounts.forms import UserNameForm
 from .models import MerchantItem, MerchantMeta, ItemGroup
 from shopify_app.shopify_client import ShopifyClient
@@ -125,36 +125,25 @@ def merchant_items(request):
                     group.save()
                     group.items.set(items_to_add)
                     return redirect("merchant_items")
-            form = MerchantItemForm()
-        else:
-            item_id = request.POST.get("item_id")
-            if item_id:
-                item = MerchantItem.objects.filter(id=item_id, merchant=request.user).first()
-                form = MerchantItemForm(request.POST, instance=item, prefix="edit")
-            else:
-                form = MerchantItemForm(request.POST)
-            if form.is_valid():
-                item = form.save(commit=False)
-                item.merchant = request.user
-                item.save()
-                return redirect("merchant_items")
-            group_form = ItemGroupForm(merchant=request.user, prefix="group")
-            selected_items = []
+        elif request.POST.get("form_type") == "delete_group":
+            group_id = request.POST.get("group_id")
+            group = ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
+            if group:
+                group.delete()
+            return redirect("merchant_items")
+        group_form = group_form if "group_form" in locals() else ItemGroupForm(
+            merchant=request.user, prefix="group"
+        )
+        selected_items = request.POST.getlist("shopify_items")
     else:
-        form = MerchantItemForm()
         group_form = ItemGroupForm(merchant=request.user, prefix="group")
         selected_items = []
 
-    items = MerchantItem.objects.filter(merchant=request.user)
-    edit_form = MerchantItemForm(prefix="edit")
     groups = ItemGroup.objects.filter(merchant=request.user).prefetch_related("items")
     return render(
         request,
         "merchants/items.html",
         {
-            "form": form,
-            "items": items,
-            "edit_form": edit_form,
             "groups": groups,
             "group_form": group_form,
             "shopify_items": shopify_items,
