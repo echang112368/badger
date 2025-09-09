@@ -93,13 +93,14 @@ def merchant_items(request):
             group_form = ItemGroupForm(
                 request.POST, instance=group, merchant=request.user, prefix="group"
             )
+            selected_items = request.POST.getlist("shopify_items")
             if group_form.is_valid():
                 group = group_form.save(commit=False)
                 group.merchant = request.user
-                group.save()
-                group.items.clear()
                 product_map = {str(p["id"]): p for p in shopify_items}
-                for pid in request.POST.getlist("shopify_items"):
+                items_to_add = []
+                conflicts = []
+                for pid in selected_items:
                     product = product_map.get(pid)
                     if product:
                         item, _ = MerchantItem.objects.get_or_create(
@@ -110,9 +111,20 @@ def merchant_items(request):
                                 "link": f"https://{shopify_domain}/products/{product['handle']}",
                             },
                         )
-                        if not item.groups.exclude(pk=group.pk).exists():
-                            group.items.add(item)
-                return redirect("merchant_items")
+                        if item.groups.exclude(pk=group.pk).exists():
+                            conflicts.append(item.title)
+                        else:
+                            items_to_add.append(item)
+                if conflicts:
+                    group_form.add_error(
+                        None,
+                        "The following items are already in another group: "
+                        + ", ".join(conflicts),
+                    )
+                else:
+                    group.save()
+                    group.items.set(items_to_add)
+                    return redirect("merchant_items")
             form = MerchantItemForm()
         else:
             item_id = request.POST.get("item_id")
@@ -127,9 +139,11 @@ def merchant_items(request):
                 item.save()
                 return redirect("merchant_items")
             group_form = ItemGroupForm(merchant=request.user, prefix="group")
+            selected_items = []
     else:
         form = MerchantItemForm()
         group_form = ItemGroupForm(merchant=request.user, prefix="group")
+        selected_items = []
 
     items = MerchantItem.objects.filter(merchant=request.user)
     edit_form = MerchantItemForm(prefix="edit")
@@ -145,6 +159,8 @@ def merchant_items(request):
             "group_form": group_form,
             "shopify_items": shopify_items,
             "shopify_domain": shopify_domain,
+            "selected_shopify_items": selected_items,
+            "group_modal_open": bool(group_form.errors),
         },
     )
 
