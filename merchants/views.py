@@ -7,7 +7,7 @@ from accounts.forms import UserNameForm
 from .models import MerchantItem, MerchantMeta, ItemGroup
 from shopify_app.shopify_client import ShopifyClient
 from ledger.models import LedgerEntry, MerchantInvoice
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 from urllib.parse import urlparse
@@ -134,25 +134,51 @@ def merchant_items(request):
                         else:
                             items_to_add.append(item)
                 if conflicts:
-                    group_form.add_error(
-                        None,
-                        "The following items are already in another group: "
-                        + ", ".join(conflicts),
-                    )
+                    post_data = request.POST.dict()
+                    post_data.pop("csrfmiddlewaretoken", None)
+                    request.session["group_form_post"] = post_data
+                    request.session["group_form_selected"] = selected_items
+                    request.session["group_form_conflicts"] = conflicts
+                    return redirect("merchant_items")
                 else:
                     group.save()
                     group.items.set(items_to_add)
                     return redirect("merchant_items")
+            else:
+                post_data = request.POST.dict()
+                post_data.pop("csrfmiddlewaretoken", None)
+                request.session["group_form_post"] = post_data
+                request.session["group_form_selected"] = selected_items
+                return redirect("merchant_items")
         elif request.POST.get("form_type") == "delete_group":
             group_id = request.POST.get("group_id")
             group = ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
             if group:
                 group.delete()
             return redirect("merchant_items")
-        group_form = group_form if "group_form" in locals() else ItemGroupForm(
-            merchant=request.user, prefix="group"
+
+    post_data = request.session.pop("group_form_post", None)
+    selected_items = request.session.pop("group_form_selected", [])
+    conflicts = request.session.pop("group_form_conflicts", [])
+    if post_data:
+        qdict = QueryDict("", mutable=True)
+        for k, v in post_data.items():
+            qdict[k] = v
+        for item in selected_items:
+            qdict.appendlist("shopify_items", item)
+        group_id = qdict.get("group_id")
+        group = (
+            ItemGroup.objects.filter(id=group_id, merchant=request.user).first()
+            if group_id
+            else None
         )
-        selected_items = request.POST.getlist("shopify_items")
+        group_form = ItemGroupForm(qdict, instance=group, merchant=request.user, prefix="group")
+        group_form.is_valid()
+        if conflicts:
+            group_form.add_error(
+                None,
+                "The following items are already in another group: " + ", ".join(conflicts),
+            )
     else:
         group_form = ItemGroupForm(merchant=request.user, prefix="group")
         selected_items = []
