@@ -74,8 +74,8 @@
             <div id="items-container" class="border p-2" style="max-height:200px; overflow-y:auto;">
               {% for product in shopify_items %}
               <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}" {% if product.id|stringformat:"s" in selected_shopify_items %}checked{% endif %}>
-                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }}</label>
+                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}" data-existing-group-id="{{ product.existing_group_id|default:'' }}" {% if product.existing_group_id %}disabled{% endif %} {% if product.id|stringformat:"s" in selected_shopify_items %}checked{% endif %}>
+                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }}{% if product.existing_group_name %} <small class="text-muted">(Already in {{ product.existing_group_name }})</small>{% endif %}</label>
               </div>
               {% endfor %}
             </div>
@@ -139,13 +139,16 @@ document.querySelectorAll('.edit-group-btn').forEach(function(btn) {
     btn.addEventListener('click', function(event) {
         var modal = document.getElementById('groupModal');
         modal.querySelector('#groupModalLabel').textContent = 'Edit Group';
-        modal.querySelector('#group-id').value = this.getAttribute('data-group-id');
+        var groupId = this.getAttribute('data-group-id');
+        modal.querySelector('#group-id').value = groupId;
         modal.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
         modal.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
         modal.querySelector('#group-error').innerHTML = '';
         var items = this.getAttribute('data-group-items').split(',');
         modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
             cb.checked = items.includes(cb.value);
+            var existingGroupId = cb.getAttribute('data-existing-group-id');
+            cb.disabled = existingGroupId && existingGroupId !== groupId;
         });
     });
 });
@@ -159,6 +162,7 @@ document.getElementById('create-group-btn').addEventListener('click', function()
     modal.querySelector('#group-error').innerHTML = '';
     modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
         cb.checked = false;
+        cb.disabled = cb.getAttribute('data-existing-group-id') !== '';
     });
     document.getElementById('item-search').value = '';
     document.querySelectorAll('#items-container .form-check').forEach(function(el){
@@ -176,6 +180,15 @@ document.querySelectorAll('.delete-group-btn').forEach(function(btn){
 {% if group_modal_open %}
 var modal = new bootstrap.Modal(document.getElementById('groupModal'));
 modal.show();
+var currentGroupId = '{{ group_form.instance.pk|default:"" }}';
+document.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
+    var existingGroupId = cb.getAttribute('data-existing-group-id');
+    if (currentGroupId) {
+        cb.disabled = existingGroupId && existingGroupId !== currentGroupId;
+    } else {
+        cb.disabled = existingGroupId !== '';
+    }
+});
 {% endif %}
 </script>
 {% endblock %}
