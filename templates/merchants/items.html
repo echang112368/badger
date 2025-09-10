@@ -36,18 +36,35 @@
     <div class="card shadow-sm rounded mt-4">
         <div class="card-body">
             <h5 class="card-title">Shopify Store Items</h5>
-            <ul class="list-group">
-                {% for product in shopify_items %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div class="me-2">
-                        <div class="fw-bold">{{ product.title }} <small class="text-muted">(ID: {{ product.id }})</small></div>
-                        <a href="https://{{ shopify_domain }}/products/{{ product.handle }}" target="_blank" class="text-decoration-none d-inline-block text-truncate" style="max-width: 250px;" title="{{ product.title }}">View on store</a>
-                    </div>
-                </li>
-                {% empty %}
-                <li class="list-group-item text-center">No Shopify items.</li>
-                {% endfor %}
-            </ul>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">View</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in shopify_items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ product.title }}</div>
+                                <small class="text-muted">ID: {{ product.id }}</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="https://{{ shopify_domain }}/products/{{ product.handle }}" target="_blank" class="text-decoration-none" title="View on store">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center">No Shopify items.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </section>
