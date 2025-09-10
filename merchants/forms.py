@@ -61,7 +61,7 @@ class ItemGroupForm(forms.ModelForm):
     )
 
     affiliate_percent = forms.DecimalField(
-        required=False,
+        required=True,
         min_value=0,
         max_value=100,
         label="Affiliate Percentage (%)",
