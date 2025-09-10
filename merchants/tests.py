@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import MerchantMeta
+from .forms import ItemGroupForm
 from decimal import Decimal
 
 
@@ -101,4 +102,17 @@ class StoreIdLookupTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"storeID": None})
+
+
+class ItemGroupFormTests(TestCase):
+    def test_affiliate_percent_required(self):
+        merchant = CustomUser.objects.create_user(
+            username="merchant_group",
+            password="pass",
+            email="merchant_group@example.com",
+            is_merchant=True,
+        )
+        form = ItemGroupForm(data={"name": "Group"}, merchant=merchant)
+        self.assertFalse(form.is_valid())
+        self.assertIn("affiliate_percent", form.errors)
 
