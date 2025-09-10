@@ -17,7 +17,7 @@
                         <small>Affiliate: {{ group.affiliate_percent }}%</small>
                         <div><small>
                             {% for gitem in group.items.all %}
-                                {{ gitem.title }}{% if not forloop.last %}, {% endif %}
+                                {{ gitem.title }}{% if gitem.shopify_product_id %} (ID: {{ gitem.shopify_product_id }}){% endif %}{% if not forloop.last %}, {% endif %}
                             {% empty %}No items{% endfor %}
                         </small></div>
                     </div>
@@ -40,7 +40,7 @@
                 {% for product in shopify_items %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                     <div class="me-2">
-                        <div class="fw-bold">{{ product.title }}</div>
+                        <div class="fw-bold">{{ product.title }} <small class="text-muted">(ID: {{ product.id }})</small></div>
                         <a href="https://{{ shopify_domain }}/products/{{ product.handle }}" target="_blank" class="text-decoration-none d-inline-block text-truncate" style="max-width: 250px;" title="{{ product.title }}">View on store</a>
                     </div>
                 </li>
@@ -75,7 +75,7 @@
               {% for product in shopify_items %}
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}" data-existing-group-id="{{ product.existing_group_id|default:'' }}" {% if product.existing_group_id %}disabled{% endif %} {% if product.id|stringformat:"s" in selected_shopify_items %}checked{% endif %}>
-                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }}{% if product.existing_group_name %} <small class="text-muted">(Already in {{ product.existing_group_name }})</small>{% endif %}</label>
+                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }} <small class="text-muted">(ID: {{ product.id }})</small>{% if product.existing_group_name %} <small class="text-muted">(Already in {{ product.existing_group_name }})</small>{% endif %}</label>
               </div>
               {% endfor %}
             </div>
