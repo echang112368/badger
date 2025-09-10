@@ -82,6 +82,24 @@ def merchant_items(request):
         except Exception:
             shopify_items = []
 
+    # Map shopify product IDs to existing groups so the template can disable
+    # items that are already assigned to a group. This prevents merchants from
+    # selecting items that are in another group before submitting the form.
+    existing_items = (
+        MerchantItem.objects.filter(merchant=request.user)
+        .prefetch_related("groups")
+    )
+    item_group_map = {}
+    for item in existing_items:
+        group = item.groups.first()
+        if group:
+            item_group_map[item.shopify_product_id] = group
+    for product in shopify_items:
+        group = item_group_map.get(str(product["id"]))
+        if group:
+            product["existing_group_id"] = group.id
+            product["existing_group_name"] = group.name
+
     if request.method == "POST":
         if request.POST.get("form_type") == "group":
             group_id = request.POST.get("group_id")
