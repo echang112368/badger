@@ -132,6 +132,8 @@ def orders_create_webhook(request):
 
     try:
         payload = json.loads(request.body)
+        order_id = payload.get("id")
+        print(f"Processing order {order_id}")
     except json.JSONDecodeError:
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
@@ -181,9 +183,17 @@ def orders_create_webhook(request):
             else:
                 rate = Decimal("0")
 
-            commission_total += (line_amount * rate / Decimal("100"))
+            commission = (line_amount * rate / Decimal("100")).quantize(
+                Decimal("0.01")
+            )
+            print(
+                f"Item {product_id}: qty={quantity}, amount={line_amount}, "
+                f"rate={rate}%, commission={commission}"
+            )
+            commission_total += commission
 
     commission_total = commission_total.quantize(Decimal("0.01"))
+    print(f"Order {order_id} total commission: {commission_total}")
 
     if merchant_meta and creator_meta and commission_total > 0:
         # Credit the content creator with the commission
