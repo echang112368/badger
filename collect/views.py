@@ -4,7 +4,7 @@ from .models import RedirectLink
 from django.http import JsonResponse
 import json
 from django.views.decorators.csrf import csrf_exempt
-from merchants.models import MerchantMeta
+from merchants.models import MerchantMeta, MerchantItem
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
@@ -151,50 +151,62 @@ def orders_create_webhook(request):
         f"received amount={amount_str} uuid={uuid} buisID={buisID} cusID={cusID}"
     )
 
-    # Print details for each product in the order
-    for item in payload.get("line_items", []):
-        product_id = item.get("product_id")
-        quantity = item.get("quantity")
-        price = item.get("price")
-        print(f"product_id={product_id} amount={price} quantity={quantity}")
-
-    try:
-        amount = Decimal(amount_str).quantize(Decimal("0.01"))
-    except (TypeError, InvalidOperation):
-        return JsonResponse({"error": "Invalid amount"}, status=400)
-
     merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
     creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
     customer_meta = CustomerMeta.objects.filter(uuid=cusID).first()
 
+    commission_total = Decimal("0")
+
+    # Calculate commission per line item based on its group percentage
     if merchant_meta and creator_meta:
-        commission_rate = Decimal(merchant_meta.affiliate_percent or 0)
-        commission = (amount * commission_rate / Decimal("100")).quantize(
-            Decimal("0.01")
+        for item in payload.get("line_items", []):
+            product_id = str(item.get("product_id"))
+            quantity = item.get("quantity", 1)
+            price = item.get("price")
+            try:
+                line_amount = (Decimal(price) * Decimal(quantity)).quantize(
+                    Decimal("0.01")
+                )
+            except (TypeError, InvalidOperation):
+                continue
+
+            # Determine commission rate: group-specific or 0 if no group
+            merchant_item = MerchantItem.objects.filter(
+                merchant=merchant_meta.user, shopify_product_id=product_id
+            ).first()
+            group = merchant_item.groups.first() if merchant_item else None
+
+            if group:
+                rate = Decimal(group.affiliate_percent or 0)
+            else:
+                rate = Decimal("0")
+
+            commission_total += (line_amount * rate / Decimal("100"))
+
+    commission_total = commission_total.quantize(Decimal("0.01"))
+
+    if merchant_meta and creator_meta and commission_total > 0:
+        # Credit the content creator with the commission
+        LedgerEntry.objects.create(
+            creator=creator_meta.user,
+            amount=commission_total,
+            entry_type="commission",
         )
 
-        if commission > 0:
-            # Credit the content creator with the commission
-            LedgerEntry.objects.create(
-                creator=creator_meta.user,
-                amount=commission,
-                entry_type="commission",
-            )
+        # Charge the merchant for the commission
+        LedgerEntry.objects.create(
+            merchant=merchant_meta.user,
+            amount=-commission_total,
+            entry_type="commission",
+        )
 
-            # Charge the merchant for the commission
+        # Reward the customer with points (60 points = $1)
+        if customer_meta:
+            points = int(commission_total * 60)
             LedgerEntry.objects.create(
-                merchant=merchant_meta.user,
-                amount=-commission,
-                entry_type="commission",
+                creator=customer_meta.user,
+                amount=Decimal(points),
+                entry_type="points",
             )
-
-            # Reward the customer with points (60 points = $1)
-            if customer_meta:
-                points = int(commission * 60)
-                LedgerEntry.objects.create(
-                    creator=customer_meta.user,
-                    amount=Decimal(points),
-                    entry_type="points",
-                )
 
     return JsonResponse({"status": "received"}, status=200)
