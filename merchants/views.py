@@ -1,6 +1,11 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
+from links.models import (
+    MerchantCreatorLink,
+    STATUS_REQUESTED,
+    STATUS_ACTIVE,
+    STATUS_INACTIVE,
+)
 from creators.models import CreatorMeta
 from .forms import MerchantSettingsForm, ItemGroupForm
 from accounts.forms import UserNameForm
@@ -220,6 +225,20 @@ def delete_creators(request):
 
 
 @login_required
+def update_creator_status(request):
+    if request.method == "POST":
+        creator_id = request.POST.get("creator_id")
+        action = request.POST.get("action")
+        link = MerchantCreatorLink.objects.filter(
+            merchant=request.user, creator__id=creator_id
+        ).first()
+        if link and action in ["activate", "deactivate"]:
+            link.status = STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
+            link.save()
+    return redirect("merchant_creators")
+
+
+@login_required
 def request_creator(request):
     if request.method == "POST":
         uuid = request.POST.get("creator_uuid", "").strip()
@@ -243,17 +262,24 @@ def request_creator(request):
 def merchant_creators(request):
     active_links = MerchantCreatorLink.objects.filter(
         merchant=request.user, status=STATUS_ACTIVE
-    )
-    creators = [link.creator for link in active_links]
+    ).select_related("creator")
+    inactive_links = MerchantCreatorLink.objects.filter(
+        merchant=request.user, status=STATUS_INACTIVE
+    ).select_related("creator")
     pending_links = MerchantCreatorLink.objects.filter(
         merchant=request.user, status=STATUS_REQUESTED
-    )
+    ).select_related("creator")
 
-    return render(request, 'merchants/creators.html', {
-        'merchant': request.user,
-        'creators': creators,
-        'pending_links': pending_links,
-    })
+    return render(
+        request,
+        'merchants/creators.html',
+        {
+            'merchant': request.user,
+            'active_links': active_links,
+            'inactive_links': inactive_links,
+            'pending_links': pending_links,
+        },
+    )
 
 
 @login_required
