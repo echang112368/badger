@@ -1,6 +1,7 @@
 from django.test import TestCase, RequestFactory
 from decimal import Decimal
 import json
+import uuid
 
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta, MerchantItem, ItemGroup
@@ -123,6 +124,59 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(merchant=merchant, entry_type="points").exists()
         )
+
+    def test_special_uuid_triggers_fixed_commission(self):
+        (
+            merchant,
+            creator,
+            customer,
+            merchant_meta,
+            creator_meta,
+            customer_meta,
+        ) = self._setup_users()
+
+        creator_meta.uuid = uuid.UUID(
+            "733d0d67-6a30-4c48-a92e-b8e211b490f5"
+        )
+        creator_meta.save()
+
+        shirt = MerchantItem.objects.create(
+            merchant=merchant,
+            title="Shirt",
+            link="http://shirt",
+            shopify_product_id="1",
+        )
+        group = ItemGroup.objects.create(
+            merchant=merchant,
+            name="Group",
+            affiliate_percent=Decimal("3"),
+        )
+        group.items.add(shirt)
+
+        line_items = [{"product_id": 1, "quantity": 1, "price": "100.00"}]
+
+        response = self._call_webhook(
+            merchant_meta,
+            creator_meta,
+            customer_meta,
+            line_items,
+            Decimal("100.00"),
+        )
+        self.assertEqual(response.status_code, 200)
+
+        creator_entry = LedgerEntry.objects.get(
+            creator=creator, entry_type="commission"
+        )
+        merchant_entry = LedgerEntry.objects.get(
+            merchant=merchant, entry_type="commission"
+        )
+        points_entry = LedgerEntry.objects.get(
+            creator=customer, entry_type="points"
+        )
+
+        self.assertEqual(creator_entry.amount, Decimal("5.00"))
+        self.assertEqual(merchant_entry.amount, Decimal("-5.00"))
+        self.assertEqual(points_entry.amount, Decimal("300"))
 
     def test_missing_customer_skips_points(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
