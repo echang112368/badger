@@ -6,7 +6,6 @@ class MerchantMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    affiliate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     paypal_email = models.EmailField(blank=True)
     shopify_access_token = models.CharField(max_length=255, blank=True)
     shopify_store_domain = models.CharField(max_length=255, blank=True)

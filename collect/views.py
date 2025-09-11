@@ -68,19 +68,18 @@ def webhook_view(request):
                 merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
                 creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
                 if merchant_meta and creator_meta:
-                    commission_rate = merchant_meta.affiliate_percent or 0
-                    commission = round(total_amount * float(commission_rate) / 100, 2)
-
-                    LedgerEntry.objects.create(
-                        creator=creator_meta.user,
-                        amount=commission,
-                        entry_type="commission",
-                    )
-                    LedgerEntry.objects.create(
-                        merchant=merchant_meta.user,
-                        amount=-commission,
-                        entry_type="commission",
-                    )
+                    commission = Decimal("0")
+                    if commission > 0:
+                        LedgerEntry.objects.create(
+                            creator=creator_meta.user,
+                            amount=commission,
+                            entry_type="commission",
+                        )
+                        LedgerEntry.objects.create(
+                            merchant=merchant_meta.user,
+                            amount=-commission,
+                            entry_type="commission",
+                        )
            
 
             # You can split the code if needed:
