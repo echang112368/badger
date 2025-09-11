@@ -1,5 +1,6 @@
 from django.test import TestCase
 from django.urls import reverse
+import uuid
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 from decimal import Decimal
@@ -123,6 +124,32 @@ class LoginAPITests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json().get("error"), "Invalid credentials")
+
+
+class PointsAPITests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="points", password="pass123", email="points@example.com"
+        )
+        LedgerEntry.objects.create(
+            creator=self.user,
+            amount=Decimal("50"),
+            entry_type="points",
+        )
+        self.meta = CustomerMeta.objects.get(user=self.user)
+
+    def test_points_endpoint_returns_balance(self):
+        url = reverse("api_points", kwargs={"uuid": self.meta.uuid})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["uuid"], str(self.meta.uuid))
+        self.assertEqual(data["points"], 50)
+
+    def test_points_endpoint_unknown_uuid_returns_404(self):
+        url = reverse("api_points", kwargs={"uuid": uuid.uuid4()})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class DashboardViewTests(TestCase):
