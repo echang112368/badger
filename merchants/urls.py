@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path('store-id/', views.store_id_lookup, name='merchant_store_id'),
     path('delete-creators/', views.delete_creators, name='delete_creators'),
+    path('update-creator-status/', views.update_creator_status, name='update_creator_status'),
     path('request-creator/', views.request_creator, name='request_creator'),
     path('delete-item/', views.delete_item, name='delete_items'),
     path('dashboard/', merchant_dashboard, name='merchant_dashboard'),

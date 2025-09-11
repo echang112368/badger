@@ -5,9 +5,11 @@ User = get_user_model()
 
 STATUS_REQUESTED = "requested"
 STATUS_ACTIVE = "active"
+STATUS_INACTIVE = "inactive"
 STATUS_CHOICES = [
     (STATUS_REQUESTED, "Requested"),
     (STATUS_ACTIVE, "Active"),
+    (STATUS_INACTIVE, "Inactive"),
 ]
 
 class MerchantCreatorLink(models.Model):
