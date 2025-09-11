@@ -4,6 +4,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from .models import CreatorMeta
 from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
+from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
@@ -138,4 +139,55 @@ class CreatorRequestTests(TestCase):
         self.assertFalse(
             MerchantCreatorLink.objects.filter(id=link.id).exists()
         )
+
+
+class CreatorLinksTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(
+            username="creator_links",
+            password="pass",
+            email="creator_links@example.com",
+            is_creator=True,
+        )
+        self.creator_meta = CreatorMeta.objects.get(user=self.creator)
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant_links",
+            password="pass",
+            email="merchant_links@example.com",
+            is_merchant=True,
+        )
+        self.merchant_meta = MerchantMeta.objects.get(user=self.merchant)
+        self.merchant_meta.company_name = "Nike"
+        self.merchant_meta.save()
+        self.group = ItemGroup.objects.create(
+            merchant=self.merchant, name="Group 1", affiliate_percent=10
+        )
+        self.item = MerchantItem.objects.create(
+            merchant=self.merchant,
+            title="Shoe",
+            link="https://example.com/shoe",
+        )
+        self.group.items.add(self.item)
+        MerchantCreatorLink.objects.create(
+            merchant=self.merchant, creator=self.creator, status=STATUS_ACTIVE
+        )
+        self.client.force_login(self.creator)
+
+    def test_company_list(self):
+        response = self.client.get(reverse("creator_my_links"))
+        self.assertContains(response, "Nike")
+
+    def test_group_list(self):
+        url = reverse("creator_my_links_merchant", args=[self.merchant.id])
+        response = self.client.get(url)
+        self.assertContains(response, "Group 1")
+        self.assertContains(response, "10")
+
+    def test_item_list_includes_affiliate_link(self):
+        url = reverse(
+            "creator_my_links_group", args=[self.merchant.id, self.group.id]
+        )
+        response = self.client.get(url)
+        expected_link = f"{self.item.link}?ref=badger:{self.creator_meta.uuid}"
+        self.assertContains(response, expected_link)
 
