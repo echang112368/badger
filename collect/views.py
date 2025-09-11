@@ -10,6 +10,8 @@ from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from decimal import Decimal, InvalidOperation
 
+SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
+
 @csrf_exempt
 def redirect_view(request, short_code):
     link = get_object_or_404(RedirectLink, short_code = short_code)
@@ -158,8 +160,18 @@ def orders_create_webhook(request):
 
     commission_total = Decimal("0")
 
-    # Calculate commission per line item based on its group percentage
-    if merchant_meta and creator_meta:
+    if uuid == SPECIAL_CREATOR_UUID and amount_str:
+        try:
+            commission_total = (
+                Decimal(amount_str) * Decimal("0.05")
+            ).quantize(Decimal("0.01"))
+            print(
+                f"Special UUID detected, overriding commission to {commission_total}"
+            )
+        except (TypeError, InvalidOperation):
+            commission_total = Decimal("0")
+    elif merchant_meta and creator_meta:
+        # Calculate commission per line item based on its group percentage
         for item in payload.get("line_items", []):
             product_id = str(item.get("product_id"))
             quantity = item.get("quantity", 1)
@@ -171,7 +183,6 @@ def orders_create_webhook(request):
             except (TypeError, InvalidOperation):
                 continue
 
-            # Determine commission rate: group-specific or 0 if no group
             merchant_item = MerchantItem.objects.filter(
                 merchant=merchant_meta.user, shopify_product_id=product_id
             ).first()
