@@ -1,94 +1,93 @@
 {% extends 'creators/base.html' %}
 {% block title %}Affiliate Companies{% endblock %}
 {% block content %}
-<section class="py-6">
-    <h1 class="text-3xl font-bold mb-6">Affiliate Companies</h1>
-
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">Affiliate Companies</h1>
     {% if pending_links %}
-    <h2 class="text-xl font-semibold mb-3">Pending Requests</h2>
-    <ul class="mb-6 space-y-2">
+    <h2 class="fs-4 mb-3">Pending Requests</h2>
+    <ul class="list-group mb-4">
         {% for link in pending_links %}
-        <li class="flex items-center justify-between bg-white shadow rounded-md p-3">
+        <li class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-                <div class="font-semibold">{{ link.merchant.username }}</div>
-                <div class="text-sm text-gray-500">{{ link.merchant.email }}</div>
+                <div class="fw-semibold">{{ link.merchant.username }}</div>
+                <div class="text-muted small">{{ link.merchant.email }}</div>
             </div>
-            <form method="post" action="{% url 'respond_request' link.id %}" class="flex gap-2">
+            <form method="post" action="{% url 'respond_request' link.id %}" class="d-flex gap-2">
                 {% csrf_token %}
-                <button name="action" value="accept" class="bg-green-600 text-white px-3 py-1 rounded-md text-sm">Accept</button>
-                <button name="action" value="decline" class="border border-red-600 text-red-600 px-3 py-1 rounded-md text-sm">Decline</button>
+                <button name="action" value="accept" class="btn btn-success btn-sm">Accept</button>
+                <button name="action" value="decline" class="btn btn-outline-danger btn-sm">Decline</button>
             </form>
         </li>
         {% endfor %}
     </ul>
     {% endif %}
-
-    {% if merchants_with_groups %}
-    <div class="overflow-x-auto bg-white shadow rounded-md">
-        <table class="min-w-full text-sm">
-            <thead class="bg-gray-100 text-gray-700">
-                <tr>
-                    <th class="text-left p-3">Company</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in merchants_with_groups %}
-                <tr class="cursor-pointer odd:bg-white even:bg-gray-50 hover:bg-gray-100" data-company="company{{ forloop.counter }}">
-                    <td class="p-3 text-left font-medium">{{ entry.merchant.username }}</td>
-                </tr>
-                <tr id="company{{ forloop.counter }}" class="hidden">
-                    <td class="p-4 bg-gray-50">
-                        {% if entry.groups %}
-                        <div class="space-y-4">
-                            {% for group in entry.groups %}
-                            <div class="border rounded-md">
-                                <button class="w-full flex justify-between items-center p-3 font-semibold group-toggle">
-                                    <span>{{ group.name }}</span>
-                                    <span class="text-sm text-gray-600">{{ group.affiliate_percent }}%</span>
-                                </button>
-                                <div class="hidden px-4 pb-3">
-                                    {% if group.items %}
-                                    <ul class="list-disc pl-5 text-sm">
-                                        {% for item in group.items %}
-                                        <li class="mb-1"><a href="{{ item.redirect_link }}" class="text-blue-600 hover:underline">{{ item.title }}</a></li>
-                                        {% endfor %}
-                                    </ul>
-                                    {% else %}
-                                    <p class="text-sm text-gray-500">No products in this group.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        <p class="text-sm text-gray-500">No groups available.</p>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if merchants_with_items %}
+    <div class="accordion" id="companiesAccordion">
+        {% for entry in merchants_with_items %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
+                    {{ entry.merchant.username }}
+                </button>
+            </h2>
+            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#companiesAccordion">
+                <div class="accordion-body">
+                    <p class="fs-6 text-muted">{{ entry.merchant.email }}</p>
+                    {% if entry.items %}
+                    <ul class="list-unstyled mb-0">
+                        {% for item in entry.items %}
+                        <li class="mb-3">
+                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.title }}" data-url="{{ item.redirect_link }}">{{ item.title }}</a>
+                            <div class="text-muted small">{{ item.redirect_link|truncatechars:60 }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted fs-6">No items available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
     {% else %}
-    <p class="text-gray-500">You are not linked to any affiliate companies yet.</p>
+    <p class="text-muted">You are not linked to any affiliate companies yet.</p>
     {% endif %}
 </section>
 
+<!-- Link Modal -->
+<div class="modal fade" id="linkModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="modal-url" readonly>
+                    <button class="btn btn-outline-secondary" type="button" id="copy-modal-url"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('tr[data-company]').forEach(row => {
-        row.addEventListener('click', () => {
-            const id = row.getAttribute('data-company');
-            document.getElementById(id).classList.toggle('hidden');
+    document.addEventListener('DOMContentLoaded', () => {
+        const linkModal = document.getElementById('linkModal');
+        linkModal.addEventListener('show.bs.modal', event => {
+            const trigger = event.relatedTarget;
+            const title = trigger.getAttribute('data-title');
+            const url = trigger.getAttribute('data-url');
+            linkModal.querySelector('.modal-title').textContent = title;
+            document.getElementById('modal-url').value = url;
+        });
+
+        document.getElementById('copy-modal-url').addEventListener('click', () => {
+            const input = document.getElementById('modal-url');
+            navigator.clipboard.writeText(input.value);
         });
     });
-    document.querySelectorAll('.group-toggle').forEach(btn => {
-        btn.addEventListener('click', e => {
-            e.preventDefault();
-            const panel = btn.nextElementSibling;
-            panel.classList.toggle('hidden');
-        });
-    });
-});
 </script>
 {% endblock %}
