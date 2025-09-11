@@ -65,49 +65,39 @@ def creator_affiliate_companies(request):
 
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
 
-    merchants_with_groups = []
+    merchants_with_items = []
     for link in active_links:
         merchant = link.merchant
         merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant)
-        groups_data = []
-        groups = ItemGroup.objects.filter(merchant=merchant).prefetch_related("items")
-        for group in groups:
-            items_data = []
-            for item in group.items.all():
-                short_code = f"{request.user.id}-{item.id}"
-                query_param = f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
-                redirect_obj, _ = RedirectLink.objects.get_or_create(
-                    short_code=short_code,
-                    defaults={
-                        "destination_url": item.link,
-                        "queryParam": query_param,
-                    },
-                )
-                if (
-                    redirect_obj.destination_url != item.link
-                    or redirect_obj.queryParam != query_param
-                ):
-                    redirect_obj.destination_url = item.link
-                    redirect_obj.queryParam = query_param
-                    redirect_obj.save()
-                redirect_url = request.build_absolute_uri(
-                    reverse("redirect_view", args=[redirect_obj.short_code])
-                )
-                items_data.append({"title": item.title, "redirect_link": redirect_url})
-            groups_data.append(
-                {
-                    "id": group.id,
-                    "name": group.name,
-                    "affiliate_percent": group.affiliate_percent,
-                    "items": items_data,
-                }
+        merchant_items = []
+        for item in MerchantItem.objects.filter(merchant=merchant):
+            short_code = f"{request.user.id}-{item.id}"
+            query_param = f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
+            redirect_obj, _ = RedirectLink.objects.get_or_create(
+                short_code=short_code,
+                defaults={
+                    "destination_url": item.link,
+                    "queryParam": query_param,
+                },
             )
-        merchants_with_groups.append({"merchant": merchant, "groups": groups_data})
+            if (
+                redirect_obj.destination_url != item.link
+                or redirect_obj.queryParam != query_param
+            ):
+                redirect_obj.destination_url = item.link
+                redirect_obj.queryParam = query_param
+                redirect_obj.save()
+            redirect_url = request.build_absolute_uri(
+                reverse("redirect_view", args=[redirect_obj.short_code])
+            )
+            merchant_items.append({"title": item.title, "redirect_link": redirect_url})
+
+        merchants_with_items.append({"merchant": merchant, "items": merchant_items})
 
     return render(
         request,
         "creators/affiliate_companies.html",
-        {"merchants_with_groups": merchants_with_groups, "pending_links": pending_links},
+        {"merchants_with_items": merchants_with_items, "pending_links": pending_links},
     )
 
 
