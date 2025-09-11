@@ -15,24 +15,15 @@ class MerchantSettingsForm(forms.ModelForm):
         required=False,
     )
 
-    affiliate_percent = forms.DecimalField(
-        required=False,
-        min_value=0,
-        max_value=100,
-        label="Commission Rate (%)",
-    )
-
     class Meta:
         model = MerchantMeta
         fields = [
             "paypal_email",
-            "affiliate_percent",
             "shopify_access_token",
             "shopify_store_domain",
         ]
         labels = {
             "paypal_email": "PayPal Email (for invoices)",
-            "affiliate_percent": "Commission Rate (%)",
             "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
         }
