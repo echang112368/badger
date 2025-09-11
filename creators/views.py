@@ -11,9 +11,8 @@ from .models import CreatorMeta
 from accounts.forms import UserNameForm
 
 from links.models import MerchantCreatorLink, STATUS_ACTIVE, STATUS_REQUESTED
-from merchants.models import MerchantItem, MerchantMeta, ItemGroup
+from merchants.models import MerchantMeta, ItemGroup
 from accounts.models import CustomUser
-from collect.models import RedirectLink
 from ledger.models import LedgerEntry
 
 
@@ -65,39 +64,25 @@ def creator_affiliate_companies(request):
 
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
 
-    merchants_with_items = []
+    merchants_with_groups = []
     for link in active_links:
         merchant = link.merchant
-        merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant)
-        merchant_items = []
-        for item in MerchantItem.objects.filter(merchant=merchant):
-            short_code = f"{request.user.id}-{item.id}"
-            query_param = f"ref=badger:{creator_meta.uuid};buisID:{merchant_meta.uuid}"
-            redirect_obj, _ = RedirectLink.objects.get_or_create(
-                short_code=short_code,
-                defaults={
-                    "destination_url": item.link,
-                    "queryParam": query_param,
-                },
-            )
-            if (
-                redirect_obj.destination_url != item.link
-                or redirect_obj.queryParam != query_param
-            ):
-                redirect_obj.destination_url = item.link
-                redirect_obj.queryParam = query_param
-                redirect_obj.save()
-            redirect_url = request.build_absolute_uri(
-                reverse("redirect_view", args=[redirect_obj.short_code])
-            )
-            merchant_items.append({"title": item.title, "redirect_link": redirect_url})
-
-        merchants_with_items.append({"merchant": merchant, "items": merchant_items})
+        groups_data = []
+        groups = ItemGroup.objects.filter(merchant=merchant).prefetch_related("items")
+        for group in groups:
+            items_data = []
+            for item in group.items.all():
+                base_link = item.link
+                sep = "&" if "?" in base_link else "?"
+                affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
+                items_data.append({"item": item, "affiliate_link": affiliate_link})
+            groups_data.append({"group": group, "items": items_data})
+        merchants_with_groups.append({"merchant": merchant, "groups": groups_data})
 
     return render(
         request,
         "creators/affiliate_companies.html",
-        {"merchants_with_items": merchants_with_items, "pending_links": pending_links},
+        {"merchants_with_groups": merchants_with_groups, "pending_links": pending_links},
     )
 
 
