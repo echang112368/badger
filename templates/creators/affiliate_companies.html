@@ -21,9 +21,9 @@
         {% endfor %}
     </ul>
     {% endif %}
-    {% if merchants_with_items %}
+    {% if merchants_with_groups %}
     <div class="accordion" id="companiesAccordion">
-        {% for entry in merchants_with_items %}
+        {% for entry in merchants_with_groups %}
         <div class="accordion-item">
             <h2 class="accordion-header" id="heading{{ forloop.counter }}">
                 <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
@@ -33,17 +33,36 @@
             <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#companiesAccordion">
                 <div class="accordion-body">
                     <p class="fs-6 text-muted">{{ entry.merchant.email }}</p>
-                    {% if entry.items %}
-                    <ul class="list-unstyled mb-0">
-                        {% for item in entry.items %}
-                        <li class="mb-3">
-                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.title }}" data-url="{{ item.redirect_link }}">{{ item.title }}</a>
-                            <div class="text-muted small">{{ item.redirect_link|truncatechars:60 }}</div>
-                        </li>
+                    {% if entry.groups %}
+                    <div class="accordion" id="groupsAccordion{{ forloop.counter }}">
+                        {% for group in entry.groups %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
+                                    {{ group.group.name }}
+                                </button>
+                            </h2>
+                            <div id="collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.parentloop.counter }}-{{ forloop.counter }}" data-bs-parent="#groupsAccordion{{ forloop.parentloop.counter }}">
+                                <div class="accordion-body">
+                                    {% if group.items %}
+                                    <ul class="list-unstyled mb-0">
+                                        {% for item in group.items %}
+                                        <li class="mb-3">
+                                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.item.title }}" data-url="{{ item.affiliate_link }}">{{ item.item.title }}</a>
+                                            <div class="text-muted small">{{ item.affiliate_link|truncatechars:60 }}</div>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% else %}
+                                    <p class="text-muted fs-6">No items available.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                         {% endfor %}
-                    </ul>
+                    </div>
                     {% else %}
-                    <p class="text-muted fs-6">No items available.</p>
+                    <p class="text-muted fs-6">No groups available.</p>
                     {% endif %}
                 </div>
             </div>
