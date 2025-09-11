@@ -2,13 +2,14 @@ import random
 
 # Probability configuration
 P_TRIGGER = 0.35  # 35% chance the lottery triggers
-P_HIGH = 0.05     # high tier relative probability
-P_MID = 0.40      # mid tier relative probability
-P_LOW = 0.55      # low tier relative probability
+P_HIGH = 0.08     # high tier relative to triggered
+P_MID = 0.40      # mid tier relative to triggered
+P_LOW = 0.52      # low tier relative to triggered
 
 # Discount ranges (percentages)
-HIGH_RANGE = [10, 15]
-MID_RANGE = [5, 7]
+# High tier discounts are any whole number between 7% and 15%.
+HIGH_RANGE = list(range(7, 16))
+MID_RANGE = [5]
 LOW_RANGE = [3]
 
 def select_discount_percentage():
