@@ -141,6 +141,40 @@ class CreatorRequestTests(TestCase):
         )
 
 
+class CreatorAffiliateCompaniesViewTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(
+            username="creator_view",
+            password="pass",
+            email="creator_view@example.com",
+            is_creator=True,
+        )
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant_view",
+            password="pass",
+            email="merchant_view@example.com",
+            is_merchant=True,
+        )
+        self.group = ItemGroup.objects.create(
+            merchant=self.merchant, name="Group A", affiliate_percent=15
+        )
+        self.item = MerchantItem.objects.create(
+            merchant=self.merchant,
+            title="Product 1",
+            link="https://example.com/p1",
+        )
+        self.group.items.add(self.item)
+        MerchantCreatorLink.objects.create(
+            merchant=self.merchant, creator=self.creator, status=STATUS_ACTIVE
+        )
+        self.client.force_login(self.creator)
+
+    def test_groups_and_items_displayed(self):
+        response = self.client.get(reverse("creator_affiliate_companies"))
+        self.assertContains(response, "Group A")
+        self.assertContains(response, "15")
+        self.assertContains(response, "Product 1")
+
 class CreatorLinksTests(TestCase):
     def setUp(self):
         self.creator = CustomUser.objects.create_user(
