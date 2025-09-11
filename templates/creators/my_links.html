@@ -3,6 +3,56 @@
 {% block content %}
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">My Links</h1>
-    <p class="text-muted">You have no links yet.</p>
+    {% if breadcrumbs %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            {% for label, url in breadcrumbs %}
+                {% if url %}
+                    <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
+                {% else %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+    {% endif %}
+
+    {% if companies %}
+        <ul class="list-group">
+            {% for company in companies %}
+            <li class="list-group-item">
+                <a href="{% url 'creator_my_links_merchant' company.id %}">{{ company.name }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    {% elif groups %}
+        <ul class="list-group">
+            {% for group in groups %}
+            <li class="list-group-item">
+                <a href="{% url 'creator_my_links_group' merchant.id group.id %}">{{ group.name }}</a>
+                <div class="text-muted small">Commission: {{ group.affiliate_percent }}%</div>
+                {% if group.items.all %}
+                <div class="text-muted small">Items:
+                    {% for item in group.items.all %}
+                        {{ item.title }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    {% elif items %}
+        <ul class="list-group">
+            {% for entry in items %}
+            <li class="list-group-item">
+                <div class="fw-semibold">{{ entry.item.title }}</div>
+                {% if entry.item.link %}<div class="text-muted small">{{ entry.item.link }}</div>{% endif %}
+                <div class="mt-1"><a href="{{ entry.affiliate_link }}" target="_blank">{{ entry.affiliate_link }}</a></div>
+            </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">You have no links yet.</p>
+    {% endif %}
 </section>
 {% endblock %}
