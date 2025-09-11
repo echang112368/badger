@@ -14,7 +14,7 @@ class OrdersWebhookTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
 
-    def _setup_users(self, percent=Decimal("10.00")):
+    def _setup_users(self):
         merchant = CustomUser.objects.create_user(
             username="merchant",
             email="m@example.com",
@@ -34,8 +34,6 @@ class OrdersWebhookTests(TestCase):
         )
 
         merchant_meta = MerchantMeta.objects.get(user=merchant)
-        merchant_meta.affiliate_percent = percent
-        merchant_meta.save()
 
         return (
             merchant,

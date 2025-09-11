@@ -4,7 +4,6 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from .models import MerchantMeta
 from .forms import ItemGroupForm
-from decimal import Decimal
 
 
 class MerchantSettingsTests(TestCase):
@@ -28,24 +27,6 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(meta.shopify_access_token, "token")
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
-    def test_saves_affiliate_percent(self):
-        user = CustomUser.objects.create_user(
-            username="merchant_aff", password="pass", email="merchant_aff@example.com", is_merchant=True
-        )
-        self.client.force_login(user)
-        response = self.client.post(
-            reverse("merchant_settings"),
-            {
-                "paypal_email": "",
-                "shopify_access_token": "",
-                "shopify_store_domain": "",
-                "affiliate_percent": "3",
-            },
-        )
-
-        self.assertRedirects(response, reverse("merchant_settings"))
-        meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.affiliate_percent, Decimal("3"))
 
     def test_settings_displays_email(self):
         user = CustomUser.objects.create_user(
