@@ -17,7 +17,28 @@
     </nav>
     {% endif %}
 
-    {% if companies %}
+    <form method="get" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search by name or ID">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+        </div>
+    </form>
+
+    {% if search_query %}
+        {% if items %}
+        <ul class="list-group">
+            {% for entry in items %}
+            <li class="list-group-item">
+                <div class="fw-semibold">{{ entry.item.title }}{% if entry.item.shopify_product_id %} (ID: {{ entry.item.shopify_product_id }}){% endif %}</div>
+                {% if entry.item.link %}<div class="text-muted small">{{ entry.item.link }}</div>{% endif %}
+                <div class="mt-1"><a href="{{ entry.affiliate_link }}" target="_blank">{{ entry.affiliate_link }}</a></div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">No items found.</p>
+        {% endif %}
+    {% elif companies %}
         <ul class="list-group">
             {% for company in companies %}
             <li class="list-group-item">
@@ -42,12 +63,6 @@
             {% endfor %}
         </ul>
     {% elif items %}
-        <form method="get" class="mb-3">
-            <div class="input-group">
-                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search by name or ID">
-                <button class="btn btn-outline-secondary" type="submit">Search</button>
-            </div>
-        </form>
         <ul class="list-group">
             {% for entry in items %}
             <li class="list-group-item">
