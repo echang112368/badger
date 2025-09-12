@@ -227,14 +227,14 @@ def delete_creators(request):
 @login_required
 def update_creator_status(request):
     if request.method == "POST":
-        creator_id = request.POST.get("creator_id")
+        creator_ids = request.POST.getlist("selected_creators")
         action = request.POST.get("action")
-        link = MerchantCreatorLink.objects.filter(
-            merchant=request.user, creator__id=creator_id
-        ).first()
-        if link and action in ["activate", "deactivate"]:
-            link.status = STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
-            link.save()
+        if creator_ids and action in ["activate", "deactivate"]:
+            MerchantCreatorLink.objects.filter(
+                merchant=request.user, creator__id__in=creator_ids
+            ).update(
+                status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
+            )
     return redirect("merchant_creators")
 
 
