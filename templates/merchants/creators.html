@@ -21,13 +21,32 @@
         </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="border-b border-gray-200 mb-4">
+    <!-- Tabs and bulk actions -->
+    <div class="border-b border-gray-200 mb-4 flex items-center justify-between">
         <nav class="flex space-x-4" aria-label="Tabs">
             <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="active">Active</button>
             <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="inactive">Inactive</button>
             <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="pending">Pending</button>
         </nav>
+        <div class="relative">
+            <button id="bulk-action-toggle" class="p-2 text-xl"><i class="bi bi-three-dots"></i></button>
+            <div id="bulk-action-menu" class="hidden absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-50">
+                <form id="bulk-activate-form" method="post" action="{% url 'update_creator_status' %}" class="hidden">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="activate">
+                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm">Activate</button>
+                </form>
+                <form id="bulk-deactivate-form" method="post" action="{% url 'update_creator_status' %}" class="hidden">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="deactivate">
+                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm">Deactivate</button>
+                </form>
+                <form id="bulk-delete-form" method="post" action="{% url 'delete_creators' %}" onsubmit="return confirm('Are you sure you want to delete the selected creators?');">
+                    {% csrf_token %}
+                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Active Creators -->
@@ -36,14 +55,13 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3"><input type="checkbox" id="select-all-creators" class="h-4 w-4" /></th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Total Earnings</th>
                         <th class="text-right p-3">Updated Earnings</th>
                         <th class="text-right p-3">Referrals</th>
                         <th class="text-right p-3">Visits</th>
-                        <th class="text-center p-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -56,28 +74,10 @@
                         <td class="p-3 text-right">{{ link.creator.updated_earnings }}</td>
                         <td class="p-3 text-right">{{ link.creator.referrals }}</td>
                         <td class="p-3 text-right">{{ link.creator.visits }}</td>
-                        <td class="p-3 text-center">
-                            <div class="relative inline-block text-left">
-                                <button type="button" class="p-2 cursor-pointer menu-toggle relative z-10" data-menu="menu-active-{{ link.id }}" aria-haspopup="true" aria-expanded="false">⋮</button>
-                                <div id="menu-active-{{ link.id }}" class="dropdown-menu hidden absolute right-0 mt-2 w-32 bg-white border rounded-md shadow-lg z-50">
-                                    <form method="post" action="{% url 'update_creator_status' %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="creator_id" value="{{ link.creator.id }}">
-                                        <input type="hidden" name="action" value="deactivate">
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm">Deactivate</button>
-                                    </form>
-                                    <form method="post" action="{% url 'delete_creators' %}" onsubmit="return confirm('Are you sure you want to delete this creator?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="selected_creators" value="{{ link.creator.id }}">
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="p-4 text-center text-gray-500">No active creators found.</td>
+                        <td colspan="7" class="p-4 text-center text-gray-500">No active creators found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -91,34 +91,17 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3">Creator Username</th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
+                        <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
-                        <th class="text-center p-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for link in inactive_links %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ link.creator.id }}" class="h-4 w-4" /></td>
                         <td class="p-3 text-left">{{ link.creator.username }}</td>
                         <td class="p-3 text-left">{{ link.creator.email }}</td>
-                        <td class="p-3 text-center">
-                            <div class="relative inline-block text-left">
-                                <button type="button" class="p-2 cursor-pointer menu-toggle relative z-10" data-menu="menu-inactive-{{ link.id }}" aria-haspopup="true" aria-expanded="false">⋮</button>
-                                <div id="menu-inactive-{{ link.id }}" class="dropdown-menu hidden absolute right-0 mt-2 w-32 bg-white border rounded-md shadow-lg z-50">
-                                    <form method="post" action="{% url 'update_creator_status' %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="creator_id" value="{{ link.creator.id }}">
-                                        <input type="hidden" name="action" value="activate">
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm">Activate</button>
-                                    </form>
-                                    <form method="post" action="{% url 'delete_creators' %}" onsubmit="return confirm('Are you sure you want to delete this creator?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="selected_creators" value="{{ link.creator.id }}">
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -136,28 +119,17 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3">Creator Username</th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="pending" /></th>
+                        <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
-                        <th class="text-center p-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for link in pending_links %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ link.creator.id }}" class="h-4 w-4" /></td>
                         <td class="p-3 text-left">{{ link.creator.username }}</td>
                         <td class="p-3 text-left">{{ link.creator.email }}</td>
-                        <td class="p-3 text-center">
-                            <div class="relative inline-block text-left">
-                                <button type="button" class="p-2 cursor-pointer menu-toggle relative z-10" data-menu="menu-pending-{{ link.id }}" aria-haspopup="true" aria-expanded="false">⋮</button>
-                                <div id="menu-pending-{{ link.id }}" class="dropdown-menu hidden absolute right-0 mt-2 w-32 bg-white border rounded-md shadow-lg z-50">
-                                    <form method="post" action="{% url 'delete_creators' %}" onsubmit="return confirm('Are you sure you want to delete this request?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="selected_creators" value="{{ link.creator.id }}">
-                                        <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        </td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -173,33 +145,56 @@
         document.addEventListener('DOMContentLoaded', function() {
             const tabs = document.querySelectorAll('.tab-link');
             const contents = document.querySelectorAll('.tab-content');
+            const bulkToggle = document.getElementById('bulk-action-toggle');
+            const bulkMenu = document.getElementById('bulk-action-menu');
+            const activateForm = document.getElementById('bulk-activate-form');
+            const deactivateForm = document.getElementById('bulk-deactivate-form');
+            const deleteForm = document.getElementById('bulk-delete-form');
+            let currentTab = 'active';
+
             function showTab(name) {
                 contents.forEach(c => c.classList.add('hidden'));
                 document.getElementById(name).classList.remove('hidden');
                 tabs.forEach(t => t.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600'));
                 document.querySelector('.tab-link[data-tab="' + name + '"]').classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
+                currentTab = name;
+                activateForm.classList.toggle('hidden', name !== 'inactive');
+                deactivateForm.classList.toggle('hidden', name !== 'active');
             }
             tabs.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
             showTab('active');
 
-            document.querySelectorAll('.menu-toggle').forEach(btn => {
-                btn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const menu = document.getElementById(this.dataset.menu);
-                    document.querySelectorAll('.dropdown-menu').forEach(m => {
-                        if (m !== menu) m.classList.add('hidden');
+            document.querySelectorAll('.select-all').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    document.querySelectorAll('#' + this.dataset.target + ' input[name="selected_creators"]').forEach(box => {
+                        box.checked = this.checked;
                     });
-                    if (menu) {
-                        menu.classList.toggle('hidden');
-                        this.setAttribute('aria-expanded', !menu.classList.contains('hidden'));
-                    }
                 });
             });
 
-            document.addEventListener('click', () => {
-                document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
-                document.querySelectorAll('.menu-toggle').forEach(b => b.setAttribute('aria-expanded', 'false'));
+            bulkToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                bulkMenu.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', () => bulkMenu.classList.add('hidden'));
+
+            function populateSelected(form) {
+                form.querySelectorAll('input[name="selected_creators"]').forEach(el => el.remove());
+                document.querySelectorAll('#' + currentTab + ' input[name="selected_creators"]:checked').forEach(cb => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_creators';
+                    input.value = cb.value;
+                    form.appendChild(input);
+                });
+            }
+
+            [activateForm, deactivateForm, deleteForm].forEach(form => {
+                form.addEventListener('submit', function() {
+                    populateSelected(this);
+                });
             });
         });
     </script>
