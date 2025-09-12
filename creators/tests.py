@@ -165,6 +165,7 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
             merchant=self.merchant,
             title="Item A",
             link="https://example.com/item-a",
+            shopify_product_id="111",
         )
         self.group.items.add(self.item)
         MerchantCreatorLink.objects.create(
@@ -177,8 +178,10 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
     def test_displays_groups_and_items_with_affiliate_link(self):
         response = self.client.get(reverse("creator_affiliate_companies"))
         self.assertContains(response, "Group 1")
-        expected_link = f"{self.item.link}?ref=badger:{self.creator_meta.uuid}"
-        self.assertContains(response, expected_link)
+        expected_link = (
+            f"{self.item.link}?ref=badger:{self.creator_meta.uuid}&item_id={self.item.shopify_product_id}"
+        )
+        self.assertContains(response, expected_link.replace("&", "&amp;"))
 
 
 class CreatorLinksTests(TestCase):
@@ -206,6 +209,7 @@ class CreatorLinksTests(TestCase):
             merchant=self.merchant,
             title="Shoe",
             link="https://example.com/shoe",
+            shopify_product_id="222",
         )
         self.group.items.add(self.item)
         MerchantCreatorLink.objects.create(
@@ -228,6 +232,24 @@ class CreatorLinksTests(TestCase):
             "creator_my_links_group", args=[self.merchant.id, self.group.id]
         )
         response = self.client.get(url)
-        expected_link = f"{self.item.link}?ref=badger:{self.creator_meta.uuid}"
-        self.assertContains(response, expected_link)
+        expected_link = (
+            f"{self.item.link}?ref=badger:{self.creator_meta.uuid}&item_id={self.item.shopify_product_id}"
+        )
+        self.assertContains(response, expected_link.replace("&", "&amp;"))
+
+    def test_search_items_by_name_and_id(self):
+        other = MerchantItem.objects.create(
+            merchant=self.merchant,
+            title="Hat",
+            link="https://example.com/hat",
+            shopify_product_id="333",
+        )
+        self.group.items.add(other)
+        url = reverse("creator_my_links_group", args=[self.merchant.id, self.group.id])
+        response = self.client.get(url, {"q": "Hat"})
+        self.assertContains(response, "Hat")
+        self.assertNotContains(response, "Shoe")
+        response = self.client.get(url, {"q": other.shopify_product_id})
+        self.assertContains(response, "Hat")
+        self.assertNotContains(response, "Shoe")
 
