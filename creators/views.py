@@ -84,17 +84,19 @@ def creator_affiliate_companies(request):
     return render(
         request,
         "creators/affiliate_companies.html",
-        {"merchants_with_groups": merchants_with_groups, "pending_links": pending_links},
+        {
+            "merchants_with_groups": merchants_with_groups,
+            "pending_links": pending_links,
+        },
     )
 
 
 @login_required
 def creator_my_links(request, merchant_id=None, group_id=None):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
-    links = (
-        MerchantCreatorLink.objects.filter(creator=request.user, status=STATUS_ACTIVE)
-        .select_related("merchant")
-    )
+    links = MerchantCreatorLink.objects.filter(
+        creator=request.user, status=STATUS_ACTIVE
+    ).select_related("merchant")
 
     breadcrumbs = [("Company", None)]
     context = {"breadcrumbs": breadcrumbs}
@@ -112,14 +114,34 @@ def creator_my_links(request, merchant_id=None, group_id=None):
                 | Q(shopify_product_id__icontains=query)
                 | Q(id__icontains=query)
             )
+
+            merchant_ids_found = set()
+            group_ids_found = set()
             items = []
             for item in item_queryset:
+                merchant_ids_found.add(item.merchant_id)
+                group_ids_found.update(item.groups.values_list("id", flat=True))
                 base_link = item.link
                 sep = "&" if "?" in base_link else "?"
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
                 items.append({"item": item, "affiliate_link": affiliate_link})
+
+            # If search results are within a single merchant or group, redirect so
+            # breadcrumbs show the full path.
+            if len(group_ids_found) == 1 and len(merchant_ids_found) == 1:
+                merchant_id = next(iter(merchant_ids_found))
+                group_id = next(iter(group_ids_found))
+                return redirect(
+                    "creator_my_links_group",
+                    merchant_id=merchant_id,
+                    group_id=group_id,
+                )
+            if len(merchant_ids_found) == 1:
+                merchant_id = next(iter(merchant_ids_found))
+                return redirect("creator_my_links_merchant", merchant_id=merchant_id)
+
             context.update({"items": items, "search_query": query})
             return render(request, "creators/my_links.html", context)
 
@@ -152,9 +174,9 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     # Merchant level: show groups or search across merchant items
     if group_id is None:
         if query:
-            item_queryset = (
-                MerchantItem.objects.filter(groups__merchant=merchant).distinct()
-            )
+            item_queryset = MerchantItem.objects.filter(
+                groups__merchant=merchant
+            ).distinct()
             item_queryset = item_queryset.filter(
                 Q(title__icontains=query)
                 | Q(shopify_product_id__icontains=query)
@@ -168,7 +190,9 @@ def creator_my_links(request, merchant_id=None, group_id=None):
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
                 items.append({"item": item, "affiliate_link": affiliate_link})
-            context.update({"merchant": merchant, "items": items, "search_query": query})
+            context.update(
+                {"merchant": merchant, "items": items, "search_query": query}
+            )
             return render(request, "creators/my_links.html", context)
 
         groups = ItemGroup.objects.filter(merchant=merchant).prefetch_related("items")
@@ -199,12 +223,14 @@ def creator_my_links(request, merchant_id=None, group_id=None):
             affiliate_link += f"&item_id={item.shopify_product_id}"
         items.append({"item": item, "affiliate_link": affiliate_link})
 
-    context.update({
-        "merchant": merchant,
-        "group": group,
-        "items": items,
-        "search_query": query,
-    })
+    context.update(
+        {
+            "merchant": merchant,
+            "group": group,
+            "items": items,
+            "search_query": query,
+        }
+    )
     return render(request, "creators/my_links.html", context)
 
 
@@ -240,14 +266,14 @@ def respond_request(request, link_id):
     try:
         link = MerchantCreatorLink.objects.get(id=link_id, creator=request.user)
     except MerchantCreatorLink.DoesNotExist:
-        return redirect('creator_affiliate_companies')
+        return redirect("creator_affiliate_companies")
 
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'accept':
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "accept":
             link.status = STATUS_ACTIVE
             link.save()
-        elif action == 'decline':
+        elif action == "decline":
             link.delete()
 
-    return redirect('creator_affiliate_companies')
+    return redirect("creator_affiliate_companies")
