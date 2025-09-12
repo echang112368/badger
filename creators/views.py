@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date
@@ -75,6 +75,8 @@ def creator_affiliate_companies(request):
                 base_link = item.link
                 sep = "&" if "?" in base_link else "?"
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
+                if item.shopify_product_id:
+                    affiliate_link += f"&item_id={item.shopify_product_id}"
                 items_data.append({"item": item, "affiliate_link": affiliate_link})
             groups_data.append({"group": group, "items": items_data})
         merchants_with_groups.append({"merchant": merchant, "groups": groups_data})
@@ -136,14 +138,30 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     )
     breadcrumbs.append((group.name, None))
 
+    query = request.GET.get("q", "").strip()
+    item_queryset = group.items.all()
+    if query:
+        item_queryset = item_queryset.filter(
+            Q(title__icontains=query)
+            | Q(shopify_product_id__icontains=query)
+            | Q(id__icontains=query)
+        )
+
     items = []
-    for item in group.items.all():
+    for item in item_queryset:
         base_link = item.link
         sep = "&" if "?" in base_link else "?"
         affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
+        if item.shopify_product_id:
+            affiliate_link += f"&item_id={item.shopify_product_id}"
         items.append({"item": item, "affiliate_link": affiliate_link})
 
-    context.update({"merchant": merchant, "group": group, "items": items})
+    context.update({
+        "merchant": merchant,
+        "group": group,
+        "items": items,
+        "search_query": query,
+    })
     return render(request, "creators/my_links.html", context)
 
 
