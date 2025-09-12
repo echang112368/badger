@@ -48,7 +48,7 @@
                                     <ul class="list-unstyled mb-0">
                                         {% for item in group.items %}
                                         <li class="mb-3">
-                                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.item.title }}" data-url="{{ item.affiliate_link }}">{{ item.item.title }}</a>
+                                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.item.title }}" data-url="{{ item.affiliate_link }}">{{ item.item.title }}{% if item.item.shopify_product_id %} (ID: {{ item.item.shopify_product_id }}){% endif %}</a>
                                             <div class="text-muted small">{{ item.affiliate_link|truncatechars:60 }}</div>
                                         </li>
                                         {% endfor %}
