@@ -29,7 +29,7 @@
             <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="pending">Pending</button>
         </nav>
         <div class="relative">
-            <button id="bulk-action-toggle" class="p-2 text-xl"><i class="bi bi-three-dots"></i></button>
+            <button id="bulk-action-toggle" type="button" class="p-2 text-xl text-gray-400 cursor-not-allowed" disabled><i class="bi bi-three-dots"></i></button>
             <div id="bulk-action-menu" class="hidden absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-lg z-50">
                 <form id="bulk-activate-form" method="post" action="{% url 'update_creator_status' %}" class="hidden">
                     {% csrf_token %}
@@ -152,12 +152,23 @@
             const deleteForm = document.getElementById('bulk-delete-form');
             let currentTab = 'active';
 
+            function updateBulkToggleState() {
+                const anyChecked = document.querySelectorAll('#' + currentTab + ' input[name="selected_creators"]:checked').length > 0;
+                bulkToggle.disabled = !anyChecked;
+                bulkToggle.classList.toggle('text-gray-400', !anyChecked);
+                bulkToggle.classList.toggle('cursor-not-allowed', !anyChecked);
+                if (!anyChecked) {
+                    bulkMenu.classList.add('hidden');
+                }
+            }
+
             function showTab(name) {
                 contents.forEach(c => c.classList.add('hidden'));
                 document.getElementById(name).classList.remove('hidden');
                 tabs.forEach(t => t.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600'));
                 document.querySelector('.tab-link[data-tab="' + name + '"]').classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
                 currentTab = name;
+                updateBulkToggleState();
                 activateForm.classList.toggle('hidden', name !== 'inactive');
                 deactivateForm.classList.toggle('hidden', name !== 'active');
             }
@@ -169,10 +180,18 @@
                     document.querySelectorAll('#' + this.dataset.target + ' input[name="selected_creators"]').forEach(box => {
                         box.checked = this.checked;
                     });
+                    updateBulkToggleState();
                 });
             });
 
+            document.querySelectorAll('input[name="selected_creators"]').forEach(cb => {
+                cb.addEventListener('change', updateBulkToggleState);
+            });
+
             bulkToggle.addEventListener('click', function(e) {
+                if (bulkToggle.disabled) {
+                    return;
+                }
                 e.preventDefault();
                 e.stopPropagation();
                 bulkMenu.classList.toggle('hidden');
