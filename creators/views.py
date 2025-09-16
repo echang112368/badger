@@ -6,11 +6,17 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date
 import json
+from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
 
-from links.models import MerchantCreatorLink, STATUS_ACTIVE, STATUS_REQUESTED
+from links.models import (
+    MerchantCreatorLink,
+    STATUS_ACTIVE,
+    STATUS_INACTIVE,
+    STATUS_REQUESTED,
+)
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
@@ -55,38 +61,97 @@ def creator_earnings(request):
 
 @login_required
 def creator_affiliate_companies(request):
-    active_links = MerchantCreatorLink.objects.filter(
-        creator=request.user, status=STATUS_ACTIVE
+    active_links = list(
+        MerchantCreatorLink.objects.filter(
+            creator=request.user, status=STATUS_ACTIVE
+        ).select_related("merchant__merchantmeta")
     )
-    pending_links = MerchantCreatorLink.objects.filter(
-        creator=request.user, status=STATUS_REQUESTED
+    inactive_links = list(
+        MerchantCreatorLink.objects.filter(
+            creator=request.user, status=STATUS_INACTIVE
+        ).select_related("merchant__merchantmeta")
+    )
+    pending_links = list(
+        MerchantCreatorLink.objects.filter(
+            creator=request.user, status=STATUS_REQUESTED
+        )
+        .select_related("merchant__merchantmeta")
+        .order_by("merchant__username")
     )
 
-    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
+    def merchant_display_name(merchant):
+        meta = getattr(merchant, "merchantmeta", None)
+        if meta and meta.company_name:
+            return meta.company_name
+        return merchant.username
 
-    merchants_with_groups = []
-    for link in active_links:
+    def quantize_amount(value):
+        if value is None:
+            value = Decimal("0")
+        elif not isinstance(value, Decimal):
+            value = Decimal(value)
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    start_of_month = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+
+    def build_company_entry(link):
         merchant = link.merchant
-        groups_data = []
-        groups = ItemGroup.objects.filter(merchant=merchant).prefetch_related("items")
-        for group in groups:
-            items_data = []
-            for item in group.items.all():
-                base_link = item.link
-                sep = "&" if "?" in base_link else "?"
-                affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
-                if item.shopify_product_id:
-                    affiliate_link += f"&item_id={item.shopify_product_id}"
-                items_data.append({"item": item, "affiliate_link": affiliate_link})
-            groups_data.append({"group": group, "items": items_data})
-        merchants_with_groups.append({"merchant": merchant, "groups": groups_data})
+        commission_entries = LedgerEntry.objects.filter(
+            creator=request.user,
+            merchant=merchant,
+            entry_type="commission",
+        )
+        total_raw = commission_entries.aggregate(total=Sum("amount"))["total"]
+        total_earnings = quantize_amount(total_raw)
+        monthly_raw = commission_entries.filter(timestamp__gte=start_of_month).aggregate(
+            total=Sum("amount")
+        )["total"]
+        monthly_earnings = quantize_amount(monthly_raw)
+        clicks = getattr(link, "clicks", 0) or 0
+        conversions = commission_entries.filter(amount__gt=0).count()
+        if clicks:
+            avg = (total_earnings / Decimal(clicks)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            conversion_rate = (
+                (Decimal(conversions) / Decimal(clicks)) * Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            avg = Decimal("0.00")
+            conversion_rate = Decimal("0.00")
+
+        return {
+            "link_id": link.id,
+            "name": merchant_display_name(merchant),
+            "email": merchant.email,
+            "monthly_earnings": monthly_earnings,
+            "total_earnings": total_earnings,
+            "clicks": clicks,
+            "avg_earnings_per_click": avg,
+            "conversion_rate": conversion_rate,
+        }
+
+    active_companies = [build_company_entry(link) for link in active_links]
+    inactive_companies = [build_company_entry(link) for link in inactive_links]
+
+    pending_requests = [
+        {
+            "id": link.id,
+            "name": merchant_display_name(link.merchant),
+            "email": link.merchant.email,
+        }
+        for link in pending_links
+    ]
 
     return render(
         request,
         "creators/affiliate_companies.html",
         {
-            "merchants_with_groups": merchants_with_groups,
-            "pending_links": pending_links,
+            "active_companies": active_companies,
+            "inactive_companies": inactive_companies,
+            "pending_requests": pending_requests,
         },
     )
 
@@ -259,6 +324,17 @@ def creator_settings(request):
 @login_required
 def creator_support(request):
     return render(request, "creators/support.html")
+
+
+@login_required
+def delete_affiliate_merchants(request):
+    if request.method == "POST":
+        link_ids = request.POST.getlist("selected_links")
+        if link_ids:
+            MerchantCreatorLink.objects.filter(
+                id__in=link_ids, creator=request.user
+            ).delete()
+    return redirect("creator_affiliate_companies")
 
 
 @login_required
