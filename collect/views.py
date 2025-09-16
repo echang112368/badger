@@ -74,7 +74,7 @@ def webhook_view(request):
                     if commission > 0:
                         LedgerEntry.objects.create(
                             creator=creator_meta.user,
-                            merchant=merchant_meta.user,
+
                             amount=commission,
                             entry_type="commission",
                         )
@@ -210,7 +210,6 @@ def orders_create_webhook(request):
         # Credit the content creator with the commission
         LedgerEntry.objects.create(
             creator=creator_meta.user,
-            merchant=merchant_meta.user,
             amount=commission_total,
             entry_type="commission",
         )
