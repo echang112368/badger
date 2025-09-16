@@ -18,11 +18,13 @@ class MerchantSettingsForm(forms.ModelForm):
     class Meta:
         model = MerchantMeta
         fields = [
+            "company_name",
             "paypal_email",
             "shopify_access_token",
             "shopify_store_domain",
         ]
         labels = {
+            "company_name": "Business Name",
             "paypal_email": "PayPal Email (for invoices)",
             "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
