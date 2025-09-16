@@ -16,6 +16,8 @@ from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET
 from urllib.parse import urlparse
+from django.urls import reverse
+from typing import Optional
 
 
 def _normalize_domain(domain: str) -> str:
@@ -27,6 +29,18 @@ def _normalize_domain(domain: str) -> str:
     if host.startswith("www."):
         host = host[4:]
     return host
+
+
+_SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api"}
+
+
+def _resolve_settings_tab(tab: Optional[str]) -> str:
+    """Return a valid settings tab slug."""
+
+    if not tab:
+        return "profile"
+    tab = tab.strip().lower()
+    return tab if tab in _SETTINGS_TABS else "profile"
 
 
 @csrf_exempt
@@ -286,13 +300,24 @@ def merchant_creators(request):
 def merchant_settings(request):
     merchant_meta, _ = MerchantMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
+        active_tab = _resolve_settings_tab(request.POST.get("active_tab"))
         form = MerchantSettingsForm(request.POST, instance=merchant_meta)
         user_form = UserNameForm(request.POST, instance=request.user)
-        if form.is_valid() and user_form.is_valid():
+        form_valid = form.is_valid()
+        user_form_valid = user_form.is_valid()
+
+        if form_valid:
             form.save()
+        if user_form_valid:
             user_form.save()
-            return redirect('merchant_settings')
+
+        if form_valid and user_form_valid:
+            redirect_url = reverse("merchant_settings")
+            if active_tab != "profile":
+                redirect_url = f"{redirect_url}?tab={active_tab}"
+            return redirect(redirect_url)
     else:
+        active_tab = _resolve_settings_tab(request.GET.get("tab"))
         form = MerchantSettingsForm(instance=merchant_meta)
         user_form = UserNameForm(instance=request.user)
 
@@ -301,4 +326,5 @@ def merchant_settings(request):
         'merchant_meta': merchant_meta,
         'settings_form': form,
         'user_form': user_form,
+        'active_tab': active_tab,
     })
