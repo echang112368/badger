@@ -1,9 +1,17 @@
+from decimal import Decimal
+
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import CreatorMeta
-from links.models import MerchantCreatorLink, STATUS_REQUESTED, STATUS_ACTIVE
+from ledger.models import LedgerEntry
+from links.models import (
+    MerchantCreatorLink,
+    STATUS_ACTIVE,
+    STATUS_INACTIVE,
+    STATUS_REQUESTED,
+)
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -149,39 +157,51 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
             email="creator_aff_view@example.com",
             is_creator=True,
         )
-        self.creator_meta = CreatorMeta.objects.get(user=self.creator)
         self.merchant = CustomUser.objects.create_user(
             username="merchant_aff_view",
             password="pass",
             email="merchant_aff_view@example.com",
             is_merchant=True,
         )
-        self.group = ItemGroup.objects.create(
-            merchant=self.merchant,
-            name="Group 1",
-            affiliate_percent=5,
-        )
-        self.item = MerchantItem.objects.create(
-            merchant=self.merchant,
-            title="Item A",
-            link="https://example.com/item-a",
-            shopify_product_id="111",
-        )
-        self.group.items.add(self.item)
-        MerchantCreatorLink.objects.create(
+        self.merchant_meta = MerchantMeta.objects.get(user=self.merchant)
+        self.merchant_meta.company_name = "Merchant Aff LLC"
+        self.merchant_meta.save()
+        self.link = MerchantCreatorLink.objects.create(
             merchant=self.merchant,
             creator=self.creator,
             status=STATUS_ACTIVE,
         )
         self.client.force_login(self.creator)
 
-    def test_displays_groups_and_items_with_affiliate_link(self):
-        response = self.client.get(reverse("creator_affiliate_companies"))
-        self.assertContains(response, "Group 1")
-        expected_link = (
-            f"{self.item.link}?ref=badger:{self.creator_meta.uuid}&item_id={self.item.shopify_product_id}"
+    def test_displays_company_metrics(self):
+        LedgerEntry.objects.create(
+            creator=self.creator,
+            merchant=self.merchant,
+            amount=Decimal("42.50"),
+            entry_type="commission",
         )
-        self.assertContains(response, expected_link.replace("&", "&amp;"))
+        response = self.client.get(reverse("creator_affiliate_companies"))
+        self.assertContains(response, "Merchant Aff LLC")
+        self.assertContains(response, "Monthly Earnings")
+        self.assertContains(response, "Avg. Per Click")
+        self.assertContains(response, "$42.50")
+
+    def test_inactive_company_lists_under_inactive_tab(self):
+        self.link.status = STATUS_INACTIVE
+        self.link.save()
+        response = self.client.get(reverse("creator_affiliate_companies"))
+        self.assertContains(response, "No active companies found.")
+        self.assertContains(response, "Merchant Aff LLC")
+
+    def test_delete_affiliate_company(self):
+        response = self.client.post(
+            reverse("creator_delete_affiliations"),
+            {"selected_links": [str(self.link.id)]},
+        )
+        self.assertRedirects(response, reverse("creator_affiliate_companies"))
+        self.assertFalse(
+            MerchantCreatorLink.objects.filter(id=self.link.id).exists()
+        )
 
 
 class CreatorLinksTests(TestCase):
