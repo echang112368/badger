@@ -2,6 +2,7 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <script src="https://cdn.tailwindcss.com"></script>
+{% with current_tab=active_tab|default:'profile' %}
 <div class="max-w-3xl mx-auto py-10 px-4">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-semibold text-gray-900">Settings</h1>
@@ -11,16 +12,17 @@
   </div>
   <div class="mb-6 border-b border-gray-200">
     <nav id="settingsTabs" class="-mb-px flex space-x-6">
-      <button data-tab="profile" class="whitespace-nowrap border-b-2 border-indigo-500 px-1 py-2 text-sm font-medium text-indigo-600">Profile</button>
-      <button data-tab="billing" class="whitespace-nowrap border-b-2 border-transparent px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Billing</button>
-      <button data-tab="notifications" class="whitespace-nowrap border-b-2 border-transparent px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Notifications</button>
-      <button data-tab="integrations" class="whitespace-nowrap border-b-2 border-transparent px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">Integrations</button>
-      <button data-tab="api" class="whitespace-nowrap border-b-2 border-transparent px-1 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">API</button>
+      <button data-tab="profile" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'profile' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Profile</button>
+      <button data-tab="billing" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'billing' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Billing</button>
+      <button data-tab="notifications" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'notifications' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Notifications</button>
+      <button data-tab="integrations" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'integrations' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Integrations</button>
+      <button data-tab="api" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'api' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">API</button>
     </nav>
   </div>
   <form id="settingsForm" method="post" action="{% url 'creator_settings' %}" class="space-y-8">
     {% csrf_token %}
-    <div id="tab-profile">
+    <input type="hidden" name="active_tab" id="activeTabInput" value="{{ current_tab }}">
+    <div id="tab-profile"{% if current_tab != 'profile' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">Profile</h2>
         <p class="text-sm text-gray-500 mb-6">Update your business and account details here.</p>
@@ -62,38 +64,38 @@
         </div>
       </div>
     </div>
-    <div id="tab-billing" class="hidden">
+    <div id="tab-billing"{% if current_tab != 'billing' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">Billing</h2>
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
         <div class="grid gap-6">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">PayPal Email</label>
-            <input type="email" name="paypal_email" value="{{ creator_meta.paypal_email|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" name="paypal_email" value="{{ settings_form.paypal_email.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
       </div>
     </div>
-    <div id="tab-notifications" class="hidden">
+    <div id="tab-notifications"{% if current_tab != 'notifications' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">Notifications</h2>
         <p class="text-sm text-gray-500">No notification settings available.</p>
       </div>
     </div>
-    <div id="tab-integrations" class="hidden">
+    <div id="tab-integrations"{% if current_tab != 'integrations' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">Integrations</h2>
         <p class="text-sm text-gray-500">No integration settings available.</p>
       </div>
     </div>
-    <div id="tab-api" class="hidden">
+    <div id="tab-api"{% if current_tab != 'api' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">API</h2>
         <div class="grid gap-6">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Shopify Admin API Access Token</label>
             <div class="relative">
-              <input type="password" name="shopify_access_token" id="shopify_access_token" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="password" name="shopify_access_token" id="shopify_access_token" value="{{ settings_form.shopify_access_token.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               <button type="button" id="copyToken" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
@@ -104,7 +106,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Shopify URL</label>
-            <input type="text" name="shopify_url" placeholder="mystore.myshopify.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" name="shopify_store_domain" value="{{ settings_form.shopify_store_domain.value|default_if_none:'' }}" placeholder="mystore.myshopify.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
       </div>
@@ -117,17 +119,43 @@
 <script>
   const tabs=document.querySelectorAll('#settingsTabs button');
   const sections={};
+  const activeTabInput=document.getElementById('activeTabInput');
+
+  function setActiveTab(tab){
+    tabs.forEach(t=>{
+      t.classList.remove('border-indigo-500','text-indigo-600');
+      t.classList.add('border-transparent','text-gray-500');
+    });
+    Object.values(sections).forEach(sec=>{
+      if(sec){
+        sec.classList.add('hidden');
+      }
+    });
+    const activeButton=document.querySelector(`#settingsTabs button[data-tab='${tab}']`);
+    if(activeButton){
+      activeButton.classList.add('border-indigo-500','text-indigo-600');
+      activeButton.classList.remove('border-transparent','text-gray-500');
+    }
+    const activeSection=sections[`tab-${tab}`];
+    if(activeSection){
+      activeSection.classList.remove('hidden');
+    }
+    if(activeTabInput){
+      activeTabInput.value=tab;
+    }
+  }
+
   tabs.forEach(btn=>{
-    const id='tab-'+btn.dataset.tab;
+    const id=`tab-${btn.dataset.tab}`;
     sections[id]=document.getElementById(id);
     btn.addEventListener('click',()=>{
-      tabs.forEach(t=>{t.classList.remove('border-indigo-500','text-indigo-600');t.classList.add('border-transparent','text-gray-500');});
-      btn.classList.add('border-indigo-500','text-indigo-600');
-      btn.classList.remove('text-gray-500','border-transparent');
-      Object.values(sections).forEach(sec=>sec.classList.add('hidden'));
-      sections[id].classList.remove('hidden');
+      setActiveTab(btn.dataset.tab);
     });
   });
+
+  const initialTab=activeTabInput?activeTabInput.value||'profile':'profile';
+  setActiveTab(initialTab);
+
   const togglePassword=document.getElementById('togglePassword');
   const password=document.getElementById('password');
   if(togglePassword&&password){
@@ -143,4 +171,5 @@
     });
   }
 </script>
+{% endwith %}
 {% endblock %}
