@@ -6,8 +6,6 @@ class CreatorMeta(models.Model):
     bio = models.TextField(blank=True)
     paypal_email = models.EmailField(blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    shopify_access_token = models.CharField(max_length=255, blank=True)
-    shopify_store_domain = models.CharField(max_length=255, blank=True)
 
 
     def __str__(self):
