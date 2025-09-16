@@ -113,11 +113,17 @@ class OrdersWebhookTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-        creator_entry = LedgerEntry.objects.get(creator=creator, entry_type="commission")
-        merchant_entry = LedgerEntry.objects.get(merchant=merchant, entry_type="commission")
+        creator_entry = LedgerEntry.objects.get(
+            creator=creator, merchant=merchant, entry_type="commission"
+        )
+        merchant_entry = LedgerEntry.objects.get(
+            merchant=merchant, creator__isnull=True, entry_type="commission"
+        )
         points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
 
+        self.assertEqual(creator_entry.merchant, merchant)
         self.assertEqual(creator_entry.amount, Decimal("0.80"))
+        self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-0.80"))
         self.assertEqual(points_entry.amount, Decimal("48"))
         self.assertIsNone(points_entry.merchant)
@@ -165,16 +171,18 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         creator_entry = LedgerEntry.objects.get(
-            creator=creator, entry_type="commission"
+            creator=creator, merchant=merchant, entry_type="commission"
         )
         merchant_entry = LedgerEntry.objects.get(
-            merchant=merchant, entry_type="commission"
+            merchant=merchant, creator__isnull=True, entry_type="commission"
         )
         points_entry = LedgerEntry.objects.get(
             creator=customer, entry_type="points"
         )
 
+        self.assertEqual(creator_entry.merchant, merchant)
         self.assertEqual(creator_entry.amount, Decimal("5.00"))
+        self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-5.00"))
         self.assertEqual(points_entry.amount, Decimal("300"))
 
