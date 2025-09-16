@@ -7,10 +7,8 @@ from django.utils import timezone
 from datetime import date
 import json
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
 
 from .models import CreatorMeta
-from .forms import CreatorSettingsForm
 from accounts.forms import UserNameForm
 
 from links.models import (
@@ -22,18 +20,6 @@ from links.models import (
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
-
-
-_SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api"}
-
-
-def _resolve_settings_tab(tab: Optional[str]) -> str:
-    """Return a valid settings tab slug."""
-
-    if not tab:
-        return "profile"
-    tab = tab.strip().lower()
-    return tab if tab in _SETTINGS_TABS else "profile"
 
 
 @login_required
@@ -317,37 +303,21 @@ def creator_my_links(request, merchant_id=None, group_id=None):
 def creator_settings(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        active_tab = _resolve_settings_tab(request.POST.get("active_tab"))
-        settings_form = CreatorSettingsForm(request.POST, instance=creator_meta)
         user_form = UserNameForm(request.POST, instance=request.user)
-        settings_valid = settings_form.is_valid()
-        user_valid = user_form.is_valid()
-
-        if settings_valid:
-            settings_form.save()
-        if user_valid:
+        paypal_email = request.POST.get("paypal_email", "").strip()
+        if user_form.is_valid():
             user_form.save()
-
-        if settings_valid and user_valid:
-            redirect_url = reverse("creator_settings")
-            if active_tab != "profile":
-                redirect_url = f"{redirect_url}?tab={active_tab}"
-            return redirect(redirect_url)
+            if paypal_email:
+                creator_meta.paypal_email = paypal_email
+                creator_meta.save()
+            return redirect("creator_settings")
     else:
-        active_tab = _resolve_settings_tab(request.GET.get("tab"))
-        settings_form = CreatorSettingsForm(instance=creator_meta)
         user_form = UserNameForm(instance=request.user)
 
     return render(
         request,
         "creators/settings.html",
-        {
-            "creator_meta": creator_meta,
-            "creator": request.user,
-            "settings_form": settings_form,
-            "user_form": user_form,
-            "active_tab": active_tab,
-        },
+        {"creator_meta": creator_meta, "creator": request.user, "user_form": user_form},
     )
 
 
