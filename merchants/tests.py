@@ -64,6 +64,63 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(user.first_name, "New")
 
 
+    def test_redirect_preserves_active_tab(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_tabs",
+            password="pass123",
+            email="merchant_tabs@example.com",
+            is_merchant=True,
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_settings"),
+            {
+                "company_name": "",
+                "paypal_email": "",
+                "shopify_access_token": "tab-token",
+                "shopify_store_domain": "https://TabStore.myshopify.com/",
+                "first_name": "",
+                "last_name": "",
+                "active_tab": "api",
+            },
+        )
+        self.assertRedirects(
+            response, f"{reverse('merchant_settings')}?tab=api"
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_access_token, "tab-token")
+        self.assertEqual(meta.shopify_store_domain, "tabstore.myshopify.com")
+
+
+    def test_saves_settings_when_user_form_invalid(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_partial",
+            password="pass123",
+            email="merchant_partial@example.com",
+            is_merchant=True,
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_settings"),
+            {
+                "company_name": "",
+                "paypal_email": "",
+                "shopify_access_token": "partial-token",
+                "shopify_store_domain": "",
+                "first_name": "A" * 200,
+                "last_name": "",
+                "active_tab": "api",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_access_token, "partial-token")
+        self.assertEqual(
+            response.context["active_tab"], "api"
+        )
+        self.assertIn("first_name", response.context["user_form"].errors)
+
+
 class StoreIdLookupTests(TestCase):
     def test_returns_uuid_for_domain(self):
         user = CustomUser.objects.create_user(
