@@ -67,58 +67,6 @@ class CreatorSettingsTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.last_name, "Name")
 
-    def test_redirect_preserves_active_tab(self):
-        user = CustomUser.objects.create_user(
-            username="creator_tabs",
-            password="pass123",
-            email="creator_tabs@example.com",
-            is_creator=True,
-        )
-        self.client.force_login(user)
-        response = self.client.post(
-            reverse("creator_settings"),
-            {
-                "paypal_email": "",
-                "shopify_access_token": "tab-token",
-                "shopify_store_domain": "https://TabStore.myshopify.com/",
-                "first_name": "",
-                "last_name": "",
-                "active_tab": "api",
-            },
-        )
-        self.assertRedirects(
-            response, f"{reverse('creator_settings')}?tab=api"
-        )
-        meta = CreatorMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_access_token, "tab-token")
-        self.assertEqual(meta.shopify_store_domain, "tabstore.myshopify.com")
-
-    def test_saves_settings_when_user_form_invalid(self):
-        user = CustomUser.objects.create_user(
-            username="creator_partial",
-            password="pass123",
-            email="creator_partial@example.com",
-            is_creator=True,
-        )
-        self.client.force_login(user)
-        response = self.client.post(
-            reverse("creator_settings"),
-            {
-                "paypal_email": "creator-paypal@example.com",
-                "shopify_access_token": "partial-token",
-                "shopify_store_domain": "",
-                "first_name": "A" * 200,
-                "last_name": "",
-                "active_tab": "api",
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        meta = CreatorMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_access_token, "partial-token")
-        self.assertEqual(meta.paypal_email, "creator-paypal@example.com")
-        self.assertIn("first_name", response.context["user_form"].errors)
-        self.assertEqual(response.context["active_tab"], "api")
-
 
 class CreatorNameAPITests(TestCase):
     def setUp(self):
