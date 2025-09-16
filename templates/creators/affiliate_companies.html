@@ -1,111 +1,210 @@
 {% extends 'creators/base.html' %}
 {% block title %}Affiliate Companies{% endblock %}
 {% block content %}
-<section class="my-4">
-    <h1 class="fw-bold fs-3 mb-4">Affiliate Companies</h1>
-    {% if pending_links %}
-    <h2 class="fs-4 mb-3">Pending Requests</h2>
-    <ul class="list-group mb-4">
-        {% for link in pending_links %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-                <div class="fw-semibold">{{ link.merchant.username }}</div>
-                <div class="text-muted small">{{ link.merchant.email }}</div>
-            </div>
-            <form method="post" action="{% url 'respond_request' link.id %}" class="d-flex gap-2">
-                {% csrf_token %}
-                <button name="action" value="accept" class="btn btn-success btn-sm">Accept</button>
-                <button name="action" value="decline" class="btn btn-outline-danger btn-sm">Decline</button>
-            </form>
-        </li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-    {% if merchants_with_groups %}
-    <div class="accordion" id="companiesAccordion">
-        {% for entry in merchants_with_groups %}
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.counter }}">
-                    {{ entry.merchant.username }}
-                </button>
-            </h2>
-            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#companiesAccordion">
-                <div class="accordion-body">
-                    <p class="fs-6 text-muted">{{ entry.merchant.email }}</p>
-                    {% if entry.groups %}
-                    <div class="accordion" id="groupsAccordion{{ forloop.counter }}">
-                        {% for group in entry.groups %}
-                        <div class="accordion-item">
-                            <h2 class="accordion-header" id="heading{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}" aria-expanded="false" aria-controls="collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}">
-                                    {{ group.group.name }}
-                                </button>
-                            </h2>
-                            <div id="collapse{{ forloop.parentloop.counter }}-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="heading{{ forloop.parentloop.counter }}-{{ forloop.counter }}" data-bs-parent="#groupsAccordion{{ forloop.parentloop.counter }}">
-                                <div class="accordion-body">
-                                    {% if group.items %}
-                                    <ul class="list-unstyled mb-0">
-                                        {% for item in group.items %}
-                                        <li class="mb-3">
-                                            <a href="#" class="fw-semibold item-link" data-bs-toggle="modal" data-bs-target="#linkModal" data-title="{{ item.item.title }}" data-url="{{ item.affiliate_link }}">{{ item.item.title }}{% if item.item.shopify_product_id %} (ID: {{ item.item.shopify_product_id }}){% endif %}</a>
-                                            <div class="text-muted small">{{ item.affiliate_link|truncatechars:60 }}</div>
-                                        </li>
-                                        {% endfor %}
-                                    </ul>
-                                    {% else %}
-                                    <p class="text-muted fs-6">No items available.</p>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <p class="text-muted fs-6">No groups available.</p>
-                    {% endif %}
+<script src="https://cdn.tailwindcss.com"></script>
+
+<section class="py-6">
+    <h1 class="text-3xl font-bold mb-6">Affiliate Companies</h1>
+
+    {% if pending_requests %}
+    <div class="mb-6 bg-white shadow rounded-md p-4">
+        <h2 class="text-xl font-semibold mb-4">Pending Requests</h2>
+        <ul class="space-y-3">
+            {% for request in pending_requests %}
+            <li class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-gray-200 rounded-md p-3">
+                <div>
+                    <div class="font-semibold">{{ request.name }}</div>
+                    <div class="text-sm text-gray-500">{{ request.email }}</div>
                 </div>
+                <div class="flex gap-2">
+                    <form method="post" action="{% url 'respond_request' request.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="accept">
+                        <button type="submit" class="bg-green-600 text-white px-3 py-2 rounded-md text-sm">Accept</button>
+                    </form>
+                    <form method="post" action="{% url 'respond_request' request.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="decline">
+                        <button type="submit" class="border border-red-500 text-red-600 px-3 py-2 rounded-md text-sm">Decline</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+        <div></div>
+        <div class="flex-1 md:max-w-xs">
+            <input type="text" placeholder="Search by business name" class="w-full border border-gray-300 rounded-md px-3 py-2" disabled>
+        </div>
+    </div>
+
+    <div class="border-b border-gray-200 mb-4 flex items-center justify-between">
+        <nav class="flex space-x-4" aria-label="Tabs">
+            <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="active">Active</button>
+            <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="inactive">Inactive</button>
+        </nav>
+        <div class="relative">
+            <button id="bulk-action-toggle" type="button" class="p-2 text-xl text-gray-400 cursor-not-allowed" disabled>
+                <i class="bi bi-three-dots-vertical"></i>
+            </button>
+            <div id="bulk-action-menu" class="hidden absolute right-0 mt-2 w-44 bg-white border rounded-md shadow-lg z-50">
+                <form id="bulk-delete-form" method="post" action="{% url 'creator_delete_affiliations' %}" onsubmit="return confirm('Are you sure you want to delete the selected companies?');">
+                    {% csrf_token %}
+                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
+                </form>
             </div>
         </div>
-        {% endfor %}
     </div>
-    {% else %}
-    <p class="text-muted">You are not linked to any affiliate companies yet.</p>
-    {% endif %}
+
+    <div id="active" class="tab-content">
+        <div class="overflow-x-auto bg-white shadow rounded-md">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-100 text-gray-700">
+                    <tr>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" /></th>
+                        <th class="text-left p-3">Business</th>
+                        <th class="text-left p-3">Email</th>
+                        <th class="text-right p-3">Monthly Earnings</th>
+                        <th class="text-right p-3">Total Earnings</th>
+                        <th class="text-right p-3">Clicks</th>
+                        <th class="text-right p-3">Avg. Per Click</th>
+                        <th class="text-right p-3">Conversion Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in active_companies %}
+                    <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
+                        <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3 text-left">{{ company.name }}</td>
+                        <td class="p-3 text-left">{{ company.email }}</td>
+                        <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.clicks }}</td>
+                        <td class="p-3 text-right">${{ company.avg_earnings_per_click|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="p-4 text-center text-gray-500">No active companies found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="inactive" class="tab-content hidden">
+        <div class="overflow-x-auto bg-white shadow rounded-md">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-100 text-gray-700">
+                    <tr>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
+                        <th class="text-left p-3">Business</th>
+                        <th class="text-left p-3">Email</th>
+                        <th class="text-right p-3">Monthly Earnings</th>
+                        <th class="text-right p-3">Total Earnings</th>
+                        <th class="text-right p-3">Clicks</th>
+                        <th class="text-right p-3">Avg. Per Click</th>
+                        <th class="text-right p-3">Conversion Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in inactive_companies %}
+                    <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
+                        <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3 text-left">{{ company.name }}</td>
+                        <td class="p-3 text-left">{{ company.email }}</td>
+                        <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.clicks }}</td>
+                        <td class="p-3 text-right">${{ company.avg_earnings_per_click|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="p-4 text-center text-gray-500">No inactive companies found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </section>
 
-<!-- Link Modal -->
-<div class="modal fade" id="linkModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <input type="text" class="form-control" id="modal-url" readonly>
-                    <button class="btn btn-outline-secondary" type="button" id="copy-modal-url"><i class="bi bi-clipboard"></i></button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const linkModal = document.getElementById('linkModal');
-        linkModal.addEventListener('show.bs.modal', event => {
-            const trigger = event.relatedTarget;
-            const title = trigger.getAttribute('data-title');
-            const url = trigger.getAttribute('data-url');
-            linkModal.querySelector('.modal-title').textContent = title;
-            document.getElementById('modal-url').value = url;
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabs = document.querySelectorAll('.tab-link');
+        const contents = document.querySelectorAll('.tab-content');
+        const bulkToggle = document.getElementById('bulk-action-toggle');
+        const bulkMenu = document.getElementById('bulk-action-menu');
+        const deleteForm = document.getElementById('bulk-delete-form');
+        let currentTab = 'active';
+
+        function updateBulkToggleState() {
+            const anyChecked = document.querySelectorAll('#' + currentTab + ' input[name="selected_links"]:checked').length > 0;
+            bulkToggle.disabled = !anyChecked;
+            bulkToggle.classList.toggle('text-gray-400', !anyChecked);
+            bulkToggle.classList.toggle('cursor-not-allowed', !anyChecked);
+            if (!anyChecked) {
+                bulkMenu.classList.add('hidden');
+            }
+        }
+
+        function showTab(name) {
+            contents.forEach(content => content.classList.add('hidden'));
+            document.getElementById(name).classList.remove('hidden');
+            tabs.forEach(tab => tab.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600'));
+            const activeTab = document.querySelector('.tab-link[data-tab="' + name + '"]');
+            if (activeTab) {
+                activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
+            }
+            currentTab = name;
+            updateBulkToggleState();
+        }
+
+        tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+        showTab('active');
+
+        document.querySelectorAll('.select-all').forEach(cb => {
+            cb.addEventListener('change', function() {
+                document.querySelectorAll('#' + this.dataset.target + ' input[name="selected_links"]').forEach(box => {
+                    box.checked = this.checked;
+                });
+                updateBulkToggleState();
+            });
         });
 
-        document.getElementById('copy-modal-url').addEventListener('click', () => {
-            const input = document.getElementById('modal-url');
-            navigator.clipboard.writeText(input.value);
+        document.querySelectorAll('input[name="selected_links"]').forEach(cb => {
+            cb.addEventListener('change', updateBulkToggleState);
+        });
+
+        bulkToggle.addEventListener('click', function(event) {
+            if (bulkToggle.disabled) {
+                return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            bulkMenu.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!bulkMenu.contains(event.target) && event.target !== bulkToggle) {
+                bulkMenu.classList.add('hidden');
+            }
+        });
+
+        deleteForm.addEventListener('submit', function() {
+            this.querySelectorAll('input[name="selected_links"]').forEach(el => el.remove());
+            document.querySelectorAll('#' + currentTab + ' input[name="selected_links"]:checked').forEach(cb => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_links';
+                input.value = cb.value;
+                this.appendChild(input);
+            });
         });
     });
 </script>

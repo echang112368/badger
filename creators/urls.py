@@ -5,12 +5,14 @@ from .views import (
     creator_my_links,
     creator_settings,
     creator_support,
+    delete_affiliate_merchants,
     respond_request,
 )
 
 urlpatterns = [
     path('earnings/', creator_earnings, name='creator_earnings'),
     path('affiliate-companies/', creator_affiliate_companies, name='creator_affiliate_companies'),
+    path('affiliate-companies/delete/', delete_affiliate_merchants, name='creator_delete_affiliations'),
     path('my-links/', creator_my_links, name='creator_my_links'),
     path('my-links/<int:merchant_id>/', creator_my_links, name='creator_my_links_merchant'),
     path('my-links/<int:merchant_id>/<int:group_id>/', creator_my_links, name='creator_my_links_group'),
