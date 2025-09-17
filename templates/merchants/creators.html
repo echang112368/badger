@@ -59,25 +59,29 @@
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Total Earnings</th>
-                        <th class="text-right p-3">Updated Earnings</th>
-                        <th class="text-right p-3">Referrals</th>
+                        <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Visits</th>
+                        <th class="text-right p-3">Conversions</th>
+                        <th class="text-right p-3">Avg. Per Visit</th>
+                        <th class="text-right p-3">Conversion Rate</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for link in active_links %}
+                    {% for creator in active_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ link.creator.id }}" class="h-4 w-4" /></td>
-                        <td class="p-3 text-left">{{ link.creator.username }}</td>
-                        <td class="p-3 text-left">{{ link.creator.email }}</td>
-                        <td class="p-3 text-right font-semibold">{{ link.creator.total_earnings }}</td>
-                        <td class="p-3 text-right">{{ link.creator.updated_earnings }}</td>
-                        <td class="p-3 text-right">{{ link.creator.referrals }}</td>
-                        <td class="p-3 text-right">{{ link.creator.visits }}</td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
+                        <td class="p-3 text-left">{{ creator.email }}</td>
+                        <td class="p-3 text-right font-semibold">${{ creator.total_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ creator.visits }}</td>
+                        <td class="p-3 text-right">{{ creator.conversions }}</td>
+                        <td class="p-3 text-right">${{ creator.avg_earnings_per_visit|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ creator.conversion_rate|floatformat:2 }}%</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="p-4 text-center text-gray-500">No active creators found.</td>
+                        <td colspan="9" class="p-4 text-center text-gray-500">No active creators found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -94,18 +98,26 @@
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
+                        <th class="text-right p-3">Total Earnings</th>
+                        <th class="text-right p-3">Monthly Earnings</th>
+                        <th class="text-right p-3">Visits</th>
+                        <th class="text-right p-3">Conversions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for link in inactive_links %}
+                    {% for creator in inactive_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ link.creator.id }}" class="h-4 w-4" /></td>
-                        <td class="p-3 text-left">{{ link.creator.username }}</td>
-                        <td class="p-3 text-left">{{ link.creator.email }}</td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
+                        <td class="p-3 text-left">{{ creator.email }}</td>
+                        <td class="p-3 text-right">${{ creator.total_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ creator.visits }}</td>
+                        <td class="p-3 text-right">{{ creator.conversions }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="p-4 text-center text-gray-500">No inactive creators found.</td>
+                        <td colspan="7" class="p-4 text-center text-gray-500">No inactive creators found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -125,11 +137,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for link in pending_links %}
+                    {% for creator in pending_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ link.creator.id }}" class="h-4 w-4" /></td>
-                        <td class="p-3 text-left">{{ link.creator.username }}</td>
-                        <td class="p-3 text-left">{{ link.creator.email }}</td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
+                        <td class="p-3 text-left">{{ creator.email }}</td>
                     </tr>
                     {% empty %}
                     <tr>

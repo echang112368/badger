@@ -1,16 +1,132 @@
-from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponseRedirect
-from .models import RedirectLink
-from django.http import JsonResponse
 import json
+import uuid
+from urllib.parse import urlparse
+
+from django.http import HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
-from merchants.models import MerchantMeta, MerchantItem
+
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
+from merchants.models import MerchantItem, MerchantMeta
+
+from .models import RedirectLink, ReferralVisit
 from decimal import Decimal, InvalidOperation
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
+
+
+def _normalize_domain(domain: str) -> str:
+    if not domain:
+        return ""
+    parsed = urlparse(domain if "://" in domain else f"//{domain}")
+    host = parsed.netloc or parsed.path
+    host = host.lower().strip()
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _parse_uuid(value):
+    if not value:
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _client_ip(request):
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+
+def _cors_json(payload, status=200):
+    response = JsonResponse(payload, status=status)
+    response["Access-Control-Allow-Origin"] = "*"
+    response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    response["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
+@csrf_exempt
+def track_referral_visit(request):
+    if request.method == "OPTIONS":
+        return _cors_json({})
+
+    if request.method != "POST":
+        return _cors_json({"error": "Invalid method"}, status=405)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return _cors_json({"error": "Invalid JSON"}, status=400)
+
+    creator_uuid = _parse_uuid(payload.get("creator_uuid"))
+    merchant_uuid = _parse_uuid(payload.get("merchant_uuid"))
+    merchant_domain = payload.get("merchant_domain") or payload.get("domain") or ""
+    normalized_domain = _normalize_domain(merchant_domain)
+
+    landing_url = (payload.get("landing_url") or "")[:1024]
+    landing_path = (payload.get("landing_path") or "")[:512]
+    query_string = payload.get("query_string") or ""
+    query_params = payload.get("query_params")
+    if not isinstance(query_params, dict):
+        query_params = {}
+    referrer = payload.get("referrer") or ""
+    visitor_id = payload.get("visitor_id") or ""
+    if visitor_id:
+        visitor_id = str(visitor_id)[:255]
+
+    if not creator_uuid:
+        return _cors_json({"error": "Invalid creator_uuid"}, status=400)
+
+    creator_meta = (
+        CreatorMeta.objects.filter(uuid=creator_uuid)
+        .select_related("user")
+        .first()
+    )
+
+    merchant_meta = None
+    if merchant_uuid:
+        merchant_meta = (
+            MerchantMeta.objects.filter(uuid=merchant_uuid)
+            .select_related("user")
+            .first()
+        )
+
+    if merchant_meta is None and normalized_domain:
+        merchant_meta = (
+            MerchantMeta.objects.filter(shopify_store_domain__iexact=normalized_domain)
+            .select_related("user")
+            .first()
+        )
+        if merchant_meta and not merchant_uuid:
+            merchant_uuid = merchant_meta.uuid
+
+    if not merchant_uuid:
+        return _cors_json({"error": "Invalid merchant_uuid"}, status=400)
+
+    visit = ReferralVisit.objects.create(
+        creator_uuid=creator_uuid,
+        merchant_uuid=merchant_uuid,
+        creator=creator_meta.user if creator_meta else None,
+        merchant=merchant_meta.user if merchant_meta else None,
+        merchant_domain=normalized_domain,
+        landing_url=landing_url,
+        landing_path=landing_path,
+        query_string=query_string,
+        query_params=query_params,
+        referrer=referrer,
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        visitor_id=visitor_id,
+        ip_address=_client_ip(request),
+    )
+
+    return _cors_json({"status": "ok", "visit_id": visit.id})
+
 
 @csrf_exempt
 def redirect_view(request, short_code):
@@ -210,6 +326,7 @@ def orders_create_webhook(request):
         # Credit the content creator with the commission
         LedgerEntry.objects.create(
             creator=creator_meta.user,
+            merchant=merchant_meta.user,
             amount=commission_total,
             entry_type="commission",
         )

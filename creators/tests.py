@@ -183,7 +183,7 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
         response = self.client.get(reverse("creator_affiliate_companies"))
         self.assertContains(response, "Merchant Aff LLC")
         self.assertContains(response, "Monthly Earnings")
-        self.assertContains(response, "Avg. Per Click")
+        self.assertContains(response, "Avg. Per Visit")
         self.assertContains(response, "$42.50")
 
     def test_inactive_company_lists_under_inactive_tab(self):

@@ -1,9 +1,40 @@
 (function () {
-  const domain = window.location.hostname;
+  var domain = window.location.hostname;
+  var currentScript = document.currentScript;
+  if (!currentScript) {
+    var scripts = document.getElementsByTagName('script');
+    currentScript = scripts[scripts.length - 1];
+  }
+  var origin = new URL(currentScript.src).origin;
+  var fetchHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
   function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\/\\+^])/g, '\\$1') + '=([^;]*)'));
+    var pattern = '(?:^|; )' + name.replace(/([.$?*|{}()\[\]\/\+^])/g, '\\$1') + '=([^;]*)';
+    var match = document.cookie.match(new RegExp(pattern));
     return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function setCookie(name, value, maxAgeSeconds) {
+    var secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    var cookie = name + '=' + encodeURIComponent(value) + '; path=/; max-age=' + maxAgeSeconds + '; SameSite=Lax' + secure;
+    document.cookie = cookie;
+  }
+
+  function safeCookieName(raw) {
+    return raw.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  }
+
+  function ensureVisitorId() {
+    var visitorId = getCookie('badgerVisitorId');
+    if (!visitorId) {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        visitorId = window.crypto.randomUUID();
+      } else {
+        visitorId = 'v-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      }
+      setCookie('badgerVisitorId', visitorId, 365 * 24 * 60 * 60);
+    }
+    return visitorId;
   }
 
   function updateCartAttributes() {
@@ -13,7 +44,6 @@
       var cusID = getCookie('cusID');
 
       if (!uuid || !storeID || !cusID) {
-        console.warn('Missing uuid, storeID, or cusID cookie');
         return;
       }
 
@@ -40,72 +70,117 @@
     }
   }
 
+  var rawSearch = window.location.search || '';
+  var params;
   try {
-    const search = window.location.search;
-    let params = new URLSearchParams(search);
-    let ref = params.get('ref');
-    const cusParam = params.get('cusID');
+    params = new URLSearchParams(rawSearch);
+  } catch (error) {
+    params = new URLSearchParams();
+  }
 
-    if (!ref) {
-      try {
-        const decodedSearch = decodeURIComponent(search);
-        params = new URLSearchParams(decodedSearch);
-        ref = params.get('ref');
-      } catch (err) {}
+  var hadReferralParam = false;
+  var queryParamsObject = {};
+  params.forEach(function (value, key) {
+    queryParamsObject[key] = value;
+  });
+
+  var ref = params.get('ref');
+  if (!ref && rawSearch) {
+    try {
+      var decodedSearch = decodeURIComponent(rawSearch);
+      params = new URLSearchParams(decodedSearch);
+      ref = params.get('ref');
+      params.forEach(function (value, key) {
+        queryParamsObject[key] = value;
+      });
+    } catch (error) {}
+  }
+
+  if (ref) {
+    try {
+      ref = decodeURIComponent(ref);
+    } catch (error) {}
+    var match = ref.match(/^badger:([0-9a-fA-F-]{36})$/);
+    if (match) {
+      hadReferralParam = true;
+      setCookie('uuid', match[1], 30 * 24 * 60 * 60);
+    }
+  }
+
+  var cusParam = params.get('cusID');
+  if (cusParam) {
+    setCookie('cusID', cusParam, 30 * 24 * 60 * 60);
+  }
+
+  var visitorId = ensureVisitorId();
+
+  function logReferralVisit() {
+    if (!hadReferralParam) {
+      return;
+    }
+    var creatorUuid = getCookie('uuid');
+    var merchantUuid = getCookie('storeID');
+    if (!creatorUuid || !merchantUuid) {
+      return;
     }
 
-    if (ref) {
-      try {
-        ref = decodeURIComponent(ref);
-      } catch (err) {}
-      const match = ref.match(/^badger:([0-9a-fA-F-]{36})$/);
-      if (match) {
-        const uuid = match[1];
-        const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-        document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
-      }
+    var cookieKey = safeCookieName('badger_visit_' + creatorUuid + '_' + merchantUuid);
+    if (getCookie(cookieKey)) {
+      return;
     }
 
-    if (cusParam) {
-      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `cusID=${encodeURIComponent(cusParam)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
-    }
-
-    console.log("try ran")
-    const origin = new URL(document.currentScript.src).origin;
-    const headers = {
-      'ngrok-skip-browser-warning': 'true'
+    var payload = {
+      creator_uuid: creatorUuid,
+      merchant_uuid: merchantUuid,
+      merchant_domain: domain,
+      landing_url: window.location.href,
+      landing_path: window.location.pathname,
+      query_string: rawSearch,
+      query_params: queryParamsObject,
+      referrer: document.referrer || '',
+      visitor_id: visitorId
     };
 
-    console.log("origin", origin);
-    console.log("domain", domain);
-  
-    console.log("fetching:", `${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`);
-
-    fetch(`${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`,{headers})
-      .then(response => {
-      console.log("Raw response:", response);
-      return response.text();
+    fetch(origin + '/collect/track-visit/', {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify(payload)
     })
-    .then(data => {
-      console.log("Parsed data:", data);
-    })
-      .catch(error => {
-      console.error("Fetch failed:", error);
-    });
-
-    fetch(`${origin}/merchant/store-id/?domain=${encodeURIComponent(domain)}`, {headers})
-      .then(r => r.json())
-      .then(data => {
-        console.log(data.storeID);
-        if (data.storeID) {
-          const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-          document.cookie = `storeID=${encodeURIComponent(data.storeID)}; path=/; max-age=2592000; SameSite=Lax${secure}`;
-          updateCartAttributes();
+      .then(function (response) {
+        if (response.ok) {
+          setCookie(cookieKey, '1', 24 * 60 * 60);
         }
       })
-      .catch(() => {});
-  } catch (e) {
-    // Ignore errors
+      .catch(function (error) {
+        console.error('Failed to record referral visit', error);
+      });
   }
+
+  function handleStoreId(storeId) {
+    if (!storeId) {
+      return;
+    }
+    setCookie('storeID', storeId, 30 * 24 * 60 * 60);
+    updateCartAttributes();
+    logReferralVisit();
+  }
+
+  if (hadReferralParam && getCookie('storeID')) {
+    logReferralVisit();
+  }
+
+  fetch(origin + '/merchant/store-id/?domain=' + encodeURIComponent(domain), { headers: fetchHeaders })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+      if (data && data.storeID) {
+        handleStoreId(data.storeID);
+      }
+    })
+    .catch(function (error) {
+      console.error('Store lookup failed', error);
+    });
 })();

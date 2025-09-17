@@ -1,4 +1,5 @@
 from django.test import TestCase, RequestFactory
+from django.urls import reverse
 from decimal import Decimal
 import json
 import uuid
@@ -8,6 +9,7 @@ from merchants.models import MerchantMeta, MerchantItem, ItemGroup
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
+from collect.models import ReferralVisit
 from .views import orders_create_webhook
 
 
@@ -258,3 +260,75 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
         )
+
+
+class ReferralTrackingTests(TestCase):
+    def setUp(self):
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant-analytics",
+            email="merchant.analytics@example.com",
+            password="pass",
+            is_merchant=True,
+        )
+        self.creator = CustomUser.objects.create_user(
+            username="creator-analytics",
+            email="creator.analytics@example.com",
+            password="pass",
+            is_creator=True,
+        )
+        self.merchant_meta = MerchantMeta.objects.get(user=self.merchant)
+        self.creator_meta = CreatorMeta.objects.get(user=self.creator)
+        self.merchant_meta.shopify_store_domain = "merchant.test"
+        self.merchant_meta.save()
+
+    def test_track_referral_visit_records_event(self):
+        url = reverse("collect_track_visit")
+        payload = {
+            "creator_uuid": str(self.creator_meta.uuid),
+            "merchant_uuid": str(self.merchant_meta.uuid),
+            "merchant_domain": "merchant.test",
+            "landing_url": "https://merchant.test/products/widget?ref=badger:%s"
+            % self.creator_meta.uuid,
+            "landing_path": "/products/widget",
+            "query_string": "?ref=badger:%s" % self.creator_meta.uuid,
+            "query_params": {"ref": f"badger:{self.creator_meta.uuid}"},
+            "referrer": "https://creator.example/",
+            "visitor_id": "visitor-123",
+        }
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_ORIGIN="https://scripts.example",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ReferralVisit.objects.count(), 1)
+        visit = ReferralVisit.objects.first()
+        self.assertEqual(str(visit.creator_uuid), str(self.creator_meta.uuid))
+        self.assertEqual(str(visit.merchant_uuid), str(self.merchant_meta.uuid))
+        self.assertEqual(visit.creator, self.creator)
+        self.assertEqual(visit.merchant, self.merchant)
+        self.assertEqual(visit.merchant_domain, "merchant.test")
+        self.assertEqual(visit.visitor_id, "visitor-123")
+        self.assertEqual(visit.query_params.get("ref"), f"badger:{self.creator_meta.uuid}")
+        self.assertEqual(visit.query_string, payload["query_string"])
+        self.assertEqual(visit.landing_url, payload["landing_url"])
+        self.assertEqual(response["Access-Control-Allow-Origin"], "*")
+
+    def test_invalid_payload_returns_error(self):
+        url = reverse("collect_track_visit")
+        response = self.client.post(
+            url,
+            data=json.dumps({"creator_uuid": "invalid"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ReferralVisit.objects.count(), 0)
+
+    def test_options_request_returns_cors_headers(self):
+        url = reverse("collect_track_visit")
+        response = self.client.options(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Access-Control-Allow-Origin"], "*")
