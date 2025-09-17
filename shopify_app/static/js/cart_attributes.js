@@ -49,22 +49,42 @@
     var uuid = getCookie('uuid');
     var storeID = getCookie('storeID');
     var cusID = getCookie('cusID');
-    if (!uuid || !storeID || !cusID) {
-      console.log('Missing uuid, storeID, or cusID cookie, proceeding without update');
+    if (!uuid || !storeID) {
+      console.log('Missing uuid or storeID cookie, proceeding without update');
       return proceed();
     }
 
     fetchCartAttributes()
       .then(function(attrs) {
-        if (attrs.uuid === uuid && attrs.storeID === storeID && attrs.cusID === cusID) {
+        var nextAttrs = Object.assign({}, attrs);
+        var updated = false;
+
+        if (nextAttrs.uuid !== uuid) {
+          nextAttrs.uuid = uuid;
+          updated = true;
+        }
+
+        if (nextAttrs.storeID !== storeID) {
+          nextAttrs.storeID = storeID;
+          updated = true;
+        }
+
+        if (cusID) {
+          if (nextAttrs.cusID !== cusID) {
+            nextAttrs.cusID = cusID;
+            updated = true;
+          }
+        } else if (nextAttrs.cusID) {
+          nextAttrs.cusID = '';
+          updated = true;
+        }
+
+        if (!updated) {
           console.log('Cart attributes already up to date');
           return proceed();
         }
 
-        attrs.uuid = uuid;
-        attrs.storeID = storeID;
-        attrs.cusID = cusID;
-        return updateCartAttributes(attrs)
+        return updateCartAttributes(nextAttrs)
           .catch(function(err) {
             console.warn('Failed to update cart attributes', err);
           })

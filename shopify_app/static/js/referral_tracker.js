@@ -43,7 +43,7 @@
       var storeID = getCookie('storeID');
       var cusID = getCookie('cusID');
 
-      if (!uuid || !storeID || !cusID) {
+      if (!uuid || !storeID) {
         return;
       }
 
@@ -51,15 +51,38 @@
         .then(function (res) { return res.json(); })
         .then(function (cart) {
           var attributes = cart && cart.attributes ? cart.attributes : {};
-          attributes.uuid = uuid;
-          attributes.storeID = storeID;
-          attributes.cusID = cusID;
+          var nextAttrs = Object.assign({}, attributes);
+          var updated = false;
+
+          if (nextAttrs.uuid !== uuid) {
+            nextAttrs.uuid = uuid;
+            updated = true;
+          }
+
+          if (nextAttrs.storeID !== storeID) {
+            nextAttrs.storeID = storeID;
+            updated = true;
+          }
+
+          if (cusID) {
+            if (nextAttrs.cusID !== cusID) {
+              nextAttrs.cusID = cusID;
+              updated = true;
+            }
+          } else if (nextAttrs.cusID) {
+            nextAttrs.cusID = '';
+            updated = true;
+          }
+
+          if (!updated) {
+            return null;
+          }
 
           return fetch('/cart/update.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({ attributes: attributes })
+            body: JSON.stringify({ attributes: nextAttrs })
           });
         })
         .catch(function (error) {
