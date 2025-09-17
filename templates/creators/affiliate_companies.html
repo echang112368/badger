@@ -69,8 +69,9 @@
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Total Earnings</th>
-                        <th class="text-right p-3">Clicks</th>
-                        <th class="text-right p-3">Avg. Per Click</th>
+                        <th class="text-right p-3">Visits</th>
+                        <th class="text-right p-3">Conversions</th>
+                        <th class="text-right p-3">Avg. Per Visit</th>
                         <th class="text-right p-3">Conversion Rate</th>
                     </tr>
                 </thead>
@@ -82,8 +83,9 @@
                         <td class="p-3 text-left">{{ company.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.clicks }}</td>
-                        <td class="p-3 text-right">${{ company.avg_earnings_per_click|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.visits }}</td>
+                        <td class="p-3 text-right">{{ company.conversions }}</td>
+                        <td class="p-3 text-right">${{ company.avg_earnings_per_visit|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
                     </tr>
                     {% empty %}
@@ -106,8 +108,9 @@
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Total Earnings</th>
-                        <th class="text-right p-3">Clicks</th>
-                        <th class="text-right p-3">Avg. Per Click</th>
+                        <th class="text-right p-3">Visits</th>
+                        <th class="text-right p-3">Conversions</th>
+                        <th class="text-right p-3">Avg. Per Visit</th>
                         <th class="text-right p-3">Conversion Rate</th>
                     </tr>
                 </thead>
@@ -119,8 +122,9 @@
                         <td class="p-3 text-left">{{ company.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.clicks }}</td>
-                        <td class="p-3 text-right">${{ company.avg_earnings_per_click|floatformat:2 }}</td>
+                        <td class="p-3 text-right">{{ company.visits }}</td>
+                        <td class="p-3 text-right">{{ company.conversions }}</td>
+                        <td class="p-3 text-right">${{ company.avg_earnings_per_visit|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
                     </tr>
                     {% empty %}

@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date
@@ -10,6 +10,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
+from collect.models import ReferralVisit
 
 from links.models import (
     MerchantCreatorLink,
@@ -96,27 +97,63 @@ def creator_affiliate_companies(request):
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
 
+    base_commissions = LedgerEntry.objects.filter(
+        creator=request.user,
+        entry_type="commission",
+    )
+    totals_by_merchant = {
+        row["merchant"]: row["total"]
+        for row in base_commissions.values("merchant").annotate(total=Sum("amount"))
+    }
+    monthly_totals_by_merchant = {
+        row["merchant"]: row["total"]
+        for row in base_commissions.filter(timestamp__gte=start_of_month)
+        .values("merchant")
+        .annotate(total=Sum("amount"))
+    }
+    conversion_counts = {
+        row["merchant"]: row["count"]
+        for row in base_commissions.filter(amount__gt=0)
+        .values("merchant")
+        .annotate(count=Count("id"))
+    }
+
+    visits_by_id = {}
+    visits_by_uuid = {}
+    for row in (
+        ReferralVisit.objects.filter(creator=request.user)
+        .values("merchant_id", "merchant_uuid")
+        .annotate(count=Count("id"))
+    ):
+        merchant_id = row["merchant_id"]
+        merchant_uuid = row["merchant_uuid"]
+        if merchant_id:
+            visits_by_id[merchant_id] = row["count"]
+        if merchant_uuid:
+            visits_by_uuid[str(merchant_uuid)] = row["count"]
+
     def build_company_entry(link):
         merchant = link.merchant
-        commission_entries = LedgerEntry.objects.filter(
-            creator=request.user,
-            merchant=merchant,
-            entry_type="commission",
+        merchant_meta = getattr(merchant, "merchantmeta", None)
+        merchant_id = merchant.id
+
+        total_earnings = quantize_amount(totals_by_merchant.get(merchant_id))
+        monthly_earnings = quantize_amount(
+            monthly_totals_by_merchant.get(merchant_id)
         )
-        total_raw = commission_entries.aggregate(total=Sum("amount"))["total"]
-        total_earnings = quantize_amount(total_raw)
-        monthly_raw = commission_entries.filter(timestamp__gte=start_of_month).aggregate(
-            total=Sum("amount")
-        )["total"]
-        monthly_earnings = quantize_amount(monthly_raw)
-        clicks = getattr(link, "clicks", 0) or 0
-        conversions = commission_entries.filter(amount__gt=0).count()
-        if clicks:
-            avg = (total_earnings / Decimal(clicks)).quantize(
+        conversions = conversion_counts.get(merchant_id, 0)
+
+        visits = visits_by_id.get(merchant_id)
+        if visits is None and merchant_meta:
+            visits = visits_by_uuid.get(str(merchant_meta.uuid))
+        visits = visits or 0
+
+        if visits:
+            avg = (total_earnings / Decimal(visits)).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
             conversion_rate = (
-                (Decimal(conversions) / Decimal(clicks)) * Decimal("100")
+                (Decimal(conversions) / Decimal(visits)) * Decimal("100")
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         else:
             avg = Decimal("0.00")
@@ -128,9 +165,10 @@ def creator_affiliate_companies(request):
             "email": merchant.email,
             "monthly_earnings": monthly_earnings,
             "total_earnings": total_earnings,
-            "clicks": clicks,
-            "avg_earnings_per_click": avg,
+            "visits": visits,
+            "avg_earnings_per_visit": avg,
             "conversion_rate": conversion_rate,
+            "conversions": conversions,
         }
 
     active_companies = [build_company_entry(link) for link in active_links]

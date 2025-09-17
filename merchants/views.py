@@ -1,5 +1,9 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count
 from django.shortcuts import render, redirect
+from django.utils import timezone
 from links.models import (
     MerchantCreatorLink,
     STATUS_REQUESTED,
@@ -18,6 +22,8 @@ from django.views.decorators.http import require_GET
 from urllib.parse import urlparse
 from django.urls import reverse
 from typing import Optional
+
+from collect.models import ReferralVisit
 
 
 def _normalize_domain(domain: str) -> str:
@@ -274,24 +280,136 @@ def request_creator(request):
 
 @login_required
 def merchant_creators(request):
-    active_links = MerchantCreatorLink.objects.filter(
-        merchant=request.user, status=STATUS_ACTIVE
-    ).select_related("creator")
-    inactive_links = MerchantCreatorLink.objects.filter(
-        merchant=request.user, status=STATUS_INACTIVE
-    ).select_related("creator")
-    pending_links = MerchantCreatorLink.objects.filter(
-        merchant=request.user, status=STATUS_REQUESTED
-    ).select_related("creator")
+    active_links = (
+        MerchantCreatorLink.objects.filter(
+            merchant=request.user, status=STATUS_ACTIVE
+        )
+        .select_related("creator__creatormeta")
+        .order_by("creator__username")
+    )
+    inactive_links = (
+        MerchantCreatorLink.objects.filter(
+            merchant=request.user, status=STATUS_INACTIVE
+        )
+        .select_related("creator__creatormeta")
+        .order_by("creator__username")
+    )
+    pending_links = (
+        MerchantCreatorLink.objects.filter(
+            merchant=request.user, status=STATUS_REQUESTED
+        )
+        .select_related("creator__creatormeta")
+        .order_by("creator__username")
+    )
+
+    def quantize_amount(value):
+        if value is None:
+            value = Decimal("0")
+        elif not isinstance(value, Decimal):
+            value = Decimal(value)
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    start_of_month = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+
+    commission_entries = LedgerEntry.objects.filter(
+        merchant=request.user,
+        entry_type="commission",
+        creator__isnull=False,
+    )
+
+    totals_by_creator = {
+        row["creator"]: row["total"]
+        for row in commission_entries.values("creator").annotate(total=Sum("amount"))
+    }
+    monthly_totals_by_creator = {
+        row["creator"]: row["total"]
+        for row in commission_entries.filter(timestamp__gte=start_of_month)
+        .values("creator")
+        .annotate(total=Sum("amount"))
+    }
+    conversion_counts = {
+        row["creator"]: row["count"]
+        for row in commission_entries.filter(amount__gt=0)
+        .values("creator")
+        .annotate(count=Count("id"))
+    }
+
+    visits_by_creator = {}
+    visits_by_uuid = {}
+    for row in (
+        ReferralVisit.objects.filter(merchant=request.user)
+        .values("creator_id", "creator_uuid")
+        .annotate(count=Count("id"))
+    ):
+        creator_id = row["creator_id"]
+        creator_uuid = row["creator_uuid"]
+        if creator_id:
+            visits_by_creator[creator_id] = row["count"]
+        if creator_uuid:
+            visits_by_uuid[str(creator_uuid)] = row["count"]
+
+    def build_creator_entry(link):
+        creator = link.creator
+        creator_meta = getattr(creator, "creatormeta", None)
+        creator_id = creator.id
+
+        total_earnings = quantize_amount(totals_by_creator.get(creator_id))
+        monthly_earnings = quantize_amount(
+            monthly_totals_by_creator.get(creator_id)
+        )
+        conversions = conversion_counts.get(creator_id, 0)
+
+        visits = visits_by_creator.get(creator_id)
+        if visits is None and creator_meta:
+            visits = visits_by_uuid.get(str(creator_meta.uuid))
+        visits = visits or 0
+
+        if visits:
+            avg = (total_earnings / Decimal(visits)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            conversion_rate = (
+                (Decimal(conversions) / Decimal(visits)) * Decimal("100")
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            avg = Decimal("0.00")
+            conversion_rate = Decimal("0.00")
+
+        return {
+            "link_id": link.id,
+            "creator_id": creator.id,
+            "username": creator.username,
+            "email": creator.email,
+            "total_earnings": total_earnings,
+            "monthly_earnings": monthly_earnings,
+            "visits": visits,
+            "conversions": conversions,
+            "avg_earnings_per_visit": avg,
+            "conversion_rate": conversion_rate,
+        }
+
+    active_creators = [build_creator_entry(link) for link in active_links]
+    inactive_creators = [build_creator_entry(link) for link in inactive_links]
+    pending_creators = [
+        {
+            "link_id": link.id,
+            "creator_id": link.creator.id,
+            "username": link.creator.username,
+            "email": link.creator.email,
+        }
+        for link in pending_links
+    ]
 
     return render(
         request,
         'merchants/creators.html',
         {
             'merchant': request.user,
-            'active_links': active_links,
-            'inactive_links': inactive_links,
-            'pending_links': pending_links,
+            'active_creators': active_creators,
+            'inactive_creators': inactive_creators,
+            'pending_creators': pending_creators,
         },
     )
 
