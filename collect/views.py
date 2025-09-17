@@ -263,21 +263,41 @@ def orders_create_webhook(request):
     note_attributes = {
         attr.get("name"): attr.get("value") for attr in payload.get("note_attributes", [])
     }
-    uuid = note_attributes.get("uuid")  # creator uuid
-    buisID = note_attributes.get("storeID")  # merchant uuid
-    cusID = note_attributes.get("cusID")  # customer uuid
+    creator_uuid_raw = note_attributes.get("uuid")  # creator uuid
+    merchant_uuid_raw = note_attributes.get("storeID")  # merchant uuid
+    customer_uuid_raw = note_attributes.get("cusID")  # customer uuid
+
+    creator_uuid = _parse_uuid(creator_uuid_raw)
+    merchant_uuid = _parse_uuid(merchant_uuid_raw)
+    customer_uuid = _parse_uuid(customer_uuid_raw)
 
     print(
-        f"received amount={amount_str} uuid={uuid} buisID={buisID} cusID={cusID}"
+        "received amount={} uuid={} buisID={} cusID={}".format(
+            amount_str, creator_uuid_raw, merchant_uuid_raw, customer_uuid_raw
+        )
     )
 
-    merchant_meta = MerchantMeta.objects.filter(uuid=buisID).first()
-    creator_meta = CreatorMeta.objects.filter(uuid=uuid).first()
-    customer_meta = CustomerMeta.objects.filter(uuid=cusID).first()
+    merchant_meta = (
+        MerchantMeta.objects.filter(uuid=merchant_uuid).first()
+        if merchant_uuid
+        else None
+    )
+    creator_meta = (
+        CreatorMeta.objects.filter(uuid=creator_uuid).first()
+        if creator_uuid
+        else None
+    )
+    customer_meta = (
+        CustomerMeta.objects.filter(uuid=customer_uuid).first()
+        if customer_uuid
+        else None
+    )
 
     commission_total = Decimal("0")
 
-    if uuid == SPECIAL_CREATOR_UUID and amount_str:
+    creator_uuid_str = str(creator_uuid) if creator_uuid else None
+
+    if creator_uuid_str == SPECIAL_CREATOR_UUID and amount_str:
         try:
             commission_total = (
                 Decimal(amount_str) * Decimal("0.05")
