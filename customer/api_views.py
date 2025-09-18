@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import CustomerMeta
 from .utils import get_points_balance
@@ -64,4 +65,60 @@ class LoginView(APIView):
                 "json_package": json_package,
             }
         )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class CustomerPointsView(APIView):
+    """Return the loyalty points balance for a customer."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        json_package = request.data
+        if isinstance(json_package, QueryDict):
+            json_package = json_package.dict()
+
+        refresh_token = json_package.get("refresh")
+        customer_uuid = json_package.get("uuid")
+
+        if not refresh_token or not customer_uuid:
+            return Response(
+                {"detail": "Refresh token and uuid are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+        except TokenError:
+            return Response(
+                {"detail": "Invalid refresh token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_id = token.get("user_id")
+        if not user_id:
+            return Response(
+                {"detail": "Token missing user information."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        User = get_user_model()
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            customer = CustomerMeta.objects.get(uuid=customer_uuid, user=user)
+        except CustomerMeta.DoesNotExist:
+            return Response(
+                {"detail": "Invalid customer uuid."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response({"uuid": str(customer.uuid), "points": get_points_balance(user)})
 
