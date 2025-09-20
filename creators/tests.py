@@ -6,6 +6,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from .models import CreatorMeta
 from ledger.models import LedgerEntry
+from collect.models import ReferralVisit, ReferralConversion
 from links.models import (
     MerchantCreatorLink,
     STATUS_ACTIVE,
@@ -174,24 +175,66 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
         self.client.force_login(self.creator)
 
     def test_displays_company_metrics(self):
+        creator_meta = CreatorMeta.objects.get(user=self.creator)
+        ReferralVisit.objects.create(
+            creator_uuid=creator_meta.uuid,
+            merchant_uuid=self.merchant_meta.uuid,
+            creator=self.creator,
+            merchant=self.merchant,
+        )
+        ReferralConversion.objects.create(
+            creator_uuid=creator_meta.uuid,
+            merchant_uuid=self.merchant_meta.uuid,
+            creator=self.creator,
+            merchant=self.merchant,
+            order_id="order-1",
+            order_amount=Decimal("200.00"),
+            commission_amount=Decimal("42.50"),
+        )
         LedgerEntry.objects.create(
             creator=self.creator,
             merchant=self.merchant,
             amount=Decimal("42.50"),
             entry_type="commission",
         )
-        response = self.client.get(reverse("creator_affiliate_companies"))
-        self.assertContains(response, "Merchant Aff LLC")
-        self.assertContains(response, "Monthly Earnings")
-        self.assertContains(response, "Avg. Per Visit")
-        self.assertContains(response, "$42.50")
+
+        html_response = self.client.get(reverse("creator_affiliate_companies"))
+        self.assertContains(html_response, "affiliate-companies-root")
+
+        data_response = self.client.get(reverse("creator_affiliate_companies_data"))
+        self.assertEqual(data_response.status_code, 200)
+        payload = data_response.json()
+        self.assertEqual(len(payload["active"]), 1)
+        company = payload["active"][0]
+        self.assertEqual(company["business"], "Merchant Aff LLC")
+        self.assertAlmostEqual(company["total_earnings"], 42.5)
+        self.assertAlmostEqual(company["monthly_earnings"], 42.5)
+        self.assertEqual(company["visits"], 1)
+        self.assertEqual(company["conversions"], 1)
+        self.assertAlmostEqual(company["avg_per_visit"], 42.5)
+        self.assertAlmostEqual(company["conversion_rate"], 100.0)
 
     def test_inactive_company_lists_under_inactive_tab(self):
         self.link.status = STATUS_INACTIVE
         self.link.save()
-        response = self.client.get(reverse("creator_affiliate_companies"))
-        self.assertContains(response, "No active companies found.")
-        self.assertContains(response, "Merchant Aff LLC")
+        creator_meta = CreatorMeta.objects.get(user=self.creator)
+        ReferralVisit.objects.create(
+            creator_uuid=creator_meta.uuid,
+            merchant_uuid=self.merchant_meta.uuid,
+            creator=self.creator,
+            merchant=self.merchant,
+        )
+        ReferralConversion.objects.create(
+            creator_uuid=creator_meta.uuid,
+            merchant_uuid=self.merchant_meta.uuid,
+            creator=self.creator,
+            merchant=self.merchant,
+        )
+
+        payload = self.client.get(reverse("creator_affiliate_companies_data")).json()
+        self.assertEqual(len(payload["active"]), 0)
+        self.assertEqual(len(payload["inactive"]), 1)
+        self.assertEqual(payload["inactive"][0]["business"], "Merchant Aff LLC")
 
     def test_delete_affiliate_company(self):
         response = self.client.post(
