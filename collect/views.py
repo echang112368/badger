@@ -11,7 +11,7 @@ from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from merchants.models import MerchantItem, MerchantMeta
 
-from .models import RedirectLink, ReferralVisit
+from .models import RedirectLink, ReferralVisit, ReferralConversion
 from decimal import Decimal, InvalidOperation
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
@@ -294,8 +294,15 @@ def orders_create_webhook(request):
     )
 
     commission_total = Decimal("0")
+    order_total = Decimal("0")
 
     creator_uuid_str = str(creator_uuid) if creator_uuid else None
+
+    if amount_str:
+        try:
+            order_total = Decimal(str(amount_str)).quantize(Decimal("0.01"))
+        except (TypeError, InvalidOperation):
+            order_total = Decimal("0")
 
     if creator_uuid_str == SPECIAL_CREATOR_UUID and amount_str:
         try:
@@ -341,6 +348,18 @@ def orders_create_webhook(request):
 
     commission_total = commission_total.quantize(Decimal("0.01"))
     print(f"Order {order_id} total commission: {commission_total}")
+
+    if merchant_meta and creator_meta:
+        ReferralConversion.objects.create(
+            creator_uuid=creator_uuid or creator_meta.uuid,
+            merchant_uuid=merchant_uuid or merchant_meta.uuid,
+            creator=creator_meta.user,
+            merchant=merchant_meta.user,
+            order_id=str(order_id) if order_id else "",
+            order_amount=order_total,
+            commission_amount=commission_total,
+            metadata={"source": "shopify_orders_create"},
+        )
 
     if merchant_meta and creator_meta and commission_total > 0:
         # Credit the content creator with the commission
