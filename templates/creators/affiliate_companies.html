@@ -66,7 +66,6 @@
                     <tr>
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" /></th>
                         <th class="text-left p-3">Business</th>
-                        <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Total Earnings</th>
                         <th class="text-right p-3">Visits</th>
@@ -80,7 +79,6 @@
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
                         <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
                         <td class="p-3 text-left">{{ company.name }}</td>
-                        <td class="p-3 text-left">{{ company.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ company.visits }}</td>
@@ -105,7 +103,6 @@
                     <tr>
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
                         <th class="text-left p-3">Business</th>
-                        <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Total Earnings</th>
                         <th class="text-right p-3">Visits</th>
@@ -119,7 +116,6 @@
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
                         <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
                         <td class="p-3 text-left">{{ company.name }}</td>
-                        <td class="p-3 text-left">{{ company.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ company.visits }}</td>
