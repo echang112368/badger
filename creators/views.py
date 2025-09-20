@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.db.models import Sum, Q, Count
@@ -10,7 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
-from collect.models import ReferralVisit
+from collect.models import ReferralVisit, ReferralConversion
 
 from links.models import (
     MerchantCreatorLink,
@@ -60,68 +61,56 @@ def creator_earnings(request):
     )
 
 
-@login_required
-def creator_affiliate_companies(request):
-    active_links = list(
-        MerchantCreatorLink.objects.filter(
-            creator=request.user, status=STATUS_ACTIVE
-        ).select_related("merchant__merchantmeta")
-    )
-    inactive_links = list(
-        MerchantCreatorLink.objects.filter(
-            creator=request.user, status=STATUS_INACTIVE
-        ).select_related("merchant__merchantmeta")
-    )
-    pending_links = list(
-        MerchantCreatorLink.objects.filter(
-            creator=request.user, status=STATUS_REQUESTED
-        )
-        .select_related("merchant__merchantmeta")
-        .order_by("merchant__username")
-    )
+def _merchant_display_name(merchant):
+    meta = getattr(merchant, "merchantmeta", None)
+    if meta and meta.company_name:
+        return meta.company_name
+    return merchant.username
 
-    def merchant_display_name(merchant):
-        meta = getattr(merchant, "merchantmeta", None)
-        if meta and meta.company_name:
-            return meta.company_name
-        return merchant.username
 
-    def quantize_amount(value):
-        if value is None:
-            value = Decimal("0")
-        elif not isinstance(value, Decimal):
-            value = Decimal(value)
-        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+def _quantize_amount(value):
+    if value is None:
+        value = Decimal("0")
+    elif not isinstance(value, Decimal):
+        value = Decimal(value)
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+
+def _affiliate_company_metrics(user):
     start_of_month = timezone.now().replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
 
-    base_commissions = LedgerEntry.objects.filter(
-        creator=request.user,
-        entry_type="commission",
+    links = list(
+        MerchantCreatorLink.objects.filter(creator=user)
+        .select_related("merchant__merchantmeta")
+        .order_by("merchant__username")
     )
+
+    merchant_ids = [link.merchant_id for link in links if link.merchant_id]
+
+    commission_entries = LedgerEntry.objects.filter(
+        creator=user,
+        entry_type="commission",
+        merchant_id__in=merchant_ids,
+    )
+
     totals_by_merchant = {
         row["merchant"]: row["total"]
-        for row in base_commissions.values("merchant").annotate(total=Sum("amount"))
+        for row in commission_entries.values("merchant").annotate(total=Sum("amount"))
     }
+
     monthly_totals_by_merchant = {
         row["merchant"]: row["total"]
-        for row in base_commissions.filter(timestamp__gte=start_of_month)
+        for row in commission_entries.filter(timestamp__gte=start_of_month)
         .values("merchant")
         .annotate(total=Sum("amount"))
-    }
-    conversion_counts = {
-        row["merchant"]: row["count"]
-        for row in base_commissions.filter(amount__gt=0)
-        .values("merchant")
-        .annotate(count=Count("id"))
     }
 
     visits_by_id = {}
     visits_by_uuid = {}
     for row in (
-        ReferralVisit.objects.filter(creator=request.user)
+        ReferralVisit.objects.filter(creator=user)
         .values("merchant_id", "merchant_uuid")
         .annotate(count=Count("id"))
     ):
@@ -132,66 +121,108 @@ def creator_affiliate_companies(request):
         if merchant_uuid:
             visits_by_uuid[str(merchant_uuid)] = row["count"]
 
-    def build_company_entry(link):
+    conversions_by_id = {}
+    conversions_by_uuid = {}
+    for row in (
+        ReferralConversion.objects.filter(creator=user)
+        .values("merchant_id", "merchant_uuid")
+        .annotate(count=Count("id"))
+    ):
+        merchant_id = row["merchant_id"]
+        merchant_uuid = row["merchant_uuid"]
+        if merchant_id:
+            conversions_by_id[merchant_id] = row["count"]
+        if merchant_uuid:
+            conversions_by_uuid[str(merchant_uuid)] = row["count"]
+
+    active_companies = []
+    inactive_companies = []
+    pending_requests = []
+
+    for link in links:
         merchant = link.merchant
+        if merchant is None:
+            continue
+
         merchant_meta = getattr(merchant, "merchantmeta", None)
         merchant_id = merchant.id
 
-        total_earnings = quantize_amount(totals_by_merchant.get(merchant_id))
-        monthly_earnings = quantize_amount(
+        total_earnings = _quantize_amount(totals_by_merchant.get(merchant_id))
+        monthly_earnings = _quantize_amount(
             monthly_totals_by_merchant.get(merchant_id)
         )
-        conversions = conversion_counts.get(merchant_id, 0)
 
         visits = visits_by_id.get(merchant_id)
         if visits is None and merchant_meta:
             visits = visits_by_uuid.get(str(merchant_meta.uuid))
         visits = visits or 0
 
+        conversions = conversions_by_id.get(merchant_id)
+        if conversions is None and merchant_meta:
+            conversions = conversions_by_uuid.get(str(merchant_meta.uuid))
+        conversions = conversions or 0
+
         if visits:
-            avg = (total_earnings / Decimal(visits)).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-            conversion_rate = (
+            avg = _quantize_amount(total_earnings / Decimal(visits))
+            conversion_rate = _quantize_amount(
                 (Decimal(conversions) / Decimal(visits)) * Decimal("100")
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            )
         else:
             avg = Decimal("0.00")
             conversion_rate = Decimal("0.00")
 
-        return {
+        entry = {
             "link_id": link.id,
-            "name": merchant_display_name(merchant),
+            "merchant_id": merchant_id,
+            "status": link.status,
+            "business": _merchant_display_name(merchant),
             "email": merchant.email,
-            "monthly_earnings": monthly_earnings,
-            "total_earnings": total_earnings,
+            "monthly_earnings": float(monthly_earnings),
+            "total_earnings": float(total_earnings),
             "visits": visits,
-            "avg_earnings_per_visit": avg,
-            "conversion_rate": conversion_rate,
             "conversions": conversions,
+            "avg_per_visit": float(avg),
+            "conversion_rate": float(conversion_rate),
         }
 
-    active_companies = [build_company_entry(link) for link in active_links]
-    inactive_companies = [build_company_entry(link) for link in inactive_links]
+        if link.status == STATUS_ACTIVE:
+            active_companies.append(entry)
+        elif link.status == STATUS_INACTIVE:
+            inactive_companies.append(entry)
+        elif link.status == STATUS_REQUESTED:
+            pending_requests.append(
+                {
+                    "id": link.id,
+                    "name": _merchant_display_name(merchant),
+                    "email": merchant.email,
+                }
+            )
 
-    pending_requests = [
-        {
-            "id": link.id,
-            "name": merchant_display_name(link.merchant),
-            "email": link.merchant.email,
-        }
-        for link in pending_links
-    ]
+    return {
+        "active": active_companies,
+        "inactive": inactive_companies,
+        "pending_requests": pending_requests,
+        "generated_at": timezone.now().isoformat(),
+    }
+
+
+@login_required
+def creator_affiliate_companies(request):
+    metrics = _affiliate_company_metrics(request.user)
 
     return render(
         request,
         "creators/affiliate_companies.html",
         {
-            "active_companies": active_companies,
-            "inactive_companies": inactive_companies,
-            "pending_requests": pending_requests,
+            "pending_requests": metrics["pending_requests"],
         },
     )
+
+
+@login_required
+def creator_affiliate_companies_data(request):
+    metrics = _affiliate_company_metrics(request.user)
+    return JsonResponse(metrics)
 
 
 @login_required

@@ -9,7 +9,7 @@ from merchants.models import MerchantMeta, MerchantItem, ItemGroup
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
-from collect.models import ReferralVisit
+from collect.models import ReferralVisit, ReferralConversion
 from .views import orders_create_webhook
 
 
@@ -122,6 +122,7 @@ class OrdersWebhookTests(TestCase):
             merchant=merchant, creator__isnull=True, entry_type="commission"
         )
         points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
+        conversion = ReferralConversion.objects.get()
 
         self.assertEqual(creator_entry.merchant, merchant)
         self.assertEqual(creator_entry.amount, Decimal("0.80"))
@@ -132,6 +133,10 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(merchant=merchant, entry_type="points").exists()
         )
+        self.assertEqual(conversion.creator, creator)
+        self.assertEqual(conversion.merchant, merchant)
+        self.assertEqual(conversion.order_amount, Decimal("25.00"))
+        self.assertEqual(conversion.commission_amount, Decimal("0.80"))
 
     def test_special_uuid_triggers_fixed_commission(self):
         (
@@ -181,12 +186,14 @@ class OrdersWebhookTests(TestCase):
         points_entry = LedgerEntry.objects.get(
             creator=customer, entry_type="points"
         )
+        conversion = ReferralConversion.objects.get()
 
         self.assertEqual(creator_entry.merchant, merchant)
         self.assertEqual(creator_entry.amount, Decimal("5.00"))
         self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-5.00"))
         self.assertEqual(points_entry.amount, Decimal("300"))
+        self.assertEqual(conversion.commission_amount, Decimal("5.00"))
 
     def test_missing_customer_skips_points(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
@@ -225,6 +232,7 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
         )
+        self.assertEqual(ReferralConversion.objects.count(), 1)
 
     def test_item_without_group_has_zero_commission(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
@@ -260,6 +268,9 @@ class OrdersWebhookTests(TestCase):
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
         )
+        conversion = ReferralConversion.objects.get()
+        self.assertEqual(conversion.order_amount, Decimal("20.00"))
+        self.assertEqual(conversion.commission_amount, Decimal("0.00"))
 
 
 class ReferralTrackingTests(TestCase):

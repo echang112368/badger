@@ -1,4 +1,5 @@
 {% extends 'creators/base.html' %}
+{% load static %}
 {% block title %}Affiliate Companies{% endblock %}
 {% block content %}
 <script src="https://cdn.tailwindcss.com"></script>
@@ -34,178 +35,18 @@
     </div>
     {% endif %}
 
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-        <div></div>
-        <div class="flex-1 md:max-w-xs">
-            <input type="text" placeholder="Search by business name" class="w-full border border-gray-300 rounded-md px-3 py-2" disabled>
-        </div>
-    </div>
-
-    <div class="border-b border-gray-200 mb-4 flex items-center justify-between">
-        <nav class="flex space-x-4" aria-label="Tabs">
-            <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="active">Active</button>
-            <button class="tab-link px-3 py-2 font-medium text-sm" data-tab="inactive">Inactive</button>
-        </nav>
-        <div class="relative">
-            <button id="bulk-action-toggle" type="button" class="p-2 text-xl text-gray-400 cursor-not-allowed" disabled>
-                <i class="bi bi-three-dots-vertical"></i>
-            </button>
-            <div id="bulk-action-menu" class="hidden absolute right-0 mt-2 w-44 bg-white border rounded-md shadow-lg z-50">
-                <form id="bulk-delete-form" method="post" action="{% url 'creator_delete_affiliations' %}" onsubmit="return confirm('Are you sure you want to delete the selected companies?');">
-                    {% csrf_token %}
-                    <button type="submit" class="block w-full text-left px-4 py-2 text-sm text-red-600">Delete</button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div id="active" class="tab-content">
-        <div class="overflow-x-auto bg-white shadow rounded-md">
-            <table class="min-w-full text-sm">
-                <thead class="bg-gray-100 text-gray-700">
-                    <tr>
-                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" /></th>
-                        <th class="text-left p-3">Business</th>
-                        <th class="text-right p-3">Monthly Earnings</th>
-                        <th class="text-right p-3">Total Earnings</th>
-                        <th class="text-right p-3">Visits</th>
-                        <th class="text-right p-3">Conversions</th>
-                        <th class="text-right p-3">Avg. Per Visit</th>
-                        <th class="text-right p-3">Conversion Rate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for company in active_companies %}
-                    <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
-                        <td class="p-3 text-left">{{ company.name }}</td>
-                        <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.visits }}</td>
-                        <td class="p-3 text-right">{{ company.conversions }}</td>
-                        <td class="p-3 text-right">${{ company.avg_earnings_per_visit|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="p-4 text-center text-gray-500">No active companies found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div id="inactive" class="tab-content hidden">
-        <div class="overflow-x-auto bg-white shadow rounded-md">
-            <table class="min-w-full text-sm">
-                <thead class="bg-gray-100 text-gray-700">
-                    <tr>
-                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
-                        <th class="text-left p-3">Business</th>
-                        <th class="text-right p-3">Monthly Earnings</th>
-                        <th class="text-right p-3">Total Earnings</th>
-                        <th class="text-right p-3">Visits</th>
-                        <th class="text-right p-3">Conversions</th>
-                        <th class="text-right p-3">Avg. Per Visit</th>
-                        <th class="text-right p-3">Conversion Rate</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for company in inactive_companies %}
-                    <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_links" value="{{ company.link_id }}" class="h-4 w-4" /></td>
-                        <td class="p-3 text-left">{{ company.name }}</td>
-                        <td class="p-3 text-right font-semibold">${{ company.monthly_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right font-semibold">${{ company.total_earnings|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.visits }}</td>
-                        <td class="p-3 text-right">{{ company.conversions }}</td>
-                        <td class="p-3 text-right">${{ company.avg_earnings_per_visit|floatformat:2 }}</td>
-                        <td class="p-3 text-right">{{ company.conversion_rate|floatformat:2 }}%</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="p-4 text-center text-gray-500">No inactive companies found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <div id="affiliate-companies-root"></div>
 </section>
 
+<form id="bulk-delete-form" method="post" action="{% url 'creator_delete_affiliations' %}" class="d-none">
+    {% csrf_token %}
+</form>
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const tabs = document.querySelectorAll('.tab-link');
-        const contents = document.querySelectorAll('.tab-content');
-        const bulkToggle = document.getElementById('bulk-action-toggle');
-        const bulkMenu = document.getElementById('bulk-action-menu');
-        const deleteForm = document.getElementById('bulk-delete-form');
-        let currentTab = 'active';
-
-        function updateBulkToggleState() {
-            const anyChecked = document.querySelectorAll('#' + currentTab + ' input[name="selected_links"]:checked').length > 0;
-            bulkToggle.disabled = !anyChecked;
-            bulkToggle.classList.toggle('text-gray-400', !anyChecked);
-            bulkToggle.classList.toggle('cursor-not-allowed', !anyChecked);
-            if (!anyChecked) {
-                bulkMenu.classList.add('hidden');
-            }
-        }
-
-        function showTab(name) {
-            contents.forEach(content => content.classList.add('hidden'));
-            document.getElementById(name).classList.remove('hidden');
-            tabs.forEach(tab => tab.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600'));
-            const activeTab = document.querySelector('.tab-link[data-tab="' + name + '"]');
-            if (activeTab) {
-                activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600');
-            }
-            currentTab = name;
-            updateBulkToggleState();
-        }
-
-        tabs.forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
-        showTab('active');
-
-        document.querySelectorAll('.select-all').forEach(cb => {
-            cb.addEventListener('change', function() {
-                document.querySelectorAll('#' + this.dataset.target + ' input[name="selected_links"]').forEach(box => {
-                    box.checked = this.checked;
-                });
-                updateBulkToggleState();
-            });
-        });
-
-        document.querySelectorAll('input[name="selected_links"]').forEach(cb => {
-            cb.addEventListener('change', updateBulkToggleState);
-        });
-
-        bulkToggle.addEventListener('click', function(event) {
-            if (bulkToggle.disabled) {
-                return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            bulkMenu.classList.toggle('hidden');
-        });
-
-        document.addEventListener('click', function(event) {
-            if (!bulkMenu.contains(event.target) && event.target !== bulkToggle) {
-                bulkMenu.classList.add('hidden');
-            }
-        });
-
-        deleteForm.addEventListener('submit', function() {
-            this.querySelectorAll('input[name="selected_links"]').forEach(el => el.remove());
-            document.querySelectorAll('#' + currentTab + ' input[name="selected_links"]:checked').forEach(cb => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'selected_links';
-                input.value = cb.value;
-                this.appendChild(input);
-            });
-        });
-    });
+    window.AFFILIATE_COMPANIES_DATA_URL = "{% url 'creator_affiliate_companies_data' %}";
 </script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel" src="{% static 'creators/js/affiliate_companies.jsx' %}"></script>
 {% endblock %}
