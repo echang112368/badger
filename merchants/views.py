@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 from django.urls import reverse
 from typing import Optional
 
-from collect.models import ReferralVisit
+from collect.models import AffiliateClick, ReferralVisit
 
 
 def _normalize_domain(domain: str) -> str:
@@ -280,6 +280,8 @@ def request_creator(request):
 
 @login_required
 def merchant_creators(request):
+    merchant_meta = getattr(request.user, "merchantmeta", None)
+
     active_links = (
         MerchantCreatorLink.objects.filter(
             merchant=request.user, status=STATUS_ACTIVE
@@ -336,6 +338,15 @@ def merchant_creators(request):
         .annotate(count=Count("id"))
     }
 
+    affiliate_clicks_by_uuid = {}
+    if merchant_meta:
+        for row in (
+            AffiliateClick.objects.filter(storeID=merchant_meta.uuid)
+            .values("uuid")
+            .annotate(count=Count("id"))
+        ):
+            affiliate_clicks_by_uuid[str(row["uuid"])] = row["count"]
+
     visits_by_creator = {}
     visits_by_uuid = {}
     for row in (
@@ -361,7 +372,11 @@ def merchant_creators(request):
         )
         conversions = conversion_counts.get(creator_id, 0)
 
-        visits = visits_by_creator.get(creator_id)
+        visits = None
+        if creator_meta:
+            visits = affiliate_clicks_by_uuid.get(str(creator_meta.uuid))
+        if visits is None:
+            visits = visits_by_creator.get(creator_id)
         if visits is None and creator_meta:
             visits = visits_by_uuid.get(str(creator_meta.uuid))
         visits = visits or 0
