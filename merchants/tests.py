@@ -44,6 +44,18 @@ class MerchantSettingsTests(TestCase):
         response = self.client.get(reverse("merchant_settings"))
         self.assertContains(response, user.password)
 
+    def test_settings_displays_uuid(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_uuid",
+            password="pass123",
+            email="merchant_uuid@example.com",
+            is_merchant=True,
+        )
+        merchant_meta = MerchantMeta.objects.get(user=user)
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+        self.assertContains(response, str(merchant_meta.uuid))
+
     def test_settings_updates_name(self):
         user = CustomUser.objects.create_user(
             username="merchant4", password="pass123", email="merchant4@example.com", is_merchant=True
