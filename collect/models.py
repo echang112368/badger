@@ -4,6 +4,21 @@ from django.conf import settings
 from django.db import models
 
 
+class AffiliateClick(models.Model):
+    """A single affiliate click between a creator and a merchant."""
+
+    uuid = models.UUIDField(db_index=True)
+    storeID = models.UUIDField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["uuid", "storeID"])]
+
+    def __str__(self):
+        return f"{self.uuid} → {self.storeID} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
 class RedirectLink(models.Model):
     short_code = models.CharField(max_length=255, unique=True)
     destination_url = models.URLField()

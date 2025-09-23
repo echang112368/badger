@@ -11,7 +11,7 @@ from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from merchants.models import MerchantItem, MerchantMeta
 
-from .models import RedirectLink, ReferralVisit, ReferralConversion
+from .models import AffiliateClick, RedirectLink, ReferralVisit, ReferralConversion
 from decimal import Decimal, InvalidOperation
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
@@ -51,6 +51,46 @@ def _cors_json(payload, status=200):
     response["Access-Control-Allow-Headers"] = "Content-Type"
     return response
 
+def _record_affiliate_click(payload):
+    creator_uuid = _parse_uuid(payload.get("uuid"))
+    store_uuid = _parse_uuid(payload.get("storeID"))
+
+    if not creator_uuid:
+        return _cors_json({"error": "Invalid uuid"}, status=400)
+
+    if not store_uuid:
+        return _cors_json({"error": "Invalid storeID"}, status=400)
+
+    creator_meta = (
+        CreatorMeta.objects.filter(uuid=creator_uuid)
+        .select_related("user")
+        .first()
+    )
+    if creator_meta is None:
+        return _cors_json({"error": "Creator not found"}, status=404)
+
+    merchant_meta = (
+        MerchantMeta.objects.filter(uuid=store_uuid)
+        .select_related("user")
+        .first()
+    )
+    if merchant_meta is None:
+        return _cors_json({"error": "Merchant not found"}, status=404)
+
+    AffiliateClick.objects.create(uuid=creator_uuid, storeID=store_uuid)
+    total_clicks = AffiliateClick.objects.filter(uuid=creator_uuid, storeID=store_uuid).count()
+
+    return _cors_json(
+        {
+            "status": "click recorded",
+            "creator": str(creator_uuid),
+            "store": str(store_uuid),
+            "total_clicks": total_clicks,
+            "debug": f"received creator: {creator_uuid} and store: {store_uuid}",
+        }
+    )
+
+
 @csrf_exempt
 def track_referral_visit(request):
     if request.method == "OPTIONS":
@@ -63,6 +103,9 @@ def track_referral_visit(request):
         payload = json.loads(request.body or "{}")
     except json.JSONDecodeError:
         return _cors_json({"error": "Invalid JSON"}, status=400)
+
+    if "uuid" in payload or "storeID" in payload:
+        return _record_affiliate_click(payload)
 
     creator_uuid = _parse_uuid(payload.get("creator_uuid"))
     merchant_uuid = _parse_uuid(payload.get("merchant_uuid"))

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import RedirectLink, ReferralVisit, ReferralConversion
+from .models import AffiliateClick, RedirectLink, ReferralVisit, ReferralConversion
 
 
 @admin.register(RedirectLink)
@@ -43,5 +43,13 @@ class ReferralConversionAdmin(admin.ModelAdmin):
         "merchant_uuid",
         "order_id",
     )
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at",)
+
+
+@admin.register(AffiliateClick)
+class AffiliateClickAdmin(admin.ModelAdmin):
+    list_display = ("uuid", "storeID", "created_at")
+    search_fields = ("uuid", "storeID")
     list_filter = ("created_at",)
     readonly_fields = ("created_at",)

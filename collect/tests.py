@@ -9,7 +9,7 @@ from merchants.models import MerchantMeta, MerchantItem, ItemGroup
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
-from collect.models import ReferralVisit, ReferralConversion
+from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 from .views import orders_create_webhook
 
 
@@ -328,6 +328,29 @@ class ReferralTrackingTests(TestCase):
         self.assertEqual(visit.landing_url, payload["landing_url"])
         self.assertEqual(response["Access-Control-Allow-Origin"], "*")
 
+    def test_track_visit_records_affiliate_click(self):
+        url = reverse("collect_track_visit")
+        payload = {
+            "uuid": str(self.creator_meta.uuid),
+            "storeID": str(self.merchant_meta.uuid),
+        }
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AffiliateClick.objects.count(), 1)
+        click = AffiliateClick.objects.first()
+        self.assertEqual(str(click.uuid), payload["uuid"])
+        self.assertEqual(str(click.storeID), payload["storeID"])
+
+        body = json.loads(response.content)
+        self.assertEqual(body.get("total_clicks"), 1)
+        self.assertIn("received creator", body.get("debug", ""))
+
     def test_invalid_payload_returns_error(self):
         url = reverse("collect_track_visit")
         response = self.client.post(
@@ -337,6 +360,49 @@ class ReferralTrackingTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(ReferralVisit.objects.count(), 0)
+
+    def test_affiliate_click_invalid_payload_returns_error(self):
+        url = reverse("collect_track_visit")
+        response = self.client.post(
+            url,
+            data=json.dumps({"uuid": "invalid", "storeID": str(self.merchant_meta.uuid)}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(AffiliateClick.objects.count(), 0)
+
+    def test_affiliate_click_missing_store_returns_not_found(self):
+        url = reverse("collect_track_visit")
+        payload = {
+            "uuid": str(self.creator_meta.uuid),
+            "storeID": str(uuid.uuid4()),
+        }
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(AffiliateClick.objects.count(), 0)
+
+    def test_affiliate_click_missing_creator_returns_not_found(self):
+        url = reverse("collect_track_visit")
+        payload = {
+            "uuid": str(uuid.uuid4()),
+            "storeID": str(self.merchant_meta.uuid),
+        }
+
+        response = self.client.post(
+            url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(AffiliateClick.objects.count(), 0)
 
     def test_options_request_returns_cors_headers(self):
         url = reverse("collect_track_visit")
