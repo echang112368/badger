@@ -11,7 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
-from collect.models import ReferralVisit, ReferralConversion
+from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 
 from links.models import (
     MerchantCreatorLink,
@@ -81,6 +81,8 @@ def _affiliate_company_metrics(user):
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
 
+    creator_meta = getattr(user, "creatormeta", None)
+
     links = list(
         MerchantCreatorLink.objects.filter(creator=user)
         .select_related("merchant__merchantmeta")
@@ -106,6 +108,15 @@ def _affiliate_company_metrics(user):
         .values("merchant")
         .annotate(total=Sum("amount"))
     }
+
+    affiliate_clicks_by_store = {}
+    if creator_meta:
+        for row in (
+            AffiliateClick.objects.filter(uuid=creator_meta.uuid)
+            .values("storeID")
+            .annotate(count=Count("id"))
+        ):
+            affiliate_clicks_by_store[str(row["storeID"])] = row["count"]
 
     visits_by_id = {}
     visits_by_uuid = {}
@@ -152,7 +163,11 @@ def _affiliate_company_metrics(user):
             monthly_totals_by_merchant.get(merchant_id)
         )
 
-        visits = visits_by_id.get(merchant_id)
+        visits = None
+        if merchant_meta:
+            visits = affiliate_clicks_by_store.get(str(merchant_meta.uuid))
+        if visits is None:
+            visits = visits_by_id.get(merchant_id)
         if visits is None and merchant_meta:
             visits = visits_by_uuid.get(str(merchant_meta.uuid))
         visits = visits or 0
