@@ -130,10 +130,6 @@
     }
   }
 
-  var cusParam = params.get('cusID');
-  if (cusParam) {
-    setCookie('cusID', cusParam, 30 * 24 * 60 * 60);
-  }
 
   var visitorId = ensureVisitorId();
 
