@@ -6,6 +6,7 @@ import uuid
 
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta, MerchantItem, ItemGroup
+from links.models import MerchantCreatorLink, STATUS_INACTIVE
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
@@ -233,6 +234,46 @@ class OrdersWebhookTests(TestCase):
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
         )
         self.assertEqual(ReferralConversion.objects.count(), 1)
+
+    def test_inactive_creator_skips_income(self):
+        merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
+            self._setup_users()
+        )
+        MerchantCreatorLink.objects.create(
+            merchant=merchant,
+            creator=creator,
+            status=STATUS_INACTIVE,
+        )
+
+        shirt = MerchantItem.objects.create(
+            merchant=merchant,
+            title="Shirt",
+            link="http://shirt",
+            shopify_product_id="1",
+        )
+        group = ItemGroup.objects.create(
+            merchant=merchant,
+            name="Group",
+            affiliate_percent=Decimal("5"),
+        )
+        group.items.add(shirt)
+
+        line_items = [{"product_id": 1, "quantity": 1, "price": "20.00"}]
+
+        response = self._call_webhook(
+            merchant_meta,
+            creator_meta,
+            customer_meta,
+            line_items,
+            Decimal("20.00"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload.get("status"), "ignored")
+        self.assertEqual(payload.get("reason"), "creator_inactive")
+        self.assertEqual(LedgerEntry.objects.count(), 0)
+        self.assertEqual(ReferralConversion.objects.count(), 0)
 
     def test_item_without_group_has_zero_commission(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
