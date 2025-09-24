@@ -9,7 +9,12 @@ from merchants.models import MerchantMeta, MerchantItem, ItemGroup
 from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
-from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
+from collect.models import (
+    AffiliateClick,
+    ReferralVisit,
+    ReferralConversion,
+    CreatorMerchantStatus,
+)
 from .views import orders_create_webhook
 
 
@@ -137,6 +142,50 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(conversion.merchant, merchant)
         self.assertEqual(conversion.order_amount, Decimal("25.00"))
         self.assertEqual(conversion.commission_amount, Decimal("0.80"))
+
+    def test_inactive_creator_skips_income_and_conversion(self):
+        merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
+            self._setup_users()
+        )
+
+        CreatorMerchantStatus.objects.create(
+            creator=creator_meta, merchant=merchant_meta, is_active=False
+        )
+
+        shirt = MerchantItem.objects.create(
+            merchant=merchant,
+            title="Shirt",
+            link="http://shirt",
+            shopify_product_id="1",
+        )
+        group = ItemGroup.objects.create(
+            merchant=merchant,
+            name="Group",
+            affiliate_percent=Decimal("10"),
+        )
+        group.items.add(shirt)
+
+        line_items = [{"product_id": 1, "quantity": 1, "price": "10.00"}]
+
+        response = self._call_webhook(
+            merchant_meta,
+            creator_meta,
+            customer_meta,
+            line_items,
+            Decimal("10.00"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            LedgerEntry.objects.filter(creator=creator, entry_type="commission").exists()
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(merchant=merchant, entry_type="commission").exists()
+        )
+        self.assertFalse(
+            LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
+        )
+        self.assertEqual(ReferralConversion.objects.count(), 0)
 
     def test_special_uuid_triggers_fixed_commission(self):
         (
