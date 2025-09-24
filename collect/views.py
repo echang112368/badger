@@ -11,7 +11,13 @@ from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from merchants.models import MerchantItem, MerchantMeta
 
-from .models import AffiliateClick, RedirectLink, ReferralVisit, ReferralConversion
+from .models import (
+    AffiliateClick,
+    RedirectLink,
+    ReferralVisit,
+    ReferralConversion,
+    CreatorMerchantStatus,
+)
 from decimal import Decimal, InvalidOperation
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
@@ -42,6 +48,22 @@ def _client_ip(request):
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
+
+
+def _creator_is_active_for_merchant(creator_meta, merchant_meta):
+    """Return whether a creator should receive payouts for a merchant."""
+
+    if not creator_meta or not merchant_meta:
+        return False
+
+    status = CreatorMerchantStatus.objects.filter(
+        creator=creator_meta, merchant=merchant_meta
+    ).first()
+
+    if status is None:
+        return True
+
+    return status.is_active
 
 
 def _cors_json(payload, status=200):
@@ -340,6 +362,9 @@ def orders_create_webhook(request):
     order_total = Decimal("0")
 
     creator_uuid_str = str(creator_uuid) if creator_uuid else None
+    creator_active_for_merchant = _creator_is_active_for_merchant(
+        creator_meta, merchant_meta
+    )
 
     if amount_str:
         try:
@@ -347,7 +372,11 @@ def orders_create_webhook(request):
         except (TypeError, InvalidOperation):
             order_total = Decimal("0")
 
-    if creator_uuid_str == SPECIAL_CREATOR_UUID and amount_str:
+    if (
+        creator_active_for_merchant
+        and creator_uuid_str == SPECIAL_CREATOR_UUID
+        and amount_str
+    ):
         try:
             commission_total = (
                 Decimal(amount_str) * Decimal("0.05")
@@ -357,7 +386,7 @@ def orders_create_webhook(request):
             )
         except (TypeError, InvalidOperation):
             commission_total = Decimal("0")
-    elif merchant_meta and creator_meta:
+    elif merchant_meta and creator_meta and creator_active_for_merchant:
         # Calculate commission per line item based on its group percentage
         for item in payload.get("line_items", []):
             product_id = str(item.get("product_id"))
@@ -392,7 +421,7 @@ def orders_create_webhook(request):
     commission_total = commission_total.quantize(Decimal("0.01"))
     print(f"Order {order_id} total commission: {commission_total}")
 
-    if merchant_meta and creator_meta:
+    if merchant_meta and creator_meta and creator_active_for_merchant:
         ReferralConversion.objects.create(
             creator_uuid=creator_uuid or creator_meta.uuid,
             merchant_uuid=merchant_uuid or merchant_meta.uuid,
@@ -404,7 +433,12 @@ def orders_create_webhook(request):
             metadata={"source": "shopify_orders_create"},
         )
 
-    if merchant_meta and creator_meta and commission_total > 0:
+    if (
+        merchant_meta
+        and creator_meta
+        and creator_active_for_merchant
+        and commission_total > 0
+    ):
         # Credit the content creator with the commission
         LedgerEntry.objects.create(
             creator=creator_meta.user,

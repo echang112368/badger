@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import AffiliateClick, RedirectLink, ReferralVisit, ReferralConversion
+from .models import (
+    AffiliateClick,
+    RedirectLink,
+    ReferralVisit,
+    ReferralConversion,
+    CreatorMerchantStatus,
+)
 
 
 @admin.register(RedirectLink)
@@ -53,3 +59,16 @@ class AffiliateClickAdmin(admin.ModelAdmin):
     search_fields = ("uuid", "storeID")
     list_filter = ("created_at",)
     readonly_fields = ("created_at",)
+
+
+@admin.register(CreatorMerchantStatus)
+class CreatorMerchantStatusAdmin(admin.ModelAdmin):
+    list_display = ("creator", "merchant", "is_active", "updated_at")
+    list_filter = ("is_active", "updated_at")
+    search_fields = (
+        "creator__user__username",
+        "creator__uuid",
+        "merchant__user__username",
+        "merchant__uuid",
+    )
+    autocomplete_fields = ("creator", "merchant")
