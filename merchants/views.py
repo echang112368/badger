@@ -250,11 +250,16 @@ def update_creator_status(request):
         creator_ids = request.POST.getlist("selected_creators")
         action = request.POST.get("action")
         if creator_ids and action in ["activate", "deactivate"]:
-            MerchantCreatorLink.objects.filter(
-                merchant=request.user, creator__id__in=creator_ids
-            ).update(
-                status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
+            new_status = (
+                STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
             )
+            links = MerchantCreatorLink.objects.filter(
+                merchant=request.user, creator__id__in=creator_ids
+            )
+            for link in links:
+                if link.status != new_status:
+                    link.status = new_status
+                    link.save()
     return redirect("merchant_creators")
 
 
