@@ -1,6 +1,6 @@
 /* global React, ReactDOM */
 
-const { useEffect, useMemo, useRef, useState } = React;
+const { useEffect, useMemo, useState } = React;
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -107,19 +107,12 @@ function AffiliateCompaniesTable({ companies, selected, onToggle, onToggleAll })
   );
 }
 
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
-
 function AffiliateCompaniesApp() {
   const [tab, setTab] = useState('active');
   const [data, setData] = useState({ active: [], inactive: [] });
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [hasUnseenInactive, setHasUnseenInactive] = useState(false);
-  const markSeenRequestedRef = useRef(false);
 
   useEffect(() => {
     const url = window.AFFILIATE_COMPANIES_DATA_URL;
@@ -142,9 +135,6 @@ function AffiliateCompaniesApp() {
           active: payload.active || [],
           inactive: payload.inactive || [],
         });
-        const unseen = Boolean(payload.has_unseen_inactive);
-        setHasUnseenInactive(unseen);
-        markSeenRequestedRef.current = !unseen;
         setLoading(false);
       })
       .catch((err) => {
@@ -215,32 +205,6 @@ function AffiliateCompaniesApp() {
       tab === currentTab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'
     }`;
 
-  useEffect(() => {
-    if (tab === 'inactive' && hasUnseenInactive) {
-      setHasUnseenInactive(false);
-
-      const markUrl = window.AFFILIATE_COMPANIES_MARK_SEEN_URL;
-      if (!markUrl || markSeenRequestedRef.current) {
-        return;
-      }
-
-      markSeenRequestedRef.current = true;
-      fetch(markUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': getCsrfToken(),
-          Accept: 'application/json',
-        },
-        credentials: 'same-origin',
-        body: JSON.stringify({}),
-      }).catch(() => {
-        // If the request fails we allow future attempts.
-        markSeenRequestedRef.current = false;
-      });
-    }
-  }, [tab, hasUnseenInactive]);
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -257,17 +221,7 @@ function AffiliateCompaniesApp() {
             className={tabButtonClass('inactive')}
             onClick={() => setTab('inactive')}
           >
-            <span className="inline-flex items-center">
-              <span>Inactive</span>
-              {hasUnseenInactive ? (
-                <span
-                  className="ml-2 inline-flex items-center text-yellow-500"
-                  aria-label="New inactive businesses"
-                >
-                  <i className="bi bi-exclamation-triangle-fill" aria-hidden="true" />
-                </span>
-              ) : null}
-            </span>
+            Inactive
           </button>
         </div>
         <div>
