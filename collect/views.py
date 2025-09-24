@@ -10,7 +10,6 @@ from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from merchants.models import MerchantItem, MerchantMeta
-from links.models import MerchantCreatorLink, STATUS_INACTIVE
 
 from .models import AffiliateClick, RedirectLink, ReferralVisit, ReferralConversion
 from decimal import Decimal, InvalidOperation
@@ -392,15 +391,6 @@ def orders_create_webhook(request):
 
     commission_total = commission_total.quantize(Decimal("0.01"))
     print(f"Order {order_id} total commission: {commission_total}")
-
-    if merchant_meta and creator_meta:
-        link = MerchantCreatorLink.objects.filter(
-            merchant=merchant_meta.user, creator=creator_meta.user
-        ).first()
-        if link and link.status == STATUS_INACTIVE:
-            return JsonResponse(
-                {"status": "ignored", "reason": "creator_inactive"}, status=200
-            )
 
     if merchant_meta and creator_meta:
         ReferralConversion.objects.create(
