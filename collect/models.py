@@ -112,3 +112,29 @@ class ReferralConversion(models.Model):
             f"Conversion {self.order_id or 'unknown'} for {self.creator_uuid} → "
             f"{self.merchant_uuid}"
         )
+
+
+class CreatorMerchantStatus(models.Model):
+    """Stores creator-specific status overrides for a merchant relationship."""
+
+    creator = models.ForeignKey(
+        "creators.CreatorMeta",
+        on_delete=models.CASCADE,
+        related_name="merchant_statuses",
+    )
+    merchant = models.ForeignKey(
+        "merchants.MerchantMeta",
+        on_delete=models.CASCADE,
+        related_name="creator_statuses",
+    )
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("creator", "merchant")
+        verbose_name = "Creator merchant status"
+        verbose_name_plural = "Creator merchant statuses"
+
+    def __str__(self):
+        state = "active" if self.is_active else "inactive"
+        return f"{self.creator} → {self.merchant} ({state})"
