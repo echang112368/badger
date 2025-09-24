@@ -213,10 +213,14 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
         self.assertEqual(company["conversions"], 1)
         self.assertAlmostEqual(company["avg_per_visit"], 42.5)
         self.assertAlmostEqual(company["conversion_rate"], 100.0)
+        self.assertFalse(payload["has_unseen_inactive"])
+        self.assertEqual(payload["inactive_unseen_count"], 0)
 
     def test_inactive_company_lists_under_inactive_tab(self):
         self.link.status = STATUS_INACTIVE
         self.link.save()
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.inactive_seen)
         creator_meta = CreatorMeta.objects.get(user=self.creator)
         ReferralVisit.objects.create(
             creator_uuid=creator_meta.uuid,
@@ -235,6 +239,24 @@ class CreatorAffiliateCompaniesViewTests(TestCase):
         self.assertEqual(len(payload["active"]), 0)
         self.assertEqual(len(payload["inactive"]), 1)
         self.assertEqual(payload["inactive"][0]["business"], "Merchant Aff LLC")
+        self.assertFalse(payload["inactive"][0]["inactive_seen"])
+        self.assertTrue(payload["has_unseen_inactive"])
+        self.assertEqual(payload["inactive_unseen_count"], 1)
+
+    def test_mark_inactive_seen_endpoint_marks_links(self):
+        self.link.status = STATUS_INACTIVE
+        self.link.save()
+
+        response = self.client.post(reverse("creator_mark_inactive_seen"))
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "ok")
+        self.link.refresh_from_db()
+        self.assertTrue(self.link.inactive_seen)
+
+        payload = self.client.get(reverse("creator_affiliate_companies_data")).json()
+        self.assertFalse(payload["has_unseen_inactive"])
+        self.assertEqual(payload["inactive_unseen_count"], 0)
 
     def test_delete_affiliate_company(self):
         response = self.client.post(

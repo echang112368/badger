@@ -198,6 +198,7 @@ def _affiliate_company_metrics(user):
             "conversions": conversions,
             "avg_per_visit": float(avg),
             "conversion_rate": float(conversion_rate),
+            "inactive_seen": getattr(link, "inactive_seen", True),
         }
 
         if link.status == STATUS_ACTIVE:
@@ -213,10 +214,16 @@ def _affiliate_company_metrics(user):
                 }
             )
 
+    unseen_inactive = [
+        company for company in inactive_companies if not company.get("inactive_seen", True)
+    ]
+
     return {
         "active": active_companies,
         "inactive": inactive_companies,
         "pending_requests": pending_requests,
+        "inactive_unseen_count": len(unseen_inactive),
+        "has_unseen_inactive": bool(unseen_inactive),
         "generated_at": timezone.now().isoformat(),
     }
 
@@ -238,6 +245,22 @@ def creator_affiliate_companies(request):
 def creator_affiliate_companies_data(request):
     metrics = _affiliate_company_metrics(request.user)
     return JsonResponse(metrics)
+
+
+@login_required
+def creator_mark_inactive_seen(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    updated = (
+        MerchantCreatorLink.objects.filter(
+            creator=request.user,
+            status=STATUS_INACTIVE,
+            inactive_seen=False,
+        ).update(inactive_seen=True)
+    )
+
+    return JsonResponse({"status": "ok", "updated": updated})
 
 
 @login_required
