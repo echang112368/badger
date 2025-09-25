@@ -18,7 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from .views import landing_page
+
 urlpatterns = [
+    path('', landing_page, name='landing'),
     path('creators/', include('creators.urls')),
     path('merchant/', include('merchants.urls')),
     path('customer/', include('customer.urls')),
