@@ -10,17 +10,28 @@
       :root {
         color-scheme: light;
       }
+      html,
+      body {
+        margin: 0;
+      }
     </style>
   </head>
   <body class="min-h-full bg-[#f9fafb] font-['Inter',_'Poppins',_'Helvetica',_'Arial',_sans-serif] text-gray-900">
-    <main>
-      <section class="relative isolate overflow-hidden bg-gradient-to-br from-[#fcd965] via-[#fde88f] to-[#fff7d6]">
-        <div class="relative mx-auto flex max-w-5xl flex-col items-center gap-10 px-6 py-16 text-center lg:px-8 lg:py-24">
+    <header class="sticky top-0 z-50 bg-[#fcd965] shadow-sm">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
+        <a href="/" class="inline-flex items-center gap-3">
           <img
             src="{% static 'img/transparent-logo2.png' %}"
             alt="Badger logo"
-            class="h-auto w-auto max-h-[1.667rem] sm:max-h-[2rem] md:max-h-[2.333rem]"
+            class="h-9 w-auto"
           />
+          <span class="sr-only">Badger</span>
+        </a>
+      </div>
+    </header>
+    <main class="pt-24">
+      <section class="relative isolate overflow-hidden bg-gradient-to-br from-[#fcd965] via-[#fde88f] to-[#fff7d6]">
+        <div class="relative mx-auto flex max-w-5xl flex-col items-center gap-10 px-6 py-16 text-center lg:px-8 lg:py-24">
           <div class="space-y-5">
             <p class="text-sm font-semibold uppercase tracking-[0.4em] text-white/80">Encore Offer</p>
             <h1 class="text-4xl font-bold tracking-tight text-[#1f1f1f] sm:text-5xl md:text-6xl">
