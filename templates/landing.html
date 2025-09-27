@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
   <head>
@@ -13,40 +14,42 @@
   </head>
   <body class="min-h-full bg-[#f9fafb] font-['Inter',_'Poppins',_'Helvetica',_'Arial',_sans-serif] text-gray-900">
     <main>
-      <section class="relative overflow-hidden">
-        <div class="mx-auto flex max-w-6xl flex-col gap-16 px-6 py-20 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-24">
-          <div class="space-y-8">
-            <img
-              src="/static/img/transparent-logo.png"
-              alt="Badger logo"
-              class="h-12 w-auto"
-            />
-            <div class="space-y-6">
-              <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Earn More. Save More. With Badger.</h1>
-              <p class="max-w-xl text-lg leading-relaxed text-[#555555]">
-                Your all-in-one affiliate extension for creators and businesses. Track rewards, grow income, and redeem easily.
-              </p>
-            </div>
-            <div>
-              <a
-                href="#download"
-                class="inline-flex items-center justify-center rounded-xl bg-[#2bf8ff] px-8 py-4 text-lg font-semibold text-white shadow-sm transition-colors duration-200 ease-out hover:bg-[#24d9df] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1fb3bd]"
-              >
-                Download Extension
-              </a>
-            </div>
+      <section class="relative isolate overflow-hidden bg-gradient-to-br from-[#fcd965] via-[#fde88f] to-[#fff7d6]">
+        <div class="absolute inset-x-12 top-12 hidden h-[26rem] rounded-[4rem] border border-white/40 bg-white/30 blur-3xl lg:block"></div>
+        <div class="relative mx-auto flex max-w-5xl flex-col items-center gap-12 px-6 py-24 text-center lg:px-8 lg:py-32">
+          <img
+            src="{% static 'img/transparent-logo.png' %}"
+            alt="Badger logo"
+            class="h-[60rem] max-h-[80vh] w-auto"
+          />
+          <div class="space-y-5">
+            <p class="text-sm font-semibold uppercase tracking-[0.4em] text-white/80">Encore Offer</p>
+            <h1 class="text-4xl font-bold tracking-tight text-[#1f1f1f] sm:text-5xl md:text-6xl">
+              Earn More. Save More.
+            </h1>
+            <p class="mx-auto max-w-2xl text-lg leading-relaxed text-[#473802]">
+              We extended our best Badger deal. Unlock creator rewards and richer affiliate payouts for the price of sharing the love.
+              Track every referral, multiply your savings, and celebrate your community.
+            </p>
           </div>
-          <div class="relative flex justify-center lg:justify-end">
-            <div class="relative max-w-xl">
-              <div class="absolute -inset-6 rounded-[40px] bg-[#2bf8ff]/10 blur-3xl"></div>
-              <img
-                src="/static/img/money-jar-71.png"
-                alt="Illustration of a Badger-branded money jar filled with teal coins"
-                class="relative z-10 w-full max-w-md drop-shadow-2xl"
-              />
-              <div class="absolute -top-10 -right-8 hidden h-24 w-24 rounded-full border-4 border-[#2bf8ff]/60 bg-white/70 backdrop-blur lg:block"></div>
-              <div class="absolute -bottom-12 -left-10 hidden h-32 w-32 rounded-full border border-[#2bf8ff]/40 bg-[#2bf8ff]/20 blur-lg lg:block"></div>
-            </div>
+          <a
+            href="#download"
+            class="inline-flex items-center justify-center rounded-full bg-[#2f1b33] px-10 py-4 text-lg font-semibold text-white shadow-[0_20px_45px_rgba(47,27,51,0.35)] transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#251428] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f1b33]"
+          >
+            Download Extension
+          </a>
+          <p class="text-sm font-medium uppercase tracking-[0.35em] text-[#2f1b33]/70">Earn more. Save more. Repeat.</p>
+        </div>
+        <div class="pointer-events-none absolute -bottom-36 right-[-8rem] w-[32rem] max-w-none rotate-6 drop-shadow-[0_35px_70px_rgba(231,176,14,0.4)] sm:-bottom-40 sm:right-[-6rem] md:right-[-4rem] lg:-bottom-44 lg:right-[4rem]">
+          <div class="relative">
+            <div class="absolute -inset-6 rounded-[56px] bg-white/20 blur-3xl"></div>
+            <img
+              src="{% static 'img/money-jar-71.png' %}"
+              alt="Badger savings jar illustration"
+              class="relative z-10 w-full"
+            />
+            <div class="absolute -top-8 -left-10 hidden h-36 w-36 rounded-full border-4 border-white/40 bg-white/30 backdrop-blur sm:block"></div>
+            <div class="absolute -bottom-16 -right-16 hidden h-44 w-44 rounded-full border-4 border-white/20 bg-white/20 backdrop-blur sm:block"></div>
           </div>
         </div>
       </section>
