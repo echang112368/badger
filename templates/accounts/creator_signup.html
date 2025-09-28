@@ -1,33 +1,12 @@
-{% extends "accounts/auth_base.html" %}
-
-{% block title %}Creator Sign Up | Badger{% endblock %}
-
-{% block toggle %}
-  <a href="{% url 'login' %}">Login</a>
-  <span class="active">Sign Up</span>
-{% endblock %}
-
-{% block heading %}
-  <h1>Join as a creator</h1>
-  <p>Build partnerships and grow your audience with Badger.</p>
-{% endblock %}
-
-{% block social_section %}
-  <div class="account-type-switcher">
-    <a href="{% url 'business_signup' %}">Business</a>
-    <span class="active">Creator</span>
-    <a href="{% url 'user_signup' %}">User</a>
-  </div>
-  <p class="auth-subtext">Tell us about your craft so brands can discover and collaborate with you.</p>
-{% endblock %}
-
-{% block divider %}
-  <div class="auth-divider"><span>Creator profile basics</span></div>
-{% endblock %}
-
-{% block submit_label %}Create creator account{% endblock %}
-
-{% block footer %}
-  Already have an account?
-  <a href="{% url 'login' %}">Log in</a>
-{% endblock %}
+<!DOCTYPE html>
+<html>
+<head><title>Creator Sign Up</title></head>
+<body>
+  <h2>Register as Content Creator</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Create Creator Account</button>
+  </form>
+</body>
+</html>
