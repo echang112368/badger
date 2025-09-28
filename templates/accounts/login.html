@@ -1,5 +1,28 @@
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Log in</button>
-</form>
+{% extends "accounts/auth_base.html" %}
+
+{% block title %}Log In | Badger{% endblock %}
+
+{% block toggle %}
+  <span class="active">Login</span>
+  <a href="{% url 'signup_choice' %}">Sign Up</a>
+{% endblock %}
+
+{% block heading %}
+  <h1>Welcome back</h1>
+  <p>Log in to continue managing your Badger account.</p>
+{% endblock %}
+
+{% block social_section %}
+  <p class="auth-subtext">Use your email and password to access your Badger dashboard.</p>
+{% endblock %}
+
+{% block divider %}
+  <div class="auth-divider"><span>Secure email login</span></div>
+{% endblock %}
+
+{% block submit_label %}Log in{% endblock %}
+
+{% block footer %}
+  Don’t have an account yet?
+  <a href="{% url 'signup_choice' %}">Create one</a>
+{% endblock %}
