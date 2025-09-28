@@ -12,17 +12,13 @@
   <p>Join Badger to connect with creators and manage your campaigns.</p>
 {% endblock %}
 
-{% block social_section %}
+{% block pre_social %}
   <div class="account-type-switcher">
     <span class="active">Business</span>
     <a href="{% url 'creator_signup' %}">Creator</a>
     <a href="{% url 'user_signup' %}">User</a>
   </div>
   <p class="auth-subtext">Share your company information so we can tailor creator partnerships to your goals.</p>
-{% endblock %}
-
-{% block divider %}
-  <div class="auth-divider"><span>Business account details</span></div>
 {% endblock %}
 
 {% block submit_label %}Create business account{% endblock %}
