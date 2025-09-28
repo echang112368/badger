@@ -1,12 +1,33 @@
-<!DOCTYPE html>
-<html>
-<head><title>Business Sign Up</title></head>
-<body>
-  <h2>Register as Business</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Create Business Account</button>
-  </form>
-</body>
-</html>
+{% extends "accounts/auth_base.html" %}
+
+{% block title %}Business Sign Up | Badger{% endblock %}
+
+{% block toggle %}
+  <a href="{% url 'login' %}">Login</a>
+  <span class="active">Sign Up</span>
+{% endblock %}
+
+{% block heading %}
+  <h1>Create your business account</h1>
+  <p>Join Badger to connect with creators and manage your campaigns.</p>
+{% endblock %}
+
+{% block social_section %}
+  <div class="account-type-switcher">
+    <span class="active">Business</span>
+    <a href="{% url 'creator_signup' %}">Creator</a>
+    <a href="{% url 'user_signup' %}">User</a>
+  </div>
+  <p class="auth-subtext">Share your company information so we can tailor creator partnerships to your goals.</p>
+{% endblock %}
+
+{% block divider %}
+  <div class="auth-divider"><span>Business account details</span></div>
+{% endblock %}
+
+{% block submit_label %}Create business account{% endblock %}
+
+{% block footer %}
+  Already have an account?
+  <a href="{% url 'login' %}">Log in</a>
+{% endblock %}
