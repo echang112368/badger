@@ -12,17 +12,13 @@
   <p>Sign up to discover offers and follow your favorite creators.</p>
 {% endblock %}
 
-{% block social_section %}
+{% block pre_social %}
   <div class="account-type-switcher">
     <a href="{% url 'business_signup' %}">Business</a>
     <a href="{% url 'creator_signup' %}">Creator</a>
     <span class="active">User</span>
   </div>
   <p class="auth-subtext">Enter a few details to unlock personalized content and creator recommendations.</p>
-{% endblock %}
-
-{% block divider %}
-  <div class="auth-divider"><span>User profile information</span></div>
 {% endblock %}
 
 {% block submit_label %}Create user account{% endblock %}

@@ -32,16 +32,16 @@
     }
 
     .auth-wrapper {
-      width: min(420px, 100%);
+      width: min(440px, 100%);
     }
 
     .auth-card {
       position: relative;
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.99));
-      border-radius: 28px;
+      border-radius: 32px;
       border: 1px solid rgba(252, 217, 101, 0.25);
       box-shadow: 0 25px 70px rgba(15, 23, 42, 0.12);
-      padding: 36px;
+      padding: 40px 36px;
       overflow: hidden;
     }
 
@@ -49,7 +49,25 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.96));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 250, 252, 0.96));
+      z-index: 0;
+    }
+
+    @supports (backdrop-filter: blur(18px)) or (-webkit-backdrop-filter: blur(18px)) {
+      .auth-card {
+        background: rgba(255, 255, 255, 0.82);
+        -webkit-backdrop-filter: blur(18px);
+        backdrop-filter: blur(18px);
+      }
+    }
+
+    .auth-card::after {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border-radius: 26px;
+      pointer-events: none;
+      background: linear-gradient(145deg, rgba(252, 217, 101, 0.16), transparent 40%);
       z-index: 0;
     }
 
@@ -89,14 +107,14 @@
     }
 
     .auth-heading {
-      margin-bottom: 24px;
+      margin-bottom: 28px;
       text-align: center;
     }
 
     .auth-heading h1 {
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 600;
-      margin: 0 0 8px;
+      margin: 0 0 10px;
     }
 
     .auth-heading p {
@@ -106,21 +124,21 @@
     }
 
     .auth-subtext {
-      margin: 0 0 18px;
+      margin: 0 0 20px;
       font-size: 13px;
       color: #1f2937;
       text-align: center;
-      background: linear-gradient(135deg, rgba(252, 217, 101, 0.65), rgba(252, 217, 101, 0.3));
-      border-radius: 16px;
-      padding: 12px 16px;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 14px 28px rgba(252, 217, 101, 0.18);
+      background: linear-gradient(135deg, rgba(252, 217, 101, 0.45), rgba(252, 217, 101, 0.18));
+      border-radius: 18px;
+      padding: 12px 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 18px 36px rgba(252, 217, 101, 0.18);
     }
 
     .social-buttons {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     .account-type-switcher {
@@ -163,19 +181,35 @@
       justify-content: center;
       gap: 10px;
       padding: 12px 16px;
-      background: #fff;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.85));
       border: 1px solid rgba(203, 213, 225, 0.9);
-      border-radius: 12px;
+      border-radius: 14px;
       font-size: 14px;
       color: #111827;
       font-weight: 500;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .social-button .social-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: rgba(252, 217, 101, 0.18);
+      color: #a16207;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
     }
 
     .social-button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      border-color: rgba(252, 217, 101, 0.6);
+      box-shadow: 0 18px 32px rgba(15, 23, 42, 0.12);
     }
 
     .auth-divider {
@@ -186,7 +220,7 @@
       letter-spacing: 0.1em;
       color: rgba(15, 23, 42, 0.6);
       gap: 16px;
-      margin: 18px 0 24px;
+      margin: 18px 0 26px;
     }
 
     .auth-divider::before,
@@ -200,7 +234,7 @@
     form.auth-form {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
     }
 
     .form-field {
@@ -227,10 +261,10 @@
     .form-field select,
     .form-field textarea {
       width: 100%;
-      border-radius: 12px;
+      border-radius: 14px;
       border: 1px solid rgba(203, 213, 225, 0.9);
       background: rgba(255, 255, 255, 0.9);
-      padding: 12px 14px;
+      padding: 13px 15px;
       font-size: 14px;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
       outline: none;
@@ -242,6 +276,11 @@
       border-color: rgba(252, 217, 101, 0.65);
       box-shadow: 0 0 0 3px rgba(252, 217, 101, 0.25);
       background: #fff;
+    }
+
+    .form-field input::placeholder,
+    .form-field textarea::placeholder {
+      color: rgba(107, 114, 128, 0.7);
     }
 
     .checkbox-field {
@@ -286,23 +325,23 @@
     .primary-button {
       border: none;
       border-radius: 999px;
-      padding: 14px;
+      padding: 15px;
       font-size: 15px;
       font-weight: 600;
       color: #fff;
       background: linear-gradient(135deg, var(--accent), var(--accent-dark));
       cursor: pointer;
-      box-shadow: 0 18px 30px rgba(252, 217, 101, 0.35);
+      box-shadow: 0 20px 32px rgba(252, 217, 101, 0.35);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .primary-button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 22px 36px rgba(252, 217, 101, 0.38);
+      box-shadow: 0 24px 38px rgba(252, 217, 101, 0.4);
     }
 
     .auth-footer {
-      margin-top: 20px;
+      margin-top: 22px;
       text-align: center;
       font-size: 13px;
       color: #6b7280;
@@ -324,7 +363,7 @@
       }
 
       .auth-card {
-        padding: 28px 24px;
+        padding: 32px 26px;
       }
     }
   </style>
@@ -339,8 +378,30 @@
         <div class="auth-heading">
           {% block heading %}{% endblock %}
         </div>
-        {% block social_section %}{% endblock %}
-        {% block divider %}{% endblock %}
+        {% block pre_social %}{% endblock %}
+        {% block social_section %}
+          <div class="social-buttons">
+            <button type="button" class="social-button">
+              <span class="social-icon">G</span>
+              Continue with Google
+            </button>
+            <button type="button" class="social-button">
+              <span class="social-icon"></span>
+              Continue with Apple
+            </button>
+            <button type="button" class="social-button">
+              <span class="social-icon">B</span>
+              Continue with Binance
+            </button>
+            <button type="button" class="social-button">
+              <span class="social-icon">W</span>
+              Continue with Wallet
+            </button>
+          </div>
+        {% endblock %}
+        {% block divider %}
+          <div class="auth-divider"><span>Or sign up with email</span></div>
+        {% endblock %}
         {% if form.non_field_errors %}
           <div class="non-field-errors">{{ form.non_field_errors }}</div>
         {% endif %}
