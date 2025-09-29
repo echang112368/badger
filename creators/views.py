@@ -6,7 +6,6 @@ from django.db.models import Sum, Q, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date
-import json
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
@@ -55,8 +54,8 @@ def creator_earnings(request):
         {
             "balance": balance,
             "ledger_entries": entries,
-            "earnings_labels": json.dumps(earnings_labels),
-            "earnings_totals": json.dumps(earnings_totals),
+            "earnings_labels": earnings_labels,
+            "earnings_totals": earnings_totals,
         },
     )
 
