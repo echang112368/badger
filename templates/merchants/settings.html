@@ -3,7 +3,7 @@
 {% block content %}
 <script src="https://cdn.tailwindcss.com"></script>
 {% with current_tab=active_tab|default:'profile' %}
-<div class="max-w-3xl mx-auto py-10 px-4">
+<div id="settingsContainer" class="mx-auto py-10 px-4 {% if current_tab == 'team' %}max-w-5xl{% else %}max-w-3xl{% endif %}">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-semibold text-gray-900">Settings</h1>
     <div>
@@ -397,6 +397,7 @@
   const tabs=document.querySelectorAll('#settingsTabs button');
   const sections={};
   const activeTabInput=document.getElementById('activeTabInput');
+  const settingsContainer=document.getElementById('settingsContainer');
 
   function setActiveTab(tab){
     tabs.forEach(t=>{
@@ -419,6 +420,10 @@
     }
     if(activeTabInput){
       activeTabInput.value=tab;
+    }
+    if(settingsContainer){
+      settingsContainer.classList.remove('max-w-3xl','max-w-5xl');
+      settingsContainer.classList.add(tab==='team'?'max-w-5xl':'max-w-3xl');
     }
   }
 
