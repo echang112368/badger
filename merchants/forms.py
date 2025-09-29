@@ -7,6 +7,7 @@ from django.utils.text import slugify
 class TeamMemberCreateForm(forms.Form):
     first_name = forms.CharField(max_length=150)
     last_name = forms.CharField(max_length=150)
+    email = forms.EmailField()
     role = forms.ChoiceField(
         choices=[
             (MerchantTeamMember.Role.ADMIN, "Admin"),
@@ -25,6 +26,14 @@ class TeamMemberCreateForm(forms.Form):
             counter += 1
             username = f"{base}-{counter}"
         return username
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        from accounts.models import CustomUser
+
+        if CustomUser.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("A user with this email already exists.")
+        return email
 
 
 class MerchantItemForm(forms.ModelForm):
