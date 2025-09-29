@@ -51,10 +51,12 @@
             </div>
         </div>
     </div>
+    {{ earnings_labels|json_script:"earnings-labels-data" }}
+    {{ earnings_totals|json_script:"earnings-totals-data" }}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        const earningsLabels = {{ earnings_labels|safe }};
-        const earningsData = {{ earnings_totals|safe }};
+        const earningsLabels = JSON.parse(document.getElementById('earnings-labels-data').textContent);
+        const earningsData = JSON.parse(document.getElementById('earnings-totals-data').textContent);
         const usdFormatter = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
