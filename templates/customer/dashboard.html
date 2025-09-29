@@ -18,6 +18,26 @@
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         padding: 24px;
     }
+    .welcome-card {
+        background: #fcd965;
+        color: #2f1b33;
+        position: relative;
+        overflow: hidden;
+    }
+    .welcome-card .display-5 {
+        color: #2f1b33;
+    }
+    .welcome-card .bg-light {
+        background-color: rgba(255, 255, 255, 0.55) !important;
+        color: #b07200;
+    }
+    .welcome-card .text-muted,
+    .welcome-card small {
+        color: rgba(47, 27, 51, 0.7) !important;
+    }
+    .welcome-card .helper-text {
+        color: rgba(47, 27, 51, 0.7);
+    }
     .helper-text {
         color: #555;
         font-size: 14px;
@@ -64,7 +84,7 @@
 </style>
 
 <div class="rewards-grid mb-4">
-    <div class="card">
+    <div class="card welcome-card">
         <div class="d-flex align-items-center mb-3">
             <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width:32px; height:32px;">
                 <i class="bi bi-trophy"></i>
