@@ -1,4 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
+import json
 import secrets
 
 from django.contrib.auth.decorators import login_required
@@ -16,6 +17,7 @@ from .forms import (
     MerchantSettingsForm,
     ItemGroupForm,
     TeamMemberCreateForm,
+    TeamMemberUpdateForm,
 )
 from accounts.forms import UserNameForm
 from accounts.models import CustomUser
@@ -551,6 +553,7 @@ def merchant_settings(request):
             "status": "active" if member.user.is_active else "inactive",
             "is_superuser": member.role == MerchantTeamMember.Role.SUPERUSER,
             "delete_url": reverse("delete_team_member", args=[member.id]),
+            "update_url": reverse("update_team_member", args=[member.id]),
         }
         for member in team_members
     ]
@@ -630,6 +633,49 @@ def merchant_settings(request):
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
     })
+
+
+@login_required
+@require_POST
+def update_team_member(request, member_id: int):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_invite_team or not permissions.merchant:
+        return JsonResponse(
+            {"error": "You do not have permission to edit team members."},
+            status=403,
+        )
+
+    membership = get_object_or_404(
+        MerchantTeamMember,
+        pk=member_id,
+        merchant=permissions.merchant,
+    )
+
+    if membership.role == MerchantTeamMember.Role.SUPERUSER:
+        return JsonResponse(
+            {"error": "The account owner cannot be edited."},
+            status=400,
+        )
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    form = TeamMemberUpdateForm(payload, user=membership.user)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors}, status=400)
+
+    user = membership.user
+    user.first_name = (form.cleaned_data.get("first_name") or "").strip()
+    user.last_name = (form.cleaned_data.get("last_name") or "").strip()
+    user.email = form.cleaned_data["email"]
+    user.save(update_fields=["first_name", "last_name", "email"])
+
+    membership.role = form.cleaned_data["role"]
+    membership.save(update_fields=["role"])
+
+    return JsonResponse({"success": True})
 
 
 @login_required
