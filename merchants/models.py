@@ -2,6 +2,39 @@ from django.db import models
 from accounts.models import CustomUser
 import uuid
 
+
+class MerchantTeamMember(models.Model):
+    class Role(models.TextChoices):
+        SUPERUSER = "superuser", "Superuser"
+        ADMIN = "admin", "Admin"
+        MEMBER = "member", "Member"
+        VIEWER = "viewer", "Viewer"
+
+    merchant = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="team_memberships",
+    )
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="merchant_team_membership",
+    )
+    role = models.CharField(max_length=20, choices=Role.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["merchant"],
+                condition=models.Q(role="superuser"),
+                name="unique_superuser_per_merchant",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.username} ({self.get_role_display()})"
+
 class MerchantMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
