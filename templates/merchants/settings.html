@@ -189,8 +189,23 @@
                 </td>
                 {% if permissions.can_invite_team %}
                 <td class="px-4 py-4 text-right text-sm">
-                  {% if member.role != team_roles.SUPERUSER and member.user != request.user %}
-                  <button type="button" class="text-sm font-medium text-rose-600 transition hover:text-rose-700" data-remove-member data-member-id="{{ member.id }}" data-delete-url="{% url 'delete_team_member' member.id %}">Remove</button>
+                  {% if member.role == team_roles.SUPERUSER %}
+                  <span class="text-sm text-gray-400">Owner</span>
+                  {% else %}
+                  <div class="flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      class="text-sm font-medium text-indigo-600 transition hover:text-indigo-700"
+                      data-edit-member
+                      data-member-id="{{ member.id }}"
+                      data-update-url="{% url 'update_team_member' member.id %}"
+                    >
+                      Edit
+                    </button>
+                    {% if member.user != request.user %}
+                    <button type="button" class="text-sm font-medium text-rose-600 transition hover:text-rose-700" data-remove-member data-member-id="{{ member.id }}" data-delete-url="{% url 'delete_team_member' member.id %}">Remove</button>
+                    {% endif %}
+                  </div>
                   {% endif %}
                 </td>
                 {% endif %}
@@ -205,6 +220,61 @@
         </div>
 
         {% if permissions.can_invite_team %}
+        <div
+          id="editMemberModal"
+          class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="editMemberModalTitle"
+          aria-describedby="editMemberSummary"
+          data-modal-root
+        >
+          <div class="absolute inset-0 bg-gray-900/60" data-close-edit></div>
+          <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
+            <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h3 id="editMemberModalTitle" class="text-lg font-semibold text-gray-900">Edit team member</h3>
+                <p id="editMemberSummary" class="mt-1 text-sm text-gray-500"></p>
+              </div>
+              <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-edit>
+                <span class="sr-only">Close</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <form id="editMemberForm" class="space-y-5 px-6 py-5">
+              <div id="editMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="editMemberFirstName" class="block text-sm font-medium text-gray-700">First name</label>
+                  <input type="text" id="editMemberFirstName" name="first_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label for="editMemberLastName" class="block text-sm font-medium text-gray-700">Last name</label>
+                  <input type="text" id="editMemberLastName" name="last_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                </div>
+              </div>
+              <div>
+                <label for="editMemberEmail" class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" id="editMemberEmail" name="email" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" required />
+              </div>
+              <div>
+                <label for="editMemberRole" class="block text-sm font-medium text-gray-700">Role</label>
+                <select id="editMemberRole" name="role" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                  {% for value, label in team_form.fields.role.choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 -mx-6 -mb-5 mt-5">
+                <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-edit>Cancel</button>
+                <button type="submit" data-submit-edit class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Save changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <div
           id="deleteMemberModal"
           class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
@@ -533,6 +603,143 @@
   }
 
   {% if permissions.can_invite_team %}
+  const editModal=document.getElementById('editMemberModal');
+  const editForm=document.getElementById('editMemberForm');
+  const editError=document.getElementById('editMemberError');
+  const editSummary=document.getElementById('editMemberSummary');
+  const editSubmitButton=editForm?editForm.querySelector('[data-submit-edit]'):null;
+
+  function populateEditForm(member){
+    if(!editForm){
+      return;
+    }
+    const firstNameInput=editForm.querySelector('input[name="first_name"]');
+    const lastNameInput=editForm.querySelector('input[name="last_name"]');
+    const emailInput=editForm.querySelector('input[name="email"]');
+    const roleSelect=editForm.querySelector('select[name="role"]');
+    if(firstNameInput){
+      firstNameInput.value=member.first_name||'';
+    }
+    if(lastNameInput){
+      lastNameInput.value=member.last_name||'';
+    }
+    if(emailInput){
+      emailInput.value=member.email||'';
+    }
+    if(roleSelect){
+      roleSelect.value=member.role||'';
+    }
+  }
+
+  function openEditModal(member,updateUrl){
+    if(!editModal||!editForm){
+      return;
+    }
+    editForm.dataset.updateUrl=updateUrl||'';
+    if(editError){
+      editError.classList.add('hidden');
+      editError.textContent='';
+    }
+    if(editSummary){
+      const name=member.full_name||member.email||'this team member';
+      editSummary.textContent=`Update access for ${name}.`;
+    }
+    populateEditForm(member);
+    showModal(editModal);
+    const firstInput=editForm.querySelector('input[name="first_name"]');
+    if(firstInput){
+      firstInput.focus();
+    }
+  }
+
+  function closeEditModal(){
+    if(!editModal||!editForm){
+      return;
+    }
+    hideModal(editModal);
+    editForm.reset();
+    editForm.dataset.updateUrl='';
+  }
+
+  if(editModal){
+    editModal.querySelectorAll('[data-close-edit]').forEach(btn=>{
+      btn.addEventListener('click',closeEditModal);
+    });
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!editModal.classList.contains('hidden')){
+        closeEditModal();
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-edit-member]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const memberId=parseInt(btn.dataset.memberId||'',10);
+      if(Number.isNaN(memberId)){
+        return;
+      }
+      const member=teamMemberMap[memberId];
+      if(!member||member.is_superuser){
+        return;
+      }
+      const updateUrl=btn.dataset.updateUrl||member.update_url||'';
+      if(!updateUrl){
+        return;
+      }
+      openEditModal(member,updateUrl);
+    });
+  });
+
+  if(editForm){
+    editForm.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(!editForm.dataset.updateUrl){
+        return;
+      }
+      const formData=new FormData(editForm);
+      const payload={
+        first_name:(formData.get('first_name')||'').toString().trim(),
+        last_name:(formData.get('last_name')||'').toString().trim(),
+        email:(formData.get('email')||'').toString().trim(),
+        role:(formData.get('role')||'').toString(),
+      };
+      if(editSubmitButton){
+        editSubmitButton.disabled=true;
+        editSubmitButton.classList.add('opacity-75');
+      }
+      try{
+        const response=await fetch(editForm.dataset.updateUrl,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'X-CSRFToken':getCsrfToken(),
+          },
+          body:JSON.stringify(payload),
+        });
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok){
+          if(editError){
+            editError.textContent=formatErrors(data);
+            editError.classList.remove('hidden');
+          }
+          return;
+        }
+        window.location.href=setTeamTabUrl();
+      }catch(error){
+        console.error('Failed to update team member',error);
+        if(editError){
+          editError.textContent='Unable to update the team member. Please try again.';
+          editError.classList.remove('hidden');
+        }
+      }finally{
+        if(editSubmitButton){
+          editSubmitButton.disabled=false;
+          editSubmitButton.classList.remove('opacity-75');
+        }
+      }
+    });
+  }
+
   const deleteModal=document.getElementById('deleteMemberModal');
   const deleteSummary=document.getElementById('deleteMemberSummary');
   const deleteError=document.getElementById('deleteMemberError');
