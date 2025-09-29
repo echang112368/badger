@@ -124,18 +124,18 @@
                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
               </svg>
             </button>
-            <div class="grid w-full max-w-full grid-cols-1 gap-4 text-sm md:flex-1 md:grid-cols-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <p class="font-medium text-gray-700">Email</p>
-                <p class="font-mono text-gray-900 break-words">{{ new_team_credentials.email }}</p>
+                <p class="font-mono text-gray-900">{{ new_team_credentials.email }}</p>
               </div>
               <div>
                 <p class="font-medium text-gray-700">Password</p>
-                <p class="font-mono text-gray-900 break-words">{{ new_team_credentials.password }}</p>
+                <p class="font-mono text-gray-900">{{ new_team_credentials.password }}</p>
               </div>
               <div>
                 <p class="font-medium text-gray-700">Role</p>
-                <p class="text-gray-900 break-words">{{ new_team_credentials.role }}</p>
+                <p class="text-gray-900">{{ new_team_credentials.role }}</p>
               </div>
             </div>
           </div>
