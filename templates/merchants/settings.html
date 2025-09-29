@@ -343,6 +343,7 @@
           aria-labelledby="inviteModalTitle"
           aria-describedby="inviteModalDescription"
           data-modal-root
+          data-open-on-load="{% if current_tab == 'team' and team_form.errors %}true{% else %}false{% endif %}"
         >
           <div class="absolute inset-0 bg-gray-900/60" data-close-invite></div>
           <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
@@ -361,7 +362,7 @@
             <div class="space-y-4 px-6 py-5">
               <div>
                 <label class="block text-sm font-medium text-gray-700">First name</label>
-                <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
+                <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-invite-first-input {% if not permissions.can_invite_team %}disabled{% endif %} />
                 {% if team_form.first_name.errors %}
                 <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
                 {% endif %}
@@ -523,7 +524,7 @@
       return;
     }
     showModal(inviteModal);
-    const firstInput=inviteModal.querySelector('input[name="{{ team_form.first_name.html_name }}"]');
+    const firstInput=inviteModal.querySelector('[data-invite-first-input]');
     if(firstInput&&!firstInput.hasAttribute('disabled')){
       firstInput.focus();
     }
@@ -551,7 +552,7 @@
     });
   }
 
-  const shouldOpenInvite={% if current_tab == 'team' and team_form.errors %}true{% else %}false{% endif %};
+  const shouldOpenInvite=inviteModal&&inviteModal.dataset.openOnLoad==='true';
   if(shouldOpenInvite){
     openInvite();
   }
@@ -657,7 +658,6 @@
     }
   }
 
-  {% if permissions.can_invite_team %}
   const editModal=document.getElementById('editMemberModal');
   const editForm=document.getElementById('editMemberForm');
   const editError=document.getElementById('editMemberError');
@@ -801,9 +801,13 @@
       return;
     }
     deleteTarget={id:member.id,delete_url:deleteUrl};
-    deleteError.classList.add('hidden');
-    deleteError.textContent='';
-    deleteSummary.textContent=`Are you sure you want to remove ${member.full_name||member.email}?`;
+    if(deleteError){
+      deleteError.classList.add('hidden');
+      deleteError.textContent='';
+    }
+    if(deleteSummary){
+      deleteSummary.textContent=`Are you sure you want to remove ${member.full_name||member.email}?`;
+    }
     showModal(deleteModal);
   }
 
@@ -852,20 +856,23 @@
         });
         const data=await response.json().catch(()=>({}));
         if(!response.ok){
-          deleteError.textContent=formatErrors(data);
-          deleteError.classList.remove('hidden');
+          if(deleteError){
+            deleteError.textContent=formatErrors(data);
+            deleteError.classList.remove('hidden');
+          }
           return;
         }
         window.location.href=setTeamTabUrl();
       }catch(error){
         console.error('Failed to remove team member',error);
-        deleteError.textContent='Unable to remove the team member. Please try again.';
-        deleteError.classList.remove('hidden');
+        if(deleteError){
+          deleteError.textContent='Unable to remove the team member. Please try again.';
+          deleteError.classList.remove('hidden');
+        }
       }
     });
   }
 
-  {% endif %}
 </script>
 {% endwith %}
 {% endblock %}
