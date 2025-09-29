@@ -199,11 +199,35 @@
                       data-edit-member
                       data-member-id="{{ member.id }}"
                       data-update-url="{% url 'update_team_member' member.id %}"
+                      data-member-first-name="{{ member.user.first_name|default_if_none:'' }}"
+                      data-member-last-name="{{ member.user.last_name|default_if_none:'' }}"
+                      data-member-email="{{ member.user.email|default_if_none:'' }}"
+                      data-member-full-name="{{ member.user.get_full_name|default:member.user.username }}"
+                      data-member-role="{{ member.role }}"
+                      data-member-role-label="{{ member.get_role_display }}"
+                      data-member-status="{% if member.user.is_active %}active{% else %}inactive{% endif %}"
+                      data-member-is-superuser="{% if member.role == team_roles.SUPERUSER %}true{% else %}false{% endif %}"
                     >
                       Edit
                     </button>
                     {% if member.user != request.user %}
-                    <button type="button" class="text-sm font-medium text-rose-600 transition hover:text-rose-700" data-remove-member data-member-id="{{ member.id }}" data-delete-url="{% url 'delete_team_member' member.id %}">Remove</button>
+                    <button
+                      type="button"
+                      class="text-sm font-medium text-rose-600 transition hover:text-rose-700"
+                      data-remove-member
+                      data-member-id="{{ member.id }}"
+                      data-delete-url="{% url 'delete_team_member' member.id %}"
+                      data-member-first-name="{{ member.user.first_name|default_if_none:'' }}"
+                      data-member-last-name="{{ member.user.last_name|default_if_none:'' }}"
+                      data-member-email="{{ member.user.email|default_if_none:'' }}"
+                      data-member-full-name="{{ member.user.get_full_name|default:member.user.username }}"
+                      data-member-role="{{ member.role }}"
+                      data-member-role-label="{{ member.get_role_display }}"
+                      data-member-status="{% if member.user.is_active %}active{% else %}inactive{% endif %}"
+                      data-member-is-superuser="{% if member.role == team_roles.SUPERUSER %}true{% else %}false{% endif %}"
+                    >
+                      Remove
+                    </button>
                     {% endif %}
                   </div>
                   {% endif %}
@@ -542,13 +566,44 @@
   const teamMemberMap={};
   if(teamMembersElement){
     try{
-      const parsed=JSON.parse(teamMembersElement.textContent);
-      parsed.forEach(member=>{
-        teamMemberMap[member.id]=member;
-      });
+      const rawTeamMembers=(teamMembersElement.textContent||'').trim();
+      if(rawTeamMembers){
+        const parsed=JSON.parse(rawTeamMembers);
+        parsed.forEach(member=>{
+          if(member&&typeof member.id!=='undefined'){
+            teamMemberMap[member.id]=member;
+          }
+        });
+      }
     }catch(error){
       console.error('Failed to parse team member data',error);
     }
+  }
+
+  function getMemberData(element){
+    if(!element){
+      return null;
+    }
+    const memberId=parseInt(element.dataset.memberId||'',10);
+    if(Number.isNaN(memberId)){
+      return null;
+    }
+    const fallback=teamMemberMap[memberId]||{};
+    const dataset=element.dataset||{};
+    const superValue=typeof dataset.memberIsSuperuser==='string'?dataset.memberIsSuperuser.toLowerCase():undefined;
+    return {
+      id:memberId,
+      first_name:dataset.memberFirstName||fallback.first_name||'',
+      last_name:dataset.memberLastName||fallback.last_name||'',
+      email:dataset.memberEmail||fallback.email||'',
+      full_name:dataset.memberFullName||fallback.full_name||'',
+      role:dataset.memberRole||fallback.role||'',
+      role_label:dataset.memberRoleLabel||fallback.role_label||'',
+      status:dataset.memberStatus||fallback.status||'',
+      is_superuser:superValue==='true'?true:superValue==='false'?false:Boolean(fallback.is_superuser),
+      update_url:dataset.updateUrl||fallback.update_url||'',
+      delete_url:dataset.deleteUrl||fallback.delete_url||'',
+    };
   }
 
   function setTeamTabUrl(){
@@ -674,19 +729,14 @@
 
   document.querySelectorAll('[data-edit-member]').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      const memberId=parseInt(btn.dataset.memberId||'',10);
-      if(Number.isNaN(memberId)){
-        return;
-      }
-      const member=teamMemberMap[memberId];
+      const member=getMemberData(btn);
       if(!member||member.is_superuser){
         return;
       }
-      const updateUrl=btn.dataset.updateUrl||member.update_url||'';
-      if(!updateUrl){
+      if(!member.update_url){
         return;
       }
-      openEditModal(member,updateUrl);
+      openEditModal(member,member.update_url);
     });
   });
 
@@ -778,15 +828,11 @@
 
   document.querySelectorAll('[data-remove-member]').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      const memberId=parseInt(btn.dataset.memberId||'',10);
-      if(Number.isNaN(memberId)){
+      const member=getMemberData(btn);
+      if(!member||!member.delete_url){
         return;
       }
-      const member=teamMemberMap[memberId];
-      if(!member){
-        return;
-      }
-      openDeleteModal(member,btn.dataset.deleteUrl);
+      openDeleteModal(member,member.delete_url);
     });
   });
 
