@@ -12,7 +12,10 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
         <!-- Primary action -->
         <div class="flex flex-wrap items-center gap-2">
-            <button type="button" class="bg-blue-600 text-white px-4 py-2 rounded-md" data-bs-toggle="modal" data-bs-target="#addCreatorModal">Add New Creator</button>
+            <button type="button"
+                class="{% if permissions.can_modify_content %}bg-blue-600 text-white{% else %}bg-gray-300 text-gray-600 cursor-not-allowed{% endif %} px-4 py-2 rounded-md"
+                data-bs-toggle="modal" data-bs-target="#addCreatorModal"
+                {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Add New Creator</button>
         </div>
 
         <!-- Search bar -->
@@ -20,6 +23,10 @@
             <input type="text" placeholder="Search by name or email" class="w-full border border-gray-300 rounded-md px-3 py-2" />
         </div>
     </div>
+
+    {% if not permissions.can_modify_content %}
+    <div class="alert alert-info">You can browse creator performance but do not have permission to make changes.</div>
+    {% endif %}
 
     <!-- Tabs and bulk actions -->
     <div class="border-b border-gray-200 mb-4 flex items-center justify-between">
@@ -55,7 +62,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" /></th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Total Earnings</th>
@@ -69,7 +76,7 @@
                 <tbody>
                     {% for creator in active_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ creator.total_earnings|floatformat:2 }}</td>
@@ -95,7 +102,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" /></th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
                         <th class="text-right p-3">Total Earnings</th>
@@ -107,7 +114,7 @@
                 <tbody>
                     {% for creator in inactive_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                         <td class="p-3 text-right">${{ creator.total_earnings|floatformat:2 }}</td>
@@ -131,7 +138,7 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
-                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="pending" /></th>
+                        <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="pending" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
                     </tr>
@@ -139,7 +146,7 @@
                 <tbody>
                     {% for creator in pending_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" /></td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                     </tr>
@@ -162,6 +169,13 @@
             const activateForm = document.getElementById('bulk-activate-form');
             const deactivateForm = document.getElementById('bulk-deactivate-form');
             const deleteForm = document.getElementById('bulk-delete-form');
+            const canModify = {{ permissions.can_modify_content|yesno:"true,false" }};
+
+            if (!canModify) {
+                bulkToggle.disabled = true;
+                bulkToggle.classList.add('cursor-not-allowed', 'text-gray-400');
+                return;
+            }
             let currentTab = 'active';
 
             function updateBulkToggleState() {
@@ -232,6 +246,7 @@
 </section>
 
 <!-- Add Creator Modal -->
+{% if permissions.can_modify_content %}
 <div class="modal fade" id="addCreatorModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -253,4 +268,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

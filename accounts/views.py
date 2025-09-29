@@ -6,6 +6,7 @@ from .forms import (
     CreatorSignUpForm,
     UserSignUpForm,
 )
+from merchants.models import MerchantTeamMember
 
 def custom_login_view(request):
     if request.method == 'POST':
@@ -14,7 +15,11 @@ def custom_login_view(request):
             user = form.get_user()
             login(request, user)
 
-            if user.is_merchant:
+            membership = getattr(user, "merchant_team_membership", None)
+            if membership is None:
+                membership = MerchantTeamMember.objects.filter(user=user).first()
+
+            if user.is_merchant or membership:
                 return redirect('merchant_dashboard')
             elif user.is_creator:
                 return redirect('creator_earnings')

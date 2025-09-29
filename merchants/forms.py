@@ -1,6 +1,30 @@
 from django import forms
 from django.db.models import Q
-from .models import MerchantItem, MerchantMeta, ItemGroup
+from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
+from django.utils.text import slugify
+
+
+class TeamMemberCreateForm(forms.Form):
+    first_name = forms.CharField(max_length=150)
+    last_name = forms.CharField(max_length=150)
+    role = forms.ChoiceField(
+        choices=[
+            (MerchantTeamMember.Role.ADMIN, "Admin"),
+            (MerchantTeamMember.Role.MEMBER, "Member"),
+            (MerchantTeamMember.Role.VIEWER, "Viewer"),
+        ]
+    )
+
+    def generate_username(self, merchant):
+        base = slugify(f"{self.cleaned_data['first_name']} {self.cleaned_data['last_name']}") or "team"
+        username = base
+        counter = 1
+        from accounts.models import CustomUser
+
+        while CustomUser.objects.filter(username=username).exists():
+            counter += 1
+            username = f"{base}-{counter}"
+        return username
 
 
 class MerchantItemForm(forms.ModelForm):
