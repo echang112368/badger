@@ -1,9 +1,7 @@
 from decimal import Decimal, ROUND_HALF_UP
-import json
 import secrets
 
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
 from django.db.models import Sum, Count
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -18,7 +16,6 @@ from .forms import (
     MerchantSettingsForm,
     ItemGroupForm,
     TeamMemberCreateForm,
-    TeamMemberUpdateForm,
 )
 from accounts.forms import UserNameForm
 from accounts.models import CustomUser
@@ -553,7 +550,6 @@ def merchant_settings(request):
             "role_label": member.get_role_display(),
             "status": "active" if member.user.is_active else "inactive",
             "is_superuser": member.role == MerchantTeamMember.Role.SUPERUSER,
-            "update_url": reverse("update_team_member", args=[member.id]),
             "delete_url": reverse("delete_team_member", args=[member.id]),
         }
         for member in team_members
@@ -634,53 +630,6 @@ def merchant_settings(request):
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
     })
-
-
-@login_required
-@require_POST
-def update_team_member(request, member_id: int):
-    permissions = resolve_merchant_permissions(request.user)
-    if not permissions.can_invite_team or not permissions.merchant:
-        return JsonResponse({"error": "You do not have permission to update team members."}, status=403)
-
-    membership = get_object_or_404(
-        MerchantTeamMember,
-        pk=member_id,
-        merchant=permissions.merchant,
-    )
-
-    try:
-        payload = json.loads(request.body.decode() or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid payload."}, status=400)
-
-    form = TeamMemberUpdateForm(payload, member=membership)
-    if not form.is_valid():
-        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
-
-    cleaned = form.cleaned_data
-    user = membership.user
-
-    with transaction.atomic():
-        user.first_name = cleaned.get("first_name", "")
-        user.last_name = cleaned.get("last_name", "")
-        user.email = cleaned["email"]
-
-        role = membership.role
-        is_active = user.is_active
-
-        if membership.role != MerchantTeamMember.Role.SUPERUSER:
-            role = cleaned["role"]
-            is_active = cleaned["status"] == "active"
-
-        user.is_active = is_active
-        user.save(update_fields=["first_name", "last_name", "email", "is_active"])
-
-        if membership.role != role:
-            membership.role = role
-            membership.save(update_fields=["role"])
-
-    return JsonResponse({"success": True})
 
 
 @login_required
