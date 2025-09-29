@@ -16,7 +16,12 @@
       <button data-tab="billing" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'billing' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Billing</button>
       <button data-tab="notifications" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'notifications' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Notifications</button>
       <button data-tab="integrations" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'integrations' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Integrations</button>
+      {% if permissions.can_view_team %}
+      <button data-tab="team" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'team' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">Team</button>
+      {% endif %}
+      {% if permissions.can_manage_api %}
       <button data-tab="api" class="whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium hover:text-gray-700 {% if current_tab == 'api' %}border-indigo-500 text-indigo-600{% else %}border-transparent text-gray-500{% endif %}">API</button>
+      {% endif %}
     </nav>
   </div>
   <form id="settingsForm" method="post" action="{% url 'merchant_settings' %}" class="space-y-8">
@@ -29,7 +34,7 @@
         <div class="grid gap-6">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
-            <input type="text" name="company_name" value="{{ settings_form.company_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" name="company_name" value="{{ settings_form.company_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Merchant UUID</label>
@@ -38,22 +43,22 @@
           <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input type="text" name="first_name" value="{{ user_form.first_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="text" name="first_name" value="{{ user_form.first_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input type="text" name="last_name" value="{{ user_form.last_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input type="text" name="last_name" value="{{ user_form.last_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
             </div>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input type="email" name="email" value="{{ merchant.email }}" placeholder="example@email.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" name="email" value="{{ merchant.email }}" placeholder="example@email.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <div class="relative">
-              <input type="password" name="password" id="password" value="{{ merchant.password }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <input type="password" name="password" id="password" value="{{ merchant.password }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
+              <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500" {% if not permissions.can_edit_settings %}disabled{% endif %}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -71,7 +76,7 @@
         <div class="grid gap-6">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">PayPal Email</label>
-            <input type="email" name="paypal_email" value="{{ settings_form.paypal_email.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" name="paypal_email" value="{{ settings_form.paypal_email.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
           </div>
         </div>
       </div>
@@ -88,6 +93,148 @@
         <p class="text-sm text-gray-500">No integration settings available.</p>
       </div>
     </div>
+    {% if permissions.can_view_team %}
+    <div id="tab-team"{% if current_tab != 'team' %} class="hidden"{% endif %}>
+      <div class="bg-white shadow-sm rounded-lg p-6 space-y-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Team</h2>
+            <p class="text-sm text-gray-500">Manage who can access this merchant dashboard.</p>
+          </div>
+          {% if permissions.can_invite_team %}
+          <button type="submit" name="team_submit" value="1" class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add User
+          </button>
+          {% endif %}
+        </div>
+
+        {% if new_team_credentials %}
+        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p class="text-sm font-semibold text-emerald-700">New teammate added</p>
+              <p class="text-sm text-emerald-700/80">Share these credentials securely with {{ new_team_credentials.name }}.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p class="font-medium text-gray-700">Email</p>
+                <p class="font-mono text-gray-900">{{ new_team_credentials.email }}</p>
+              </div>
+              <div>
+                <p class="font-medium text-gray-700">Password</p>
+                <p class="font-mono text-gray-900">{{ new_team_credentials.password }}</p>
+              </div>
+              <div>
+                <p class="font-medium text-gray-700">Role</p>
+                <p class="text-gray-900">{{ new_team_credentials.role }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="grid lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2">
+            <div class="overflow-hidden rounded-lg border border-gray-200">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Role</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Added</th>
+                    <th scope="col" class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  {% for member in team_members %}
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-4">
+                      <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full {% if member.role == team_roles.SUPERUSER %}bg-indigo-600 text-white{% else %}bg-indigo-50 text-indigo-600{% endif %} font-semibold">
+                          {% with member.user.first_name|default:member.user.username as display_name %}
+                          {{ display_name|slice:":1"|upper }}
+                          {% endwith %}
+                        </div>
+                        <div>
+                          <div class="text-sm font-medium text-gray-900">{{ member.user.get_full_name|default:member.user.username }}</div>
+                          <div class="text-sm text-gray-500">{{ member.user.email }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-4 py-4">
+                      <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold {% if member.role == team_roles.SUPERUSER %}bg-indigo-100 text-indigo-700{% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ member.get_role_display }}
+                        {% if member.role == team_roles.SUPERUSER %}
+                        <span class="text-[10px] uppercase tracking-wide">Owner</span>
+                        {% endif %}
+                      </span>
+                    </td>
+                    <td class="px-4 py-4 text-sm text-gray-500">{{ member.created_at|date:"M d, Y" }}</td>
+                    <td class="px-4 py-4 text-right text-sm">
+                      <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Active</span>
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">No team members yet.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div>
+              <h3 class="text-base font-semibold text-gray-900">Invite teammate</h3>
+              <p class="text-sm text-gray-500">Create a login that is linked to this merchant account.</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">First name</label>
+                <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
+                {% if team_form.first_name.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
+                {% endif %}
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Last name</label>
+                <input type="text" name="{{ team_form.last_name.html_name }}" value="{{ team_form.last_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
+                {% if team_form.last_name.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ team_form.last_name.errors.0 }}</p>
+                {% endif %}
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Role</label>
+                <select name="{{ team_form.role.html_name }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %}>
+                  {% for value,label in team_form.fields.role.choices %}
+                  <option value="{{ value }}" {% if team_form.role.value == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                {% if team_form.role.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ team_form.role.errors.0 }}</p>
+                {% endif %}
+              </div>
+            </div>
+            {% if team_form.non_field_errors %}
+            <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {% for error in team_form.non_field_errors %}
+              <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if permissions.can_invite_team %}
+            <button type="submit" name="team_submit" value="1" class="w-full rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Create Account</button>
+            {% else %}
+            <p class="text-sm text-gray-500">You do not have permission to invite teammates.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     <div id="tab-api"{% if current_tab != 'api' %} class="hidden"{% endif %}>
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">API</h2>
@@ -95,8 +242,8 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Shopify Admin API Access Token</label>
             <div class="relative">
-              <input type="password" name="shopify_access_token" id="shopify_access_token" value="{{ settings_form.shopify_access_token.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-              <button type="button" id="copyToken" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <input type="password" name="shopify_access_token" id="shopify_access_token" value="{{ settings_form.shopify_access_token.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_manage_api %}disabled{% endif %} />
+              <button type="button" id="copyToken" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500" {% if not permissions.can_manage_api %}disabled{% endif %}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h10a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6a2 2 0 012-2z" />
@@ -106,15 +253,17 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Shopify URL</label>
-            <input type="text" name="shopify_store_domain" value="{{ settings_form.shopify_store_domain.value|default_if_none:'' }}" placeholder="mystore.myshopify.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" name="shopify_store_domain" value="{{ settings_form.shopify_store_domain.value|default_if_none:'' }}" placeholder="mystore.myshopify.com" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_manage_api %}disabled{% endif %} />
           </div>
         </div>
       </div>
     </div>
   </form>
+  {% if permissions.can_edit_settings and current_tab != 'team' %}
   <div class="fixed bottom-6 right-6">
     <button type="submit" form="settingsForm" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Save Changes</button>
   </div>
+  {% endif %}
 </div>
 <script>
   const tabs=document.querySelectorAll('#settingsTabs button');
@@ -158,13 +307,13 @@
 
   const togglePassword=document.getElementById('togglePassword');
   const password=document.getElementById('password');
-  if(togglePassword&&password){
+  if(togglePassword&&password&&!togglePassword.hasAttribute('disabled')){
     togglePassword.addEventListener('click',()=>{
       password.type=password.type==='password'?'text':'password';
     });
   }
   const copyBtn=document.getElementById('copyToken');
-  if(copyBtn){
+  if(copyBtn&&!copyBtn.hasAttribute('disabled')){
     copyBtn.addEventListener('click',()=>{
       const token=document.getElementById('shopify_access_token');
       navigator.clipboard.writeText(token.value);
