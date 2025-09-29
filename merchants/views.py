@@ -1,9 +1,11 @@
 from decimal import Decimal, ROUND_HALF_UP
+import json
 import secrets
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Sum, Count
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from links.models import (
     MerchantCreatorLink,
@@ -12,7 +14,12 @@ from links.models import (
     STATUS_INACTIVE,
 )
 from creators.models import CreatorMeta
-from .forms import MerchantSettingsForm, ItemGroupForm, TeamMemberCreateForm
+from .forms import (
+    MerchantSettingsForm,
+    ItemGroupForm,
+    TeamMemberCreateForm,
+    TeamMemberUpdateForm,
+)
 from accounts.forms import UserNameForm
 from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
@@ -20,7 +27,7 @@ from shopify_app.shopify_client import ShopifyClient
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse
 from django.urls import reverse
 from typing import Optional
@@ -530,11 +537,27 @@ def merchant_settings(request):
     merchant_user = permissions.merchant
     merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
 
-    team_members = (
+    team_members = list(
         MerchantTeamMember.objects.filter(merchant=merchant_user)
         .select_related("user")
         .order_by("-created_at")
     )
+    team_members_payload = [
+        {
+            "id": member.id,
+            "first_name": member.user.first_name,
+            "last_name": member.user.last_name,
+            "email": member.user.email,
+            "full_name": member.user.get_full_name() or member.user.username,
+            "role": member.role,
+            "role_label": member.get_role_display(),
+            "status": "active" if member.user.is_active else "inactive",
+            "is_superuser": member.role == MerchantTeamMember.Role.SUPERUSER,
+            "update_url": reverse("update_team_member", args=[member.id]),
+            "delete_url": reverse("delete_team_member", args=[member.id]),
+        }
+        for member in team_members
+    ]
     stored_credentials = request.session.pop("team_credentials", None)
 
     form = MerchantSettingsForm(instance=merchant_meta)
@@ -609,4 +632,76 @@ def merchant_settings(request):
         'active_tab': active_tab,
         'permissions': permissions,
         'team_roles': MerchantTeamMember.Role,
+        'team_members_payload': team_members_payload,
     })
+
+
+@login_required
+@require_POST
+def update_team_member(request, member_id: int):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_invite_team or not permissions.merchant:
+        return JsonResponse({"error": "You do not have permission to update team members."}, status=403)
+
+    membership = get_object_or_404(
+        MerchantTeamMember,
+        pk=member_id,
+        merchant=permissions.merchant,
+    )
+
+    try:
+        payload = json.loads(request.body.decode() or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid payload."}, status=400)
+
+    form = TeamMemberUpdateForm(payload, member=membership)
+    if not form.is_valid():
+        return JsonResponse({"errors": form.errors.get_json_data()}, status=400)
+
+    cleaned = form.cleaned_data
+    user = membership.user
+
+    with transaction.atomic():
+        user.first_name = cleaned.get("first_name", "")
+        user.last_name = cleaned.get("last_name", "")
+        user.email = cleaned["email"]
+
+        role = membership.role
+        is_active = user.is_active
+
+        if membership.role != MerchantTeamMember.Role.SUPERUSER:
+            role = cleaned["role"]
+            is_active = cleaned["status"] == "active"
+
+        user.is_active = is_active
+        user.save(update_fields=["first_name", "last_name", "email", "is_active"])
+
+        if membership.role != role:
+            membership.role = role
+            membership.save(update_fields=["role"])
+
+    return JsonResponse({"success": True})
+
+
+@login_required
+@require_POST
+def delete_team_member(request, member_id: int):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_invite_team or not permissions.merchant:
+        return JsonResponse({"error": "You do not have permission to remove team members."}, status=403)
+
+    membership = get_object_or_404(
+        MerchantTeamMember,
+        pk=member_id,
+        merchant=permissions.merchant,
+    )
+
+    if membership.role == MerchantTeamMember.Role.SUPERUSER:
+        return JsonResponse({"error": "The account owner cannot be removed."}, status=400)
+
+    if membership.user_id == request.user.id:
+        return JsonResponse({"error": "You cannot remove your own account."}, status=400)
+
+    membership.user.delete()
+
+    return JsonResponse({"success": True})

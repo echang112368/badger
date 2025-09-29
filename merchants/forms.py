@@ -36,6 +36,79 @@ class TeamMemberCreateForm(forms.Form):
         return email
 
 
+class TeamMemberUpdateForm(forms.Form):
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    email = forms.EmailField()
+    role = forms.ChoiceField(
+        choices=[
+            (MerchantTeamMember.Role.ADMIN, "Admin"),
+            (MerchantTeamMember.Role.MEMBER, "Member"),
+            (MerchantTeamMember.Role.VIEWER, "Viewer"),
+        ],
+        required=False,
+    )
+    status = forms.ChoiceField(
+        choices=[
+            ("active", "Active"),
+            ("inactive", "Inactive"),
+        ],
+        required=False,
+    )
+
+    def __init__(self, *args, member=None, **kwargs):
+        self.member = member
+        super().__init__(*args, **kwargs)
+        if member and member.role == MerchantTeamMember.Role.SUPERUSER:
+            self.fields["role"].disabled = True
+            self.fields["status"].disabled = True
+
+    def clean_first_name(self):
+        return self.cleaned_data.get("first_name", "").strip()
+
+    def clean_last_name(self):
+        return self.cleaned_data.get("last_name", "").strip()
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        from accounts.models import CustomUser
+
+        if self.member is None:
+            return email
+
+        existing = (
+            CustomUser.objects.filter(email__iexact=email)
+            .exclude(pk=self.member.user_id)
+            .exists()
+        )
+        if existing:
+            raise forms.ValidationError("A user with this email already exists.")
+        return email
+
+    def clean_role(self):
+        if self.member and self.member.role == MerchantTeamMember.Role.SUPERUSER:
+            return self.member.role
+
+        role = self.cleaned_data.get("role")
+        valid_roles = {
+            MerchantTeamMember.Role.ADMIN,
+            MerchantTeamMember.Role.MEMBER,
+            MerchantTeamMember.Role.VIEWER,
+        }
+        if role not in valid_roles:
+            raise forms.ValidationError("Invalid role selection.")
+        return role
+
+    def clean_status(self):
+        if self.member and self.member.role == MerchantTeamMember.Role.SUPERUSER:
+            return "active"
+
+        status = self.cleaned_data.get("status") or "active"
+        if status not in {"active", "inactive"}:
+            raise forms.ValidationError("Invalid status selection.")
+        return status
+
+
 class MerchantItemForm(forms.ModelForm):
     class Meta:
         model = MerchantItem
