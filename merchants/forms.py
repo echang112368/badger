@@ -36,6 +36,34 @@ class TeamMemberCreateForm(forms.Form):
         return email
 
 
+class TeamMemberUpdateForm(forms.Form):
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    email = forms.EmailField()
+    role = forms.ChoiceField(
+        choices=[
+            (MerchantTeamMember.Role.ADMIN, "Admin"),
+            (MerchantTeamMember.Role.MEMBER, "Member"),
+            (MerchantTeamMember.Role.VIEWER, "Viewer"),
+        ]
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        from accounts.models import CustomUser
+
+        qs = CustomUser.objects.filter(email__iexact=email)
+        if self.user is not None:
+            qs = qs.exclude(pk=self.user.pk)
+        if qs.exists():
+            raise forms.ValidationError("A user with this email already exists.")
+        return email
+
+
 class MerchantItemForm(forms.ModelForm):
     class Meta:
         model = MerchantItem
