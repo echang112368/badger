@@ -66,7 +66,7 @@ def _generate_team_email(merchant: CustomUser, username: str) -> str:
 
 def _create_team_member_account(merchant: CustomUser, form: TeamMemberCreateForm):
     username = form.generate_username(merchant)
-    email = _generate_team_email(merchant, username)
+    email = form.cleaned_data["email"] or _generate_team_email(merchant, username)
     password = secrets.token_urlsafe(12)
     user = CustomUser.objects.create_user(
         username=username,
