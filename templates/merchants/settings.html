@@ -189,12 +189,9 @@
                 </td>
                 {% if permissions.can_invite_team %}
                 <td class="px-4 py-4 text-right text-sm">
-                  <div class="flex items-center justify-end gap-3">
-                    <button type="button" class="text-sm font-medium text-indigo-600 transition hover:text-indigo-800" data-edit-member data-member-id="{{ member.id }}" data-update-url="{% url 'update_team_member' member.id %}" data-delete-url="{% url 'delete_team_member' member.id %}">Edit</button>
-                    {% if member.role != team_roles.SUPERUSER and member.user != request.user %}
-                    <button type="button" class="text-sm font-medium text-rose-600 transition hover:text-rose-700" data-remove-member data-member-id="{{ member.id }}" data-delete-url="{% url 'delete_team_member' member.id %}">Remove</button>
-                    {% endif %}
-                  </div>
+                  {% if member.role != team_roles.SUPERUSER and member.user != request.user %}
+                  <button type="button" class="text-sm font-medium text-rose-600 transition hover:text-rose-700" data-remove-member data-member-id="{{ member.id }}" data-delete-url="{% url 'delete_team_member' member.id %}">Remove</button>
+                  {% endif %}
                 </td>
                 {% endif %}
               </tr>
@@ -208,90 +205,6 @@
         </div>
 
         {% if permissions.can_invite_team %}
-        <div
-          id="editMemberModal"
-          class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="editMemberModalTitle"
-          aria-describedby="editMemberModalDescription"
-          data-modal-root
-        >
-          <div class="absolute inset-0 bg-gray-900/60" data-close-edit></div>
-          <form id="editMemberForm" class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
-              <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
-                <div>
-                  <h3 id="editMemberModalTitle" class="text-lg font-semibold text-gray-900">Edit team member</h3>
-                  <p id="editMemberModalDescription" class="mt-1 text-sm text-gray-500">Update member details, role, or status.</p>
-                </div>
-                <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-edit>
-                  <span class="sr-only">Close</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-              <div class="space-y-4 px-6 py-5">
-                <div id="editMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700" for="editMemberFirstName">First name</label>
-                  <input
-                    type="text"
-                    id="editMemberFirstName"
-                    name="first_name"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700" for="editMemberLastName">Last name</label>
-                  <input
-                    type="text"
-                    id="editMemberLastName"
-                    name="last_name"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700" for="editMemberEmail">Email</label>
-                  <input
-                    type="email"
-                    id="editMemberEmail"
-                    name="email"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                <div id="editMemberRoleRow">
-                  <label class="block text-sm font-medium text-gray-700" for="editMemberRole">Role</label>
-                  <select
-                    id="editMemberRole"
-                    name="role"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="{{ team_roles.ADMIN }}">{{ team_roles.ADMIN.label }}</option>
-                    <option value="{{ team_roles.MEMBER }}">{{ team_roles.MEMBER.label }}</option>
-                    <option value="{{ team_roles.VIEWER }}">{{ team_roles.VIEWER.label }}</option>
-                  </select>
-                </div>
-                <div id="editMemberStatusRow">
-                  <label class="block text-sm font-medium text-gray-700" for="editMemberStatus">Status</label>
-                  <select
-                    id="editMemberStatus"
-                    name="status"
-                    class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-              <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-                <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-edit>Cancel</button>
-                <button type="submit" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Save changes</button>
-              </div>
-          </form>
-        </div>
-
         <div
           id="deleteMemberModal"
           class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
@@ -620,127 +533,6 @@
   }
 
   {% if permissions.can_invite_team %}
-  const editModal=document.getElementById('editMemberModal');
-  const editForm=document.getElementById('editMemberForm');
-  const editError=document.getElementById('editMemberError');
-  const editFirstName=document.getElementById('editMemberFirstName');
-  const editLastName=document.getElementById('editMemberLastName');
-  const editEmail=document.getElementById('editMemberEmail');
-  const editRole=document.getElementById('editMemberRole');
-  const editRoleRow=document.getElementById('editMemberRoleRow');
-  const editStatus=document.getElementById('editMemberStatus');
-  const editStatusRow=document.getElementById('editMemberStatusRow');
-  let activeMember=null;
-
-  function openEditModal(member,urls){
-    if(!editModal){
-      return;
-    }
-    activeMember={...member,...urls};
-    editFirstName.value=member.first_name||'';
-    editLastName.value=member.last_name||'';
-    editEmail.value=member.email||'';
-    editError.classList.add('hidden');
-    editError.textContent='';
-
-    if(member.is_superuser){
-      editRoleRow.classList.add('hidden');
-      editStatusRow.classList.add('hidden');
-    }else{
-      editRoleRow.classList.remove('hidden');
-      editStatusRow.classList.remove('hidden');
-      editRole.value=member.role;
-      editStatus.value=member.status;
-    }
-
-    showModal(editModal);
-    editFirstName.focus();
-  }
-
-  function closeEditModal(){
-    if(!editModal){
-      return;
-    }
-    hideModal(editModal);
-    activeMember=null;
-  }
-
-  if(editModal){
-    editModal.querySelectorAll('[data-close-edit]').forEach(btn=>{
-      btn.addEventListener('click',closeEditModal);
-    });
-    document.addEventListener('keydown',event=>{
-      if(event.key==='Escape'&&!editModal.classList.contains('hidden')){
-        closeEditModal();
-      }
-    });
-  }
-
-  document.querySelectorAll('[data-edit-member]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const memberId=parseInt(btn.dataset.memberId||'',10);
-      if(Number.isNaN(memberId)){
-        return;
-      }
-      const member=teamMemberMap[memberId];
-      if(!member){
-        return;
-      }
-      openEditModal(member,{update_url:btn.dataset.updateUrl,delete_url:btn.dataset.deleteUrl});
-    });
-  });
-
-  if(editForm){
-    editForm.addEventListener('submit',async event=>{
-      event.preventDefault();
-      if(!activeMember||!activeMember.update_url){
-        return;
-      }
-      const submitButton=editForm.querySelector('button[type="submit"]');
-      const originalButtonText=submitButton?submitButton.textContent:null;
-      if(submitButton){
-        submitButton.disabled=true;
-        submitButton.textContent='Saving...';
-      }
-      const payload={
-        first_name:editFirstName.value.trim(),
-        last_name:editLastName.value.trim(),
-        email:editEmail.value.trim(),
-      };
-      if(!activeMember.is_superuser){
-        payload.role=editRole.value;
-        payload.status=editStatus.value;
-      }
-
-      try{
-        const response=await fetch(activeMember.update_url,{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-CSRFToken':getCsrfToken(),
-          },
-          body:JSON.stringify(payload),
-        });
-        const data=await response.json().catch(()=>({}));
-        if(!response.ok){
-          editError.textContent=formatErrors(data);
-          editError.classList.remove('hidden');
-          return;
-        }
-        window.location.href=setTeamTabUrl();
-      }catch(error){
-        console.error('Failed to update team member',error);
-        editError.textContent='Unable to update the team member. Please try again.';
-        editError.classList.remove('hidden');
-      }finally{
-        if(submitButton){
-          submitButton.disabled=false;
-          submitButton.textContent=originalButtonText;
-        }
-      }
-    });
-  }
-
   const deleteModal=document.getElementById('deleteMemberModal');
   const deleteSummary=document.getElementById('deleteMemberSummary');
   const deleteError=document.getElementById('deleteMemberError');
@@ -820,16 +612,6 @@
     });
   }
 
-  document.addEventListener('keydown',event=>{
-    if(event.key==='Escape'){
-      if(editModal&&!editModal.classList.contains('hidden')){
-        closeEditModal();
-      }
-      if(deleteModal&&!deleteModal.classList.contains('hidden')){
-        closeDeleteModal();
-      }
-    }
-  });
   {% endif %}
 </script>
 {% endwith %}
