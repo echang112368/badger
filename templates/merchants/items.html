@@ -154,26 +154,37 @@
 {% endif %}
 
 <script>
-if (document.getElementById('item-search')) {
-    document.getElementById('item-search').addEventListener('input', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    var itemSearchInput = document.getElementById('item-search');
+    if (!itemSearchInput) {
+        return;
+    }
+
+    var groupModalElement = document.getElementById('groupModal');
+    var deleteGroupModalElement = document.getElementById('deleteGroupModal');
+
+    itemSearchInput.addEventListener('input', function () {
         var filter = this.value.toLowerCase();
-        document.querySelectorAll('#items-container .form-check').forEach(function(el) {
+        document.querySelectorAll('#items-container .form-check').forEach(function (el) {
             var text = el.innerText.toLowerCase();
             el.style.display = text.indexOf(filter) > -1 ? '' : 'none';
         });
     });
 
-    document.querySelectorAll('.edit-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(event) {
-            var modal = document.getElementById('groupModal');
-            modal.querySelector('#groupModalLabel').textContent = 'Edit Group';
+    document.querySelectorAll('.edit-group-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!groupModalElement) {
+                return;
+            }
+
+            groupModalElement.querySelector('#groupModalLabel').textContent = 'Edit Group';
             var groupId = this.getAttribute('data-group-id');
-            modal.querySelector('#group-id').value = groupId;
-            modal.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
-            modal.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
-            modal.querySelector('#group-error').innerHTML = '';
+            groupModalElement.querySelector('#group-id').value = groupId;
+            groupModalElement.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
+            groupModalElement.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
+            groupModalElement.querySelector('#group-error').innerHTML = '';
             var items = this.getAttribute('data-group-items').split(',');
-            modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
+            groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
                 cb.checked = items.includes(cb.value);
                 var existingGroupId = cb.getAttribute('data-existing-group-id');
                 cb.disabled = existingGroupId && existingGroupId !== groupId;
@@ -181,44 +192,55 @@ if (document.getElementById('item-search')) {
         });
     });
 
-    document.getElementById('create-group-btn').addEventListener('click', function() {
-        var modal = document.getElementById('groupModal');
-        modal.querySelector('#groupModalLabel').textContent = 'Create Group';
-        modal.querySelector('#group-id').value = '';
-        modal.querySelector('#id_group-name').value = '';
-        modal.querySelector('#id_group-affiliate_percent').value = '';
-        modal.querySelector('#group-error').innerHTML = '';
-        modal.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
-            cb.checked = false;
-            cb.disabled = cb.getAttribute('data-existing-group-id') !== '';
-        });
-        document.getElementById('item-search').value = '';
-        document.querySelectorAll('#items-container .form-check').forEach(function(el){
-            el.style.display = '';
-        });
-    });
+    var createGroupButton = document.getElementById('create-group-btn');
+    if (createGroupButton) {
+        createGroupButton.addEventListener('click', function () {
+            if (!groupModalElement) {
+                return;
+            }
 
-    document.querySelectorAll('.delete-group-btn').forEach(function(btn){
-        btn.addEventListener('click', function(){
-            var modal = document.getElementById('deleteGroupModal');
-            modal.querySelector('#delete-group-id').value = this.getAttribute('data-group-id');
+            groupModalElement.querySelector('#groupModalLabel').textContent = 'Create Group';
+            groupModalElement.querySelector('#group-id').value = '';
+            groupModalElement.querySelector('#id_group-name').value = '';
+            groupModalElement.querySelector('#id_group-affiliate_percent').value = '';
+            groupModalElement.querySelector('#group-error').innerHTML = '';
+            groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
+                cb.checked = false;
+                cb.disabled = cb.getAttribute('data-existing-group-id') !== '';
+            });
+            itemSearchInput.value = '';
+            document.querySelectorAll('#items-container .form-check').forEach(function (el) {
+                el.style.display = '';
+            });
+        });
+    }
+
+    document.querySelectorAll('.delete-group-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!deleteGroupModalElement) {
+                return;
+            }
+
+            deleteGroupModalElement.querySelector('#delete-group-id').value = this.getAttribute('data-group-id');
         });
     });
 
     {% if group_modal_open %}
-    var modal = new bootstrap.Modal(document.getElementById('groupModal'));
-    modal.show();
-    var currentGroupId = '{{ group_form.instance.pk|default:"" }}';
-    document.querySelectorAll('#items-container input[type=checkbox]').forEach(function(cb){
-        var existingGroupId = cb.getAttribute('data-existing-group-id');
-        if (currentGroupId) {
-            cb.disabled = existingGroupId && existingGroupId !== currentGroupId;
-        } else {
-            cb.disabled = existingGroupId !== '';
-        }
-    });
+    if (groupModalElement) {
+        var bootstrapModal = new bootstrap.Modal(groupModalElement);
+        bootstrapModal.show();
+        var currentGroupId = '{{ group_form.instance.pk|default:"" }}';
+        groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
+            var existingGroupId = cb.getAttribute('data-existing-group-id');
+            if (currentGroupId) {
+                cb.disabled = existingGroupId && existingGroupId !== currentGroupId;
+            } else {
+                cb.disabled = existingGroupId !== '';
+            }
+        });
+    }
     {% endif %}
-}
+});
 </script>
 {% endblock %}
 
