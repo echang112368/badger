@@ -183,11 +183,14 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
             groupModalElement.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
             groupModalElement.querySelector('#group-error').innerHTML = '';
-            var items = this.getAttribute('data-group-items').split(',');
+            var itemsAttr = this.getAttribute('data-group-items') || '';
+            var items = itemsAttr ? itemsAttr.split(',').filter(function (value) {
+                return value.trim() !== '';
+            }) : [];
             groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
                 cb.checked = items.includes(cb.value);
                 var existingGroupId = cb.getAttribute('data-existing-group-id');
-                cb.disabled = existingGroupId && existingGroupId !== groupId;
+                cb.disabled = Boolean(existingGroupId && existingGroupId !== groupId);
             });
         });
     });
@@ -206,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#group-error').innerHTML = '';
             groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
                 cb.checked = false;
-                cb.disabled = cb.getAttribute('data-existing-group-id') !== '';
+                cb.disabled = Boolean(cb.getAttribute('data-existing-group-id'));
             });
             itemSearchInput.value = '';
             document.querySelectorAll('#items-container .form-check').forEach(function (el) {
@@ -227,15 +230,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     {% if group_modal_open %}
     if (groupModalElement) {
-        var bootstrapModal = new bootstrap.Modal(groupModalElement);
-        bootstrapModal.show();
+        if (window.bootstrap && typeof bootstrap.Modal === 'function') {
+            var bootstrapModal;
+            if (typeof bootstrap.Modal.getOrCreateInstance === 'function') {
+                bootstrapModal = bootstrap.Modal.getOrCreateInstance(groupModalElement);
+            } else {
+                bootstrapModal = new bootstrap.Modal(groupModalElement);
+            }
+            bootstrapModal.show();
+        }
         var currentGroupId = '{{ group_form.instance.pk|default:"" }}';
         groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
             var existingGroupId = cb.getAttribute('data-existing-group-id');
             if (currentGroupId) {
-                cb.disabled = existingGroupId && existingGroupId !== currentGroupId;
+                cb.disabled = Boolean(existingGroupId && existingGroupId !== currentGroupId);
             } else {
-                cb.disabled = existingGroupId !== '';
+                cb.disabled = Boolean(existingGroupId);
             }
         });
     }
