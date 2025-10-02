@@ -371,24 +371,27 @@
   >
     <div class="absolute inset-0 bg-gray-900/60" data-close-invite></div>
     <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
-      <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
-        <div>
-          <h3 id="inviteModalTitle" class="text-lg font-semibold text-gray-900">Invite teammate</h3>
-          <p id="inviteModalDescription" class="mt-1 text-sm text-gray-500">Create a login that is linked to this merchant account.</p>
+      <form method="post" action="{% url 'merchant_settings' %}" class="flex h-full flex-col">
+        {% csrf_token %}
+        <input type="hidden" name="active_tab" value="team">
+        <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+          <div>
+            <h3 id="inviteModalTitle" class="text-lg font-semibold text-gray-900">Invite teammate</h3>
+            <p id="inviteModalDescription" class="mt-1 text-sm text-gray-500">Create a login that is linked to this merchant account.</p>
+          </div>
+          <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-invite>
+            <span class="sr-only">Close</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
         </div>
-        <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-invite>
-          <span class="sr-only">Close</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-          </svg>
-        </button>
-      </div>
-      <div class="space-y-4 px-6 py-5">
-        <div>
-          <label class="block text-sm font-medium text-gray-700">First name</label>
-          <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-invite-first-input {% if not permissions.can_invite_team %}disabled{% endif %} />
-          {% if team_form.first_name.errors %}
-          <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
+        <div class="space-y-4 px-6 py-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">First name</label>
+            <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-invite-first-input {% if not permissions.can_invite_team %}disabled{% endif %} />
+            {% if team_form.first_name.errors %}
+            <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
           {% endif %}
         </div>
         <div>
@@ -423,11 +426,12 @@
           {% endfor %}
         </div>
         {% endif %}
-      </div>
-      <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-        <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-invite>Cancel</button>
-        <button type="submit" name="team_submit" value="1" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Create Account</button>
-      </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+          <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-invite>Cancel</button>
+          <button type="submit" name="team_submit" value="1" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" {% if not permissions.can_invite_team %}disabled{% endif %}>Create Account</button>
+        </div>
+      </form>
     </div>
   </div>
   {% endif %}
