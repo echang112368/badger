@@ -242,171 +242,6 @@
             </tbody>
           </table>
         </div>
-
-        {% if permissions.can_invite_team %}
-        <div
-          id="editMemberModal"
-          class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="editMemberModalTitle"
-          aria-describedby="editMemberSummary"
-          data-modal-root
-        >
-          <div class="absolute inset-0 bg-gray-900/60" data-close-edit></div>
-          <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
-            <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 id="editMemberModalTitle" class="text-lg font-semibold text-gray-900">Edit team member</h3>
-                <p id="editMemberSummary" class="mt-1 text-sm text-gray-500"></p>
-              </div>
-              <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-edit>
-                <span class="sr-only">Close</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <form id="editMemberForm" class="space-y-5 px-6 py-5">
-              <div id="editMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label for="editMemberFirstName" class="block text-sm font-medium text-gray-700">First name</label>
-                  <input type="text" id="editMemberFirstName" name="first_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                </div>
-                <div>
-                  <label for="editMemberLastName" class="block text-sm font-medium text-gray-700">Last name</label>
-                  <input type="text" id="editMemberLastName" name="last_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
-                </div>
-              </div>
-              <div>
-                <label for="editMemberEmail" class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" id="editMemberEmail" name="email" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" required />
-              </div>
-              <div>
-                <label for="editMemberRole" class="block text-sm font-medium text-gray-700">Role</label>
-                <select id="editMemberRole" name="role" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
-                  {% for value, label in team_form.fields.role.choices %}
-                  <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 -mx-6 -mb-5 mt-5">
-                <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-edit>Cancel</button>
-                <button type="submit" data-submit-edit class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Save changes</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div
-          id="deleteMemberModal"
-          class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="deleteMemberModalTitle"
-          aria-describedby="deleteMemberSummary"
-          data-modal-root
-        >
-          <div class="absolute inset-0 bg-gray-900/60" data-close-delete></div>
-          <div class="relative z-10 w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
-            <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 id="deleteMemberModalTitle" class="text-lg font-semibold text-gray-900">Remove team member</h3>
-                <p id="deleteMemberSummary" class="mt-1 text-sm text-gray-500"></p>
-              </div>
-              <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-delete>
-                <span class="sr-only">Close</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <div class="space-y-4 px-6 py-5">
-              <div id="deleteMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
-              <p class="text-sm text-gray-600">This action will permanently remove access for this user.</p>
-            </div>
-            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-              <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-delete>Cancel</button>
-              <button type="button" id="confirmDeleteMember" class="inline-flex items-center rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">Remove member</button>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if permissions.can_invite_team %}
-        <div
-          id="inviteModal"
-          class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="inviteModalTitle"
-          aria-describedby="inviteModalDescription"
-          data-modal-root
-          data-open-on-load="{% if current_tab == 'team' and team_form.errors %}true{% else %}false{% endif %}"
-        >
-          <div class="absolute inset-0 bg-gray-900/60" data-close-invite></div>
-          <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
-            <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 id="inviteModalTitle" class="text-lg font-semibold text-gray-900">Invite teammate</h3>
-                <p id="inviteModalDescription" class="mt-1 text-sm text-gray-500">Create a login that is linked to this merchant account.</p>
-              </div>
-              <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-invite>
-                <span class="sr-only">Close</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <div class="space-y-4 px-6 py-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700">First name</label>
-                <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-invite-first-input {% if not permissions.can_invite_team %}disabled{% endif %} />
-                {% if team_form.first_name.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
-                {% endif %}
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Last name</label>
-                <input type="text" name="{{ team_form.last_name.html_name }}" value="{{ team_form.last_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
-                {% if team_form.last_name.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ team_form.last_name.errors.0 }}</p>
-                {% endif %}
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" name="{{ team_form.email.html_name }}" value="{{ team_form.email.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
-                {% if team_form.email.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ team_form.email.errors.0 }}</p>
-                {% endif %}
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700">Role</label>
-                <select name="{{ team_form.role.html_name }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %}>
-                  {% for value,label in team_form.fields.role.choices %}
-                  <option value="{{ value }}" {% if team_form.role.value == value %}selected{% endif %}>{{ label }}</option>
-                  {% endfor %}
-                </select>
-                {% if team_form.role.errors %}
-                <p class="mt-1 text-xs text-red-600">{{ team_form.role.errors.0 }}</p>
-                {% endif %}
-              </div>
-              {% if team_form.non_field_errors %}
-              <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                {% for error in team_form.non_field_errors %}
-                <p>{{ error }}</p>
-                {% endfor %}
-              </div>
-              {% endif %}
-            </div>
-            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
-              <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-invite>Cancel</button>
-              <button type="submit" name="team_submit" value="1" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Create Account</button>
-            </div>
-          </div>
-        </div>
-        {% endif %}
       </div>
     </div>
     {% endif %}
@@ -434,6 +269,168 @@
       </div>
     </div>
   </form>
+  {% if permissions.can_invite_team %}
+  <div
+    id="editMemberModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="editMemberModalTitle"
+    aria-describedby="editMemberSummary"
+    data-modal-root
+  >
+    <div class="absolute inset-0 bg-gray-900/60" data-close-edit></div>
+    <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+        <div>
+          <h3 id="editMemberModalTitle" class="text-lg font-semibold text-gray-900">Edit team member</h3>
+          <p id="editMemberSummary" class="mt-1 text-sm text-gray-500"></p>
+        </div>
+        <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-edit>
+          <span class="sr-only">Close</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+      <form id="editMemberForm" class="space-y-5 px-6 py-5">
+        <div id="editMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="editMemberFirstName" class="block text-sm font-medium text-gray-700">First name</label>
+            <input type="text" id="editMemberFirstName" name="first_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="editMemberLastName" class="block text-sm font-medium text-gray-700">Last name</label>
+            <input type="text" id="editMemberLastName" name="last_name" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div>
+          <label for="editMemberEmail" class="block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" id="editMemberEmail" name="email" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" required />
+        </div>
+        <div>
+          <label for="editMemberRole" class="block text-sm font-medium text-gray-700">Role</label>
+          <select id="editMemberRole" name="role" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            {% for value, label in team_form.fields.role.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 -mx-6 -mb-5 mt-5">
+          <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-edit>Cancel</button>
+          <button type="submit" data-submit-edit class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div
+    id="deleteMemberModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="deleteMemberModalTitle"
+    aria-describedby="deleteMemberSummary"
+    data-modal-root
+  >
+    <div class="absolute inset-0 bg-gray-900/60" data-close-delete></div>
+    <div class="relative z-10 w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+        <div>
+          <h3 id="deleteMemberModalTitle" class="text-lg font-semibold text-gray-900">Remove team member</h3>
+          <p id="deleteMemberSummary" class="mt-1 text-sm text-gray-500"></p>
+        </div>
+        <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-delete>
+          <span class="sr-only">Close</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+      <div class="space-y-4 px-6 py-5">
+        <div id="deleteMemberError" class="hidden rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"></div>
+        <p class="text-sm text-gray-600">This action will permanently remove access for this user.</p>
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+        <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-delete>Cancel</button>
+        <button type="button" id="confirmDeleteMember" class="inline-flex items-center rounded-md bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2">Remove member</button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    id="inviteModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="inviteModalTitle"
+    aria-describedby="inviteModalDescription"
+    data-modal-root
+    data-open-on-load="{% if current_tab == 'team' and team_form.errors %}true{% else %}false{% endif %}"
+  >
+    <div class="absolute inset-0 bg-gray-900/60" data-close-invite></div>
+    <div class="relative z-10 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+        <div>
+          <h3 id="inviteModalTitle" class="text-lg font-semibold text-gray-900">Invite teammate</h3>
+          <p id="inviteModalDescription" class="mt-1 text-sm text-gray-500">Create a login that is linked to this merchant account.</p>
+        </div>
+        <button type="button" class="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" data-close-invite>
+          <span class="sr-only">Close</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+      <div class="space-y-4 px-6 py-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">First name</label>
+          <input type="text" name="{{ team_form.first_name.html_name }}" value="{{ team_form.first_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-invite-first-input {% if not permissions.can_invite_team %}disabled{% endif %} />
+          {% if team_form.first_name.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ team_form.first_name.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Last name</label>
+          <input type="text" name="{{ team_form.last_name.html_name }}" value="{{ team_form.last_name.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
+          {% if team_form.last_name.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ team_form.last_name.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Email</label>
+          <input type="email" name="{{ team_form.email.html_name }}" value="{{ team_form.email.value|default_if_none:'' }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %} />
+          {% if team_form.email.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ team_form.email.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Role</label>
+          <select name="{{ team_form.role.html_name }}" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" {% if not permissions.can_invite_team %}disabled{% endif %}>
+            {% for value,label in team_form.fields.role.choices %}
+            <option value="{{ value }}" {% if team_form.role.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          {% if team_form.role.errors %}
+          <p class="mt-1 text-xs text-red-600">{{ team_form.role.errors.0 }}</p>
+          {% endif %}
+        </div>
+        {% if team_form.non_field_errors %}
+        <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {% for error in team_form.non_field_errors %}
+          <p>{{ error }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+        <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2" data-close-invite>Cancel</button>
+        <button type="submit" name="team_submit" value="1" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Create Account</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   {% if permissions.can_edit_settings and current_tab != 'team' %}
   <div class="fixed bottom-6 right-6">
     <button type="submit" form="settingsForm" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Save Changes</button>
