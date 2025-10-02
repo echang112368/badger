@@ -1,6 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
-<head><title>Stripe Webhook Received</title></head>
+<head>
+<title>Stripe Webhook Received</title>
+<link rel="icon" type="image/png" href="{% static 'img/justbadger-logo.png' %}">
+</head>
 <body>
   <h1>Stripe Webhook Received</h1>
   <p>Reference: {{ ref }}</p>
