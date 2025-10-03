@@ -19,7 +19,7 @@
   </head>
   <body class="min-h-full bg-[#f9fafb] font-['Inter',_'Poppins',_'Helvetica',_'Arial',_sans-serif] text-gray-900">
     <header class="sticky top-0 z-50 bg-[#fcd965] shadow-sm">
-      <div class="mx-auto flex max-w-6xl items-center justify-center px-6 py-4 lg:px-8">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
         <a href="/" class="inline-flex items-center gap-3">
           <img
             src="{% static 'img/transparent-logo2.png' %}"
@@ -28,6 +28,20 @@
           />
           <span class="sr-only">Badger</span>
         </a>
+        <div class="flex items-center gap-3">
+          <a
+            href="/accounts/login/"
+            class="rounded-full border border-[#f6c736] bg-white/60 px-4 py-2 text-sm font-semibold text-[#2f1b33] transition hover:bg-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f1b33]"
+          >
+            Log in
+          </a>
+          <a
+            href="/accounts/signup/"
+            class="inline-flex items-center justify-center rounded-full bg-gradient-to-br from-[#fde88f] to-[#fcd965] px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-[#2f1b33] shadow-md transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f1b33]"
+          >
+            Join
+          </a>
+        </div>
       </div>
     </header>
     <main>
@@ -121,5 +135,22 @@
         </div>
       </section>
     </main>
+    <footer class="bg-[#1f1f1f] py-16 text-[#fcd965]">
+      <div class="mx-auto grid max-w-6xl gap-12 px-6 sm:grid-cols-2 md:grid-cols-4 lg:px-8">
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Contact:</h3>
+          <p class="text-base font-medium text-white/90">usebadgerextensions@gmail.com</p>
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Product:</h3>
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Legal:</h3>
+        </div>
+        <div class="space-y-4">
+          <p class="text-sm text-white/60">© {% now "Y" %} Badger. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
