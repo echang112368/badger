@@ -1,0 +1,172 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Badger &mdash; Earn More. Save More.</title>
+    <link rel="icon" type="image/png" href="{% static 'launch/img/justbadger-logo.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body class="min-h-full bg-[#f9fafb] font-['Inter',_'Poppins',_'Helvetica',_'Arial',_sans-serif] text-gray-900">
+    <header class="sticky top-0 z-50 bg-[#fcd965] shadow-sm">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
+        <a href="/" class="inline-flex items-center gap-3">
+          <img
+            src="{% static 'launch/img/transparent-logo2.png' %}"
+            alt="Badger logo"
+            class="h-9 w-auto"
+          />
+          <span class="sr-only">Badger</span>
+        </a>
+        <div class="flex items-center gap-3"></div>
+      </div>
+    </header>
+    <main>
+      <section class="relative isolate overflow-hidden bg-gradient-to-br from-[#fcd965] via-[#fde88f] to-[#fff7d6]">
+        <div class="relative mx-auto flex max-w-5xl flex-col items-center gap-10 px-6 py-16 text-center lg:px-8 lg:py-24">
+          <div class="space-y-5">
+            <p class="text-sm font-semibold uppercase tracking-[0.4em] text-white/80">Encore Offer</p>
+            <h1 class="text-4xl font-bold tracking-tight text-[#1f1f1f] sm:text-5xl md:text-6xl">
+              Earn More. Save More.
+            </h1>
+            <p class="mx-auto max-w-2xl text-lg leading-relaxed text-[#473802]">
+              We extended our best Badger deal. Unlock creator rewards and richer affiliate payouts for the price of sharing the love.
+              Track every referral, multiply your savings, and celebrate your community.
+            </p>
+          </div>
+          <form class="flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
+            <label for="email" class="sr-only">Email address</label>
+            <input
+              type="email"
+              name="email"
+              id="email"
+              required
+              placeholder="Enter your email to get launch updates"
+              class="w-full flex-1 rounded-full border border-[#2f1b33]/10 bg-white px-6 py-3 text-base text-[#2f1b33] shadow-[0_10px_30px_rgba(47,27,51,0.15)] focus:border-[#2f1b33] focus:outline-none focus:ring-2 focus:ring-[#2f1b33]/60"
+            />
+            <button
+              type="submit"
+              class="inline-flex items-center justify-center rounded-full bg-[#2f1b33] px-6 py-3 text-base font-semibold text-white shadow-[0_20px_45px_rgba(47,27,51,0.35)] transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-[#251428] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f1b33]"
+            >
+              Notify Me
+            </button>
+          </form>
+          <p class="text-sm font-medium uppercase tracking-[0.35em] text-[#2f1b33]/70">Earn more. Save more. Repeat.</p>
+        </div>
+        <div class="pointer-events-none absolute -bottom-36 right-[-8rem] w-[32rem] max-w-none rotate-6 drop-shadow-[0_35px_70px_rgba(231,176,14,0.4)] sm:-bottom-40 sm:right-[-6rem] md:right-[-4rem] lg:-bottom-44 lg:right-[4rem]">
+          <div class="relative">
+            <div class="absolute -inset-6 rounded-[56px] bg-white/20 blur-3xl"></div>
+            <img
+              src="{% static 'launch/img/money-jar-71.png' %}"
+              alt="Badger savings jar illustration"
+              class="relative z-10 w-full"
+            />
+            <div class="absolute -bottom-16 -right-16 hidden h-44 w-44 rounded-full border-4 border-white/20 bg-white/20 backdrop-blur sm:block"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white py-20">
+        <div class="mx-auto flex max-w-6xl flex-col items-center gap-12 px-6 text-center lg:px-8">
+          <div class="space-y-4">
+            <p class="text-sm font-semibold uppercase tracking-[0.4em] text-[#b39627]">How It Works</p>
+            <h2 class="text-3xl font-bold tracking-tight text-[#2f1b33] sm:text-4xl">Badger in Three Easy Steps</h2>
+            <p class="mx-auto max-w-2xl text-lg leading-relaxed text-[#493c0d]/80">
+              Activate the extension, keep shopping the way you already do, and let Badger celebrate you with rewards
+              that keep stacking up.
+            </p>
+          </div>
+
+          <div class="grid w-full gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
+              <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-[#fde88f]">
+                <img
+                  src="{% static 'launch/img/download-extension.png' %}"
+                  alt="Illustration of installing the Badger browser extension"
+                  class="h-full w-auto object-contain"
+                />
+              </div>
+              <div class="space-y-3">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-[#b39627]">
+                  Step 1
+                </div>
+                <h3 class="text-2xl font-semibold text-[#2f1b33]">Add the Badger Extension</h3>
+                <p class="text-base leading-relaxed text-[#493c0d]/80">
+                  Install the extension in a click and bring Badger along wherever you browse. We stay tucked into your
+                  toolbar, ready to boost your earnings.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
+              <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-white/80">
+                <img
+                  src="{% static 'launch/img/getDeal.png' %}"
+                  alt="Illustration representing shopping with Badger"
+                  class="h-full w-auto object-contain"
+                />
+              </div>
+              <div class="space-y-3">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-[#b39627]">
+                  Step 2
+                </div>
+                <h3 class="text-2xl font-semibold text-[#2f1b33]">Shop Just Like Always</h3>
+                <p class="text-base leading-relaxed text-[#493c0d]/80">
+                  Browse your favorite stores, creators, and brands without changing a thing. Badger quietly tracks the
+                  offers and keeps your rewards organized.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
+              <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-white/80">
+                <img
+                  src="{% static 'launch/img/undraw_savings_uwjn.png' %}"
+                  alt="Illustration of rewards and savings rolling in"
+                  class="h-full w-auto object-contain"
+                />
+              </div>
+              <div class="space-y-3">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-[#b39627]">
+                  Step 3
+                </div>
+                <h3 class="text-2xl font-semibold text-[#2f1b33]">Watch the Awards Roll In</h3>
+                <p class="text-base leading-relaxed text-[#493c0d]/80">
+                  Badger dishes out badges, bonuses, and affiliate awards automatically. Sit back, enjoy the surprises,
+                  and share the excitement with your community.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="bg-[#1f1f1f] py-16 text-[#fcd965]">
+      <div class="mx-auto grid max-w-6xl gap-12 px-6 sm:grid-cols-2 md:grid-cols-4 lg:px-8">
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Contact:</h3>
+          <p class="text-base font-medium text-white/90">usebadgerextensions@gmail.com</p>
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Product:</h3>
+        </div>
+        <div class="space-y-4">
+          <h3 class="text-xs font-semibold uppercase tracking-[0.35em] text-[#fcd965]/80">Legal:</h3>
+        </div>
+        <div class="space-y-4">
+          <p class="text-sm text-white/60">© {% now "Y" %} Badger. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
