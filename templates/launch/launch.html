@@ -1,11 +1,10 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Badger &mdash; Earn More. Save More.</title>
-    <link rel="icon" type="image/png" href="{% static 'launch/img/justbadger-logo.png' %}">
+    <link rel="icon" type="image/png" href="./justbadger-logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
@@ -21,11 +20,7 @@
     <header class="sticky top-0 z-50 bg-[#fcd965] shadow-sm">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
         <a href="/" class="inline-flex items-center gap-3">
-          <img
-            src="{% static 'launch/img/transparent-logo2.png' %}"
-            alt="Badger logo"
-            class="h-9 w-auto"
-          />
+          <img src="./transparent-logo2.png" alt="Badger logo" class="h-9 w-auto" />
           <span class="sr-only">Badger</span>
         </a>
         <div class="flex items-center gap-3"></div>
@@ -44,7 +39,11 @@
               Track every referral, multiply your savings, and celebrate your community.
             </p>
           </div>
-          <form class="flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
+          <form
+            id="launch-form"
+            class="flex w-full max-w-xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-center"
+            data-endpoint="https://your-api-id.execute-api.your-region.amazonaws.com/prod/launch-signup"
+          >
             <label for="email" class="sr-only">Email address</label>
             <input
               type="email"
@@ -61,16 +60,13 @@
               Notify Me
             </button>
           </form>
+          <p id="form-status" class="text-sm font-medium" role="status" aria-live="polite"></p>
           <p class="text-sm font-medium uppercase tracking-[0.35em] text-[#2f1b33]/70">Earn more. Save more. Repeat.</p>
         </div>
         <div class="pointer-events-none absolute -bottom-36 right-[-8rem] w-[32rem] max-w-none rotate-6 drop-shadow-[0_35px_70px_rgba(231,176,14,0.4)] sm:-bottom-40 sm:right-[-6rem] md:right-[-4rem] lg:-bottom-44 lg:right-[4rem]">
           <div class="relative">
             <div class="absolute -inset-6 rounded-[56px] bg-white/20 blur-3xl"></div>
-            <img
-              src="{% static 'launch/img/money-jar-71.png' %}"
-              alt="Badger savings jar illustration"
-              class="relative z-10 w-full"
-            />
+            <img src="./money-jar-71.png" alt="Badger savings jar illustration" class="relative z-10 w-full" />
             <div class="absolute -bottom-16 -right-16 hidden h-44 w-44 rounded-full border-4 border-white/20 bg-white/20 backdrop-blur sm:block"></div>
           </div>
         </div>
@@ -91,7 +87,7 @@
             <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
               <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-[#fde88f]">
                 <img
-                  src="{% static 'launch/img/download-extension.png' %}"
+                  src="./download-extension.png"
                   alt="Illustration of installing the Badger browser extension"
                   class="h-full w-auto object-contain"
                 />
@@ -111,7 +107,7 @@
             <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
               <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-white/80">
                 <img
-                  src="{% static 'launch/img/getDeal.png' %}"
+                  src="./getDeal.png"
                   alt="Illustration representing shopping with Badger"
                   class="h-full w-auto object-contain"
                 />
@@ -131,7 +127,7 @@
             <div class="flex flex-col gap-6 rounded-3xl border border-[#fcd965]/40 bg-[#fff6d8] p-8 text-left shadow-[0_25px_60px_rgba(252,217,101,0.18)]">
               <div class="flex h-40 w-full items-center justify-center rounded-2xl bg-white/80">
                 <img
-                  src="{% static 'launch/img/undraw_savings_uwjn.png' %}"
+                  src="./undraw_savings_uwjn.png"
                   alt="Illustration of rewards and savings rolling in"
                   class="h-full w-auto object-contain"
                 />
@@ -168,5 +164,64 @@
         </div>
       </div>
     </footer>
+    <script>
+      (function () {
+        const form = document.getElementById('launch-form');
+        if (!form) {
+          return;
+        }
+
+        const statusElement = document.getElementById('form-status');
+        const endpoint = form.dataset.endpoint;
+
+        function setStatus(message, type) {
+          if (!statusElement) return;
+          statusElement.textContent = message;
+          statusElement.classList.remove('text-[#d14343]', 'text-[#2f1b33]');
+          statusElement.classList.add(type === 'error' ? 'text-[#d14343]' : 'text-[#2f1b33]');
+        }
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const emailInput = /** @type {HTMLInputElement | null} */ (document.getElementById('email'));
+
+          if (!emailInput) {
+            return;
+          }
+
+          const email = emailInput.value.trim();
+          if (!email) {
+            setStatus('Please enter a valid email address.', 'error');
+            return;
+          }
+
+          if (!endpoint || endpoint.includes('your-api-id')) {
+            setStatus('Signup endpoint is not configured yet.', 'error');
+            return;
+          }
+
+          setStatus('Submitting…', 'info');
+
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            });
+
+            if (!response.ok) {
+              const errorMessage = await response.text();
+              throw new Error(errorMessage || 'Unable to submit email at this time.');
+            }
+
+            setStatus('Thanks! You are on the list.', 'success');
+            form.reset();
+          } catch (error) {
+            console.error(error);
+            setStatus('Something went wrong. Please try again later.', 'error');
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
