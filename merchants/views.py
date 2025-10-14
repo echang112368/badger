@@ -133,22 +133,47 @@ def merchant_dashboard(request):
     merchant_user = permissions.merchant
     balance = LedgerEntry.merchant_balance(merchant_user)
     entries = LedgerEntry.objects.filter(merchant=merchant_user).order_by('-timestamp')
-    invoices = (
+    return render(request, 'merchants/dashboard.html', {
+        'merchant': merchant_user,
+        'balance': balance,
+        'ledger_entries': entries,
+        'permissions': permissions,
+    })
+
+
+@login_required
+def merchant_invoices(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return render(request, "403.html", status=403)
+
+    merchant_user = permissions.merchant
+    invoices_qs = (
         MerchantInvoice.objects.filter(merchant=merchant_user)
         .order_by('-created_at')
     )
 
     from ledger.invoices import update_invoice_status
-    for invoice in invoices:
-        update_invoice_status(invoice)
 
-    return render(request, 'merchants/dashboard.html', {
-        'merchant': merchant_user,
-        'balance': balance,
-        'ledger_entries': entries,
-        'invoices': invoices,
-        'permissions': permissions,
-    })
+    invoices = []
+    for invoice in invoices_qs:
+        update_invoice_status(invoice)
+        invoice.refresh_from_db()
+        invoices.append(invoice)
+
+    open_invoices = [invoice for invoice in invoices if invoice.status != "PAID"]
+    paid_invoices = [invoice for invoice in invoices if invoice.status == "PAID"]
+
+    return render(
+        request,
+        'merchants/invoices.html',
+        {
+            'merchant': merchant_user,
+            'permissions': permissions,
+            'open_invoices': open_invoices,
+            'paid_invoices': paid_invoices,
+        },
+    )
 
 @login_required
 def merchant_items(request):

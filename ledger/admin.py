@@ -60,4 +60,25 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
     search_fields = ("merchant__username", "paypal_invoice_id")
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
+    change_list_template = "admin/ledger/merchantinvoice/change_list.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "generate-all/",
+                self.admin_site.admin_view(self.generate_invoices),
+                name="ledger_invoice_generate_all",
+            ),
+        ]
+        return custom_urls + urls
+
+    def generate_invoices(self, request):
+        if request.method == "POST":
+            invoices = generate_all_invoices(ignore_date=True)
+            messages.success(
+                request,
+                f"Generated {len(invoices)} invoice(s) for merchants with outstanding balances.",
+            )
+        return redirect("../")
 
