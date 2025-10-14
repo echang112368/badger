@@ -18,7 +18,6 @@ db.sqlite3
 *.pyd
 migrations/
 !merchants/migrations/
-!ledger/migrations/
 
 # Environment
 .env

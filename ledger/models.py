@@ -23,20 +23,6 @@ class MerchantInvoice(models.Model):
     def __str__(self):
         return f"Invoice {self.paypal_invoice_id or self.id} for {self.merchant}"
 
-
-class InvoicingConfiguration(models.Model):
-    """Store global configuration for merchant invoicing."""
-
-    paypal_invoicer_email = models.EmailField(blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "Invoicing configuration"
-        verbose_name_plural = "Invoicing configuration"
-
-    def __str__(self):
-        return "Merchant invoicing settings"
-
 class LedgerEntry(models.Model):
     ENTRY_TYPES = [
         ("commission", "Commission"),
