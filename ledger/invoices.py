@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
 
-from .models import LedgerEntry, MerchantInvoice
+from .models import InvoicingConfiguration, LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
 from .payouts import _get_paypal_access_token
 
@@ -32,6 +32,10 @@ def generate_invoice_number() -> str:
 
 def _get_paypal_invoicer_email() -> str:
     """Return the configured PayPal invoicer email if available."""
+
+    config = InvoicingConfiguration.objects.first()
+    if config and config.paypal_invoicer_email:
+        return config.paypal_invoicer_email.strip()
 
     email = getattr(settings, "PAYPAL_INVOICER_EMAIL", None)
     if email:

@@ -2,6 +2,11 @@
 {% load i18n %}
 
 {% block object-tools %}
+<form action="{% url 'admin:ledger_invoice_update_invoicer_email' %}" method="post" style="display:inline;margin-right:1em;">
+    {% csrf_token %}
+    <input type="email" name="paypal_invoicer_email" value="{{ paypal_invoicer_email }}" placeholder="{% trans 'PayPal invoicer email' %}" style="margin-right:0.5em;">
+    <input type="submit" class="button" value="{% trans 'Save PayPal invoicer email' %}">
+</form>
 <form action="{% url 'admin:ledger_invoice_generate_all' %}" method="post" style="display:inline;margin-right:1em;">
     {% csrf_token %}
     <input type="submit" class="button" value="{% trans 'Generate Merchant Invoices' %}">
