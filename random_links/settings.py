@@ -73,6 +73,9 @@ import os
 load_dotenv()
 
 PAYPAL_INVOICER_EMAIL = "sb-sbodx44976751@business.example.com"
+PAYPAL_CLIENT_ID = "AT-mJUySw-T9ugLDhVSJEEEyDnYBAmQPUYeyNYjXgGfnFiTD3LeMCDD3"
+PAYPAL_CLIENT_SECRET = "DUL88JC8CGTZAKBY"
+
 
 TEMPLATES = [
     {
