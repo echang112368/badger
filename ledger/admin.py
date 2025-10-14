@@ -1,10 +1,8 @@
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
 from django.shortcuts import redirect
 from django.urls import path
 
-from .models import InvoicingConfiguration, LedgerEntry, MerchantInvoice
+from .models import LedgerEntry, MerchantInvoice
 from .payouts import send_mass_payouts
 from .invoices import generate_all_invoices
 
@@ -76,11 +74,6 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.generate_invoices),
                 name="ledger_invoice_generate_all",
             ),
-            path(
-                "update-invoicer-email/",
-                self.admin_site.admin_view(self.update_invoicer_email),
-                name="ledger_invoice_update_invoicer_email",
-            ),
         ]
         return custom_urls + urls
 
@@ -96,37 +89,4 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
                     f"Generated {len(invoices)} invoice(s) for merchants with outstanding balances.",
                 )
         return redirect("../")
-
-    def update_invoicer_email(self, request):
-        if request.method == "POST":
-            email = (request.POST.get("paypal_invoicer_email") or "").strip()
-            if email:
-                try:
-                    validate_email(email)
-                except ValidationError:
-                    messages.error(request, "Enter a valid PayPal invoicer email address.")
-                    return redirect("../")
-            config, _ = InvoicingConfiguration.objects.get_or_create(pk=1)
-            config.paypal_invoicer_email = email
-            config.save(update_fields=["paypal_invoicer_email", "updated_at"])
-            if email:
-                messages.success(
-                    request,
-                    "Updated the PayPal invoicer email used for merchant invoices.",
-                )
-            else:
-                messages.warning(
-                    request,
-                    "Cleared the PayPal invoicer email. Invoices require this value to be set.",
-                )
-        return redirect("../")
-
-    def changelist_view(self, request, extra_context=None):
-        config = InvoicingConfiguration.objects.first()
-        if extra_context is None:
-            extra_context = {}
-        extra_context["paypal_invoicer_email"] = (
-            config.paypal_invoicer_email if config else ""
-        )
-        return super().changelist_view(request, extra_context=extra_context)
 
