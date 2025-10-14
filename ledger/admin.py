@@ -38,8 +38,12 @@ class LedgerEntryAdmin(admin.ModelAdmin):
 
     def generate_invoices(self, request):
         if request.method == "POST":
-            invoices = generate_all_invoices(ignore_date=True)
-            messages.success(request, f"Generated {len(invoices)} invoice(s)")
+            try:
+                invoices = generate_all_invoices(ignore_date=True)
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"Generated {len(invoices)} invoice(s)")
         return redirect("../")
 
 
@@ -75,10 +79,14 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
 
     def generate_invoices(self, request):
         if request.method == "POST":
-            invoices = generate_all_invoices(ignore_date=True)
-            messages.success(
-                request,
-                f"Generated {len(invoices)} invoice(s) for merchants with outstanding balances.",
-            )
+            try:
+                invoices = generate_all_invoices(ignore_date=True)
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"Generated {len(invoices)} invoice(s) for merchants with outstanding balances.",
+                )
         return redirect("../")
 
