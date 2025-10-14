@@ -72,6 +72,8 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
+PAYPAL_INVOICER_EMAIL = "sb-sbodx44976751@business.example.com"
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
