@@ -4,8 +4,10 @@ from decimal import Decimal
 import os
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Sum
 from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
@@ -18,10 +20,6 @@ from .payouts import _get_paypal_access_token
 # endpoint when running in production.
 PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
 
-# PayPal email that issues the invoices. This should be the business account
-# configured in your PayPal developer dashboard.
-PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
-
 # All invoices are issued in USD.
 PAYPAL_CURRENCY_CODE = "USD"
 
@@ -30,6 +28,17 @@ def generate_invoice_number() -> str:
     """Return a unique, 25-character invoice number for PayPal."""
     date_str = timezone.now().strftime("%Y%m%d")
     return f"{date_str}-{uuid.uuid4().hex[:16]}"
+
+
+def _get_paypal_invoicer_email() -> str:
+    """Return the configured PayPal invoicer email if available."""
+
+    email = getattr(settings, "PAYPAL_INVOICER_EMAIL", None)
+    if email:
+        return email.strip()
+
+    email = os.environ.get("PAYPAL_INVOICER_EMAIL")
+    return email.strip() if email else ""
 
 
 def create_invoice_for_merchant(merchant):
@@ -42,10 +51,12 @@ def create_invoice_for_merchant(merchant):
         return None
 
     meta = MerchantMeta.objects.filter(user=merchant).first()
-    if not meta or not meta.paypal_email:
+    paypal_email = (meta.paypal_email or "").strip() if meta else ""
+    if not paypal_email:
         return None
 
-    if not PAYPAL_INVOICER_EMAIL:
+    invoicer_email = _get_paypal_invoicer_email()
+    if not invoicer_email:
         raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
 
     # Merchant ledger entries store commissions as negative amounts since the
@@ -70,10 +81,10 @@ def create_invoice_for_merchant(merchant):
             "currency_code": PAYPAL_CURRENCY_CODE,
         },
         "invoicer": {
-            "email_address": PAYPAL_INVOICER_EMAIL,
+            "email_address": invoicer_email,
             "name": {"given_name": "Badger"},
         },
-        "primary_recipients": [{"billing_info": {"email_address": meta.paypal_email}}],
+        "primary_recipients": [{"billing_info": {"email_address": paypal_email}}],
         "items": [
             {
                 "name": "Monthly charges",
@@ -179,8 +190,27 @@ def generate_all_invoices(ignore_date: bool = False):
     if not ignore_date and today.day != 1:
         return []
 
+    outstanding_totals = (
+        LedgerEntry.objects.filter(merchant__isnull=False, paid=False, invoice__isnull=True)
+        .values("merchant")
+        .annotate(total=Sum("amount"))
+    )
+
+    merchant_ids = [
+        record["merchant"]
+        for record in outstanding_totals
+        if record["merchant"] is not None and record["total"] and record["total"] < 0
+    ]
+
+    if not merchant_ids:
+        return []
+
     User = get_user_model()
-    merchants = User.objects.filter(is_merchant=True)
+    merchants = (
+        User.objects.filter(id__in=merchant_ids, is_merchant=True)
+        .filter(merchantmeta__paypal_email__isnull=False)
+        .exclude(merchantmeta__paypal_email__exact="")
+    )
 
     created = []
     for merchant in merchants:
