@@ -2,6 +2,7 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 import os
+from typing import Optional
 
 import requests
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
+
 from .payouts import _get_paypal_access_token
 
 """PayPal invoice integration using the sandbox API."""
@@ -22,6 +24,68 @@ PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
 
 # All invoices are issued in USD.
 PAYPAL_CURRENCY_CODE = "USD"
+
+
+def _get_invoice_detail(invoice_id: str, access_token: Optional[str] = None) -> dict:
+    """Return the JSON payload for a PayPal invoice."""
+
+    if not invoice_id:
+        raise ValueError("invoice_id is required")
+
+    token = access_token or _get_paypal_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_paypal_payment_link(
+    invoice_id: str, *, access_token: Optional[str] = None
+) -> str:
+    """Return the customer-facing PayPal payment link for an invoice.
+
+    The function authenticates with PayPal using the client credentials from the
+    environment, fetches the invoice detail payload, and extracts the
+    ``recipient_view_url`` value that customers use to pay their invoices.
+
+    Args:
+        invoice_id: The PayPal invoice identifier.
+        access_token: Optional pre-fetched OAuth token to reuse.
+
+    Raises:
+        ValueError: If ``invoice_id`` is not supplied.
+        RuntimeError: When PayPal responds with an error or the URL cannot be
+            located in the response payload.
+
+    Returns:
+        The public, customer-facing PayPal payment URL.
+    """
+
+    if not invoice_id:
+        raise ValueError("invoice_id is required")
+
+    try:
+        data = _get_invoice_detail(invoice_id, access_token=access_token)
+    except requests.HTTPError as exc:
+        raise RuntimeError(
+            f"PayPal returned an error for invoice '{invoice_id}'."
+        ) from exc
+    except requests.RequestException as exc:
+        raise RuntimeError(
+            f"Failed to retrieve PayPal invoice '{invoice_id}'."
+        ) from exc
+
+    try:
+        detail = data.get("detail", {})
+        metadata = detail.get("metadata", {})
+    except AttributeError as exc:
+        raise RuntimeError("Unexpected PayPal invoice payload structure.") from exc
+
+    pay_url = metadata.get("recipient_view_url")
+    if not pay_url:
+        raise RuntimeError("PayPal invoice payload missing recipient_view_url.")
+
+    return pay_url
 
 
 def generate_invoice_number() -> str:
@@ -113,14 +177,14 @@ def create_invoice_for_merchant(merchant):
     send_resp = requests.post(f"{PAYPAL_INVOICE_URL}/{invoice_id}/send", headers=headers)
     send_resp.raise_for_status()
 
-    detail_resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
-    detail_resp.raise_for_status()
-    detail = detail_resp.json()
-    pay_url = None
-    for link in detail.get("links", []):
-        if link.get("rel") == "payer_view":
-            pay_url = link.get("href")
-            break
+    pay_url: Optional[str] = None
+    try:
+        pay_url = get_paypal_payment_link(invoice_id, access_token=access_token)
+    except RuntimeError:
+        pay_url = None
+
+    if not pay_url:
+        pay_url = f"https://www.paypal.com/invoice/p/#{invoice_id}"
 
     with transaction.atomic():
         invoice = MerchantInvoice.objects.create(
@@ -140,19 +204,17 @@ def update_invoice_status(invoice: MerchantInvoice):
     if not invoice.paypal_invoice_id:
         return invoice.status
     access_token = _get_paypal_access_token()
-    headers = {"Authorization": f"Bearer {access_token}"}
-    resp = requests.get(
-        f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    data = _get_invoice_detail(invoice.paypal_invoice_id, access_token)
 
     status = data.get("status")
     pay_url = invoice.paypal_invoice_url
-    for link in data.get("links", []):
-        if link.get("rel") == "payer_view":
-            pay_url = link.get("href")
-            break
+    try:
+        pay_url = get_paypal_payment_link(
+            invoice.paypal_invoice_id, access_token=access_token
+        )
+    except RuntimeError:
+        if not pay_url and invoice.paypal_invoice_id:
+            pay_url = f"https://www.paypal.com/invoice/p/#{invoice.paypal_invoice_id}"
 
     update_fields = []
     if status and status != invoice.status:
