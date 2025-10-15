@@ -72,9 +72,14 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-PAYPAL_INVOICER_EMAIL = "sb-sbodx44976751@business.example.com"
-PAYPAL_CLIENT_ID = "AT-mJUySw-T9ugLDhVSJEEEyDnYBAmQPUYeyNYjXgGfnFiTD3LeMCDD3"
-PAYPAL_CLIENT_SECRET = "DUL88JC8CGTZAKBY"
+# PayPal configuration is provided through environment variables so that
+# credentials remain outside of source control.
+PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID")
+PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET")
+PAYPAL_OAUTH_URL = os.environ.get(
+    "PAYPAL_OAUTH_URL", "https://api-m.sandbox.paypal.com/v1/oauth2/token"
+)
 
 
 TEMPLATES = [
