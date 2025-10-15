@@ -15,6 +15,7 @@ class MerchantInvoice(models.Model):
     )
     paypal_invoice_id = models.CharField(max_length=64, blank=True, null=True)
     paypal_invoice_url = models.URLField(blank=True, null=True)
+    payment_link = models.URLField(blank=True, null=True)
     status = models.CharField(max_length=32, default="DRAFT")
     created_at = models.DateTimeField(auto_now_add=True)
     due_date = models.DateField()
