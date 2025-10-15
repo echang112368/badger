@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from decimal import Decimal, ROUND_HALF_UP
+from typing import Optional
 
 User = get_user_model()
 
@@ -22,6 +23,16 @@ class MerchantInvoice(models.Model):
 
     def __str__(self):
         return f"Invoice {self.paypal_invoice_id or self.id} for {self.merchant}"
+
+    @property
+    def payment_link(self) -> Optional[str]:
+        """Return the PayPal payer link derived from stored invoice data."""
+
+        if self.paypal_invoice_url:
+            return self.paypal_invoice_url
+        if self.paypal_invoice_id:
+            return f"https://www.paypal.com/invoice/p/#{self.paypal_invoice_id}"
+        return None
 
 class LedgerEntry(models.Model):
     ENTRY_TYPES = [
