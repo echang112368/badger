@@ -2,7 +2,6 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 import os
-from typing import Optional
 
 import requests
 from django.conf import settings
@@ -13,7 +12,6 @@ from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
-
 from .payouts import _get_paypal_access_token
 
 """PayPal invoice integration using the sandbox API."""
@@ -24,27 +22,6 @@ PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
 
 # All invoices are issued in USD.
 PAYPAL_CURRENCY_CODE = "USD"
-
-
-def _get_invoice_detail(invoice_id: str, access_token: Optional[str] = None) -> dict:
-    """Return the JSON payload for a PayPal invoice."""
-
-    if not invoice_id:
-        raise ValueError("invoice_id is required")
-
-    token = access_token or _get_paypal_access_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def _build_paypal_invoice_url(invoice_id: str) -> Optional[str]:
-    """Return the PayPal payer URL derived from the invoice ID."""
-
-    if not invoice_id:
-        return None
-    return f"https://www.paypal.com/invoice/p/#{invoice_id}"
 
 
 def generate_invoice_number() -> str:
@@ -136,7 +113,14 @@ def create_invoice_for_merchant(merchant):
     send_resp = requests.post(f"{PAYPAL_INVOICE_URL}/{invoice_id}/send", headers=headers)
     send_resp.raise_for_status()
 
-    pay_url = _build_paypal_invoice_url(invoice_id)
+    detail_resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
+    detail_resp.raise_for_status()
+    detail = detail_resp.json()
+    pay_url = None
+    for link in detail.get("links", []):
+        if link.get("rel") == "payer_view":
+            pay_url = link.get("href")
+            break
 
     with transaction.atomic():
         invoice = MerchantInvoice.objects.create(
@@ -156,10 +140,19 @@ def update_invoice_status(invoice: MerchantInvoice):
     if not invoice.paypal_invoice_id:
         return invoice.status
     access_token = _get_paypal_access_token()
-    data = _get_invoice_detail(invoice.paypal_invoice_id, access_token)
+    headers = {"Authorization": f"Bearer {access_token}"}
+    resp = requests.get(
+        f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
     status = data.get("status")
-    pay_url = _build_paypal_invoice_url(invoice.paypal_invoice_id) or invoice.paypal_invoice_url
+    pay_url = invoice.paypal_invoice_url
+    for link in data.get("links", []):
+        if link.get("rel") == "payer_view":
+            pay_url = link.get("href")
+            break
 
     update_fields = []
     if status and status != invoice.status:
