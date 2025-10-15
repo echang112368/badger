@@ -133,28 +133,11 @@ def merchant_dashboard(request):
     merchant_user = permissions.merchant
     balance = LedgerEntry.merchant_balance(merchant_user)
     entries = LedgerEntry.objects.filter(merchant=merchant_user).order_by('-timestamp')
-
-    from ledger.invoices import update_invoice_status
-
-    open_invoices_qs = (
-        MerchantInvoice.objects.filter(merchant=merchant_user)
-        .exclude(status="PAID")
-        .order_by('-created_at')
-    )
-
-    open_invoices = []
-    for invoice in open_invoices_qs:
-        update_invoice_status(invoice)
-        invoice.refresh_from_db(fields=["status", "payment_link", "paypal_invoice_url"])
-        if invoice.status != "PAID":
-            open_invoices.append(invoice)
-
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
         'balance': balance,
         'ledger_entries': entries,
         'permissions': permissions,
-        'open_invoices': open_invoices,
     })
 
 
@@ -175,7 +158,7 @@ def merchant_invoices(request):
     invoices = []
     for invoice in invoices_qs:
         update_invoice_status(invoice)
-        invoice.refresh_from_db(fields=["status", "payment_link", "paypal_invoice_url"])
+        invoice.refresh_from_db()
         invoices.append(invoice)
 
     open_invoices = [invoice for invoice in invoices if invoice.status != "PAID"]
