@@ -43,7 +43,7 @@
                         <th>Due</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <th>Payment link</th>
+                        <th>Payment</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,8 +54,15 @@
                         <td>${{ invoice.total_amount }}</td>
                         <td>{{ invoice.status|title }}</td>
                         <td>
-                            {% if invoice.paypal_invoice_url %}
-                                <a href="{{ invoice.paypal_invoice_url }}" target="_blank" rel="noopener">Pay Invoice</a>
+                            {% if invoice.payment_link %}
+                                <a
+                                    class="btn btn-sm btn-primary"
+                                    href="{{ invoice.payment_link }}"
+                                    target="_blank"
+                                    rel="noopener"
+                                >
+                                    View &amp; Pay
+                                </a>
                             {% else %}
                                 -
                             {% endif %}
