@@ -54,11 +54,13 @@
                         <td>${{ invoice.total_amount }}</td>
                         <td>{{ invoice.status|title }}</td>
                         <td>
-                            {% if invoice.paypal_invoice_url %}
-                                <a href="{{ invoice.paypal_invoice_url }}" target="_blank" rel="noopener">Pay Invoice</a>
-                            {% else %}
-                                -
-                            {% endif %}
+                            {% with pay_link=invoice.payment_link %}
+                                {% if pay_link %}
+                                    <a href="{{ pay_link }}" target="_blank" rel="noopener">Pay Invoice</a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
                         </td>
                     </tr>
                     {% empty %}
