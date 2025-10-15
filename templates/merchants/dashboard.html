@@ -10,54 +10,6 @@
         </div>
     </div>
 
-    <div class="card shadow-sm rounded mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h2 class="fs-5 fw-semibold mb-0">Outstanding invoices</h2>
-            <a class="btn btn-sm btn-outline-primary" href="{% url 'merchant_invoices' %}">View all invoices</a>
-        </div>
-        <div class="card-body p-0">
-            {% if open_invoices %}
-            <table class="table table-striped table-bordered mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Created</th>
-                        <th>Due</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Payment</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for invoice in open_invoices %}
-                    <tr>
-                        <td><time class="local-time" datetime="{{ invoice.created_at|date:'c' }}">{{ invoice.created_at }}</time></td>
-                        <td>{{ invoice.due_date }}</td>
-                        <td>${{ invoice.total_amount }}</td>
-                        <td>{{ invoice.status|title }}</td>
-                        <td>
-                            {% if invoice.payment_link %}
-                                <a
-                                    class="btn btn-sm btn-primary"
-                                    href="{{ invoice.payment_link }}"
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    View &amp; Pay
-                                </a>
-                            {% else %}
-                                <span class="text-muted">Generating link…</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="mb-0 py-3 text-center text-muted">You have no outstanding invoices.</p>
-            {% endif %}
-        </div>
-    </div>
-
     <h2 class="fw-bold fs-4 mb-3">Transaction History</h2>
     <div class="card shadow-sm rounded mb-4">
         <div class="card-body p-0">
