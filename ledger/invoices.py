@@ -12,15 +12,13 @@ from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
+from .payouts import _get_paypal_access_token
 
 """PayPal invoice integration using the sandbox API."""
 
 # Sandbox endpoint for creating and sending invoices. Switch to the live
 # endpoint when running in production.
 PAYPAL_INVOICE_URL = "https://api-m.sandbox.paypal.com/v2/invoicing/invoices"
-PAYPAL_OAUTH_URL = os.environ.get(
-    "PAYPAL_OAUTH_URL", "https://api-m.sandbox.paypal.com/v1/oauth2/token"
-)
 
 # All invoices are issued in USD.
 PAYPAL_CURRENCY_CODE = "USD"
@@ -68,7 +66,7 @@ def create_invoice_for_merchant(merchant):
     if total <= 0:
         return None
 
-    access_token = get_paypal_access_token()
+    access_token = _get_paypal_access_token()
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
@@ -118,20 +116,17 @@ def create_invoice_for_merchant(merchant):
     detail_resp = requests.get(f"{PAYPAL_INVOICE_URL}/{invoice_id}", headers=headers)
     detail_resp.raise_for_status()
     detail = detail_resp.json()
-    metadata = detail.get("detail", {}).get("metadata", {}) if isinstance(detail, dict) else {}
-    pay_url = metadata.get("recipient_view_url")
-    if not pay_url:
-        for link in detail.get("links", []):
-            if link.get("rel") == "payer_view":
-                pay_url = link.get("href")
-                break
+    pay_url = None
+    for link in detail.get("links", []):
+        if link.get("rel") == "payer_view":
+            pay_url = link.get("href")
+            break
 
     with transaction.atomic():
         invoice = MerchantInvoice.objects.create(
             merchant=merchant,
             paypal_invoice_id=invoice_id,
             paypal_invoice_url=pay_url,
-            payment_link=pay_url,
             status="SENT",
             due_date=timezone.now().date() + timedelta(days=14),
             total_amount=total,
@@ -144,24 +139,20 @@ def update_invoice_status(invoice: MerchantInvoice):
     """Refresh invoice status from PayPal and mark entries paid if needed."""
     if not invoice.paypal_invoice_id:
         return invoice.status
-    access_token = get_paypal_access_token()
+    access_token = _get_paypal_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
     resp = requests.get(
         f"{PAYPAL_INVOICE_URL}/{invoice.paypal_invoice_id}", headers=headers
     )
     resp.raise_for_status()
     data = resp.json()
-    if not isinstance(data, dict):
-        data = {}
 
     status = data.get("status")
-    metadata = data.get("detail", {}).get("metadata", {})
-    pay_url = metadata.get("recipient_view_url") or invoice.payment_link or invoice.paypal_invoice_url
-    if not pay_url:
-        for link in data.get("links", []):
-            if link.get("rel") == "payer_view":
-                pay_url = link.get("href")
-                break
+    pay_url = invoice.paypal_invoice_url
+    for link in data.get("links", []):
+        if link.get("rel") == "payer_view":
+            pay_url = link.get("href")
+            break
 
     update_fields = []
     if status and status != invoice.status:
@@ -170,14 +161,9 @@ def update_invoice_status(invoice: MerchantInvoice):
         if status == "PAID":
             LedgerEntry.objects.filter(invoice=invoice).update(paid=True)
 
-    if pay_url and pay_url != invoice.payment_link:
-        invoice.payment_link = pay_url
-        update_fields.append("payment_link")
-
     if pay_url and pay_url != invoice.paypal_invoice_url:
         invoice.paypal_invoice_url = pay_url
-        if "paypal_invoice_url" not in update_fields:
-            update_fields.append("paypal_invoice_url")
+        update_fields.append("paypal_invoice_url")
 
     if update_fields:
         invoice.save(update_fields=update_fields)
@@ -232,25 +218,3 @@ def generate_all_invoices(ignore_date: bool = False):
         if invoice:
             created.append(invoice)
     return created
-
-
-def get_paypal_access_token() -> str:
-    """Obtain an access token for the PayPal API."""
-
-    client_id = os.environ.get("PAYPAL_CLIENT_ID")
-    client_secret = os.environ.get("PAYPAL_CLIENT_SECRET")
-    if not client_id or not client_secret:
-        raise RuntimeError("PayPal credentials are not configured")
-
-    response = requests.post(
-        PAYPAL_OAUTH_URL,
-        data={"grant_type": "client_credentials"},
-        auth=(client_id, client_secret),
-    )
-    response.raise_for_status()
-
-    data = response.json()
-    access_token = data.get("access_token")
-    if not access_token:
-        raise RuntimeError("PayPal access token not present in response")
-    return access_token
