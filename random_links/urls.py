@@ -34,4 +34,5 @@ urlpatterns = [
     path('shopify/', include('shopify_app.urls')),
     path('collect/', include('collect.urls')),
     path('verification/', include('verify_email.urls')),
+    path('', include('merchantlist.urls')),
     ]

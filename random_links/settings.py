@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'links',
     'ledger',
     'shopify_app',
+    'merchantlist',
     "verify_email.apps.VerifyEmailConfig",
     'corsheaders',
     'rest_framework',
