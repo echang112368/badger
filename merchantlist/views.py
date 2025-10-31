@@ -1,5 +1,6 @@
 import hashlib
 import json
+from json import JSONDecodeError
 import os
 from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
@@ -10,6 +11,16 @@ from django.utils.http import http_date, parse_http_date_safe
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Config
+from .utils import collect_merchant_domains
+
+
+def _get_active_config() -> Config:
+    """Return the most recently updated configuration, creating one if needed."""
+
+    config = Config.objects.order_by("-updated_at", "-pk").first()
+    if config is None:
+        config = Config.objects.create()
+    return config
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_FILE = BASE_DIR / "static" / "merchant_list.json"
@@ -33,7 +44,7 @@ def _check_cache_headers(request, etag: str, last_modified: datetime):
 
 @csrf_exempt
 def merchant_meta(request):
-    config, _ = Config.objects.get_or_create(pk=1)
+    config = _get_active_config()
     updated_at = config.updated_at or timezone.now()
     updated_utc = timezone.localtime(updated_at, dt_timezone.utc)
     etag = f'W/"merchant-meta-{config.merchant_version}-{int(updated_utc.timestamp())}"'
@@ -54,28 +65,59 @@ def merchant_meta(request):
 
 @csrf_exempt
 def merchant_list(request):
-    config, _ = Config.objects.get_or_create(pk=1)
+    config = _get_active_config()
     updated_at = config.updated_at or timezone.now()
     updated_utc = timezone.localtime(updated_at, dt_timezone.utc)
+    updated_iso = updated_utc.isoformat().replace("+00:00", "Z")
 
     merchants: list[str] = []
     file_updated = None
+    file_data: dict | None = None
     if STATIC_FILE.exists():
-        with STATIC_FILE.open("r", encoding="utf-8") as fp:
-            file_data = json.load(fp)
-        merchants = file_data.get("merchants", [])
-        raw_updated = file_data.get("updated")
-        if raw_updated:
-            try:
-                file_updated = datetime.fromisoformat(raw_updated.replace("Z", "+00:00"))
-            except ValueError:
-                file_updated = None
+        try:
+            with STATIC_FILE.open("r", encoding="utf-8") as fp:
+                file_data = json.load(fp)
+        except (OSError, JSONDecodeError):
+            file_data = None
 
-    payload = {
-        "version": config.merchant_version,
-        "updated": updated_utc.isoformat().replace("+00:00", "Z"),
-        "merchants": merchants,
-    }
+        if file_data:
+            merchants = file_data.get("merchants", [])
+            raw_updated = file_data.get("updated")
+            if raw_updated:
+                try:
+                    file_updated = datetime.fromisoformat(raw_updated.replace("Z", "+00:00"))
+                except ValueError:
+                    file_updated = None
+
+    needs_refresh = True
+    if file_data:
+        needs_refresh = not (
+            file_data.get("version") == config.merchant_version
+            and file_data.get("updated") == updated_iso
+            and isinstance(merchants, list)
+        )
+
+    if needs_refresh:
+        merchants = collect_merchant_domains()
+        file_updated = updated_utc
+        payload = {
+            "version": config.merchant_version,
+            "updated": updated_iso,
+            "merchants": merchants,
+        }
+        try:
+            STATIC_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with STATIC_FILE.open("w", encoding="utf-8") as fp:
+                json.dump(payload, fp, ensure_ascii=False, indent=2)
+                fp.write("\n")
+        except OSError:
+            pass
+    else:
+        payload = {
+            "version": config.merchant_version,
+            "updated": updated_iso,
+            "merchants": merchants,
+        }
 
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     etag = f'W/"merchant-list-{digest}"'
