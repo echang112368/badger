@@ -11,6 +11,15 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .models import Config
 
+
+def _get_active_config() -> Config:
+    """Return the most recently updated configuration, creating one if needed."""
+
+    config = Config.objects.order_by("-updated_at", "-pk").first()
+    if config is None:
+        config = Config.objects.create()
+    return config
+
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_FILE = BASE_DIR / "static" / "merchant_list.json"
 
@@ -33,7 +42,7 @@ def _check_cache_headers(request, etag: str, last_modified: datetime):
 
 @csrf_exempt
 def merchant_meta(request):
-    config, _ = Config.objects.get_or_create(pk=1)
+    config = _get_active_config()
     updated_at = config.updated_at or timezone.now()
     updated_utc = timezone.localtime(updated_at, dt_timezone.utc)
     etag = f'W/"merchant-meta-{config.merchant_version}-{int(updated_utc.timestamp())}"'
@@ -54,7 +63,7 @@ def merchant_meta(request):
 
 @csrf_exempt
 def merchant_list(request):
-    config, _ = Config.objects.get_or_create(pk=1)
+    config = _get_active_config()
     updated_at = config.updated_at or timezone.now()
     updated_utc = timezone.localtime(updated_at, dt_timezone.utc)
 
