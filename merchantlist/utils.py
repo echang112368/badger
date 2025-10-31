@@ -91,7 +91,7 @@ def publish_merchant_config(config: Config | None = None) -> Tuple[Config, dict]
     static_path.parent.mkdir(parents=True, exist_ok=True)
 
     with transaction.atomic():
-        qs = Config.objects.select_for_update().order_by("-updated_at", "-pk")
+        qs = Config.objects.select_for_update()
         if config is not None:
             config = qs.get(pk=config.pk)
         else:
