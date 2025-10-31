@@ -1,0 +1,22 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block submit_buttons_top %}
+  {{ block.super }}
+  {% if change and original %}
+    <form method="post" action="{% url 'admin:merchantlist_config_publish' original.pk %}" style="display:inline-block;margin-left:0.5rem;">
+      {% csrf_token %}
+      <button type="submit" class="button">{% trans "Publish merchant list" %}</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if change and original %}
+    <form method="post" action="{% url 'admin:merchantlist_config_publish' original.pk %}" style="display:inline-block;margin-left:0.5rem;">
+      {% csrf_token %}
+      <button type="submit" class="button">{% trans "Publish merchant list" %}</button>
+    </form>
+  {% endif %}
+{% endblock %}
