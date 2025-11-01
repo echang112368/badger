@@ -4,20 +4,9 @@
 <section class="my-4">
     <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm rounded h-100">
-                <div class="card-body">
-                    <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm rounded h-100">
-                <div class="card-body">
-                    <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
-                </div>
-            </div>
+    <div class="card shadow-sm rounded mb-4">
+        <div class="card-body">
+            <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
         </div>
     </div>
 
@@ -37,7 +26,7 @@
                     {% for entry in ledger_entries %}
                     <tr>
                         <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
-                        <td>{{ entry.get_entry_type_display }}</td>
+                        <td>{{ entry.entry_type }}</td>
                         <td>{{ entry.amount }}</td>
                         <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
                     </tr>
