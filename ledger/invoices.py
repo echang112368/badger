@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 import os
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from django.conf import settings
@@ -105,14 +105,22 @@ def _get_paypal_invoicer_email() -> str:
     return email.strip() if email else ""
 
 
+def _merchant_display_name(merchant) -> str:
+    meta = None
+    try:
+        meta = merchant.merchantmeta
+    except MerchantMeta.DoesNotExist:
+        meta = None
+
+    if meta and meta.company_name:
+        return meta.company_name
+
+    full_name = merchant.get_full_name()
+    return full_name or merchant.username
+
+
 def create_invoice_for_merchant(merchant):
     """Create and send a PayPal invoice for all unpaid ledger entries."""
-    entries = (
-        LedgerEntry.objects.filter(merchant=merchant, paid=False, invoice__isnull=True)
-        .order_by("id")
-    )
-    if not entries.exists():
-        return None
 
     meta = MerchantMeta.objects.filter(user=merchant).first()
     paypal_email = (meta.paypal_email or "").strip() if meta else ""
@@ -123,11 +131,122 @@ def create_invoice_for_merchant(merchant):
     if not invoicer_email:
         raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
 
-    # Merchant ledger entries store commissions as negative amounts since the
-    # merchant owes money. PayPal invoices expect a positive value, so flip the
-    # sign when summing unpaid entries.
-    total = -sum((e.amount for e in entries), Decimal("0"))
-    if total <= 0:
+    now = timezone.now()
+    start_of_period = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    def _pending_entries():
+        return (
+            LedgerEntry.objects.filter(
+                merchant=merchant, paid=False, invoice__isnull=True
+            ).order_by("id")
+        )
+
+    entries = _pending_entries()
+
+    monthly_fee = Decimal("0.00")
+    if meta and meta.monthly_fee:
+        monthly_fee = meta.monthly_fee.quantize(Decimal("0.01"))
+        if monthly_fee > 0:
+            has_monthly_fee = entries.filter(
+                entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+                amount=-monthly_fee,
+                timestamp__gte=start_of_period,
+            ).exists()
+            if not has_monthly_fee:
+                LedgerEntry.objects.create(
+                    merchant=merchant,
+                    amount=-monthly_fee,
+                    entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+                )
+                entries = _pending_entries()
+
+    def _sum_positive(qs) -> Decimal:
+        total = qs.aggregate(total=Sum("amount")).get("total")
+        if total is None:
+            return Decimal("0.00")
+        return abs(total).quantize(Decimal("0.01"))
+
+    affiliate_total = _sum_positive(
+        entries.filter(entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT)
+    )
+
+    affiliate_processing_fee = Decimal("0.00")
+    if affiliate_total > 0:
+        affiliate_processing_fee = (affiliate_total * Decimal("0.05")).quantize(
+            Decimal("0.01")
+        )
+        if affiliate_processing_fee > 0:
+            has_processing_fee = entries.filter(
+                entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+                amount=-affiliate_processing_fee,
+                timestamp__gte=start_of_period,
+            ).exists()
+            if not has_processing_fee:
+                LedgerEntry.objects.create(
+                    merchant=merchant,
+                    amount=-affiliate_processing_fee,
+                    entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+                )
+                entries = _pending_entries()
+
+    if not entries.exists():
+        return None
+
+    affiliate_total = _sum_positive(
+        entries.filter(entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT)
+    )
+    badger_total = _sum_positive(
+        entries.filter(entry_type=LedgerEntry.EntryType.BADGER_PAYOUT)
+    )
+    other_total = _sum_positive(
+        entries.exclude(
+            entry_type__in=[
+                LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+                LedgerEntry.EntryType.BADGER_PAYOUT,
+            ]
+        )
+    )
+
+    affiliate_processing_fee = Decimal("0.00")
+    if affiliate_total > 0:
+        affiliate_processing_fee = (affiliate_total * Decimal("0.05")).quantize(
+            Decimal("0.01")
+        )
+
+    monthly_fee_line = Decimal("0.00")
+    if monthly_fee > 0 and entries.filter(
+        entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+        amount=-monthly_fee,
+    ).exists():
+        monthly_fee_line = monthly_fee
+
+    badger_payout_total = badger_total
+    if monthly_fee_line > 0:
+        badger_payout_total -= monthly_fee_line
+    if affiliate_processing_fee > 0:
+        badger_payout_total -= affiliate_processing_fee
+    if badger_payout_total < 0:
+        badger_payout_total = Decimal("0.00")
+
+    components = []
+    if affiliate_total > 0:
+        components.append(("Affiliate payouts", affiliate_total))
+    if badger_payout_total > 0:
+        components.append(("Badger payouts", badger_payout_total))
+    if monthly_fee_line > 0:
+        components.append(("Monthly fee", monthly_fee_line))
+    if affiliate_processing_fee > 0:
+        components.append(("Affiliate processing fee (5%)", affiliate_processing_fee))
+    if other_total > 0:
+        components.append(("Additional ledger adjustments", other_total))
+
+    total = sum((amount for _, amount in components), Decimal("0.00"))
+    if not components:
+        total = _sum_positive(entries)
+        if total <= 0:
+            return None
+        components.append(("Outstanding balance", total))
+    elif total <= 0:
         return None
 
     access_token = _get_paypal_access_token()
@@ -139,6 +258,20 @@ def create_invoice_for_merchant(merchant):
         "Prefer": "return=representation",
     }
 
+    total_amount = total.quantize(Decimal("0.01"))
+
+    items_payload = [
+        {
+            "name": name,
+            "quantity": "1",
+            "unit_amount": {
+                "currency_code": PAYPAL_CURRENCY_CODE,
+                "value": str(amount.quantize(Decimal("0.01"))),
+            },
+        }
+        for name, amount in components
+    ]
+
     payload = {
         "detail": {
             "invoice_number": generate_invoice_number(),
@@ -149,16 +282,7 @@ def create_invoice_for_merchant(merchant):
             "name": {"given_name": "Badger"},
         },
         "primary_recipients": [{"billing_info": {"email_address": paypal_email}}],
-        "items": [
-            {
-                "name": "Monthly charges",
-                "quantity": "1",
-                "unit_amount": {
-                    "currency_code": PAYPAL_CURRENCY_CODE,
-                    "value": str(total.quantize(Decimal("0.01"))),
-                },
-            }
-        ],
+        "items": items_payload,
     }
 
     response = requests.post(PAYPAL_INVOICE_URL, json=payload, headers=headers)
@@ -193,7 +317,7 @@ def create_invoice_for_merchant(merchant):
             paypal_invoice_url=pay_url,
             status="SENT",
             due_date=timezone.now().date() + timedelta(days=14),
-            total_amount=total,
+            total_amount=total_amount,
         )
         entries.update(invoice=invoice)
     return invoice
@@ -268,14 +392,39 @@ def generate_all_invoices(ignore_date: bool = False):
         return []
 
     User = get_user_model()
-    merchants = (
+    merchants_qs = (
         User.objects.filter(id__in=merchant_ids, is_merchant=True)
-        .filter(merchantmeta__paypal_email__isnull=False)
-        .exclude(merchantmeta__paypal_email__exact="")
+        .select_related("merchantmeta")
     )
 
-    created = []
+    merchants: List = list(merchants_qs)
+    missing_fees: List[str] = []
+    ready_merchants = []
     for merchant in merchants:
+        try:
+            meta = merchant.merchantmeta
+        except MerchantMeta.DoesNotExist:
+            meta = None
+
+        fee = getattr(meta, "monthly_fee", None)
+        if meta is None or fee is None or fee <= 0:
+            missing_fees.append(_merchant_display_name(merchant))
+            continue
+
+        email = (meta.paypal_email or "").strip()
+        if email:
+            ready_merchants.append(merchant)
+
+    if missing_fees:
+        missing_fees = sorted(set(missing_fees))
+        missing_list = ", ".join(missing_fees)
+        raise RuntimeError(
+            "Cannot generate invoices because the following merchants do not have a monthly fee configured: "
+            f"{missing_list}."
+        )
+
+    created = []
+    for merchant in ready_merchants:
         invoice = create_invoice_for_merchant(merchant)
         if invoice:
             created.append(invoice)
