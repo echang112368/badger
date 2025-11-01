@@ -1,0 +1,51 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="module" id="monthly-fees">
+    <h2>{% trans "Merchant Monthly Fees" %}</h2>
+    <form action="{% url 'admin:ledger_monthly_fees_update' %}" method="post">
+        {% csrf_token %}
+        {{ monthly_fee_formset.management_form }}
+        <input type="hidden" name="_update_monthly_fees" value="1">
+        <table class="adminlist">
+            <thead>
+                <tr>
+                    <th scope="col">{% trans "Merchant" %}</th>
+                    <th scope="col">{% trans "Monthly Fee" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for form in monthly_fee_formset.forms %}
+                    <tr{% if form.errors %} class="errors"{% endif %}>
+                        <th scope="row">
+                            {% with meta=form.instance %}
+                                {{ meta.company_name|default:meta.user.get_full_name|default:meta.user.username }}
+                            {% endwith %}
+                            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                        </th>
+                        <td>
+                            {{ form.monthly_fee }}
+                            {% if form.monthly_fee.errors %}
+                                <div class="errors">
+                                    {% for error in form.monthly_fee.errors %}
+                                        <p class="error">{{ error }}</p>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="2" style="text-align:center;">{% trans "No merchants found." %}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="submit-row">
+            <input type="submit" class="button" value="{% trans 'Update Monthly Fees' %}">
+        </div>
+    </form>
+</div>
+{{ block.super }}
+{% endblock %}

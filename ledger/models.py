@@ -1,8 +1,10 @@
-from django.db import models
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.db.models import Sum
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
+
+from merchants.models import MerchantMeta
 
 User = get_user_model()
 
@@ -33,6 +35,17 @@ class MerchantInvoice(models.Model):
         if self.paypal_invoice_id:
             return f"https://www.paypal.com/invoice/p/#{self.paypal_invoice_id}"
         return None
+
+
+class MerchantMonthlyFee(MerchantMeta):
+    """Proxy model to expose monthly fee management within the ledger app."""
+
+    class Meta:
+        proxy = True
+        app_label = "ledger"
+        verbose_name = "Merchant Monthly Fee"
+        verbose_name_plural = "Merchant Monthly Fees"
+
 
 class LedgerEntry(models.Model):
     class EntryType(models.TextChoices):
