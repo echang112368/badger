@@ -8,7 +8,7 @@ from .models import MerchantMeta
 
 @admin.register(MerchantMeta)
 class MerchantMetaAdmin(admin.ModelAdmin):
-    list_display = ('user', 'company_name', 'paypal_email', 'monthly_fee', 'uuid')
+    list_display = ('user', 'company_name', 'paypal_email', 'uuid')
     search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email')
     actions = ['generate_invoice']
     change_list_template = "admin/merchants/merchantmeta/change_list.html"
