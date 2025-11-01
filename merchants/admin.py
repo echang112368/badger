@@ -8,7 +8,7 @@ from .models import MerchantMeta
 
 @admin.register(MerchantMeta)
 class MerchantMetaAdmin(admin.ModelAdmin):
-    list_display = ('user', 'company_name', 'paypal_email', 'uuid')
+    list_display = ('user', 'company_name', 'paypal_email', 'monthly_fee', 'uuid')
     search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email')
     actions = ['generate_invoice']
     change_list_template = "admin/merchants/merchantmeta/change_list.html"
@@ -39,6 +39,10 @@ class MerchantMetaAdmin(admin.ModelAdmin):
         if request.method == "POST":
             from ledger.invoices import generate_all_invoices
 
-            invoices = generate_all_invoices(ignore_date=True)
-            messages.success(request, f"Generated {len(invoices)} invoice(s)")
+            try:
+                invoices = generate_all_invoices(ignore_date=True)
+            except RuntimeError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"Generated {len(invoices)} invoice(s)")
         return redirect("../")
