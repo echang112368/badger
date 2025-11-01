@@ -121,10 +121,14 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         creator_entry = LedgerEntry.objects.get(
-            creator=creator, merchant=merchant, entry_type="commission"
+            creator=creator,
+            merchant=merchant,
+            entry_type=LedgerEntry.EntryType.COMMISSION,
         )
         merchant_entry = LedgerEntry.objects.get(
-            merchant=merchant, creator__isnull=True, entry_type="commission"
+            merchant=merchant,
+            creator__isnull=True,
+            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
         )
         points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
         conversion = ReferralConversion.objects.get()
@@ -177,10 +181,18 @@ class OrdersWebhookTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(
-            LedgerEntry.objects.filter(creator=creator, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                creator=creator, entry_type=LedgerEntry.EntryType.COMMISSION
+            ).exists()
         )
         self.assertFalse(
-            LedgerEntry.objects.filter(merchant=merchant, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                merchant=merchant,
+                entry_type__in=[
+                    LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+                    LedgerEntry.EntryType.BADGER_PAYOUT,
+                ],
+            ).exists()
         )
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
@@ -227,10 +239,14 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         creator_entry = LedgerEntry.objects.get(
-            creator=creator, merchant=merchant, entry_type="commission"
+            creator=creator,
+            merchant=merchant,
+            entry_type=LedgerEntry.EntryType.COMMISSION,
         )
         merchant_entry = LedgerEntry.objects.get(
-            merchant=merchant, creator__isnull=True, entry_type="commission"
+            merchant=merchant,
+            creator__isnull=True,
+            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
         )
         points_entry = LedgerEntry.objects.get(
             creator=customer, entry_type="points"
@@ -273,10 +289,15 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         self.assertTrue(
-            LedgerEntry.objects.filter(creator=creator, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                creator=creator, entry_type=LedgerEntry.EntryType.COMMISSION
+            ).exists()
         )
         self.assertTrue(
-            LedgerEntry.objects.filter(merchant=merchant, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                merchant=merchant,
+                entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+            ).exists()
         )
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
@@ -309,10 +330,18 @@ class OrdersWebhookTests(TestCase):
 
         # No commissions or points should be recorded when item lacks a group
         self.assertFalse(
-            LedgerEntry.objects.filter(creator=creator, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                creator=creator, entry_type=LedgerEntry.EntryType.COMMISSION
+            ).exists()
         )
         self.assertFalse(
-            LedgerEntry.objects.filter(merchant=merchant, entry_type="commission").exists()
+            LedgerEntry.objects.filter(
+                merchant=merchant,
+                entry_type__in=[
+                    LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+                    LedgerEntry.EntryType.BADGER_PAYOUT,
+                ],
+            ).exists()
         )
         self.assertFalse(
             LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()

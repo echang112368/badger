@@ -35,12 +35,13 @@ class MerchantInvoice(models.Model):
         return None
 
 class LedgerEntry(models.Model):
-    ENTRY_TYPES = [
-        ("commission", "Commission"),
-        ("payout", "Payout"),
-        ("payment", "Payment"),
-        ("points", "Points"),
-    ]
+    class EntryType(models.TextChoices):
+        COMMISSION = "commission", "Commission"
+        PAYOUT = "payout", "Payout"
+        PAYMENT = "payment", "Payment"
+        POINTS = "points", "Points"
+        AFFILIATE_PAYOUT = "affiliate_payout", "Affiliate Payout"
+        BADGER_PAYOUT = "badger_payout", "Badger Payout"
 
     creator = models.ForeignKey(
         User,
@@ -59,7 +60,7 @@ class LedgerEntry(models.Model):
         limit_choices_to={"is_merchant": True},
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    entry_type = models.CharField(max_length=20, choices=ENTRY_TYPES)
+    entry_type = models.CharField(max_length=20, choices=EntryType.choices)
     timestamp = models.DateTimeField(auto_now_add=True)
     paid = models.BooleanField(default=False)
     invoice = models.ForeignKey(
