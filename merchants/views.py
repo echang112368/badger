@@ -133,23 +133,11 @@ def merchant_dashboard(request):
     merchant_user = permissions.merchant
     balance = LedgerEntry.merchant_balance(merchant_user)
     entries = LedgerEntry.objects.filter(merchant=merchant_user).order_by('-timestamp')
-    affiliate_total_raw = (
-        LedgerEntry.objects.filter(
-            merchant=merchant_user,
-            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
-            paid=False,
-        ).aggregate(total=Sum("amount"))
-    ).get("total") or Decimal("0")
-    affiliate_total = (
-        -affiliate_total_raw if affiliate_total_raw < 0 else affiliate_total_raw
-    )
-    affiliate_total = affiliate_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
         'balance': balance,
         'ledger_entries': entries,
         'permissions': permissions,
-        'affiliate_total': affiliate_total,
     })
 
 
@@ -451,7 +439,7 @@ def merchant_creators(request):
 
     commission_entries = LedgerEntry.objects.filter(
         merchant=merchant_user,
-        entry_type=LedgerEntry.EntryType.COMMISSION,
+        entry_type="commission",
         creator__isnull=False,
     )
 
