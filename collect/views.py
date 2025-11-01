@@ -255,14 +255,19 @@ def webhook_view(request):
                     if commission > 0:
                         LedgerEntry.objects.create(
                             creator=creator_meta.user,
-
+                            merchant=merchant_meta.user,
                             amount=commission,
-                            entry_type="commission",
+                            entry_type=LedgerEntry.EntryType.COMMISSION,
+                        )
+                        merchant_entry_type = (
+                            LedgerEntry.EntryType.BADGER_PAYOUT
+                            if str(creator_meta.uuid) == SPECIAL_CREATOR_UUID
+                            else LedgerEntry.EntryType.AFFILIATE_PAYOUT
                         )
                         LedgerEntry.objects.create(
                             merchant=merchant_meta.user,
                             amount=-commission,
-                            entry_type="commission",
+                            entry_type=merchant_entry_type,
                         )
            
 
@@ -442,16 +447,21 @@ def orders_create_webhook(request):
         # Credit the content creator with the commission
         LedgerEntry.objects.create(
             creator=creator_meta.user,
-           
+            merchant=merchant_meta.user,
             amount=commission_total,
-            entry_type="commission",
+            entry_type=LedgerEntry.EntryType.COMMISSION,
         )
 
         # Charge the merchant for the commission
+        merchant_entry_type = (
+            LedgerEntry.EntryType.BADGER_PAYOUT
+            if creator_uuid_str == SPECIAL_CREATOR_UUID
+            else LedgerEntry.EntryType.AFFILIATE_PAYOUT
+        )
         LedgerEntry.objects.create(
             merchant=merchant_meta.user,
             amount=-commission_total,
-            entry_type="commission",
+            entry_type=merchant_entry_type,
         )
 
         # Reward the customer with points (60 points = $1)
