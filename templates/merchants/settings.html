@@ -808,6 +808,15 @@
     if(normalized.includes('permission')){
       return `${text} Contact an administrator to adjust your permissions or have them start billing for you.`;
     }
+    if(normalized.includes('monthly fee')){
+      return `${text} Set a positive monthly fee for this merchant before trying again.`;
+    }
+    if(normalized.includes('capped amount')){
+      return `${text} Update the Shopify billing capped amount configuration to a valid number and retry.`;
+    }
+    if(normalized.includes('unexpected response from shopify')){
+      return `${text} Check your Shopify connection or try again in a few minutes.`;
+    }
 
     return text;
   }
