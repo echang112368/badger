@@ -83,12 +83,14 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email",
             "shopify_access_token",
             "shopify_store_domain",
+            "business_type",
         ]
         labels = {
             "company_name": "Business Name",
             "paypal_email": "PayPal Email (for invoices)",
             "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
+            "business_type": "Business Type",
         }
 
     def clean_shopify_store_domain(self):
@@ -105,6 +107,33 @@ class MerchantSettingsForm(forms.ModelForm):
         if host.startswith("www."):
             host = host[4:]
         return host
+
+    def clean(self):
+        cleaned = super().clean()
+        business_type = cleaned.get("business_type") or MerchantMeta.BusinessType.INDEPENDENT
+        paypal_email = (cleaned.get("paypal_email") or "").strip()
+
+        if business_type == MerchantMeta.BusinessType.INDEPENDENT and not paypal_email:
+            self.add_error(
+                "paypal_email",
+                "PayPal email is required for independent merchants.",
+            )
+
+        if business_type == MerchantMeta.BusinessType.SHOPIFY:
+            access_token = (cleaned.get("shopify_access_token") or "").strip()
+            store_domain = (cleaned.get("shopify_store_domain") or "").strip()
+            if not access_token:
+                self.add_error(
+                    "shopify_access_token",
+                    "A Shopify access token is required for Shopify billing.",
+                )
+            if not store_domain:
+                self.add_error(
+                    "shopify_store_domain",
+                    "A Shopify store URL is required for Shopify billing.",
+                )
+
+        return cleaned
 
 
 class ItemGroupForm(forms.ModelForm):

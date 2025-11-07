@@ -1,3 +1,4 @@
+from decimal import Decimal
 from unittest.mock import patch, MagicMock, ANY
 from datetime import datetime, timedelta
 from django.test import TestCase
@@ -6,6 +7,8 @@ from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 import uuid
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from . import billing
 
 
 class CreateDiscountViewTests(TestCase):
@@ -67,4 +70,72 @@ class CreateDiscountViewTests(TestCase):
             "/admin/api/2024-07/price_rules/222/discount_codes.json",
             json=ANY,
         )
+
+
+class ShopifyBillingTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="billing",
+            password="pass",
+            email="billing@example.com",
+        )
+        self.meta = MerchantMeta.objects.create(
+            user=self.user,
+            shopify_access_token="token",
+            shopify_store_domain="example.myshopify.com",
+            monthly_fee=Decimal("30.00"),
+        )
+
+    @patch("shopify_app.billing.ShopifyClient")
+    def test_create_recurring_charge_updates_meta(self, mock_client_cls):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "recurring_application_charge": {
+                "id": 123,
+                "status": "pending",
+                "confirmation_url": "https://confirm",
+                "terms": "Usage terms",
+                "capped_amount": "500.00",
+            }
+        }
+        mock_client_cls.return_value.post.return_value = mock_response
+
+        result = billing.create_or_update_recurring_charge(
+            self.meta, return_url="https://return"
+        )
+
+        self.meta.refresh_from_db()
+        self.assertEqual(self.meta.shopify_recurring_charge_id, "123")
+        self.assertEqual(self.meta.shopify_billing_status, "pending")
+        self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
+        self.assertEqual(result["id"], 123)
+
+    def test_ensure_active_charge_requires_status(self):
+        self.meta.shopify_recurring_charge_id = ""
+        self.meta.shopify_billing_status = "pending"
+        self.meta.save()
+
+        with self.assertRaises(billing.ShopifyBillingError):
+            billing.ensure_active_charge(self.meta)
+
+    @patch("shopify_app.billing.ShopifyClient")
+    def test_create_usage_charge(self, mock_client_cls):
+        self.meta.shopify_recurring_charge_id = "999"
+        self.meta.shopify_billing_status = "active"
+        self.meta.save()
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"usage_charge": {"id": 55}}
+        mock_client = mock_client_cls.return_value
+        mock_client.post.return_value = mock_response
+
+        billing.create_usage_charge(
+            self.meta,
+            amount=Decimal("10.25"),
+            description="Test charge",
+        )
+
+        mock_client.post.assert_called_once()
+        path = mock_client.post.call_args[0][0]
+        self.assertIn("usage_charges", path)
 
