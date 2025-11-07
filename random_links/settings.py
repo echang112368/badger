@@ -82,6 +82,15 @@ PAYPAL_OAUTH_URL = os.environ.get(
     "PAYPAL_OAUTH_URL", "https://api-m.sandbox.paypal.com/v1/oauth2/token"
 )
 
+# Shopify OAuth configuration
+SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
+SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET", "")
+SHOPIFY_SCOPES = os.environ.get(
+    "SHOPIFY_SCOPES",
+    "read_products,write_discounts",
+)
+SHOPIFY_REDIRECT_URI = os.environ.get("SHOPIFY_REDIRECT_URI")
+
 
 TEMPLATES = [
     {
