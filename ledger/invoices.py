@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
+from shopify_app import billing as shopify_billing
 
 from .payouts import _get_paypal_access_token
 
@@ -124,12 +125,18 @@ def create_invoice_for_merchant(merchant):
 
     meta = MerchantMeta.objects.filter(user=merchant).first()
     paypal_email = (meta.paypal_email or "").strip() if meta else ""
-    if not paypal_email:
+    business_type = (
+        meta.business_type if meta else MerchantMeta.BusinessType.INDEPENDENT
+    )
+
+    if business_type != MerchantMeta.BusinessType.SHOPIFY and not paypal_email:
         return None
 
-    invoicer_email = _get_paypal_invoicer_email()
-    if not invoicer_email:
-        raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
+    invoicer_email = None
+    if business_type != MerchantMeta.BusinessType.SHOPIFY:
+        invoicer_email = _get_paypal_invoicer_email()
+        if not invoicer_email:
+            raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
 
     now = timezone.now()
     start_of_period = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -247,6 +254,22 @@ def create_invoice_for_merchant(merchant):
             return None
         components.append(("Outstanding balance", total))
     elif total <= 0:
+        return None
+
+    if business_type == MerchantMeta.BusinessType.SHOPIFY:
+        description_components = [
+            f"{name} ${amount.quantize(Decimal('0.01'))}" for name, amount in components
+        ]
+        description = "Badger usage charge"
+        if description_components:
+            description = f"{description} ({'; '.join(description_components)})"
+
+        shopify_billing.create_usage_charge(
+            meta,
+            amount=total,
+            description=description,
+        )
+        entries.update(paid=True)
         return None
 
     access_token = _get_paypal_access_token()
@@ -406,9 +429,18 @@ def generate_all_invoices(ignore_date: bool = False):
         except MerchantMeta.DoesNotExist:
             meta = None
 
-        fee = getattr(meta, "monthly_fee", None)
-        if meta is None or fee is None or fee <= 0:
+        if meta is None:
             missing_fees.append(_merchant_display_name(merchant))
+            continue
+
+        fee = getattr(meta, "monthly_fee", None)
+        if fee is None or fee <= 0:
+            missing_fees.append(_merchant_display_name(merchant))
+            continue
+
+        business_type = getattr(meta, "business_type", MerchantMeta.BusinessType.INDEPENDENT)
+        if business_type == MerchantMeta.BusinessType.SHOPIFY:
+            ready_merchants.append(merchant)
             continue
 
         email = (meta.paypal_email or "").strip()

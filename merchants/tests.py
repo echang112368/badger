@@ -3,7 +3,47 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import MerchantMeta
-from .forms import ItemGroupForm
+from decimal import Decimal
+from unittest.mock import patch
+
+from .forms import ItemGroupForm, MerchantSettingsForm
+
+
+class MerchantSettingsFormTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="merchant_form",
+            password="pass",
+            email="form@example.com",
+            is_merchant=True,
+        )
+
+    def test_requires_paypal_for_independent(self):
+        form = MerchantSettingsForm(
+            data={
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
+                "paypal_email": "",
+                "shopify_access_token": "",
+                "shopify_store_domain": "",
+            },
+            instance=self.user.merchantmeta,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("paypal_email", form.errors)
+
+    def test_requires_shopify_credentials(self):
+        form = MerchantSettingsForm(
+            data={
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "paypal_email": "",
+                "shopify_access_token": "",
+                "shopify_store_domain": "",
+            },
+            instance=self.user.merchantmeta,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("shopify_access_token", form.errors)
+        self.assertIn("shopify_store_domain", form.errors)
 
 
 class MerchantSettingsTests(TestCase):
@@ -18,6 +58,7 @@ class MerchantSettingsTests(TestCase):
                 "paypal_email": "merchant@example.com",
                 "shopify_access_token": "token",
                 "shopify_store_domain": "https://Example.myshopify.com/",
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
             },
         )
 
@@ -66,9 +107,10 @@ class MerchantSettingsTests(TestCase):
             {
                 "first_name": "New",
                 "last_name": "Name",
-                "paypal_email": "",
+                "paypal_email": "merchant4@example.com",
                 "shopify_access_token": "",
                 "shopify_store_domain": "",
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
             },
         )
         self.assertRedirects(response, reverse("merchant_settings"))
@@ -94,6 +136,7 @@ class MerchantSettingsTests(TestCase):
                 "first_name": "",
                 "last_name": "",
                 "active_tab": "api",
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
             },
         )
         self.assertRedirects(
@@ -118,10 +161,11 @@ class MerchantSettingsTests(TestCase):
                 "company_name": "",
                 "paypal_email": "",
                 "shopify_access_token": "partial-token",
-                "shopify_store_domain": "",
+                "shopify_store_domain": "partial-store.myshopify.com",
                 "first_name": "A" * 200,
                 "last_name": "",
                 "active_tab": "api",
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -131,6 +175,36 @@ class MerchantSettingsTests(TestCase):
             response.context["active_tab"], "api"
         )
         self.assertIn("first_name", response.context["user_form"].errors)
+
+    @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
+    def test_start_shopify_billing(self, mock_create):
+        user = CustomUser.objects.create_user(
+            username="shopify", password="pass", email="shopify@example.com", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "shop.test"
+        meta.monthly_fee = Decimal("25.00")
+        meta.save()
+
+        mock_create.return_value = {"id": 1, "status": "pending", "capped_amount": "100.00"}
+
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("status", data)
+        mock_create.assert_called_once()
+
+    def test_start_shopify_billing_requires_shopify_type(self):
+        user = CustomUser.objects.create_user(
+            username="shopify_type", password="pass", email="shopifytype@example.com", is_merchant=True
+        )
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
 
 
 class StoreIdLookupTests(TestCase):
