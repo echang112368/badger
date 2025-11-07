@@ -23,6 +23,7 @@ from accounts.forms import UserNameForm
 from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from shopify_app.shopify_client import ShopifyClient
+from shopify_app import billing as shopify_billing
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
@@ -669,7 +670,57 @@ def merchant_settings(request):
         'permissions': permissions,
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
+        'start_shopify_billing_url': reverse('merchant_start_shopify_billing'),
     })
+
+
+@login_required
+@require_POST
+def start_shopify_billing(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_edit_settings:
+        return JsonResponse({"error": "You do not have permission to update billing."}, status=403)
+
+    merchant_user = permissions.merchant
+    if merchant_user is None:
+        return JsonResponse({"error": "No merchant account found."}, status=400)
+
+    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
+
+    if merchant_meta.business_type != MerchantMeta.BusinessType.SHOPIFY:
+        return JsonResponse(
+            {"error": "Shopify billing is not enabled for this merchant."},
+            status=400,
+        )
+
+    if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
+        return JsonResponse(
+            {"error": "Shopify credentials are required before starting billing."},
+            status=400,
+        )
+
+    return_url = request.build_absolute_uri(f"{reverse('merchant_settings')}?tab=billing")
+
+    try:
+        charge = shopify_billing.create_or_update_recurring_charge(
+            merchant_meta,
+            return_url=return_url,
+        )
+    except shopify_billing.ShopifyBillingError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    merchant_meta.refresh_from_db()
+
+    payload = {
+        "status": merchant_meta.shopify_billing_status,
+        "charge_id": merchant_meta.shopify_recurring_charge_id,
+        "confirmation_url": merchant_meta.shopify_billing_confirmation_url,
+    }
+
+    if charge and isinstance(charge, dict):
+        payload["raw"] = charge
+
+    return JsonResponse(payload)
 
 
 @login_required

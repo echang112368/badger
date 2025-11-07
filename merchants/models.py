@@ -38,12 +38,31 @@ class MerchantTeamMember(models.Model):
         return f"{self.user.get_full_name() or self.user.username} ({self.get_role_display()})"
 
 class MerchantMeta(models.Model):
+    class BusinessType(models.TextChoices):
+        INDEPENDENT = "independent", "Independent"
+        SHOPIFY = "shopify", "Shopify"
+
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     paypal_email = models.EmailField(blank=True)
     shopify_access_token = models.CharField(max_length=255, blank=True)
     shopify_store_domain = models.CharField(max_length=255, blank=True)
+    business_type = models.CharField(
+        max_length=20,
+        choices=BusinessType.choices,
+        default=BusinessType.INDEPENDENT,
+    )
+    shopify_billing_status = models.CharField(max_length=32, blank=True)
+    shopify_recurring_charge_id = models.CharField(max_length=64, blank=True)
+    shopify_billing_confirmation_url = models.URLField(blank=True)
+    shopify_usage_terms = models.CharField(max_length=255, blank=True)
+    shopify_usage_capped_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     monthly_fee = models.DecimalField(
         max_digits=10,
         decimal_places=2,
