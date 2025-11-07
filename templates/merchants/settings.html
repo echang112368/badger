@@ -57,7 +57,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <div class="relative">
-              <input type="password" name="password" id="password" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
+              <input type="password" name="password" id="password" value="{{ request.user.password }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
               <button type="button" id="togglePassword" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500" {% if not permissions.can_edit_settings %}disabled{% endif %}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -75,8 +75,104 @@
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
         <div class="grid gap-6">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">PayPal Email</label>
-            <input type="email" name="paypal_email" value="{{ settings_form.paypal_email.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_edit_settings %}disabled{% endif %} />
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="business_type">Business Type</label>
+            <select
+              name="business_type"
+              id="business_type"
+              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              data-business-type-select
+              {% if not permissions.can_edit_settings %}disabled{% endif %}
+            >
+              {% for value, label in settings_form.fields.business_type.choices %}
+              <option value="{{ value }}" {% if settings_form.business_type.value == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Choose how you prefer to be billed for platform fees.</p>
+            {% if settings_form.business_type.errors %}
+            <p class="mt-1 text-xs text-red-600">{{ settings_form.business_type.errors.0 }}</p>
+            {% endif %}
+          </div>
+          <div
+            data-billing-section="independent"
+            class="space-y-2 {% if settings_form.business_type.value != 'independent' %}hidden{% endif %}"
+          >
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1" for="paypal_email">PayPal Email</label>
+              <input
+                type="email"
+                name="paypal_email"
+                id="paypal_email"
+                value="{{ settings_form.paypal_email.value|default_if_none:'' }}"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {% if not permissions.can_edit_settings %}disabled{% endif %}
+              />
+              {% if settings_form.paypal_email.errors %}
+              <p class="mt-1 text-xs text-red-600">{{ settings_form.paypal_email.errors.0 }}</p>
+              {% endif %}
+            </div>
+            <p class="text-xs text-gray-500">Invoices are generated and sent via PayPal using this address.</p>
+          </div>
+          <div
+            data-billing-section="shopify"
+            class="space-y-4 {% if settings_form.business_type.value != 'shopify' %}hidden{% endif %}"
+          >
+            <div class="rounded-md border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+              <p class="font-medium">Shopify billing enabled</p>
+              <p class="mt-1 text-indigo-700/80">Recurring platform fees and usage charges will be billed through Shopify.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Charge status</span>
+                <span class="text-sm text-gray-900" data-shopify-status>{{ merchant_meta.shopify_billing_status|default:"Not configured" }}</span>
+              </div>
+              <div>
+                <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Recurring charge ID</span>
+                <span class="text-sm text-gray-900" data-shopify-charge-id>{{ merchant_meta.shopify_recurring_charge_id|default:"—" }}</span>
+              </div>
+              <div>
+                <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Usage terms</span>
+                <span class="text-sm text-gray-900" data-shopify-terms>{{ merchant_meta.shopify_usage_terms|default:"Badger usage charge" }}</span>
+              </div>
+              <div>
+                <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Capped amount</span>
+                <span class="text-sm text-gray-900" data-shopify-capped>
+                  {% if merchant_meta.shopify_usage_capped_amount %}
+                  ${{ merchant_meta.shopify_usage_capped_amount }}
+                  {% else %}
+                  —
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            <div
+              class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 {% if not merchant_meta.shopify_billing_confirmation_url %}hidden{% endif %}"
+              data-shopify-confirmation-container
+            >
+              <p class="font-medium">Action required</p>
+              <p class="mt-1">Complete your billing setup in Shopify to activate the subscription.</p>
+              <a
+                href="{{ merchant_meta.shopify_billing_confirmation_url }}"
+                class="mt-2 inline-flex items-center text-sm font-medium text-amber-900 underline"
+                target="_blank"
+                rel="noopener"
+                data-shopify-confirmation-link
+              >
+                Open confirmation link
+              </a>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                id="startShopifyBilling"
+                data-start-billing-url="{{ start_shopify_billing_url }}"
+                class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {% if not permissions.can_edit_settings %}disabled{% endif %}
+              >
+                Create or refresh Shopify billing charge
+              </button>
+              <p id="shopifyBillingFeedback" class="text-sm text-gray-600 hidden"></p>
+            </div>
+            <p class="text-xs text-gray-500">Shopify uses your Admin API credentials (configured under the API tab) to manage billing.</p>
           </div>
         </div>
       </div>
@@ -447,6 +543,8 @@
   const sections={};
   const activeTabInput=document.getElementById('activeTabInput');
   const settingsContainer=document.getElementById('settingsContainer');
+  const businessTypeSelect=document.querySelector('[data-business-type-select]');
+  const billingSections=document.querySelectorAll('[data-billing-section]');
 
   function setActiveTab(tab){
     tabs.forEach(t=>{
@@ -486,6 +584,33 @@
 
   const initialTab=activeTabInput?activeTabInput.value||'profile':'profile';
   setActiveTab(initialTab);
+
+  function updateBillingSections(value){
+    if(!billingSections){
+      return;
+    }
+    billingSections.forEach(section=>{
+      if(!section){
+        return;
+      }
+      const target=section.dataset.billingSection||'independent';
+      if(target===value){
+        section.classList.remove('hidden');
+      }else{
+        section.classList.add('hidden');
+      }
+    });
+  }
+
+  if(businessTypeSelect){
+    const initialValue=businessTypeSelect.value||'independent';
+    updateBillingSections(initialValue);
+    if(!businessTypeSelect.hasAttribute('disabled')){
+      businessTypeSelect.addEventListener('change',()=>{
+        updateBillingSections(businessTypeSelect.value||'independent');
+      });
+    }
+  }
 
   const togglePassword=document.getElementById('togglePassword');
   const password=document.getElementById('password');
@@ -637,6 +762,95 @@
       }
     }
     return 'Something went wrong. Please try again.';
+  }
+
+  const shopifyStatusElement=document.querySelector('[data-shopify-status]');
+  const shopifyChargeElement=document.querySelector('[data-shopify-charge-id]');
+  const shopifyTermsElement=document.querySelector('[data-shopify-terms]');
+  const shopifyCappedElement=document.querySelector('[data-shopify-capped]');
+  const shopifyConfirmationContainer=document.querySelector('[data-shopify-confirmation-container]');
+  const shopifyConfirmationLink=document.querySelector('[data-shopify-confirmation-link]');
+  const shopifyFeedback=document.getElementById('shopifyBillingFeedback');
+  const startShopifyBillingButton=document.getElementById('startShopifyBilling');
+
+  function setShopifyFeedback(message,isError=false){
+    if(!shopifyFeedback){
+      return;
+    }
+    shopifyFeedback.textContent=message||'';
+    shopifyFeedback.classList.toggle('hidden',!message);
+    shopifyFeedback.classList.toggle('text-rose-600',Boolean(isError));
+    shopifyFeedback.classList.toggle('text-gray-600',!isError);
+  }
+
+  async function startShopifyBilling(){
+    if(!startShopifyBillingButton){
+      return;
+    }
+    const url=startShopifyBillingButton.dataset.startBillingUrl;
+    if(!url){
+      setShopifyFeedback('Missing billing endpoint.',true);
+      return;
+    }
+
+    startShopifyBillingButton.disabled=true;
+    setShopifyFeedback('Creating billing charge…');
+
+    try{
+      const response=await fetch(url,{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'X-CSRFToken':getCsrfToken(),
+        },
+        body:JSON.stringify({}),
+      });
+
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){
+        const message=data&&data.error?data.error:'Failed to create Shopify billing charge.';
+        setShopifyFeedback(message,true);
+        return;
+      }
+
+      const status=(data.status||'').trim()||'Pending';
+      if(shopifyStatusElement){
+        shopifyStatusElement.textContent=status;
+      }
+      if(shopifyChargeElement){
+        shopifyChargeElement.textContent=data.charge_id||'—';
+      }
+      if(shopifyTermsElement&&data.raw&&data.raw.terms){
+        shopifyTermsElement.textContent=data.raw.terms;
+      }
+      if(shopifyCappedElement&&data.raw){
+        const capped=data.raw.capped_amount;
+        shopifyCappedElement.textContent=capped?`$${capped}`:'—';
+      }
+
+      const confirmation=(data.confirmation_url||'').trim();
+      if(shopifyConfirmationContainer){
+        if(confirmation){
+          shopifyConfirmationContainer.classList.remove('hidden');
+        }else{
+          shopifyConfirmationContainer.classList.add('hidden');
+        }
+      }
+      if(shopifyConfirmationLink&&confirmation){
+        shopifyConfirmationLink.setAttribute('href',confirmation);
+      }
+
+      setShopifyFeedback('Shopify billing charge created. Complete setup in Shopify if required.');
+    }catch(error){
+      console.error('Failed to create Shopify billing charge',error);
+      setShopifyFeedback('Failed to create Shopify billing charge. Please try again.',true);
+    }finally{
+      startShopifyBillingButton.disabled=false;
+    }
+  }
+
+  if(startShopifyBillingButton&&!startShopifyBillingButton.hasAttribute('disabled')){
+    startShopifyBillingButton.addEventListener('click',startShopifyBilling);
   }
 
   function showModal(modal){

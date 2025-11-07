@@ -15,4 +15,5 @@ urlpatterns = [
     path('team/<int:member_id>/update/', views.update_team_member, name='update_team_member'),
     path('team/<int:member_id>/delete/', views.delete_team_member, name='delete_team_member'),
     path('settings/', views.merchant_settings, name='merchant_settings'),
+    path('settings/shopify/start-billing/', views.start_shopify_billing, name='merchant_start_shopify_billing'),
 ]
