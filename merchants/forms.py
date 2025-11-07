@@ -75,10 +75,6 @@ class MerchantSettingsForm(forms.ModelForm):
         widget=forms.PasswordInput(render_value=True),
         required=False,
     )
-    shopify_oauth_authorization_line = forms.CharField(
-        required=False,
-        help_text="Optional header value used for custom integrations that rely on OAuth.",
-    )
 
     class Meta:
         model = MerchantMeta
@@ -87,7 +83,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email",
             "shopify_access_token",
             "shopify_store_domain",
-            "shopify_oauth_authorization_line",
             "business_type",
         ]
         labels = {
@@ -95,7 +90,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email": "PayPal Email (for invoices)",
             "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
-            "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
         }
 
