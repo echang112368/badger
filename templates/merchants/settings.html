@@ -543,6 +543,7 @@
   const sections={};
   const activeTabInput=document.getElementById('activeTabInput');
   const settingsContainer=document.getElementById('settingsContainer');
+  const settingsForm=document.getElementById('settingsForm');
   const businessTypeSelect=document.querySelector('[data-business-type-select]');
   const billingSections=document.querySelectorAll('[data-billing-section]');
 
@@ -607,7 +608,15 @@
     updateBillingSections(initialValue);
     if(!businessTypeSelect.hasAttribute('disabled')){
       businessTypeSelect.addEventListener('change',()=>{
-        updateBillingSections(businessTypeSelect.value||'independent');
+        const selectedValue=businessTypeSelect.value||'independent';
+        updateBillingSections(selectedValue);
+        if(settingsForm){
+          if(typeof settingsForm.requestSubmit==='function'){
+            settingsForm.requestSubmit();
+          }else{
+            settingsForm.submit();
+          }
+        }
       });
     }
   }
@@ -783,6 +792,26 @@
     shopifyFeedback.classList.toggle('text-gray-600',!isError);
   }
 
+  function describeShopifyBillingError(message){
+    const text=(message||'').toString().trim();
+    if(!text){
+      return 'Failed to create Shopify billing charge. Confirm that Shopify is selected as your billing business type and that your Shopify Admin API credentials are saved, then try again.';
+    }
+
+    const normalized=text.toLowerCase();
+    if(normalized.includes('not enabled')){
+      return `${text} Select Shopify as the billing business type and save your settings before starting billing.`;
+    }
+    if(normalized.includes('credentials')){
+      return `${text} Add your Shopify Admin API credentials under the API tab and save them first.`;
+    }
+    if(normalized.includes('permission')){
+      return `${text} Contact an administrator to adjust your permissions or have them start billing for you.`;
+    }
+
+    return text;
+  }
+
   async function startShopifyBilling(){
     if(!startShopifyBillingButton){
       return;
@@ -808,8 +837,8 @@
 
       const data=await response.json().catch(()=>({}));
       if(!response.ok){
-        const message=data&&data.error?data.error:'Failed to create Shopify billing charge.';
-        setShopifyFeedback(message,true);
+        const message=data&&data.error?data.error:'';
+        setShopifyFeedback(describeShopifyBillingError(message),true);
         return;
       }
 
@@ -843,7 +872,7 @@
       setShopifyFeedback('Shopify billing charge created. Complete setup in Shopify if required.');
     }catch(error){
       console.error('Failed to create Shopify billing charge',error);
-      setShopifyFeedback('Failed to create Shopify billing charge. Please try again.',true);
+      setShopifyFeedback(describeShopifyBillingError(error&&error.message),true);
     }finally{
       startShopifyBillingButton.disabled=false;
     }
