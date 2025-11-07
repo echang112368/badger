@@ -48,7 +48,6 @@ class MerchantMeta(models.Model):
     paypal_email = models.EmailField(blank=True)
     shopify_access_token = models.CharField(max_length=255, blank=True)
     shopify_store_domain = models.CharField(max_length=255, blank=True)
-    shopify_oauth_authorization_line = models.CharField(max_length=512, blank=True)
     business_type = models.CharField(
         max_length=20,
         choices=BusinessType.choices,
