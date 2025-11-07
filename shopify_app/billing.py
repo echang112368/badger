@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
+from requests import HTTPError
+
 from django.conf import settings
 
 from merchants.models import MerchantMeta
@@ -115,10 +117,13 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
         }
     }
 
-    response = client.post(
-        "/admin/api/2024-07/recurring_application_charges.json",
-        json=payload,
-    )
+    try:
+        response = client.post(
+            "/admin/api/2024-07/recurring_application_charges.json",
+            json=payload,
+        )
+    except HTTPError as exc:
+        raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
     data = response.json()
     charge = data.get("recurring_application_charge")
@@ -127,6 +132,70 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
 
     _update_meta_from_charge(meta, charge)
     return charge
+
+
+def _describe_shopify_http_error(error: HTTPError) -> str:
+    response = getattr(error, "response", None)
+    if response is None:
+        return "Shopify rejected the billing request. Verify your Shopify billing configuration and try again."
+
+    status_text = str(response.status_code)
+    if response.reason:
+        status_text = f"{status_text} {response.reason}"
+
+    message = f"Shopify rejected the billing request (HTTP {status_text})."
+
+    details = _extract_shopify_error_details(response)
+    if details:
+        message = f"{message} Details: {details}."
+    else:
+        message = f"{message} Check your monthly fee, capped amount, and any pending confirmation in Shopify, then try again."
+
+    request_id = response.headers.get("X-Request-Id")
+    if request_id:
+        message = f"{message} Shopify request ID: {request_id}."
+
+    return message
+
+
+def _extract_shopify_error_details(response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    messages = []
+    if isinstance(payload, dict):
+        errors = payload.get("errors")
+        if errors:
+            messages.append(_stringify_error_value(errors))
+
+        error_text = payload.get("error") or payload.get("message")
+        if error_text:
+            messages.append(str(error_text))
+
+    if not messages:
+        text = (response.text or "").strip()
+        if text:
+            messages.append(text.splitlines()[0])
+
+    return "; ".join(filter(None, (msg.strip() for msg in messages if msg)))
+
+
+def _stringify_error_value(value) -> str:
+    if isinstance(value, dict):
+        parts = []
+        for key, inner in value.items():
+            inner_text = _stringify_error_value(inner)
+            if inner_text:
+                parts.append(f"{key}: {inner_text}")
+        return "; ".join(parts)
+
+    if isinstance(value, (list, tuple, set)):
+        parts = [_stringify_error_value(item) for item in value]
+        return "; ".join(part for part in parts if part)
+
+    return str(value)
 
 
 def ensure_active_charge(meta: MerchantMeta) -> None:
