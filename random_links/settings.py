@@ -71,6 +71,27 @@ ROOT_URLCONF = 'random_links.urls'
 
 from dotenv import load_dotenv
 import os
+
+# Load environment variables from a .env file or directory if present.
+ENV_PATH = BASE_DIR / ".env"
+if ENV_PATH.exists():
+    if ENV_PATH.is_file():
+        load_dotenv(ENV_PATH)
+    else:
+        def _looks_like_dotenv(path):
+            filename = path.name
+            return path.is_file() and (
+                filename == ".env"
+                or filename.endswith(".env")
+                or filename.startswith(".env.")
+            )
+
+        for env_file in sorted(p for p in ENV_PATH.glob("**/*") if _looks_like_dotenv(p)):
+            load_dotenv(env_file)
+
+# Always fall back to python-dotenv's default discovery so deployments that
+# rely on a standalone `.env` file continue to work without additional
+# configuration.
 load_dotenv()
 
 # PayPal configuration is provided through environment variables so that
