@@ -227,7 +227,11 @@ def oauth_callback(request):
             login_form = CustomLoginForm(request)
             if signup_form.is_valid():
                 user = signup_form.save()
-                _persist_shopify_credentials(user, oauth_data, signup_form.company_name)
+                _persist_shopify_credentials(
+                    user,
+                    oauth_data,
+                    signup_form.get_company_name(),
+                )
                 auth_login(request, user)
                 request.session.pop(OAUTH_SESSION_KEY, None)
                 request.session.pop("shopify_oauth_state", None)
