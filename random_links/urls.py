@@ -31,7 +31,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
-    path('shopify/', include('shopify_app.urls')),
+    path('shopify_app/', include('shopify_app.urls')),
     path('collect/', include('collect.urls')),
     path('verification/', include('verify_email.urls')),
     path('', include('merchantlist.urls')),
