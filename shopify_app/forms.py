@@ -53,6 +53,5 @@ class ShopifyOAuthSignupForm(forms.Form):
         user.save(update_fields=["is_active", "is_merchant"])
         return user
 
-    @property
-    def company_name(self) -> str:
+    def get_company_name(self) -> str:
         return self.cleaned_data.get("company_name", "")
