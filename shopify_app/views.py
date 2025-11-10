@@ -1,43 +1,37 @@
+"""Views for interacting with Shopify."""
+
 import hashlib
 import hmac
-import logging
+import secrets
 import uuid
 from typing import Dict
 from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
-from django.contrib.auth import login as auth_login
-from django.shortcuts import redirect, render
+from django.http import (
+    HttpRequest,
+    HttpResponseBadRequest,
+    JsonResponse,
+)
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
 
-from accounts.forms import CustomLoginForm
-from merchants.models import MerchantMeta, MerchantTeamMember
+from merchants.models import MerchantMeta
+
 from .discounts import select_discount_percentage
-from .forms import ShopifyOAuthSignupForm
+from .models import Shop
 from .shopify_client import ShopifyClient
 
 
-logger = logging.getLogger(__name__)
-
-
-def _log_oauth_event(level: int, request, message: str, **details) -> None:
-    """Emit structured logging for Shopify OAuth progress and failures."""
-
-    payload = {
-        "message": message,
-        "method": request.method,
-        "path": request.get_full_path(),
-    }
-    if details:
-        payload.update(details)
-    logger.log(level, "Shopify OAuth: %s", message, extra={"shopify_oauth_event": payload})
+# Session key that stores the randomly generated OAuth state token.
+STATE_SESSION_KEY = "shopify_oauth_state"
 
 
 @api_view(["POST"])
@@ -90,432 +84,152 @@ def create_discount(request, merchant_uuid):
     return Response({"coupon_code": coupon_code, "discount": percentage})
 
 
-OAUTH_SESSION_KEY = "shopify_oauth_pending"
+@require_GET
+def oauth_authorize(request: HttpRequest):
+    """Begin the classic Shopify OAuth flow."""
+
+    # Shopify requires the merchant's shop domain for OAuth. Reject the request
+    # immediately when the `shop` query parameter is missing.
+    shop = (request.GET.get("shop") or "").strip()
+    if not shop:
+        return HttpResponseBadRequest("Missing 'shop' parameter.")
+
+    # Normalise user-supplied shop domain values by removing protocol prefixes
+    # and trailing slashes. Shopify expects `example.myshopify.com` only.
+    if shop.startswith("https://") or shop.startswith("http://"):
+        shop = shop.split("://", 1)[1]
+    shop = shop.strip("/")
+
+    # Both the public API key and secret must exist before we can start OAuth.
+    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
+        return JsonResponse(
+            {"error": "Shopify API credentials are not configured."},
+            status=500,
+        )
+
+    # Generate a cryptographically secure random string to defend against CSRF
+    # attacks and store it in the session for later validation.
+    state = _generate_state_token()
+    request.session[STATE_SESSION_KEY] = state
+
+    # Build the callback URL that Shopify will redirect the merchant back to.
+    callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
+    if callback_url.startswith("http://"):
+        # Shopify requires an HTTPS redirect URI. When developing locally with
+        # tunnelling tools we commonly receive an HTTP request, so upgrade it.
+        callback_url = "https://" + callback_url.split("://", 1)[1]
+
+    # Construct the Shopify authorization URL with the requested scopes.
+    params = {
+        "client_id": settings.SHOPIFY_API_KEY,
+        "scope": "read_products,write_orders",
+        "redirect_uri": callback_url,
+        "state": state,
+    }
+    authorization_url = f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"
+
+    # Redirect the merchant to Shopify where they can approve the installation.
+    return redirect(authorization_url)
 
 
-def _validate_shopify_hmac(params) -> bool:
+@require_GET
+def oauth_callback(request: HttpRequest):
+    """Handle Shopify's OAuth callback and persist the merchant token."""
+
+    # Shopify sends all OAuth results as query parameters in the callback URL.
+    # The `shop` and `code` parameters are mandatory for token exchange.
+    shop = (request.GET.get("shop") or "").strip()
+    code = (request.GET.get("code") or "").strip()
+    if not shop or not code:
+        return HttpResponseBadRequest("Missing required OAuth parameters.")
+
+    # Ensure the request genuinely originated from Shopify by validating the
+    # HMAC signature using the shared client secret.
+    if not _validate_shopify_hmac(request.GET):
+        return HttpResponseBadRequest("Invalid Shopify HMAC signature.")
+
+    # Compare the `state` parameter against the value stored in the session to
+    # confirm that the callback matches the session that initiated OAuth.
+    expected_state = request.session.pop(STATE_SESSION_KEY, None)
+    received_state = request.GET.get("state")
+    if not expected_state or expected_state != received_state:
+        return HttpResponseBadRequest("OAuth state mismatch.")
+
+    # Exchange the short-lived authorization code for a permanent access token.
+    try:
+        access_token = _exchange_code_for_token(shop, code)
+    except requests.RequestException as exc:
+        return JsonResponse(
+            {
+                "error": "Failed to exchange access token with Shopify.",
+                "details": str(exc),
+            },
+            status=500,
+        )
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
+
+    # Persist the access token so that future API calls can be made on behalf of
+    # the merchant. If the shop already exists we overwrite the stored token.
+    Shop.objects.update_or_create(
+        shop_domain=shop,
+        defaults={"access_token": access_token},
+    )
+
+    # Provide a simple confirmation payload to the merchant (or installer) so
+    # they know the OAuth process completed successfully.
+    return JsonResponse({"status": "ok", "shop": shop})
+
+
+def _generate_state_token() -> str:
+    """Return a cryptographically secure random string for OAuth state."""
+
+    return secrets.token_urlsafe(32)
+
+
+def _validate_shopify_hmac(params: Dict[str, str]) -> bool:
+    """Validate the request signature provided by Shopify."""
+
     provided_hmac = params.get("hmac")
-    if not provided_hmac:
+    if not provided_hmac or not settings.SHOPIFY_API_SECRET:
         return False
-    items = [
-        (key, ",".join(params.getlist(key)))
-        for key in params.keys()
-        if key != "hmac"
-    ]
-    message = "&".join(f"{key}={value}" for key, value in sorted(items))
+
+    # Shopify requires that parameters are sorted lexicographically, joined as
+    # `key=value` pairs and concatenated with `&` before signing the message.
+    message_parts = []
+    for key in sorted(k for k in params.keys() if k != "hmac"):
+        values = params.getlist(key) if hasattr(params, "getlist") else [params[key]]
+        message_parts.append(f"{key}={','.join(values)}")
+    message = "&".join(message_parts)
+
     digest = hmac.new(
         settings.SHOPIFY_API_SECRET.encode("utf-8"),
         message.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
+
     return hmac.compare_digest(digest, provided_hmac)
 
 
-def _exchange_code_for_token(shop_domain: str, code: str) -> Dict[str, str]:
-    url = f"https://{shop_domain}/admin/oauth/access_token"
+def _exchange_code_for_token(shop: str, code: str) -> str:
+    """Exchange the OAuth authorization code for an access token."""
+
+    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
+        raise ValueError("Shopify API credentials are not configured.")
+
+    url = f"https://{shop}/admin/oauth/access_token"
     payload = {
         "client_id": settings.SHOPIFY_API_KEY,
         "client_secret": settings.SHOPIFY_API_SECRET,
         "code": code,
     }
+
     response = requests.post(url, json=payload, timeout=10)
     response.raise_for_status()
-    return response.json()
+    data = response.json()
 
+    access_token = data.get("access_token")
+    if not access_token:
+        raise ValueError("Shopify response did not include an access token.")
 
-def _ensure_merchant_membership(user):
-    membership = getattr(user, "merchant_team_membership", None)
-    if membership is None:
-        membership = MerchantTeamMember.objects.filter(user=user).first()
-        if membership is not None:
-            setattr(user, "merchant_team_membership", membership)
-    if membership and membership.merchant:
-        return membership.merchant
-    if not user.is_merchant:
-        user.is_merchant = True
-        user.save(update_fields=["is_merchant"])
-    membership, _ = MerchantTeamMember.objects.get_or_create(
-        user=user,
-        defaults={
-            "merchant": user,
-            "role": MerchantTeamMember.Role.SUPERUSER,
-        },
-    )
-    setattr(user, "merchant_team_membership", membership)
-    return membership.merchant
-
-
-def _persist_shopify_credentials(user, oauth_data: Dict[str, str], company_name: str = ""):
-    merchant_user = _ensure_merchant_membership(user)
-    meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
-    access_token = oauth_data.get("access_token", "")
-    store_domain = (oauth_data.get("shop") or "").lower()
-    meta.shopify_access_token = access_token
-    meta.shopify_store_domain = store_domain
-    meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-    if company_name:
-        meta.company_name = company_name
-    if access_token:
-        meta.shopify_oauth_authorization_line = f"Authorization: Bearer {access_token}"
-    meta.save()
-    return meta
-
-
-@require_http_methods(["GET"])
-def oauth_authorize(request):
-    """Kick off the classic Shopify OAuth authorization flow."""
-
-    shop_param = (request.GET.get("shop") or "").strip()
-    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
-        _log_oauth_event(
-            logging.ERROR,
-            request,
-            "API credentials missing during OAuth authorize",
-        )
-        return render(
-            request,
-            "shopify_app/oauth_connect_error.html",
-            {"error": "Shopify credentials are not configured."},
-            status=500,
-        )
-
-    if not shop_param:
-        _log_oauth_event(
-            logging.ERROR,
-            request,
-            "Shop parameter missing during OAuth authorize",
-        )
-        return render(
-            request,
-            "shopify_app/oauth_connect_error.html",
-            {"error": "Missing Shopify shop parameter."},
-            status=400,
-        )
-
-    shop = shop_param.lower()
-    if shop.startswith("https://") or shop.startswith("http://"):
-        shop = shop.split("://", 1)[1]
-    shop = shop.strip("/")
-
-    if "myshopify.com" not in shop or "." not in shop:
-        _log_oauth_event(
-            logging.ERROR,
-            request,
-            "Invalid shop domain supplied",
-            shop=shop_param,
-        )
-        return render(
-            request,
-            "shopify_app/oauth_connect_error.html",
-            {"error": "Invalid Shopify shop domain."},
-            status=400,
-        )
-
-    state = uuid.uuid4().hex
-    request.session["shopify_oauth_state"] = state
-    request.session.modified = True
-
-    callback_default = request.build_absolute_uri(
-        reverse("shopify_oauth_callback")
-    )
-    redirect_uri = settings.SHOPIFY_REDIRECT_URI or callback_default
-
-    params = {
-        "client_id": settings.SHOPIFY_API_KEY,
-        "scope": settings.SHOPIFY_SCOPES,
-        "redirect_uri": redirect_uri,
-        "state": state,
-    }
-
-    authorize_url = f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"
-    _log_oauth_event(
-        logging.INFO,
-        request,
-        "Redirecting merchant to Shopify OAuth authorize",
-        shop_domain=shop,
-        redirect_uri=redirect_uri,
-    )
-    return redirect(authorize_url)
-
-
-@require_http_methods(["GET", "POST"])
-def oauth_callback(request):
-    try:
-        if request.method == "GET":
-            _log_oauth_event(
-                logging.INFO,
-                request,
-                "Received Shopify OAuth GET callback",
-            )
-            if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "API credentials missing during OAuth callback",
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {
-                        "error": "Shopify credentials are not configured.",
-                    },
-                    status=500,
-                )
-
-            if not _validate_shopify_hmac(request.GET):
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "Invalid HMAC signature received",
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": "Invalid Shopify signature."},
-                    status=400,
-                )
-            else:
-                _log_oauth_event(
-                    logging.DEBUG,
-                    request,
-                    "HMAC signature validated successfully",
-                )
-
-            state = request.GET.get("state")
-            expected_state = request.session.get("shopify_oauth_state")
-            if expected_state and state != expected_state:
-                _log_oauth_event(
-                    logging.WARNING,
-                    request,
-                    "State mismatch detected",
-                    expected_state=expected_state,
-                    received_state=state,
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": "The OAuth session has expired. Start the installation again."},
-                    status=400,
-                )
-            else:
-                _log_oauth_event(
-                    logging.DEBUG,
-                    request,
-                    "OAuth state validated",
-                    expected_state=expected_state,
-                )
-
-            code = request.GET.get("code")
-            shop = request.GET.get("shop")
-            if not code or not shop:
-                missing_params = []
-                if not code:
-                    missing_params.append("code")
-                if not shop:
-                    missing_params.append("shop")
-
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "Missing required OAuth parameters",
-                    missing_params=missing_params,
-                    has_code=bool(code),
-                    has_shop=bool(shop),
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": "Missing required Shopify OAuth parameters."},
-                    status=400,
-                )
-            else:
-                _log_oauth_event(
-                    logging.DEBUG,
-                    request,
-                    "Received authorization code",
-                    shop_domain=shop,
-                )
-
-            try:
-                token_payload = _exchange_code_for_token(shop, code)
-            except requests.RequestException as exc:
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "Failed to exchange authorization code",
-                    shop_domain=shop,
-                    exception=str(exc),
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": f"Failed to exchange access token: {exc}"},
-                    status=502,
-                )
-            else:
-                _log_oauth_event(
-                    logging.INFO,
-                    request,
-                    "Successfully exchanged authorization code",
-                    shop_domain=shop,
-                )
-
-            access_token = token_payload.get("access_token")
-            if not access_token:
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "Access token missing from Shopify response",
-                    shop_domain=shop,
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": "Shopify did not return an access token."},
-                    status=502,
-                )
-
-            request.session[OAUTH_SESSION_KEY] = {
-                "shop": shop,
-                "access_token": access_token,
-                "scope": token_payload.get("scope", ""),
-            }
-            request.session.modified = True
-            _log_oauth_event(
-                logging.INFO,
-                request,
-                "Stored OAuth payload in session",
-                shop_domain=shop,
-            )
-            signup_form = ShopifyOAuthSignupForm()
-            login_form = CustomLoginForm(request)
-        else:
-            _log_oauth_event(
-                logging.INFO,
-                request,
-                "Received Shopify OAuth POST submission",
-                action=request.POST.get("action"),
-            )
-            oauth_data = request.session.get(OAUTH_SESSION_KEY)
-            if not oauth_data:
-                _log_oauth_event(
-                    logging.ERROR,
-                    request,
-                    "OAuth session payload missing on POST",
-                )
-                return render(
-                    request,
-                    "shopify_app/oauth_connect_error.html",
-                    {"error": "The Shopify OAuth session could not be found. Start the installation again."},
-                    status=400,
-                )
-
-            action = request.POST.get("action")
-            if action == "signup":
-                signup_form = ShopifyOAuthSignupForm(request.POST)
-                login_form = CustomLoginForm(request)
-                if signup_form.is_valid():
-                    _log_oauth_event(
-                        logging.INFO,
-                        request,
-                        "Persisting Shopify credentials for new signup",
-                    )
-                    user = signup_form.save()
-                    _persist_shopify_credentials(
-                        user,
-                        oauth_data,
-                        signup_form.get_company_name(),
-                    )
-                    auth_login(request, user)
-                    request.session.pop(OAUTH_SESSION_KEY, None)
-                    request.session.pop("shopify_oauth_state", None)
-                    return redirect(f"{reverse('merchant_settings')}?tab=api")
-                else:
-                    _log_oauth_event(
-                        logging.WARNING,
-                        request,
-                        "Signup form validation failed",
-                        errors=signup_form.errors.get_json_data(),
-                    )
-            elif action == "login":
-                signup_form = ShopifyOAuthSignupForm()
-                login_form = CustomLoginForm(request, data=request.POST)
-                if login_form.is_valid():
-                    _log_oauth_event(
-                        logging.INFO,
-                        request,
-                        "Persisting Shopify credentials for login",
-                    )
-                    user = login_form.get_user()
-                    auth_login(request, user)
-                    _persist_shopify_credentials(user, oauth_data)
-                    request.session.pop(OAUTH_SESSION_KEY, None)
-                    request.session.pop("shopify_oauth_state", None)
-                    return redirect(f"{reverse('merchant_settings')}?tab=api")
-                else:
-                    _log_oauth_event(
-                        logging.WARNING,
-                        request,
-                        "Login form validation failed",
-                        errors=login_form.errors.get_json_data(),
-                    )
-            else:
-                if action:
-                    _log_oauth_event(
-                        logging.WARNING,
-                        request,
-                        "Unexpected POST action received",
-                        action=action,
-                    )
-                signup_form = ShopifyOAuthSignupForm()
-                login_form = CustomLoginForm(request)
-
-        context = {
-            "signup_form": signup_form,
-            "login_form": login_form,
-            "shop_domain": request.session.get(OAUTH_SESSION_KEY, {}).get("shop"),
-        }
-        return render(request, "shopify_app/oauth_connect.html", context)
-    except Exception:
-        _log_oauth_debug_information(request)
-        raise
-
-
-SENSITIVE_QUERY_KEYS = {"hmac", "code", "timestamp", "state", "id_token", "session"}
-
-
-def _log_oauth_debug_information(request) -> None:
-    """Capture debugging information when the OAuth callback fails."""
-
-    def _clean_params(query_dict):
-        cleaned = {}
-        for key in query_dict.keys():
-            value = list(query_dict.getlist(key))
-            if key in SENSITIVE_QUERY_KEYS:
-                value = ["<redacted>"] * len(value)
-            cleaned[key] = value if len(value) > 1 else value[0]
-        return cleaned
-
-    pending_oauth = request.session.get(OAUTH_SESSION_KEY)
-    if isinstance(pending_oauth, dict):
-        pending_oauth = {
-            key: ("<redacted>" if key == "access_token" else value)
-            for key, value in pending_oauth.items()
-        }
-
-    debug_payload = {
-        "method": request.method,
-        "path": request.get_full_path(),
-        "is_authenticated": request.user.is_authenticated,
-        "session_keys": sorted(request.session.keys()),
-        "expected_state": request.session.get("shopify_oauth_state"),
-        "pending_oauth": pending_oauth,
-        "query_params": _clean_params(request.GET if request.method == "GET" else request.POST),
-        "headers": {
-            "Referer": request.headers.get("Referer"),
-            "User-Agent": request.headers.get("User-Agent"),
-            "X-Forwarded-For": request.headers.get("X-Forwarded-For"),
-        },
-    }
-
-    logger.exception("Shopify OAuth callback failed", extra={"shopify_oauth_debug": debug_payload})
+    return access_token
