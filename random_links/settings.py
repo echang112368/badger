@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import json
 from pathlib import Path
 from datetime import timedelta
 
@@ -27,6 +28,27 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 DEBUG = True
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", '72fdb558e0a5.ngrok-free.app']
+
+MERCHANT_LIST_PATH = BASE_DIR / "merchantlist" / "static" / "merchant_list.json"
+try:
+    with MERCHANT_LIST_PATH.open("r", encoding="utf-8") as merchant_list_file:
+        merchant_list_data = json.load(merchant_list_file)
+except (OSError, ValueError, TypeError):
+    merchant_domains: list[str] = []
+else:
+    raw_domains = merchant_list_data.get("merchants")
+    merchant_domains = []
+    if isinstance(raw_domains, list):
+        for entry in raw_domains:
+            if not isinstance(entry, str):
+                continue
+            domain = entry.strip().lower()
+            if domain and domain not in merchant_domains:
+                merchant_domains.append(domain)
+
+for domain in merchant_domains:
+    if domain not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(domain)
 
 
 # Application definition
