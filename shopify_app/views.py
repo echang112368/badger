@@ -3,6 +3,7 @@ import hmac
 import logging
 import uuid
 from typing import Dict
+from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
@@ -158,6 +159,83 @@ def _persist_shopify_credentials(user, oauth_data: Dict[str, str], company_name:
         meta.shopify_oauth_authorization_line = f"Authorization: Bearer {access_token}"
     meta.save()
     return meta
+
+
+@require_http_methods(["GET"])
+def oauth_authorize(request):
+    """Kick off the classic Shopify OAuth authorization flow."""
+
+    shop_param = (request.GET.get("shop") or "").strip()
+    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
+        _log_oauth_event(
+            logging.ERROR,
+            request,
+            "API credentials missing during OAuth authorize",
+        )
+        return render(
+            request,
+            "shopify_app/oauth_connect_error.html",
+            {"error": "Shopify credentials are not configured."},
+            status=500,
+        )
+
+    if not shop_param:
+        _log_oauth_event(
+            logging.ERROR,
+            request,
+            "Shop parameter missing during OAuth authorize",
+        )
+        return render(
+            request,
+            "shopify_app/oauth_connect_error.html",
+            {"error": "Missing Shopify shop parameter."},
+            status=400,
+        )
+
+    shop = shop_param.lower()
+    if shop.startswith("https://") or shop.startswith("http://"):
+        shop = shop.split("://", 1)[1]
+    shop = shop.strip("/")
+
+    if "myshopify.com" not in shop or "." not in shop:
+        _log_oauth_event(
+            logging.ERROR,
+            request,
+            "Invalid shop domain supplied",
+            shop=shop_param,
+        )
+        return render(
+            request,
+            "shopify_app/oauth_connect_error.html",
+            {"error": "Invalid Shopify shop domain."},
+            status=400,
+        )
+
+    state = uuid.uuid4().hex
+    request.session["shopify_oauth_state"] = state
+    request.session.modified = True
+
+    callback_default = request.build_absolute_uri(
+        reverse("shopify_oauth_callback")
+    )
+    redirect_uri = settings.SHOPIFY_REDIRECT_URI or callback_default
+
+    params = {
+        "client_id": settings.SHOPIFY_API_KEY,
+        "scope": settings.SHOPIFY_SCOPES,
+        "redirect_uri": redirect_uri,
+        "state": state,
+    }
+
+    authorize_url = f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"
+    _log_oauth_event(
+        logging.INFO,
+        request,
+        "Redirecting merchant to Shopify OAuth authorize",
+        shop_domain=shop,
+        redirect_uri=redirect_uri,
+    )
+    return redirect(authorize_url)
 
 
 @require_http_methods(["GET", "POST"])
