@@ -199,6 +199,14 @@ USE_I18N = True
 USE_TZ = True
 
 
+# Shopify OAuth requires cross-site cookie support while the authorization
+# handshake hops between Shopify and our application. Mark the session cookie as
+# secure and compatible with cross-site requests so it is available during the
+# callback.
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 

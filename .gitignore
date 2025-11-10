@@ -18,6 +18,7 @@ db.sqlite3
 *.pyd
 migrations/
 !merchants/migrations/
+!shopify_app/migrations/
 
 # Environment
 .env
