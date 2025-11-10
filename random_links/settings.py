@@ -103,9 +103,13 @@ PAYPAL_OAUTH_URL = os.environ.get(
     "PAYPAL_OAUTH_URL", "https://api-m.sandbox.paypal.com/v1/oauth2/token"
 )
 
-# Shopify OAuth configuration
+# Shopify OAuth configuration. Support legacy `.env` files that use
+# `SHOPIFY_SECRET` for the private key by falling back to that variable when
+# `SHOPIFY_API_SECRET` is absent.
 SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
-SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET", "")
+SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET") or os.environ.get(
+    "SHOPIFY_SECRET", ""
+)
 SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
     "read_products,write_discounts",
