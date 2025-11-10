@@ -11,8 +11,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import json
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,7 +28,7 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", '72fdb558e0a5.ngrok-free.app']
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 MERCHANT_LIST_PATH = BASE_DIR / "merchantlist" / "static" / "merchant_list.json"
 try:
@@ -85,6 +86,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'shopify_app.middleware.ShopifyEmbeddedAppSecurityMiddleware',
     #'django.middleware.common.CommonMiddleware',
 ]
 
@@ -116,6 +118,63 @@ if ENV_PATH.exists():
 # configuration.
 load_dotenv()
 
+
+def _normalise_origin(value: str | None) -> tuple[str | None, str | None]:
+    """Return the host and origin portion of a URL or hostname."""
+
+    if not value:
+        return None, None
+
+    candidate = value.strip()
+    if not candidate:
+        return None, None
+
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+
+    parsed = urlparse(candidate)
+    if not parsed.scheme or not parsed.netloc:
+        return None, None
+
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    return parsed.netloc, origin
+
+
+SHOPIFY_ORIGIN_CANDIDATES = [
+    os.environ.get("SHOPIFY_APP_ORIGIN"),
+    os.environ.get("SHOPIFY_APP_URL"),
+    os.environ.get("NGROK_URL"),
+    os.environ.get("NGROK_HOST"),
+    os.environ.get("SHOPIFY_APP_HOST"),
+    os.environ.get("SHOPIFY_APP_DOMAIN"),
+    "https://72fdb558e0a5.ngrok-free.app",
+]
+
+SHOPIFY_APP_HOST = None
+SHOPIFY_APP_ORIGIN = None
+for candidate in SHOPIFY_ORIGIN_CANDIDATES:
+    host, origin = _normalise_origin(candidate)
+    if host and origin:
+        SHOPIFY_APP_HOST = host
+        SHOPIFY_APP_ORIGIN = origin
+        break
+
+if SHOPIFY_APP_HOST and SHOPIFY_APP_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(SHOPIFY_APP_HOST)
+
+_frame_ancestors = [
+    "https://admin.shopify.com",
+    "https://*.myshopify.com",
+]
+_extra_frame_ancestors = os.environ.get("SHOPIFY_FRAME_ANCESTORS")
+if _extra_frame_ancestors:
+    for ancestor in _extra_frame_ancestors.split(","):
+        candidate = ancestor.strip()
+        if candidate and candidate not in _frame_ancestors:
+            _frame_ancestors.append(candidate)
+
+SHOPIFY_EMBEDDED_APP_FRAME_ANCESTORS = tuple(_frame_ancestors)
+
 # PayPal configuration is provided through environment variables so that
 # credentials remain outside of source control.
 PAYPAL_INVOICER_EMAIL = os.environ.get("PAYPAL_INVOICER_EMAIL")
@@ -136,7 +195,19 @@ SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
     "read_products,write_discounts",
 )
-SHOPIFY_REDIRECT_URI = os.environ.get("SHOPIFY_REDIRECT_URI")
+
+_shopify_base = SHOPIFY_APP_ORIGIN.rstrip("/") if SHOPIFY_APP_ORIGIN else None
+_default_shopify_app_url = (
+    f"{_shopify_base}/shopify/" if _shopify_base else ""
+)
+_default_shopify_redirect_uri = (
+    f"{_shopify_base}/shopify/oauth/callback/" if _shopify_base else ""
+)
+
+SHOPIFY_APP_URL = os.environ.get("SHOPIFY_APP_URL", _default_shopify_app_url)
+SHOPIFY_REDIRECT_URI = os.environ.get(
+    "SHOPIFY_REDIRECT_URI", _default_shopify_redirect_uri
+)
 
 
 TEMPLATES = [
@@ -205,6 +276,11 @@ USE_TZ = True
 # callback.
 SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+
+X_FRAME_OPTIONS = "ALLOWALL"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 
 # Static files (CSS, JavaScript, Images)
@@ -224,10 +300,17 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'webmaster@localhost'
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://72fdb558e0a5.ngrok-free.app"
+CSRF_TRUSTED_ORIGINS: list[str] = []
+if SHOPIFY_APP_ORIGIN:
+    CSRF_TRUSTED_ORIGINS.append(SHOPIFY_APP_ORIGIN)
 
-]
+_extra_csrf_origins = os.environ.get("EXTRA_CSRF_TRUSTED_ORIGINS")
+if _extra_csrf_origins:
+    for origin in _extra_csrf_origins.split(","):
+        _, normalised_origin = _normalise_origin(origin)
+        if normalised_origin and normalised_origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(normalised_origin)
+
 #change url in shoplify_app/management/commands/inject_scripts_all_merchants.py if you change the ngrok URL
 
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, change for production
