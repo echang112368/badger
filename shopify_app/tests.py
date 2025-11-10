@@ -6,6 +6,8 @@ import hashlib
 import hmac
 import uuid
 
+import jwt
+
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from accounts.models import CustomUser
@@ -233,3 +235,67 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(meta.shopify_store_domain, self.shop.shop_domain)
         self.assertEqual(meta.shopify_access_token, self.shop.access_token)
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+
+
+@override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
+class OAuthCallbackTests(TestCase):
+    def setUp(self):
+        self.url = reverse("shopify_oauth_callback")
+        self.shop = Shop.objects.create(
+            shop_domain="example.myshopify.com",
+            access_token="shppa_token",
+        )
+
+    def _build_id_token(self, **extra_claims):
+        now = datetime.utcnow()
+        payload = {
+            "iss": "https://example.myshopify.com/admin",
+            "dest": "https://example.myshopify.com",
+            "aud": "key",
+            "sub": "1",
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
+            "nbf": int((now - timedelta(minutes=1)).timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": "session-token",
+        }
+        payload.update(extra_claims)
+        token = jwt.encode(payload, "shh", algorithm="HS256")
+        if isinstance(token, bytes):
+            token = token.decode("utf-8")
+        return token
+
+    def test_session_token_logs_in_existing_merchant(self):
+        user = CustomUser.objects.create_user(
+            username="merchant",
+            email="merchant@example.com",
+            password="pass12345",
+        )
+        MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain="example.myshopify.com",
+            shopify_access_token="shppa_token",
+        )
+
+        response = self.client.get(self.url, {"id_token": self._build_id_token()})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("merchant_dashboard"))
+        self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+
+    def test_session_token_redirects_to_onboarding_when_unknown(self):
+        response = self.client.get(self.url, {"id_token": self._build_id_token()})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/onboard/?shop=example.myshopify.com")
+        self.assertEqual(
+            self.client.session.get("shopify_pending_shop"), "example.myshopify.com"
+        )
+
+    def test_invalid_session_token_returns_400(self):
+        bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
+        if isinstance(bad_token, bytes):
+            bad_token = bad_token.decode("utf-8")
+
+        response = self.client.get(self.url, {"id_token": bad_token})
+
+        self.assertEqual(response.status_code, 400)

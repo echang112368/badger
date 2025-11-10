@@ -4,14 +4,16 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from typing import Dict
+from typing import Any, Dict, Tuple
 from urllib.parse import urlencode
 
+import jwt
 import requests
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.http import (
     HttpRequest,
+    HttpResponse,
     HttpResponseBadRequest,
     JsonResponse,
 )
@@ -38,6 +40,12 @@ from accounts.models import CustomUser
 STATE_SESSION_KEY = "shopify_oauth_state"
 EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
 EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
+PENDING_ONBOARD_SESSION_KEY = "shopify_pending_shop"
+
+
+class ShopifySessionTokenError(Exception):
+    """Raised when a Shopify session token (``id_token``) is invalid."""
+
 
 
 def _normalise_shop_domain(domain: str) -> str:
@@ -310,6 +318,13 @@ def oauth_authorize(request: HttpRequest):
 def oauth_callback(request: HttpRequest):
     """Handle Shopify's OAuth callback and persist the merchant token."""
 
+    # Shopify can return either the legacy OAuth `code` parameters or the new
+    # session-token (`id_token`) when the embedded app loads from the admin.
+    id_token = (request.GET.get("id_token") or "").strip()
+
+    if id_token and not request.GET.get("code"):
+        return _handle_session_token_callback(request, id_token)
+
     # Shopify sends all OAuth results as query parameters in the callback URL.
     # The `shop` and `code` parameters are mandatory for token exchange.
     shop = (request.GET.get("shop") or "").strip()
@@ -345,14 +360,87 @@ def oauth_callback(request: HttpRequest):
 
     # Persist the access token so that future API calls can be made on behalf of
     # the merchant. If the shop already exists we overwrite the stored token.
+    normalised_shop = _normalise_shop_domain(shop)
     Shop.objects.update_or_create(
-        shop_domain=shop,
+        shop_domain=normalised_shop,
         defaults={"access_token": access_token},
     )
 
     # Provide a simple confirmation payload to the merchant (or installer) so
     # they know the OAuth process completed successfully.
-    return JsonResponse({"status": "ok", "shop": shop})
+    return JsonResponse({"status": "ok", "shop": normalised_shop})
+
+
+def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpResponse:
+    """Handle the session-token (`id_token`) callback for embedded apps."""
+
+    try:
+        shop_domain, _payload = _verify_shopify_session_token(id_token)
+    except ShopifySessionTokenError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    normalised_shop = _normalise_shop_domain(shop_domain)
+    shop_record = Shop.objects.filter(shop_domain__iexact=normalised_shop).first()
+
+    if not shop_record:
+        request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
+        return redirect(f"/onboard/?shop={normalised_shop}")
+
+    merchant_meta = (
+        MerchantMeta.objects.select_related("user")
+        .filter(shopify_store_domain__iexact=normalised_shop)
+        .first()
+    )
+
+    if not merchant_meta or not merchant_meta.user:
+        request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
+        return redirect(f"/onboard/?shop={normalised_shop}")
+
+    user = merchant_meta.user
+    if not getattr(user, "backend", None):
+        backends = getattr(settings, "AUTHENTICATION_BACKENDS", [])
+        user.backend = backends[0] if backends else "django.contrib.auth.backends.ModelBackend"
+
+    auth_login(request, user)
+    request.session[EMBEDDED_SHOP_SESSION_KEY] = shop_record.shop_domain
+    request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
+    request.session[PENDING_ONBOARD_SESSION_KEY] = ""
+
+    return redirect("merchant_dashboard")
+
+
+def _verify_shopify_session_token(id_token: str) -> Tuple[str, Dict[str, Any]]:
+    """Validate and decode Shopify's session token."""
+
+    if not id_token:
+        raise ShopifySessionTokenError("Missing Shopify session token.")
+
+    if not settings.SHOPIFY_API_SECRET or not settings.SHOPIFY_API_KEY:
+        raise ShopifySessionTokenError("Shopify API credentials are not configured.")
+
+    try:
+        payload = jwt.decode(
+            id_token,
+            settings.SHOPIFY_API_SECRET,
+            algorithms=["HS256"],
+            audience=settings.SHOPIFY_API_KEY,
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise ShopifySessionTokenError("Shopify session token has expired.") from exc
+    except jwt.InvalidTokenError as exc:
+        raise ShopifySessionTokenError("Invalid Shopify session token.") from exc
+
+    destination = payload.get("dest") or payload.get("iss") or ""
+    destination = destination.split("://", 1)[-1]
+    shop_domain = _normalise_shop_domain(destination)
+    if not shop_domain:
+        raise ShopifySessionTokenError("Shopify session token did not include a shop domain.")
+
+    issuer = payload.get("iss", "")
+    if issuer and shop_domain not in issuer:
+        raise ShopifySessionTokenError("Shopify session token issuer mismatch.")
+
+    return shop_domain, payload
 
 
 def _generate_state_token() -> str:
