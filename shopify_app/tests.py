@@ -1,14 +1,20 @@
-from decimal import Decimal
-from unittest.mock import patch, MagicMock, ANY
+"""Tests for the Shopify integration."""
+
 from datetime import datetime, timedelta
-from django.test import TestCase
+from decimal import Decimal
+import hashlib
+import hmac
+import uuid
+
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
-import uuid
 from rest_framework_simplejwt.tokens import RefreshToken
+from unittest.mock import ANY, MagicMock, patch
 
 from . import billing
+from .models import Shop
 
 
 class CreateDiscountViewTests(TestCase):
@@ -139,3 +145,91 @@ class ShopifyBillingTests(TestCase):
         path = mock_client.post.call_args[0][0]
         self.assertIn("usage_charges", path)
 
+
+@override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
+class EmbeddedAppHomeTests(TestCase):
+    def setUp(self):
+        self.shop = Shop.objects.create(
+            shop_domain="example.myshopify.com",
+            access_token="shpua_token",
+        )
+
+    def _signed_params(self, **params):
+        base = {"shop": self.shop.shop_domain, "timestamp": "1234567890"}
+        base.update(params)
+        message = "&".join(
+            f"{key}={value}"
+            for key, value in sorted(base.items())
+            if key != "hmac"
+        )
+        digest = hmac.new(b"shh", message.encode("utf-8"), hashlib.sha256).hexdigest()
+        base["hmac"] = digest
+        return base
+
+    def test_get_requires_valid_signature(self):
+        url = reverse("shopify_embedded_home")
+        params = {
+            "shop": self.shop.shop_domain,
+            "timestamp": "1234567890",
+            "hmac": "bad",
+        }
+        response = self.client.get(url, params)
+        self.assertEqual(response.status_code, 400)
+
+        response = self.client.get(url, self._signed_params())
+        self.assertEqual(response.status_code, 200)
+
+    def test_signup_links_shopify_store(self):
+        url = reverse("shopify_embedded_home")
+        self.client.get(url, self._signed_params())
+
+        post_data = {
+            "action": "signup",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada@example.com",
+            "company_name": "Ada Co",
+            "password1": "supersafe123",
+            "password2": "supersafe123",
+        }
+
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("merchant_dashboard"))
+
+        user = CustomUser.objects.get(email="ada@example.com")
+        self.assertTrue(user.is_merchant)
+
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_store_domain, self.shop.shop_domain)
+        self.assertEqual(meta.shopify_access_token, self.shop.access_token)
+        self.assertEqual(meta.company_name, "Ada Co")
+
+        self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+
+    def test_login_attaches_existing_user(self):
+        user = CustomUser.objects.create_user(
+            username="merchant",
+            email="merchant@example.com",
+            password="pass12345",
+        )
+
+        url = reverse("shopify_embedded_home")
+        self.client.get(url, self._signed_params())
+
+        response = self.client.post(
+            url,
+            {
+                "action": "login",
+                "username": "merchant@example.com",
+                "password": "pass12345",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("merchant_dashboard"))
+
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_store_domain, self.shop.shop_domain)
+        self.assertEqual(meta.shopify_access_token, self.shop.access_token)
+        self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)

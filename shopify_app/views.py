@@ -9,15 +9,16 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
+from django.contrib.auth import login as auth_login
 from django.http import (
     HttpRequest,
     HttpResponseBadRequest,
     JsonResponse,
 )
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -28,10 +29,183 @@ from merchants.models import MerchantMeta
 from .discounts import select_discount_percentage
 from .models import Shop
 from .shopify_client import ShopifyClient
+from .forms import ShopifyOAuthSignupForm
+from accounts.forms import CustomLoginForm
+from accounts.models import CustomUser
 
 
 # Session key that stores the randomly generated OAuth state token.
 STATE_SESSION_KEY = "shopify_oauth_state"
+EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
+EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
+
+
+def _normalise_shop_domain(domain: str) -> str:
+    """Return a normalised Shopify shop domain."""
+
+    if not domain:
+        return ""
+    domain = domain.strip().lower()
+    if domain.startswith("https://") or domain.startswith("http://"):
+        domain = domain.split("://", 1)[1]
+    return domain.strip("/")
+
+
+def _ensure_shopify_link(
+    user: CustomUser, shop_domain: str, access_token: str, *, company_name: str = ""
+) -> None:
+    """Persist Shopify credentials on the merchant's metadata record."""
+
+    normalised_domain = _normalise_shop_domain(shop_domain)
+    existing = (
+        MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
+        .exclude(user=user)
+        .first()
+    )
+    if existing:
+        raise ValueError("This Shopify store is already connected to a different account.")
+
+    meta, _ = MerchantMeta.objects.get_or_create(
+        user=user,
+        defaults={
+            "company_name": company_name or "",
+            "business_type": MerchantMeta.BusinessType.SHOPIFY,
+        },
+    )
+
+    fields_to_update = ["shopify_access_token", "shopify_store_domain", "business_type"]
+
+    if company_name and company_name.strip():
+        meta.company_name = company_name.strip()
+        fields_to_update.append("company_name")
+
+    meta.shopify_access_token = access_token
+    meta.shopify_store_domain = normalised_domain
+    meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+    meta.save(update_fields=fields_to_update)
+
+    if not user.is_merchant:
+        user.is_merchant = True
+        user.save(update_fields=["is_merchant"])
+
+
+def _render_shopify_error(request: HttpRequest, message: str, *, status_code: int = 400):
+    """Render an error page suitable for embedded Shopify requests."""
+
+    return render(
+        request,
+        "shopify_app/oauth_connect_error.html",
+        {"error": message},
+        status=status_code,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def embedded_app_home(request: HttpRequest):
+    """Surface signup/login flows for merchants inside the Shopify admin."""
+
+    if request.method == "GET":
+        shop = request.GET.get("shop", "")
+        if not shop:
+            return _render_shopify_error(request, "Missing Shopify shop parameter.")
+
+        if not _validate_shopify_hmac(request.GET):
+            return HttpResponseBadRequest("Invalid Shopify HMAC signature.")
+
+        normalised_shop = _normalise_shop_domain(shop)
+        shop_record = (
+            Shop.objects.filter(shop_domain__iexact=normalised_shop).first()
+        )
+        if not shop_record or not shop_record.access_token:
+            return _render_shopify_error(
+                request,
+                "We couldn't find an authorized Shopify installation for this store."
+                " Please reinstall the app from Shopify to continue.",
+            )
+
+        request.session[EMBEDDED_SHOP_SESSION_KEY] = shop_record.shop_domain
+        request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
+
+        if request.user.is_authenticated:
+            meta = getattr(request.user, "merchantmeta", None)
+            if meta and _normalise_shop_domain(meta.shopify_store_domain) == normalised_shop:
+                return redirect("merchant_dashboard")
+
+        context = {
+            "signup_form": ShopifyOAuthSignupForm(),
+            "login_form": CustomLoginForm(request),
+            "shop_domain": shop_record.shop_domain,
+        }
+        return render(request, "shopify_app/oauth_connect.html", context)
+
+    # POST handling requires a previously validated GET request so that we
+    # trust the HMAC and store domain stored in the session.
+    if not request.session.get(EMBEDDED_AUTHORIZED_SESSION_KEY):
+        return HttpResponseBadRequest("Shopify session not initialised.")
+
+    shop_domain = request.session.get(EMBEDDED_SHOP_SESSION_KEY, "")
+    if not shop_domain:
+        return HttpResponseBadRequest("Missing Shopify session context.")
+
+    shop_record = Shop.objects.filter(
+        shop_domain__iexact=_normalise_shop_domain(shop_domain)
+    ).first()
+    if not shop_record or not shop_record.access_token:
+        return _render_shopify_error(
+            request,
+            "We couldn't find an authorized Shopify installation for this store."
+            " Please reinstall the app from Shopify to continue.",
+        )
+
+    action = (request.POST.get("action") or "").strip().lower()
+    if action not in {"signup", "login"}:
+        return HttpResponseBadRequest("Unsupported action.")
+
+    if action == "signup":
+        signup_form = ShopifyOAuthSignupForm(request.POST)
+        login_form = CustomLoginForm(request)
+        if signup_form.is_valid():
+            user = signup_form.save()
+            try:
+                _ensure_shopify_link(
+                    user,
+                    shop_record.shop_domain,
+                    shop_record.access_token,
+                    company_name=signup_form.get_company_name(),
+                )
+            except ValueError as exc:
+                signup_form.add_error(None, str(exc))
+            else:
+                auth_login(request, user)
+                return redirect("merchant_dashboard")
+    else:
+        signup_form = ShopifyOAuthSignupForm()
+        login_form = CustomLoginForm(request, data=request.POST)
+        if login_form.is_valid():
+            user = login_form.get_user()
+            company_name = ""
+            meta = getattr(user, "merchantmeta", None)
+            if meta:
+                company_name = meta.company_name
+            try:
+                _ensure_shopify_link(
+                    user,
+                    shop_record.shop_domain,
+                    shop_record.access_token,
+                    company_name=company_name,
+                )
+            except ValueError as exc:
+                login_form.add_error(None, str(exc))
+            else:
+                auth_login(request, user)
+                return redirect("merchant_dashboard")
+
+    context = {
+        "signup_form": signup_form,
+        "login_form": login_form,
+        "shop_domain": shop_record.shop_domain,
+    }
+    return render(request, "shopify_app/oauth_connect.html", context, status=400)
 
 
 @api_view(["POST"])

@@ -1,3 +1,5 @@
+"""Forms used during the Shopify embedded onboarding flow."""
+
 from django import forms
 from django.contrib.auth import get_user_model
 
@@ -8,12 +10,25 @@ User = get_user_model()
 class ShopifyOAuthSignupForm(forms.Form):
     """Collect account details for merchants completing Shopify OAuth."""
 
+    input_css = (
+        "mt-1 w-full rounded-md border border-gray-300 px-3 py-2 "
+        "focus:outline-none focus:ring-2 focus:ring-indigo-500"
+    )
+
     first_name = forms.CharField(max_length=150, required=False)
     last_name = forms.CharField(max_length=150, required=False)
     email = forms.EmailField()
     company_name = forms.CharField(max_length=255, required=False)
     password1 = forms.CharField(widget=forms.PasswordInput)
     password2 = forms.CharField(widget=forms.PasswordInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            existing = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{existing} {self.input_css}".strip()
+        self.fields["email"].widget.attrs.setdefault("placeholder", "you@example.com")
+        self.fields["company_name"].widget.attrs.setdefault("placeholder", "Badger Co.")
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
