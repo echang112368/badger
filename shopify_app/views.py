@@ -230,10 +230,17 @@ def oauth_callback(request):
             code = request.GET.get("code")
             shop = request.GET.get("shop")
             if not code or not shop:
+                missing_params = []
+                if not code:
+                    missing_params.append("code")
+                if not shop:
+                    missing_params.append("shop")
+
                 _log_oauth_event(
                     logging.ERROR,
                     request,
                     "Missing required OAuth parameters",
+                    missing_params=missing_params,
                     has_code=bool(code),
                     has_shop=bool(shop),
                 )
