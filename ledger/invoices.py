@@ -393,8 +393,13 @@ def generate_due_invoices():
     return created
 
 
-def generate_all_invoices(ignore_date: bool = False):
-    """Generate invoices for all merchants with unpaid ledger entries."""
+def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False):
+    """Generate invoices for all merchants with unpaid ledger entries.
+
+    When ``shopify_only`` is true, only Shopify merchants are processed and
+    PayPal invoice generation is skipped. This is primarily used by the admin
+    interface when triggering Shopify billing directly.
+    """
     today = timezone.now().date()
     if not ignore_date and today.day != 1:
         return []
@@ -430,17 +435,29 @@ def generate_all_invoices(ignore_date: bool = False):
             meta = None
 
         if meta is None:
+            if shopify_only:
+                continue
             missing_fees.append(_merchant_display_name(merchant))
             continue
 
         fee = getattr(meta, "monthly_fee", None)
-        if fee is None or fee <= 0:
-            missing_fees.append(_merchant_display_name(merchant))
+        business_type = getattr(
+            meta, "business_type", MerchantMeta.BusinessType.INDEPENDENT
+        )
+
+        if shopify_only and business_type != MerchantMeta.BusinessType.SHOPIFY:
             continue
 
-        business_type = getattr(meta, "business_type", MerchantMeta.BusinessType.INDEPENDENT)
+        if fee is None or fee <= 0:
+            if not shopify_only or business_type == MerchantMeta.BusinessType.SHOPIFY:
+                missing_fees.append(_merchant_display_name(merchant))
+            continue
+
         if business_type == MerchantMeta.BusinessType.SHOPIFY:
             ready_merchants.append(merchant)
+            continue
+
+        if shopify_only:
             continue
 
         email = (meta.paypal_email or "").strip()

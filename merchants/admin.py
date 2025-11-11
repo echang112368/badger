@@ -8,8 +8,16 @@ from .models import MerchantMeta
 
 @admin.register(MerchantMeta)
 class MerchantMetaAdmin(admin.ModelAdmin):
-    list_display = ('user', 'company_name', 'paypal_email', 'monthly_fee', 'uuid')
-    search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email')
+    list_display = (
+        'user',
+        'company_name',
+        'business_type',
+        'shopify_billing_status',
+        'monthly_fee',
+        'uuid',
+    )
+    search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email', 'shopify_store_domain')
+    list_filter = ('business_type', 'shopify_billing_status')
     actions = ['generate_invoice']
     change_list_template = "admin/merchants/merchantmeta/change_list.html"
 
