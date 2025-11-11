@@ -8,6 +8,7 @@ import uuid
 
 import jwt
 
+from django.contrib.messages import get_messages
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from accounts.models import CustomUser
@@ -16,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import ANY, MagicMock, patch
 
 from . import billing
-from .models import Shop
+from .models import Shop, ShopifyChargeRecord
 
 
 class CreateDiscountViewTests(TestCase):
@@ -104,6 +105,8 @@ class ShopifyBillingTests(TestCase):
                 "confirmation_url": "https://confirm",
                 "terms": "Usage terms",
                 "capped_amount": "500.00",
+                "price": "30.00",
+                "currency": "USD",
             }
         }
         mock_client_cls.return_value.post.return_value = mock_response
@@ -117,6 +120,11 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(self.meta.shopify_billing_status, "pending")
         self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
         self.assertEqual(result["id"], 123)
+
+        record = ShopifyChargeRecord.objects.get()
+        self.assertEqual(record.charge_type, ShopifyChargeRecord.ChargeType.RECURRING)
+        self.assertEqual(record.amount, Decimal("30.00"))
+        self.assertEqual(record.shopify_charge_id, "123")
 
     def test_ensure_active_charge_requires_status(self):
         self.meta.shopify_recurring_charge_id = ""
@@ -147,6 +155,59 @@ class ShopifyBillingTests(TestCase):
         path = mock_client.post.call_args[0][0]
         self.assertIn("usage_charges", path)
 
+        record = ShopifyChargeRecord.objects.get()
+        self.assertEqual(record.charge_type, ShopifyChargeRecord.ChargeType.USAGE)
+        self.assertEqual(record.amount, Decimal("10.25"))
+        self.assertEqual(record.shopify_charge_id, "55")
+
+
+class ShopifyAdminBillingTests(TestCase):
+    def setUp(self):
+        self.staff = CustomUser.objects.create_superuser(
+            username="admin", email="admin@example.com", password="pass"
+        )
+        self.client.force_login(self.staff)
+
+        self.merchant = CustomUser.objects.create_user(
+            username="shopowner",
+            email="shopowner@example.com",
+            password="pass",
+            is_merchant=True,
+        )
+        self.meta = MerchantMeta.objects.get(user=self.merchant)
+        self.meta.shopify_access_token = "token"
+        self.meta.shopify_store_domain = "store.example.com"
+        self.meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        self.meta.monthly_fee = Decimal("25.00")
+        self.meta.save()
+
+    @patch("ledger.invoices.generate_all_invoices")
+    def test_admin_trigger_creates_success_message(self, mock_generate):
+        def side_effect(**kwargs):
+            ShopifyChargeRecord.objects.create(
+                merchant=self.merchant,
+                merchant_meta=self.meta,
+                charge_type=ShopifyChargeRecord.ChargeType.USAGE,
+                shopify_charge_id="777",
+                name="Usage charge",
+                description="Monthly usage",
+                amount=Decimal("25.00"),
+                currency="USD",
+                status="processed",
+                raw_response={"id": 777},
+            )
+            return []
+
+        mock_generate.side_effect = side_effect
+
+        url = reverse("admin:shopify_app_shopifychargerecord_send_billing")
+        response = self.client.post(url, follow=True)
+
+        mock_generate.assert_called_once_with(ignore_date=True, shopify_only=True)
+        self.assertEqual(ShopifyChargeRecord.objects.count(), 1)
+
+        messages = list(get_messages(response.wsgi_request))
+        self.assertTrue(any("Triggered 1 Shopify billing charge" in str(msg) for msg in messages))
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class EmbeddedAppHomeTests(TestCase):

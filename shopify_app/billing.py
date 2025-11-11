@@ -12,6 +12,8 @@ from django.conf import settings
 
 from merchants.models import MerchantMeta
 
+from .models import ShopifyChargeRecord
+
 from .shopify_client import ShopifyClient
 
 
@@ -64,6 +66,63 @@ def _ensure_monthly_fee(meta: MerchantMeta) -> Decimal:
     if monthly_fee is None or Decimal(monthly_fee) <= 0:
         raise ShopifyBillingError("A positive monthly fee is required for Shopify billing.")
     return Decimal(monthly_fee)
+
+
+def _extract_decimal(value) -> Optional[Decimal]:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _log_shopify_charge(
+    meta: MerchantMeta,
+    charge: dict,
+    *,
+    charge_type: ShopifyChargeRecord.ChargeType,
+    fallback_amount: Optional[Decimal] = None,
+) -> None:
+    if not isinstance(charge, dict):
+        return
+
+    amount_candidates = [
+        charge.get("price"),
+        charge.get("amount"),
+        charge.get("balance_used"),
+        charge.get("capped_amount"),
+    ]
+    amount_value: Optional[Decimal] = None
+    for candidate in amount_candidates:
+        amount_value = _extract_decimal(candidate)
+        if amount_value is not None:
+            break
+
+    if amount_value is None:
+        amount_value = fallback_amount
+
+    if amount_value is None:
+        amount_value = Decimal("0.00")
+
+    currency = charge.get("currency") or charge.get("currency_code") or "USD"
+    if isinstance(currency, str):
+        currency = currency.upper()[:3]
+    else:
+        currency = "USD"
+
+    ShopifyChargeRecord.objects.create(
+        merchant=meta.user,
+        merchant_meta=meta,
+        charge_type=charge_type,
+        shopify_charge_id=str(charge.get("id", "")),
+        name=str(charge.get("name", "") or ""),
+        description=str(charge.get("description", "") or charge.get("terms", "") or ""),
+        amount=amount_value.quantize(Decimal("0.01")),
+        currency=currency,
+        status=str(charge.get("status", "") or charge.get("billing_on", "") or ""),
+        raw_response=charge,
+    )
 
 
 def _update_meta_from_charge(meta: MerchantMeta, charge: dict) -> None:
@@ -131,6 +190,12 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
         raise ShopifyBillingError("Unexpected response from Shopify when creating recurring charge.")
 
     _update_meta_from_charge(meta, charge)
+    _log_shopify_charge(
+        meta,
+        charge,
+        charge_type=ShopifyChargeRecord.ChargeType.RECURRING,
+        fallback_amount=price,
+    )
     return charge
 
 
@@ -239,5 +304,12 @@ def create_usage_charge(meta: MerchantMeta, *, amount: Decimal, description: str
     usage_charge = data.get("usage_charge")
     if not isinstance(usage_charge, dict):
         raise ShopifyBillingError("Unexpected Shopify response when creating usage charge.")
+
+    _log_shopify_charge(
+        meta,
+        usage_charge,
+        charge_type=ShopifyChargeRecord.ChargeType.USAGE,
+        fallback_amount=normalized_amount,
+    )
 
     return usage_charge
