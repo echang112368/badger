@@ -82,3 +82,32 @@ class ShopifyInvoiceTests(TestCase):
         generate_all_invoices(ignore_date=True)
 
         mock_usage_charge.assert_called_once()
+
+    @patch("ledger.invoices.shopify_billing.create_usage_charge")
+    def test_generate_all_invoices_shopify_only_skips_non_shopify(self, mock_usage_charge):
+        other = CustomUser.objects.create_user(
+            username="other", email="other@example.com", password="pass", is_merchant=True
+        )
+        other_meta = MerchantMeta.objects.get(user=other)
+        other_meta.monthly_fee = Decimal("0.00")
+        other_meta.paypal_email = ""
+        other_meta.save()
+
+        LedgerEntry.objects.create(
+            merchant=other,
+            amount=Decimal("-20.00"),
+            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+        )
+        LedgerEntry.objects.create(
+            merchant=self.merchant,
+            amount=Decimal("-12.00"),
+            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+        )
+
+        generate_all_invoices(ignore_date=True, shopify_only=True)
+
+        mock_usage_charge.assert_called_once()
+        self.assertTrue(
+            LedgerEntry.objects.filter(merchant=other, paid=False).exists(),
+            "Non-Shopify merchants should be ignored when shopify_only is True",
+        )
