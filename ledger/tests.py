@@ -8,11 +8,7 @@ from merchants.models import MerchantMeta
 from shopify_app.billing import ShopifyChargeDetails
 
 from .models import LedgerEntry, MerchantInvoice
-from .invoices import (
-    ShopifyBillingConfirmationRequired,
-    create_invoice_for_merchant,
-    generate_all_invoices,
-)
+from .invoices import generate_all_invoices, create_invoice_for_merchant
 
 
 class InvoiceGenerationTests(TestCase):
@@ -107,12 +103,11 @@ class ShopifyInvoiceTests(TestCase):
             entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
         )
 
-        result = generate_all_invoices(ignore_date=True)
+        invoices = generate_all_invoices(ignore_date=True)
 
         mock_usage_charge.assert_called_once()
-        self.assertEqual(len(result), 1)
-        self.assertFalse(result.pending_shopify)
-        self.assertEqual(result[0].provider, MerchantInvoice.Provider.SHOPIFY)
+        self.assertEqual(len(invoices), 1)
+        self.assertEqual(invoices[0].provider, MerchantInvoice.Provider.SHOPIFY)
 
     @patch("ledger.invoices.shopify_billing.create_usage_charge")
     def test_generate_all_invoices_shopify_only_skips_non_shopify(self, mock_usage_charge):
@@ -144,38 +139,14 @@ class ShopifyInvoiceTests(TestCase):
             entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
         )
 
-        result = generate_all_invoices(ignore_date=True, shopify_only=True)
+        invoices = generate_all_invoices(ignore_date=True, shopify_only=True)
 
         mock_usage_charge.assert_called_once()
-        self.assertEqual(len(result), 1)
-        self.assertFalse(result.pending_shopify)
+        self.assertEqual(len(invoices), 1)
         self.assertTrue(
             LedgerEntry.objects.filter(merchant=other, paid=False).exists(),
             "Non-Shopify merchants should be ignored when shopify_only is True",
         )
-
-    @patch("ledger.invoices.shopify_billing.create_or_update_recurring_charge")
-    @patch("ledger.invoices.shopify_billing.create_usage_charge")
-    def test_generate_all_invoices_requests_recurring_charge_when_missing(
-        self, mock_usage_charge, mock_create
-    ):
-        self.meta.shopify_recurring_charge_id = ""
-        self.meta.shopify_billing_status = ""
-        self.meta.save()
-
-        LedgerEntry.objects.create(
-            merchant=self.merchant,
-            amount=Decimal("-18.00"),
-            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
-        )
-
-        result = generate_all_invoices(ignore_date=True)
-
-        mock_usage_charge.assert_not_called()
-        mock_create.assert_called_once()
-        self.assertEqual(len(result), 0)
-        self.assertEqual(len(result.pending_shopify), 1)
-        self.assertEqual(result.pending_shopify[0].pk, self.meta.pk)
 
     @patch("ledger.invoices.shopify_billing.create_usage_charge")
     def test_shopify_invoice_includes_monthly_affiliate_and_special_fees(
@@ -235,27 +206,6 @@ class ShopifyInvoiceTests(TestCase):
         special_uuid_entry.refresh_from_db()
         self.assertEqual(affiliate_entry.invoice, invoice)
         self.assertEqual(special_uuid_entry.invoice, invoice)
-
-    @patch("ledger.invoices.shopify_billing.create_usage_charge")
-    @patch("ledger.invoices.shopify_billing.create_or_update_recurring_charge")
-    def test_create_invoice_requests_recurring_charge_when_missing(
-        self, mock_create, mock_usage
-    ):
-        self.meta.shopify_recurring_charge_id = ""
-        self.meta.shopify_billing_status = ""
-        self.meta.save()
-
-        LedgerEntry.objects.create(
-            merchant=self.merchant,
-            amount=Decimal("-30.00"),
-            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
-        )
-
-        with self.assertRaises(ShopifyBillingConfirmationRequired):
-            create_invoice_for_merchant(self.merchant)
-
-        mock_usage.assert_not_called()
-        mock_create.assert_called_once()
 
     @patch("ledger.invoices.shopify_billing.create_usage_charge")
     def test_shopify_only_monthly_fee_creates_usage_charge(self, mock_usage_charge):
