@@ -128,6 +128,7 @@ def create_invoice_for_merchant(merchant):
     business_type = (
         meta.business_type if meta else MerchantMeta.BusinessType.INDEPENDENT
     )
+    shopify_business = business_type == MerchantMeta.BusinessType.SHOPIFY
 
     if business_type != MerchantMeta.BusinessType.SHOPIFY and not paypal_email:
         return None
@@ -221,10 +222,13 @@ def create_invoice_for_merchant(merchant):
         )
 
     monthly_fee_line = Decimal("0.00")
-    if monthly_fee > 0 and entries.filter(
-        entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
-        amount=-monthly_fee,
-    ).exists():
+    if (
+        monthly_fee > 0
+        and entries.filter(
+            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+            amount=-monthly_fee,
+        ).exists()
+    ):
         monthly_fee_line = monthly_fee
 
     badger_payout_total = badger_total
