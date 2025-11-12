@@ -17,7 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import ANY, MagicMock, patch
 
 from . import billing
-from .models import Shop, ShopifyChargeRecord
+from .views import _session_token_key
 
 
 class CreateDiscountViewTests(TestCase):
@@ -121,11 +121,6 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
         self.assertEqual(result["id"], 123)
 
-        record = ShopifyChargeRecord.objects.get()
-        self.assertEqual(record.charge_type, ShopifyChargeRecord.ChargeType.RECURRING)
-        self.assertEqual(record.amount, Decimal("30.00"))
-        self.assertEqual(record.shopify_charge_id, "123")
-
     def test_ensure_active_charge_requires_status(self):
         self.meta.shopify_recurring_charge_id = ""
         self.meta.shopify_billing_status = "pending"
@@ -145,7 +140,7 @@ class ShopifyBillingTests(TestCase):
         mock_client = mock_client_cls.return_value
         mock_client.post.return_value = mock_response
 
-        billing.create_usage_charge(
+        details = billing.create_usage_charge(
             self.meta,
             amount=Decimal("10.25"),
             description="Test charge",
@@ -154,71 +149,44 @@ class ShopifyBillingTests(TestCase):
         mock_client.post.assert_called_once()
         path = mock_client.post.call_args[0][0]
         self.assertIn("usage_charges", path)
-
-        record = ShopifyChargeRecord.objects.get()
-        self.assertEqual(record.charge_type, ShopifyChargeRecord.ChargeType.USAGE)
-        self.assertEqual(record.amount, Decimal("10.25"))
-        self.assertEqual(record.shopify_charge_id, "55")
+        self.assertEqual(details.charge_id, "55")
+        self.assertEqual(details.amount, Decimal("10.25"))
 
 
-class ShopifyAdminBillingTests(TestCase):
+class MerchantInvoiceAdminTests(TestCase):
     def setUp(self):
         self.staff = CustomUser.objects.create_superuser(
             username="admin", email="admin@example.com", password="pass"
         )
         self.client.force_login(self.staff)
 
-        self.merchant = CustomUser.objects.create_user(
-            username="shopowner",
-            email="shopowner@example.com",
-            password="pass",
-            is_merchant=True,
-        )
-        self.meta = MerchantMeta.objects.get(user=self.merchant)
-        self.meta.shopify_access_token = "token"
-        self.meta.shopify_store_domain = "store.example.com"
-        self.meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        self.meta.monthly_fee = Decimal("25.00")
-        self.meta.save()
+    @patch("ledger.admin.generate_all_invoices")
+    def test_generate_all_triggers_message(self, mock_generate):
+        mock_generate.return_value = [MagicMock(), MagicMock()]
 
-    @patch("ledger.invoices.generate_all_invoices")
-    def test_admin_trigger_creates_success_message(self, mock_generate):
-        def side_effect(**kwargs):
-            ShopifyChargeRecord.objects.create(
-                merchant=self.merchant,
-                merchant_meta=self.meta,
-                charge_type=ShopifyChargeRecord.ChargeType.USAGE,
-                shopify_charge_id="777",
-                name="Usage charge",
-                description="Monthly usage",
-                amount=Decimal("25.00"),
-                currency="USD",
-                status="processed",
-                raw_response={"id": 777},
-            )
-            return []
-
-        mock_generate.side_effect = side_effect
-
-        url = reverse("admin:shopify_app_shopifychargerecord_send_billing")
+        url = reverse("admin:ledger_invoice_generate_all")
         response = self.client.post(url, follow=True)
 
-        mock_generate.assert_called_once_with(ignore_date=True, shopify_only=True)
-        self.assertEqual(ShopifyChargeRecord.objects.count(), 1)
+        mock_generate.assert_called_once_with(ignore_date=True)
 
-        messages = list(get_messages(response.wsgi_request))
-        self.assertTrue(any("Triggered 1 Shopify billing charge" in str(msg) for msg in messages))
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(
+            any("Generated 2 invoice(s) or Shopify charges" in message for message in messages)
+        )
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class EmbeddedAppHomeTests(TestCase):
     def setUp(self):
-        self.shop = Shop.objects.create(
-            shop_domain="example.myshopify.com",
-            access_token="shpua_token",
-        )
+        self.shop_domain = "example.myshopify.com"
+        self.access_token = "shpua_token"
+
+    def _store_session_token(self):
+        session = self.client.session
+        session[_session_token_key(self.shop_domain)] = self.access_token
+        session.save()
 
     def _signed_params(self, **params):
-        base = {"shop": self.shop.shop_domain, "timestamp": "1234567890"}
+        base = {"shop": self.shop_domain, "timestamp": "1234567890"}
         base.update(params)
         message = "&".join(
             f"{key}={value}"
@@ -232,18 +200,20 @@ class EmbeddedAppHomeTests(TestCase):
     def test_get_requires_valid_signature(self):
         url = reverse("shopify_embedded_home")
         params = {
-            "shop": self.shop.shop_domain,
+            "shop": self.shop_domain,
             "timestamp": "1234567890",
             "hmac": "bad",
         }
         response = self.client.get(url, params)
         self.assertEqual(response.status_code, 400)
 
+        self._store_session_token()
         response = self.client.get(url, self._signed_params())
         self.assertEqual(response.status_code, 200)
 
     def test_signup_links_shopify_store(self):
         url = reverse("shopify_embedded_home")
+        self._store_session_token()
         self.client.get(url, self._signed_params())
 
         post_data = {
@@ -264,17 +234,24 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertTrue(user.is_merchant)
 
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_store_domain, self.shop.shop_domain)
-        self.assertEqual(meta.shopify_access_token, self.shop.access_token)
+        self.assertEqual(meta.shopify_store_domain, self.shop_domain)
+        self.assertEqual(meta.shopify_access_token, self.access_token)
         self.assertEqual(meta.company_name, "Ada Co")
 
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+        self.assertNotIn(_session_token_key(self.shop_domain), self.client.session)
 
     def test_login_attaches_existing_user(self):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
             password="pass12345",
+        )
+
+        MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain=self.shop_domain,
+            shopify_access_token=self.access_token,
         )
 
         url = reverse("shopify_embedded_home")
@@ -293,8 +270,8 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(response["Location"], reverse("merchant_dashboard"))
 
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_store_domain, self.shop.shop_domain)
-        self.assertEqual(meta.shopify_access_token, self.shop.access_token)
+        self.assertEqual(meta.shopify_store_domain, self.shop_domain)
+        self.assertEqual(meta.shopify_access_token, self.access_token)
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
 
 
@@ -302,10 +279,8 @@ class EmbeddedAppHomeTests(TestCase):
 class OAuthCallbackTests(TestCase):
     def setUp(self):
         self.url = reverse("shopify_oauth_callback")
-        self.shop = Shop.objects.create(
-            shop_domain="example.myshopify.com",
-            access_token="shppa_token",
-        )
+        self.shop_domain = "example.myshopify.com"
+        self.access_token = "shppa_token"
 
     def _build_id_token(self, **extra_claims):
         now = datetime.utcnow()
@@ -333,8 +308,8 @@ class OAuthCallbackTests(TestCase):
         )
         MerchantMeta.objects.create(
             user=user,
-            shopify_store_domain="example.myshopify.com",
-            shopify_access_token="shppa_token",
+            shopify_store_domain=self.shop_domain,
+            shopify_access_token=self.access_token,
         )
 
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
@@ -347,10 +322,25 @@ class OAuthCallbackTests(TestCase):
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/onboard/?shop=example.myshopify.com")
+        self.assertEqual(response["Location"], f"/onboard/?shop={self.shop_domain}")
         self.assertEqual(
-            self.client.session.get("shopify_pending_shop"), "example.myshopify.com"
+            self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
+
+    @patch("shopify_app.views._exchange_code_for_token", return_value="shppa_token")
+    @patch("shopify_app.views._validate_shopify_hmac", return_value=True)
+    def test_oauth_callback_stores_session_token(self, mock_hmac, mock_exchange):
+        session = self.client.session
+        session["shopify_oauth_state"] = "abc"
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"shop": self.shop_domain, "code": "abc", "hmac": "valid", "state": "abc"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(_session_token_key(self.shop_domain), self.client.session)
 
     def test_invalid_session_token_returns_400(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")

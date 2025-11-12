@@ -264,13 +264,28 @@ def create_invoice_for_merchant(merchant):
         if description_components:
             description = f"{description} ({'; '.join(description_components)})"
 
-        shopify_billing.create_usage_charge(
+        charge_details = shopify_billing.create_usage_charge(
             meta,
             amount=total,
             description=description,
         )
-        entries.update(paid=True)
-        return None
+
+        total_amount = charge_details.amount.quantize(Decimal("0.01"))
+
+        with transaction.atomic():
+            invoice = MerchantInvoice.objects.create(
+                merchant=merchant,
+                provider=MerchantInvoice.Provider.SHOPIFY,
+                status="CHARGED",
+                due_date=timezone.now().date(),
+                total_amount=total_amount,
+                shopify_charge_id=charge_details.charge_id or None,
+                shopify_status=charge_details.status,
+                shopify_payload=charge_details.raw,
+            )
+            entries.update(invoice=invoice, paid=True)
+
+        return invoice
 
     access_token = _get_paypal_access_token()
     headers = {
@@ -348,6 +363,9 @@ def create_invoice_for_merchant(merchant):
 
 def update_invoice_status(invoice: MerchantInvoice):
     """Refresh invoice status from PayPal and mark entries paid if needed."""
+    if invoice.provider == MerchantInvoice.Provider.SHOPIFY:
+        return invoice.status
+
     if not invoice.paypal_invoice_id:
         return invoice.status
     access_token = _get_paypal_access_token()
