@@ -4,7 +4,7 @@
 {% block object-tools %}
 <form action="{% url 'admin:ledger_invoice_generate_all' %}" method="post" style="display:inline;margin-right:1em;">
     {% csrf_token %}
-    <input type="submit" class="button" value="{% trans 'Generate Merchant Invoices' %}">
+    <input type="submit" class="button" value="{% trans 'Generate PayPal & Shopify Invoices' %}">
 </form>
 {{ block.super }}
 {% endblock %}
