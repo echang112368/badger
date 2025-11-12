@@ -176,6 +176,29 @@ def merchant_invoices(request):
 
     open_invoices = [invoice for invoice in invoices if invoice.status != "PAID"]
     paid_invoices = [invoice for invoice in invoices if invoice.status == "PAID"]
+    shopify_invoices = [
+        invoice
+        for invoice in invoices
+        if invoice.provider == MerchantInvoice.Provider.SHOPIFY
+    ]
+
+    try:
+        merchant_meta = merchant_user.merchantmeta
+    except MerchantMeta.DoesNotExist:
+        merchant_meta = None
+
+    is_shopify_merchant = bool(
+        merchant_meta
+        and merchant_meta.business_type == MerchantMeta.BusinessType.SHOPIFY
+    )
+    billing_status = (merchant_meta.shopify_billing_status or "") if merchant_meta else ""
+    shopify_pending_confirmation = bool(
+        is_shopify_merchant
+        and (
+            not merchant_meta.shopify_recurring_charge_id
+            or billing_status.lower() != "active"
+        )
+    )
 
     return render(
         request,
@@ -185,6 +208,11 @@ def merchant_invoices(request):
             'permissions': permissions,
             'open_invoices': open_invoices,
             'paid_invoices': paid_invoices,
+            'shopify_invoices': shopify_invoices,
+            'all_invoices': invoices,
+            'merchant_meta': merchant_meta,
+            'is_shopify_merchant': is_shopify_merchant,
+            'shopify_pending_confirmation': shopify_pending_confirmation,
         },
     )
 
