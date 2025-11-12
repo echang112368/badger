@@ -1,5 +1,4 @@
 from decimal import Decimal
-from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -148,3 +147,88 @@ class ShopifyInvoiceTests(TestCase):
             LedgerEntry.objects.filter(merchant=other, paid=False).exists(),
             "Non-Shopify merchants should be ignored when shopify_only is True",
         )
+
+    @patch("ledger.invoices.shopify_billing.create_usage_charge")
+    def test_shopify_invoice_includes_monthly_affiliate_and_special_fees(
+        self, mock_usage_charge
+    ):
+        affiliate_entry = LedgerEntry.objects.create(
+            merchant=self.merchant,
+            amount=Decimal("-100.00"),
+            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+        )
+        special_uuid_entry = LedgerEntry.objects.create(
+            merchant=self.merchant,
+            amount=Decimal("-15.00"),
+            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
+        )
+
+        expected_total = Decimal("130.00")
+        mock_usage_charge.return_value = ShopifyChargeDetails(
+            charge_id="101",
+            amount=expected_total,
+            currency="USD",
+            status="processed",
+            name="Usage",
+            description="Outstanding",
+            raw={"id": 101},
+        )
+
+        invoice = create_invoice_for_merchant(self.merchant)
+
+        self.assertIsNotNone(invoice)
+        self.assertEqual(invoice.total_amount, expected_total)
+
+        mock_usage_charge.assert_called_once()
+        self.assertEqual(mock_usage_charge.call_args.kwargs["amount"], expected_total)
+
+        entries = list(LedgerEntry.objects.filter(merchant=self.merchant))
+        self.assertTrue(all(entry.paid for entry in entries))
+        self.assertTrue(all(entry.invoice == invoice for entry in entries))
+
+        monthly_entry = next(
+            entry
+            for entry in entries
+            if entry.entry_type == LedgerEntry.EntryType.BADGER_PAYOUT
+            and entry.amount == Decimal("-10.00")
+        )
+        processing_entry = next(
+            entry
+            for entry in entries
+            if entry.entry_type == LedgerEntry.EntryType.BADGER_PAYOUT
+            and entry.amount == Decimal("-5.00")
+        )
+
+        self.assertIsNotNone(monthly_entry)
+        self.assertIsNotNone(processing_entry)
+
+        affiliate_entry.refresh_from_db()
+        special_uuid_entry.refresh_from_db()
+        self.assertEqual(affiliate_entry.invoice, invoice)
+        self.assertEqual(special_uuid_entry.invoice, invoice)
+
+    @patch("ledger.invoices.shopify_billing.create_usage_charge")
+    def test_shopify_only_monthly_fee_creates_usage_charge(self, mock_usage_charge):
+        expected_total = Decimal("10.00")
+        mock_usage_charge.return_value = ShopifyChargeDetails(
+            charge_id="202",
+            amount=expected_total,
+            currency="USD",
+            status="processed",
+            name="Usage",
+            description="Monthly",
+            raw={"id": 202},
+        )
+
+        invoice = create_invoice_for_merchant(self.merchant)
+
+        self.assertIsNotNone(invoice)
+        self.assertEqual(invoice.total_amount, expected_total)
+
+        mock_usage_charge.assert_called_once()
+        self.assertEqual(mock_usage_charge.call_args.kwargs["amount"], expected_total)
+
+        entries = list(LedgerEntry.objects.filter(merchant=self.merchant))
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0].paid)
+        self.assertEqual(entries[0].invoice, invoice)
