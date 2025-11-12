@@ -11,8 +11,39 @@ from .utils import collect_merchant_domains, publish_merchant_config
 
 @admin.register(Merchant)
 class MerchantAdmin(admin.ModelAdmin):
-    list_display = ("domain",)
-    search_fields = ("domain",)
+    list_display = (
+        "merchant_account",
+        "domain",
+        "business_type",
+        "auto_managed",
+    )
+    list_filter = ("business_type", "auto_managed")
+    search_fields = ("account_name", "account__username", "account__email", "domain")
+    readonly_fields = ("auto_managed",)
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "account",
+                    "account_name",
+                    "domain",
+                    "business_type",
+                    "auto_managed",
+                )
+            },
+        ),
+    )
+
+    @admin.display(description="Merchant account")
+    def merchant_account(self, obj):
+        return obj.display_name
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj and obj.auto_managed:
+            readonly.extend(["account", "account_name", "domain", "business_type"])
+        return readonly
 
 
 @admin.register(Config)
@@ -55,16 +86,19 @@ class ConfigAdmin(admin.ModelAdmin):
                 % {"error": exc},
             )
         else:
-            messages.success(
-                request,
-                _(
-                    "Published merchant list version %(version)s with %(count)s merchants."
-                )
-                % {
-                    "version": config.merchant_version,
-                    "count": len(payload.get("merchants", [])),
-                },
-            )
+            new_count = len(payload.get("new_merchants", []))
+            base_message = _(
+                "Updated merchant list version %(version)s with %(count)s merchants."
+            ) % {
+                "version": config.merchant_version,
+                "count": len(payload.get("merchants", [])),
+            }
+            if new_count:
+                base_message += " " + _("%(added)s new merchant%(plural)s detected.") % {
+                    "added": new_count,
+                    "plural": "s" if new_count != 1 else "",
+                }
+            messages.success(request, base_message)
 
         return redirect(reverse("admin:merchantlist_config_change", args=(config.pk,)))
 

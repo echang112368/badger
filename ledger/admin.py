@@ -56,14 +56,28 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
         "id",
         "merchant",
         "status",
+        "provider",
         "total_amount",
         "due_date",
         "paypal_invoice_id",
+        "shopify_charge_id",
         "created_at",
     )
-    list_filter = ("status", "due_date", "created_at")
-    search_fields = ("merchant__username", "paypal_invoice_id")
-    readonly_fields = ("created_at",)
+    list_filter = ("status", "provider", "due_date", "created_at")
+    search_fields = (
+        "merchant__username",
+        "paypal_invoice_id",
+        "shopify_charge_id",
+    )
+    readonly_fields = (
+        "created_at",
+        "provider",
+        "paypal_invoice_id",
+        "paypal_invoice_url",
+        "shopify_charge_id",
+        "shopify_status",
+        "shopify_payload",
+    )
     ordering = ("-created_at",)
     change_list_template = "admin/ledger/merchantinvoice/change_list.html"
 
@@ -87,7 +101,9 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
             else:
                 messages.success(
                     request,
-                    f"Generated {len(invoices)} invoice(s) for merchants with outstanding balances.",
+                    "Generated {} invoice(s) or Shopify charges for merchants with outstanding balances.".format(
+                        len(invoices)
+                    ),
                 )
         return redirect("../")
 
