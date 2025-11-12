@@ -41,31 +41,11 @@ class LedgerEntryAdmin(admin.ModelAdmin):
     def generate_invoices(self, request):
         if request.method == "POST":
             try:
-                result = generate_all_invoices(ignore_date=True)
+                invoices = generate_all_invoices(ignore_date=True)
             except RuntimeError as exc:
                 messages.error(request, str(exc))
             else:
-                if result.pending_shopify:
-                    names = ", ".join(
-                        sorted(
-                            {
-                                meta.company_name
-                                or meta.user.get_full_name()
-                                or meta.user.username
-                                for meta in result.pending_shopify
-                                if meta and getattr(meta, "user", None)
-                            }
-                        )
-                    )
-                    messages.warning(
-                        request,
-                        (
-                            "Shopify billing confirmation required for: "
-                            f"{names}. Confirmation links are available on each merchant's invoices page."
-                        ),
-                    )
-
-                messages.success(request, f"Generated {len(result)} invoice(s)")
+                messages.success(request, f"Generated {len(invoices)} invoice(s)")
         return redirect("../")
 
 @admin.register(MerchantInvoice)
@@ -115,34 +95,14 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
     def generate_invoices(self, request):
         if request.method == "POST":
             try:
-                result = generate_all_invoices(ignore_date=True)
+                invoices = generate_all_invoices(ignore_date=True)
             except RuntimeError as exc:
                 messages.error(request, str(exc))
             else:
-                if result.pending_shopify:
-                    names = ", ".join(
-                        sorted(
-                            {
-                                meta.company_name
-                                or meta.user.get_full_name()
-                                or meta.user.username
-                                for meta in result.pending_shopify
-                                if meta and getattr(meta, "user", None)
-                            }
-                        )
-                    )
-                    messages.warning(
-                        request,
-                        (
-                            "Shopify billing confirmation required for: "
-                            f"{names}. Confirmation links are available on each merchant's invoices page."
-                        ),
-                    )
-
                 messages.success(
                     request,
                     "Generated {} invoice(s) or Shopify charges for merchants with outstanding balances.".format(
-                        len(result)
+                        len(invoices)
                     ),
                 )
         return redirect("../")
