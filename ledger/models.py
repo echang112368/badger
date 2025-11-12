@@ -10,11 +10,20 @@ User = get_user_model()
 
 
 class MerchantInvoice(models.Model):
+    class Provider(models.TextChoices):
+        PAYPAL = "paypal", "PayPal"
+        SHOPIFY = "shopify", "Shopify"
+
     merchant = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="invoices",
         limit_choices_to={"is_merchant": True},
+    )
+    provider = models.CharField(
+        max_length=20,
+        choices=Provider.choices,
+        default=Provider.PAYPAL,
     )
     paypal_invoice_id = models.CharField(max_length=64, blank=True, null=True)
     paypal_invoice_url = models.URLField(blank=True, null=True)
@@ -22,13 +31,21 @@ class MerchantInvoice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     due_date = models.DateField()
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    shopify_charge_id = models.CharField(max_length=64, blank=True, null=True)
+    shopify_status = models.CharField(max_length=64, blank=True)
+    shopify_payload = models.JSONField(blank=True, default=dict)
 
     def __str__(self):
-        return f"Invoice {self.paypal_invoice_id or self.id} for {self.merchant}"
+        provider_label = self.get_provider_display() or "Invoice"
+        reference = self.paypal_invoice_id or self.shopify_charge_id or self.id
+        return f"{provider_label} invoice {reference} for {self.merchant}"
 
     @property
     def payment_link(self) -> Optional[str]:
         """Return the stored PayPal payment link for the invoice."""
+
+        if self.provider == self.Provider.SHOPIFY:
+            return None
 
         if self.paypal_invoice_url:
             return self.paypal_invoice_url

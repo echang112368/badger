@@ -8,7 +8,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         count = 0
-        for invoice in MerchantInvoice.objects.exclude(status="PAID"):
+        for invoice in MerchantInvoice.objects.exclude(
+            status="PAID"
+        ).filter(provider=MerchantInvoice.Provider.PAYPAL):
             update_invoice_status(invoice)
             count += 1
         self.stdout.write(self.style.SUCCESS(f"Checked {count} invoice(s)"))

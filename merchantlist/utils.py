@@ -4,10 +4,9 @@ from __future__ import annotations
 import json
 from datetime import timezone as dt_timezone
 from pathlib import Path
-from typing import Iterable, List, Set, Tuple
+from typing import List, Set, Tuple
 from urllib.parse import urlparse
 
-from django.apps import apps
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,41 +36,11 @@ def _normalize_domain(value: str | None) -> str:
     return host
 
 
-def _iter_account_domains() -> Iterable[str]:
-    """Yield domain strings from merchant accounts if available."""
-    if not apps.is_installed("merchants"):
-        return []
-
-    MerchantMeta = apps.get_model("merchants", "MerchantMeta")
-    if MerchantMeta is None:
-        return []
-
-    field_name = None
-    for field in MerchantMeta._meta.get_fields():  # type: ignore[attr-defined]
-        if field.name == "domain":
-            field_name = "domain"
-            break
-        if field.name == "shopify_store_domain":
-            field_name = "shopify_store_domain"
-    if field_name is None:
-        return []
-
-    queryset = MerchantMeta.objects.exclude(**{f"{field_name}__isnull": True}).exclude(
-        **{field_name: ""}
-    )
-    return queryset.values_list(field_name, flat=True)
-
-
 def collect_merchant_domains() -> List[str]:
-    """Collect domains from both curated entries and merchant accounts."""
+    """Collect domains from curated merchant entries."""
     domains: Set[str] = set()
 
     for domain in Merchant.objects.values_list("domain", flat=True):
-        normalized = _normalize_domain(domain)
-        if normalized:
-            domains.add(normalized)
-
-    for domain in _iter_account_domains():
         normalized = _normalize_domain(domain)
         if normalized:
             domains.add(normalized)
@@ -90,6 +59,20 @@ def publish_merchant_config(config: Config | None = None) -> Tuple[Config, dict]
     static_path = Path(__file__).resolve().parent / "static" / "merchant_list.json"
     static_path.parent.mkdir(parents=True, exist_ok=True)
 
+    previous_merchants: Set[str] = set()
+    if static_path.exists():
+        try:
+            with static_path.open("r", encoding="utf-8") as fp:
+                previous_data = json.load(fp)
+        except (OSError, json.JSONDecodeError, TypeError):
+            previous_data = {}
+        else:
+            raw_merchants = previous_data.get("merchants", []) if isinstance(previous_data, dict) else []
+            for domain in raw_merchants:
+                normalized = _normalize_domain(domain)
+                if normalized:
+                    previous_merchants.add(normalized)
+
     with transaction.atomic():
         qs = Config.objects.select_for_update().order_by("-updated_at", "-pk")
         if config is not None:
@@ -107,6 +90,7 @@ def publish_merchant_config(config: Config | None = None) -> Tuple[Config, dict]
             "version": config.merchant_version,
             "updated": updated_utc.isoformat().replace("+00:00", "Z"),
             "merchants": merchants,
+            "new_merchants": sorted(set(merchants) - previous_merchants),
         }
 
         with static_path.open("w", encoding="utf-8") as fp:

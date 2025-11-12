@@ -12,13 +12,24 @@ from django.conf import settings
 
 from merchants.models import MerchantMeta
 
-from .models import ShopifyChargeRecord
-
 from .shopify_client import ShopifyClient
 
 
 class ShopifyBillingError(RuntimeError):
     """Raised when Shopify billing operations fail."""
+
+
+@dataclass
+class ShopifyChargeDetails:
+    """Normalised details for a Shopify billing charge."""
+
+    charge_id: str
+    amount: Decimal
+    currency: str
+    status: str
+    name: str
+    description: str
+    raw: dict
 
 
 @dataclass
@@ -77,22 +88,23 @@ def _extract_decimal(value) -> Optional[Decimal]:
         return None
 
 
-def _log_shopify_charge(
-    meta: MerchantMeta,
+def _build_charge_details(
     charge: dict,
     *,
-    charge_type: ShopifyChargeRecord.ChargeType,
     fallback_amount: Optional[Decimal] = None,
-) -> None:
-    if not isinstance(charge, dict):
-        return
+    default_description: str = "",
+) -> ShopifyChargeDetails:
+    """Return normalised charge information suitable for invoicing."""
 
-    amount_candidates = [
+    if not isinstance(charge, dict):
+        charge = {}
+
+    amount_candidates = (
         charge.get("price"),
         charge.get("amount"),
         charge.get("balance_used"),
         charge.get("capped_amount"),
-    ]
+    )
     amount_value: Optional[Decimal] = None
     for candidate in amount_candidates:
         amount_value = _extract_decimal(candidate)
@@ -100,28 +112,34 @@ def _log_shopify_charge(
             break
 
     if amount_value is None:
-        amount_value = fallback_amount
-
-    if amount_value is None:
-        amount_value = Decimal("0.00")
+        amount_value = fallback_amount or Decimal("0.00")
 
     currency = charge.get("currency") or charge.get("currency_code") or "USD"
     if isinstance(currency, str):
-        currency = currency.upper()[:3]
+        currency_value = currency.upper()[:3]
     else:
-        currency = "USD"
+        currency_value = "USD"
 
-    ShopifyChargeRecord.objects.create(
-        merchant=meta.user,
-        merchant_meta=meta,
-        charge_type=charge_type,
-        shopify_charge_id=str(charge.get("id", "")),
-        name=str(charge.get("name", "") or ""),
-        description=str(charge.get("description", "") or charge.get("terms", "") or ""),
+    name = str(charge.get("name", "") or "")
+    description = str(
+        charge.get("description", "")
+        or charge.get("terms", "")
+        or default_description
+        or ""
+    )
+
+    status_value = str(
+        charge.get("status", "") or charge.get("billing_on", "") or ""
+    )
+
+    return ShopifyChargeDetails(
+        charge_id=str(charge.get("id", "")),
         amount=amount_value.quantize(Decimal("0.01")),
-        currency=currency,
-        status=str(charge.get("status", "") or charge.get("billing_on", "") or ""),
-        raw_response=charge,
+        currency=currency_value,
+        status=status_value,
+        name=name,
+        description=description,
+        raw=charge,
     )
 
 
@@ -190,12 +208,6 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
         raise ShopifyBillingError("Unexpected response from Shopify when creating recurring charge.")
 
     _update_meta_from_charge(meta, charge)
-    _log_shopify_charge(
-        meta,
-        charge,
-        charge_type=ShopifyChargeRecord.ChargeType.RECURRING,
-        fallback_amount=price,
-    )
     return charge
 
 
@@ -273,7 +285,9 @@ def ensure_active_charge(meta: MerchantMeta) -> None:
         raise ShopifyBillingError("Shopify recurring charge is not active.")
 
 
-def create_usage_charge(meta: MerchantMeta, *, amount: Decimal, description: str) -> dict:
+def create_usage_charge(
+    meta: MerchantMeta, *, amount: Decimal, description: str
+) -> ShopifyChargeDetails:
     """Create a usage charge for the merchant's active recurring charge."""
 
     ensure_active_charge(meta)
@@ -305,11 +319,8 @@ def create_usage_charge(meta: MerchantMeta, *, amount: Decimal, description: str
     if not isinstance(usage_charge, dict):
         raise ShopifyBillingError("Unexpected Shopify response when creating usage charge.")
 
-    _log_shopify_charge(
-        meta,
+    return _build_charge_details(
         usage_charge,
-        charge_type=ShopifyChargeRecord.ChargeType.USAGE,
         fallback_amount=normalized_amount,
+        default_description=description,
     )
-
-    return usage_charge
