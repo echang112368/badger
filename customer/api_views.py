@@ -1,3 +1,5 @@
+import secrets
+
 from django.contrib.auth import get_user_model
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -6,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import CustomerMeta
@@ -80,6 +82,7 @@ class CustomerPointsView(APIView):
             json_package = json_package.dict()
 
         refresh_token = json_package.get("refresh")
+        access_token = json_package.get("access")
         customer_uuid = json_package.get("uuid")
 
         if not refresh_token or not customer_uuid:
@@ -87,6 +90,15 @@ class CustomerPointsView(APIView):
                 {"detail": "Refresh token and uuid are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        access_user_id = None
+        if access_token:
+            try:
+                access = AccessToken(access_token)
+            except TokenError:
+                access = None
+            else:
+                access_user_id = access.get("user_id")
 
         try:
             token = RefreshToken(refresh_token)
@@ -100,6 +112,12 @@ class CustomerPointsView(APIView):
         if not user_id:
             return Response(
                 {"detail": "Token missing user information."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if access_user_id and access_user_id != user_id:
+            return Response(
+                {"detail": "Access token does not match refresh token."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -120,5 +138,16 @@ class CustomerPointsView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response({"uuid": str(customer.uuid), "points": get_points_balance(user)})
+        new_refresh = RefreshToken.for_user(user)
+        new_refresh.payload["nonce"] = secrets.token_hex(8)
+        new_access = AccessToken(payload={"user_id": user.id, "nonce": secrets.token_hex(8)})
+
+        return Response(
+            {
+                "uuid": str(customer.uuid),
+                "points": get_points_balance(user),
+                "access": str(new_access),
+                "refresh": str(new_refresh),
+            }
+        )
 
