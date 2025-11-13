@@ -327,6 +327,16 @@ class OAuthCallbackTests(TestCase):
             self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
 
+    @override_settings(SHOPIFY_SESSION_TOKEN_LEEWAY=30)
+    def test_session_token_allows_for_small_clock_skew(self):
+        future_nbf = int((datetime.utcnow() + timedelta(seconds=20)).timestamp())
+        token = self._build_id_token(nbf=future_nbf)
+
+        response = self.client.get(self.url, {"id_token": token})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"/onboard/?shop={self.shop_domain}")
+
     @patch("shopify_app.views._exchange_code_for_token", return_value="shppa_token")
     @patch("shopify_app.views._validate_shopify_hmac", return_value=True)
     def test_oauth_callback_stores_session_token(self, mock_hmac, mock_exchange):

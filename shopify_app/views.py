@@ -458,13 +458,24 @@ def _verify_shopify_session_token(id_token: str) -> Tuple[str, Dict[str, Any]]:
     if not settings.SHOPIFY_API_SECRET or not settings.SHOPIFY_API_KEY:
         raise ShopifySessionTokenError("Shopify API credentials are not configured.")
 
+    leeway_setting = getattr(settings, "SHOPIFY_SESSION_TOKEN_LEEWAY", 0)
+    try:
+        leeway = int(leeway_setting)
+    except (TypeError, ValueError):
+        leeway = 0
+    else:
+        leeway = max(0, leeway)
+
     try:
         payload = jwt.decode(
             id_token,
             settings.SHOPIFY_API_SECRET,
             algorithms=["HS256"],
             audience=settings.SHOPIFY_API_KEY,
+            leeway=leeway,
         )
+    except jwt.ImmatureSignatureError as exc:
+        raise ShopifySessionTokenError("Shopify session token is not yet valid.") from exc
     except jwt.ExpiredSignatureError as exc:
         raise ShopifySessionTokenError("Shopify session token has expired.") from exc
     except jwt.InvalidTokenError as exc:
