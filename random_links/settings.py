@@ -189,7 +189,7 @@ PAYPAL_OAUTH_URL = os.environ.get(
 # `SHOPIFY_API_SECRET` is absent.
 SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
 SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET") or os.environ.get(
-    "SHOPIFY_API_SECRET", ""
+    "SHOPIFY_SECRET", ""
 )
 SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
