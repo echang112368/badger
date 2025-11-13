@@ -1,5 +1,6 @@
 """Views for interacting with Shopify."""
 
+import base64
 import hashlib
 import hmac
 import secrets
@@ -41,6 +42,8 @@ EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
 EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
 PENDING_ONBOARD_SESSION_KEY = "shopify_pending_shop"
 CALLBACK_SESSION_KEY = "shopify_oauth_redirect"
+SESSION_TOKEN_RETRY_PREFIX = "shopify_session_retry:"
+SESSION_TOKEN_RETRY_COOLDOWN_SECONDS = 30
 
 
 class ShopifySessionTokenError(Exception):
@@ -129,6 +132,59 @@ def _render_shopify_error(request: HttpRequest, message: str, *, status_code: in
         {"error": message},
         status=status_code,
     )
+
+
+def _session_retry_key(shop_domain: str) -> str:
+    """Return the session key used to throttle retry attempts."""
+
+    return f"{SESSION_TOKEN_RETRY_PREFIX}{shop_domain}"
+
+
+def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") -> None:
+    """Remove cached Shopify session information for the current visitor."""
+
+    keys_to_clear = [
+        STATE_SESSION_KEY,
+        CALLBACK_SESSION_KEY,
+        EMBEDDED_SHOP_SESSION_KEY,
+        EMBEDDED_AUTHORIZED_SESSION_KEY,
+        PENDING_ONBOARD_SESSION_KEY,
+    ]
+
+    for key in keys_to_clear:
+        request.session.pop(key, None)
+
+    normalised_shop = _normalise_shop_domain(shop_domain)
+    if normalised_shop:
+        request.session.pop(_session_token_key(normalised_shop), None)
+        retry_key = _session_retry_key(normalised_shop)
+        request.session.pop(retry_key, None)
+
+
+def _extract_shop_from_request(request: HttpRequest) -> str:
+    """Return the best-effort shop domain found in the callback request."""
+
+    shop_param = _normalise_shop_domain(request.GET.get("shop", ""))
+    if shop_param:
+        return shop_param
+
+    host_param = (request.GET.get("host") or "").strip()
+    if host_param:
+        padded = host_param + "=" * (-len(host_param) % 4)
+        try:
+            decoded = base64.urlsafe_b64decode(padded).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            decoded = ""
+        if decoded:
+            # Embedded host strings typically look like
+            # "admin.shopify.com/store/<store-slug>".
+            parts = decoded.split("/store/", 1)
+            if len(parts) == 2 and parts[1]:
+                slug = parts[1].split("/", 1)[0]
+                if slug:
+                    return _normalise_shop_domain(f"{slug}.myshopify.com")
+
+    return ""
 
 
 @require_http_methods(["GET", "POST"])
@@ -437,6 +493,28 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     try:
         shop_domain, _payload = _verify_shopify_session_token(id_token)
     except ShopifySessionTokenError as exc:
+        shop_from_request = _extract_shop_from_request(request)
+        if shop_from_request:
+            normalised_shop = _normalise_shop_domain(shop_from_request)
+            retry_key = _session_retry_key(normalised_shop)
+            now_ts = timezone.now().timestamp()
+            last_retry_ts = 0.0
+            try:
+                last_retry_ts = float(request.session.get(retry_key, 0) or 0)
+            except (TypeError, ValueError):
+                last_retry_ts = 0.0
+
+            if now_ts - last_retry_ts < SESSION_TOKEN_RETRY_COOLDOWN_SECONDS:
+                return _render_shopify_error(
+                    request,
+                    "We couldn't validate your Shopify session. Please try again in a moment.",
+                )
+
+            _clear_shopify_session_state(request, normalised_shop)
+            request.session[retry_key] = str(now_ts)
+            authorize_url = f"{reverse('shopify_oauth_authorize')}?{urlencode({'shop': normalised_shop})}"
+            return redirect(authorize_url)
+
         return HttpResponseBadRequest(str(exc))
 
     normalised_shop = _normalise_shop_domain(shop_domain)
