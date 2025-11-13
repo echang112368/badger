@@ -191,6 +191,12 @@ SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
 SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET") or os.environ.get(
     "SHOPIFY_API_SECRET", ""
 )
+try:
+    SHOPIFY_SESSION_TOKEN_LEEWAY = int(
+        os.environ.get("SHOPIFY_SESSION_TOKEN_LEEWAY", "10")
+    )
+except (TypeError, ValueError):
+    SHOPIFY_SESSION_TOKEN_LEEWAY = 10
 SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
     "read_products,write_discounts",
