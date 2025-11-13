@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
 import jwt
@@ -40,6 +40,7 @@ STATE_SESSION_KEY = "shopify_oauth_state"
 EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
 EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
 PENDING_ONBOARD_SESSION_KEY = "shopify_pending_shop"
+CALLBACK_SESSION_KEY = "shopify_oauth_redirect"
 
 
 class ShopifySessionTokenError(Exception):
@@ -147,8 +148,8 @@ def embedded_app_home(request: HttpRequest):
         if not access_token:
             return _render_shopify_error(
                 request,
-                "We couldn't find an authorized Shopify installation for this store."
-                " Please reinstall the app from Shopify to continue.",
+                "We couldn't find an authorized Shopify installation for this store. "
+                "Please reinstall the app from Shopify to continue.",
             )
 
         request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
@@ -180,8 +181,8 @@ def embedded_app_home(request: HttpRequest):
     if not access_token:
         return _render_shopify_error(
             request,
-            "We couldn't find an authorized Shopify installation for this store."
-            " Please reinstall the app from Shopify to continue.",
+            "We couldn't find an authorized Shopify installation for this store. "
+            "Please reinstall the app from Shopify to continue.",
         )
 
     action = (request.POST.get("action") or "").strip().lower()
@@ -316,16 +317,29 @@ def oauth_authorize(request: HttpRequest):
     request.session[STATE_SESSION_KEY] = state
 
     # Build the callback URL that Shopify will redirect the merchant back to.
-    callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
-    if callback_url.startswith("http://"):
-        # Shopify requires an HTTPS redirect URI. When developing locally with
-        # tunnelling tools we commonly receive an HTTP request, so upgrade it.
-        callback_url = "https://" + callback_url.split("://", 1)[1]
+    configured_redirect = getattr(settings, "SHOPIFY_REDIRECT_URI", "") or ""
+    if configured_redirect:
+        callback_url = configured_redirect
+    else:
+        callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
+        if callback_url.startswith("http://"):
+            # Shopify requires an HTTPS redirect URI. When developing locally with
+            # tunnelling tools we commonly receive an HTTP request, so upgrade it.
+            callback_url = "https://" + callback_url.split("://", 1)[1]
+
+    request.session[CALLBACK_SESSION_KEY] = callback_url
 
     # Construct the Shopify authorization URL with the requested scopes.
+    scopes = getattr(settings, "SHOPIFY_SCOPES", "")
+    if isinstance(scopes, (list, tuple, set)):
+        scope_value = ",".join(str(scope) for scope in scopes if scope)
+    else:
+        scope_value = str(scopes)
+    scope_value = scope_value.strip() or "read_products,write_discounts"
+
     params = {
         "client_id": settings.SHOPIFY_API_KEY,
-        "scope": "read_products,write_orders",
+        "scope": scope_value,
         "redirect_uri": callback_url,
         "state": state,
     }
@@ -366,8 +380,14 @@ def oauth_callback(request: HttpRequest):
         return HttpResponseBadRequest("OAuth state mismatch.")
 
     # Exchange the short-lived authorization code for a permanent access token.
+    callback_url = request.session.pop(CALLBACK_SESSION_KEY, None)
+    if not callback_url:
+        callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
+        if callback_url.startswith("http://"):
+            callback_url = "https://" + callback_url.split("://", 1)[1]
+
     try:
-        access_token = _exchange_code_for_token(shop, code)
+        access_token = _exchange_code_for_token(shop, code, redirect_uri=callback_url)
     except requests.RequestException as exc:
         return JsonResponse(
             {
@@ -513,7 +533,9 @@ def _validate_shopify_hmac(params: Dict[str, str]) -> bool:
     return hmac.compare_digest(digest, provided_hmac)
 
 
-def _exchange_code_for_token(shop: str, code: str) -> str:
+def _exchange_code_for_token(
+    shop: str, code: str, *, redirect_uri: Optional[str] = None
+) -> str:
     """Exchange the OAuth authorization code for an access token."""
 
     if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
@@ -525,6 +547,9 @@ def _exchange_code_for_token(shop: str, code: str) -> str:
         "client_secret": settings.SHOPIFY_API_SECRET,
         "code": code,
     }
+
+    if redirect_uri:
+        payload["redirect_uri"] = redirect_uri
 
     response = requests.post(url, json=payload, timeout=10)
     response.raise_for_status()

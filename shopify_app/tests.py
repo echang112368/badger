@@ -7,6 +7,7 @@ import hmac
 import uuid
 
 import jwt
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.messages import get_messages
 from django.test import TestCase, override_settings
@@ -16,8 +17,8 @@ from merchants.models import MerchantMeta
 from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import ANY, MagicMock, patch
 
-from . import billing
-from .views import _session_token_key
+from . import billing, views
+from .views import CALLBACK_SESSION_KEY, _session_token_key
 
 
 class CreateDiscountViewTests(TestCase):
@@ -162,7 +163,10 @@ class MerchantInvoiceAdminTests(TestCase):
 
     @patch("ledger.admin.generate_all_invoices")
     def test_generate_all_triggers_message(self, mock_generate):
-        mock_generate.return_value = [MagicMock(), MagicMock()]
+        result = MagicMock()
+        result.pending_shopify = []
+        result.__len__.return_value = 2
+        mock_generate.return_value = result
 
         url = reverse("admin:ledger_invoice_generate_all")
         response = self.client.post(url, follow=True)
@@ -173,6 +177,67 @@ class MerchantInvoiceAdminTests(TestCase):
         self.assertTrue(
             any("Generated 2 invoice(s) or Shopify charges" in message for message in messages)
         )
+
+
+@override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
+class ShopifyOAuthAuthorizeTests(TestCase):
+    def test_uses_configured_redirect_and_scopes(self):
+        configured_redirect = "https://app.example.com/shopify/callback/"
+        with override_settings(
+            SHOPIFY_REDIRECT_URI=configured_redirect,
+            SHOPIFY_SCOPES=["read_products", "write_discounts"],
+        ):
+            response = self.client.get(
+                reverse("shopify_oauth_authorize"),
+                {"shop": "example.myshopify.com"},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        redirect_url = urlparse(response["Location"])
+        params = parse_qs(redirect_url.query)
+
+        self.assertEqual(params["redirect_uri"], [configured_redirect])
+        self.assertEqual(params["scope"], ["read_products,write_discounts"])
+
+        session = self.client.session
+        self.assertEqual(session[CALLBACK_SESSION_KEY], configured_redirect)
+
+    def test_fallback_redirect_upgrades_to_https(self):
+        response = self.client.get(
+            reverse("shopify_oauth_authorize"),
+            {"shop": "example.myshopify.com"},
+            secure=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        redirect_url = urlparse(response["Location"])
+        params = parse_qs(redirect_url.query)
+
+        self.assertTrue(params["redirect_uri"][0].startswith("https://"))
+
+
+class ShopifyExchangeCodeTests(TestCase):
+    @override_settings(SHOPIFY_API_SECRET="secret", SHOPIFY_API_KEY="key")
+    @patch("shopify_app.views.requests.post")
+    def test_exchange_code_includes_redirect_uri(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "token"}
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        token = views._exchange_code_for_token(
+            "example.myshopify.com",
+            "code123",
+            redirect_uri="https://app.example.com/shopify/callback/",
+        )
+
+        self.assertEqual(token, "token")
+        self.assertTrue(mock_post.called)
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(
+            payload["redirect_uri"], "https://app.example.com/shopify/callback/"
+        )
+
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class EmbeddedAppHomeTests(TestCase):
