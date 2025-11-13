@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shopify installation complete</title>
+    <script>
+      window.addEventListener("load", function () {
+        const target = "{{ redirect_url|escapejs }}";
+        if (target) {
+          if (window.top) {
+            window.top.location.href = target;
+          } else {
+            window.location.href = target;
+          }
+        }
+      });
+    </script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: #f6f6f7;
+        color: #212b36;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+        max-width: 420px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+      }
+      p {
+        margin: 0.5rem 0;
+      }
+      .details {
+        font-size: 0.875rem;
+        color: #637381;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>You're all set!</h1>
+      <p>We connected <strong>{{ shop_domain }}</strong> to your Badger account.</p>
+      {% if scopes %}
+      <p class="details">Authorized scopes: {{ scopes }}</p>
+      {% endif %}
+      <p class="details">If you are not redirected automatically, <a href="{{ redirect_url }}">continue to the app</a>.</p>
+    </div>
+  </body>
+</html>
