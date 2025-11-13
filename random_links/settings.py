@@ -147,7 +147,7 @@ SHOPIFY_ORIGIN_CANDIDATES = [
     os.environ.get("NGROK_HOST"),
     os.environ.get("SHOPIFY_APP_HOST"),
     os.environ.get("SHOPIFY_APP_DOMAIN"),
-    "https://72fdb558e0a5.ngrok-free.app",
+    "https://75b2cce96ebc.ngrok-free.app",
 ]
 
 SHOPIFY_APP_HOST = None
@@ -189,7 +189,7 @@ PAYPAL_OAUTH_URL = os.environ.get(
 # `SHOPIFY_API_SECRET` is absent.
 SHOPIFY_API_KEY = os.environ.get("SHOPIFY_API_KEY", "")
 SHOPIFY_API_SECRET = os.environ.get("SHOPIFY_API_SECRET") or os.environ.get(
-    "SHOPIFY_SECRET", ""
+    "SHOPIFY_API_SECRET", ""
 )
 SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
