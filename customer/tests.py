@@ -4,6 +4,7 @@ from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 from decimal import Decimal
 from ledger.models import LedgerEntry
+from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomerMeta
 
 
@@ -26,13 +27,13 @@ class CustomerSettingsTests(TestCase):
         response = self.client.get(reverse('user_settings'))
         self.assertContains(response, user.email)
 
-    def test_settings_displays_password(self):
+    def test_settings_does_not_display_password_hash(self):
         user = CustomUser.objects.create_user(
             username='tester2', password='secret', email='tester2@example.com'
         )
         self.client.login(username='tester2', password='secret')
         response = self.client.get(reverse('user_settings'))
-        self.assertContains(response, user.password)
+        self.assertNotContains(response, user.password)
 
     def test_settings_updates_name(self):
         user = CustomUser.objects.create_user(
@@ -154,3 +155,79 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "StoreCo")
         self.assertContains(response, "+120 pts")
         self.assertContains(response, "+$2.00")
+
+
+class CustomerPointsAPITests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="customer",
+            password="secret",
+            email="customer@example.com",
+            first_name="Customer",
+            last_name="User",
+        )
+        self.meta = CustomerMeta.objects.get(user=self.user)
+        LedgerEntry.objects.create(
+            creator=self.user,
+            amount=Decimal("42"),
+            entry_type="points",
+        )
+        login_response = self.client.post(
+            reverse("api_login"),
+            {"username": "customer@example.com", "password": "secret"},
+        )
+        self.assertEqual(login_response.status_code, 200)
+        self.login_tokens = login_response.json()
+
+    def test_returns_points_and_new_tokens(self):
+        url = reverse("api_points")
+        response = self.client.post(
+            url,
+            {
+                "uuid": str(self.meta.uuid),
+                "refresh": self.login_tokens["refresh"],
+                "access": self.login_tokens["access"],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["uuid"], str(self.meta.uuid))
+        self.assertEqual(data["points"], 42)
+        self.assertIn("access", data)
+        self.assertIn("refresh", data)
+        self.assertNotEqual(data["access"], self.login_tokens["access"])
+        self.assertNotEqual(data["refresh"], self.login_tokens["refresh"])
+
+    def test_rejects_mismatched_access_token(self):
+        other_user = CustomUser.objects.create_user(
+            username="other",
+            password="secret",
+            email="other@example.com",
+        )
+        other_refresh = RefreshToken.for_user(other_user)
+        url = reverse("api_points")
+        response = self.client.post(
+            url,
+            {
+                "uuid": str(self.meta.uuid),
+                "refresh": self.login_tokens["refresh"],
+                "access": str(other_refresh.access_token),
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json().get("detail"),
+            "Access token does not match refresh token.",
+        )
+
+    def test_invalid_refresh_token_returns_error(self):
+        url = reverse("api_points")
+        response = self.client.post(
+            url,
+            {
+                "uuid": str(self.meta.uuid),
+                "refresh": "invalid",  # not a valid token
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json().get("detail"), "Invalid refresh token.")
