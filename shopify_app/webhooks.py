@@ -3,7 +3,7 @@ import requests
 
 
 def register_orders_create_webhook(shop_domain: str, access_token: str,
-                                    webhook_url: str = "https://9ea9a9df1627.ngrok-free.app/shopify/webhooks/orders-create/"):
+                                    webhook_url: str = "https://75b2cce96ebc.ngrok-free.app/shopify/webhooks/orders-create/"):
     """Register an orders/create webhook for the given shop."""
     url = f"https://{shop_domain}/admin/api/2024-07/webhooks.json"
     payload = {
