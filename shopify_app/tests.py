@@ -5,6 +5,7 @@ from decimal import Decimal
 import hashlib
 import hmac
 import uuid
+import html
 
 import jwt
 from urllib.parse import parse_qs, urlparse
@@ -12,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from django.contrib.messages import get_messages
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -407,11 +409,45 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(_session_token_key(self.shop_domain), self.client.session)
 
-    def test_invalid_session_token_returns_400(self):
+    def test_invalid_session_token_triggers_reauthorize(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
         if isinstance(bad_token, bytes):
             bad_token = bad_token.decode("utf-8")
 
-        response = self.client.get(self.url, {"id_token": bad_token})
+        session = self.client.session
+        session[_session_token_key(self.shop_domain)] = "cached_token"
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"id_token": bad_token, "shop": self.shop_domain},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(
+            f"{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}",
+            response["Location"],
+        )
+        self.assertNotIn(_session_token_key(self.shop_domain), self.client.session)
+
+    def test_invalid_session_token_retries_are_throttled(self):
+        bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
+        if isinstance(bad_token, bytes):
+            bad_token = bad_token.decode("utf-8")
+
+        retry_key = "shopify_session_retry:example.myshopify.com"
+        session = self.client.session
+        session[retry_key] = str(timezone.now().timestamp())
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"id_token": bad_token, "shop": self.shop_domain},
+        )
 
         self.assertEqual(response.status_code, 400)
+        html_response = html.unescape(response.content.decode())
+        self.assertIn(
+            "We couldn't validate your Shopify session. Please try again in a moment.",
+            html_response,
+        )
