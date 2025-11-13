@@ -20,7 +20,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from unittest.mock import ANY, MagicMock, patch
 
 from . import billing, views
-from .views import CALLBACK_SESSION_KEY, _session_token_key
+from .oauth import (
+    CALLBACK_SESSION_KEY,
+    STATE_SESSION_KEY,
+    AccessTokenResponse,
+    exchange_code_for_token,
+    session_scope_key,
+    session_token_key,
+)
 
 
 class CreateDiscountViewTests(TestCase):
@@ -156,6 +163,33 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(details.amount, Decimal("10.25"))
 
 
+class ShopifyBillingReturnTests(TestCase):
+    def setUp(self):
+        self.url = reverse("shopify_billing_return")
+
+    def test_missing_shop_returns_error(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Missing shop identifier", response.content.decode())
+
+    def test_active_charge_success(self):
+        user = CustomUser.objects.create_user(
+            username="merchant", email="merchant@example.com", password="pass"
+        )
+        meta = MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain="example.myshopify.com",
+            shopify_access_token="token",
+            monthly_fee=Decimal("10.00"),
+            shopify_recurring_charge_id="123",
+            shopify_billing_status="active",
+        )
+
+        response = self.client.get(self.url, {"shop": meta.shopify_store_domain})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("active", response.content.decode().lower())
+
+
 class MerchantInvoiceAdminTests(TestCase):
     def setUp(self):
         self.staff = CustomUser.objects.create_superuser(
@@ -220,20 +254,23 @@ class ShopifyOAuthAuthorizeTests(TestCase):
 
 class ShopifyExchangeCodeTests(TestCase):
     @override_settings(SHOPIFY_API_SECRET="secret", SHOPIFY_API_KEY="key")
-    @patch("shopify_app.views.requests.post")
+    @patch("shopify_app.oauth.requests.post")
     def test_exchange_code_includes_redirect_uri(self, mock_post):
         mock_response = MagicMock()
-        mock_response.json.return_value = {"access_token": "token"}
+        mock_response.json.return_value = {
+            "access_token": "token",
+            "scope": "read_products",
+        }
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
 
-        token = views._exchange_code_for_token(
+        token_response = exchange_code_for_token(
             "example.myshopify.com",
             "code123",
             redirect_uri="https://app.example.com/shopify/callback/",
         )
 
-        self.assertEqual(token, "token")
+        self.assertEqual(token_response.access_token, "token")
         self.assertTrue(mock_post.called)
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(
@@ -249,7 +286,7 @@ class EmbeddedAppHomeTests(TestCase):
 
     def _store_session_token(self):
         session = self.client.session
-        session[_session_token_key(self.shop_domain)] = self.access_token
+        session[session_token_key(self.shop_domain)] = self.access_token
         session.save()
 
     def _signed_params(self, **params):
@@ -306,7 +343,8 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(meta.company_name, "Ada Co")
 
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
-        self.assertNotIn(_session_token_key(self.shop_domain), self.client.session)
+        self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
+        self.assertNotIn(session_scope_key(self.shop_domain), self.client.session)
 
     def test_login_attaches_existing_user(self):
         user = CustomUser.objects.create_user(
@@ -340,6 +378,7 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(meta.shopify_store_domain, self.shop_domain)
         self.assertEqual(meta.shopify_access_token, self.access_token)
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+        self.assertNotIn(session_scope_key(self.shop_domain), self.client.session)
 
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
@@ -394,20 +433,29 @@ class OAuthCallbackTests(TestCase):
             self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
 
-    @patch("shopify_app.views._exchange_code_for_token", return_value="shppa_token")
-    @patch("shopify_app.views._validate_shopify_hmac", return_value=True)
+    @patch("shopify_app.oauth.exchange_code_for_token")
+    @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
     def test_oauth_callback_stores_session_token(self, mock_hmac, mock_exchange):
+        mock_exchange.return_value = AccessTokenResponse(
+            access_token="shppa_token",
+            scope="read_products",
+            associated_user_scope="",
+            raw={},
+        )
+
         session = self.client.session
-        session["shopify_oauth_state"] = "abc"
+        session[STATE_SESSION_KEY] = "abc"
         session.save()
 
         response = self.client.get(
             self.url,
-            {"shop": self.shop_domain, "code": "abc", "hmac": "valid", "state": "abc"},
+            {"shop": self.shop_domain, "code": "abc", "state": "abc", "hmac": "1"},
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(_session_token_key(self.shop_domain), self.client.session)
+        self.assertIn(session_token_key(self.shop_domain), self.client.session)
+        self.assertIn(session_scope_key(self.shop_domain), self.client.session)
+        self.assertIn("window.top.location.href", response.content.decode())
 
     def test_invalid_session_token_triggers_reauthorize(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
@@ -415,7 +463,7 @@ class OAuthCallbackTests(TestCase):
             bad_token = bad_token.decode("utf-8")
 
         session = self.client.session
-        session[_session_token_key(self.shop_domain)] = "cached_token"
+        session[session_token_key(self.shop_domain)] = "cached_token"
         session.save()
 
         response = self.client.get(
@@ -428,7 +476,7 @@ class OAuthCallbackTests(TestCase):
             f"{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}",
             response["Location"],
         )
-        self.assertNotIn(_session_token_key(self.shop_domain), self.client.session)
+        self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
 
     def test_invalid_session_token_retries_are_throttled(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")

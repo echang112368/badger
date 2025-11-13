@@ -1,15 +1,12 @@
 """Views for interacting with Shopify."""
 
 import base64
-import hashlib
-import hmac
-import secrets
 import uuid
+from decimal import Decimal
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
 import jwt
-import requests
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.http import (
@@ -19,7 +16,7 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import redirect, render
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 from rest_framework import status
@@ -29,43 +26,32 @@ from rest_framework.response import Response
 
 from merchants.models import MerchantMeta
 
+from . import billing
+from .billing import ShopifyBillingError
 from .discounts import select_discount_percentage
-from .shopify_client import ShopifyClient
 from .forms import ShopifyOAuthSignupForm
+from .oauth import (
+    CALLBACK_SESSION_KEY,
+    STATE_SESSION_KEY,
+    ShopifyOAuthError,
+    ShopifyOAuthService,
+    normalise_shop_domain,
+    session_scope_key,
+    session_token_key,
+    validate_shopify_hmac,
+)
+from .shopify_client import ShopifyClient
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
 
-# Session key that stores the randomly generated OAuth state token.
-STATE_SESSION_KEY = "shopify_oauth_state"
 EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
 EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
 PENDING_ONBOARD_SESSION_KEY = "shopify_pending_shop"
-CALLBACK_SESSION_KEY = "shopify_oauth_redirect"
 SESSION_TOKEN_RETRY_PREFIX = "shopify_session_retry:"
 SESSION_TOKEN_RETRY_COOLDOWN_SECONDS = 30
-
-
 class ShopifySessionTokenError(Exception):
     """Raised when a Shopify session token (``id_token``) is invalid."""
-
-
-
-def _normalise_shop_domain(domain: str) -> str:
-    """Return a normalised Shopify shop domain."""
-
-    if not domain:
-        return ""
-    domain = domain.strip().lower()
-    if domain.startswith("https://") or domain.startswith("http://"):
-        domain = domain.split("://", 1)[1]
-    return domain.strip("/")
-
-
-def _session_token_key(domain: str) -> str:
-    """Return the session key used to store temporary Shopify tokens."""
-
-    return f"shopify_install_token:{_normalise_shop_domain(domain)}"
 
 
 def _resolve_shopify_access_token(
@@ -82,15 +68,21 @@ def _resolve_shopify_access_token(
     if meta and meta.shopify_access_token:
         return meta.shopify_access_token
 
-    return request.session.get(_session_token_key(normalised_domain), "")
+    return request.session.get(session_token_key(normalised_domain), "")
 
 
 def _ensure_shopify_link(
-    user: CustomUser, shop_domain: str, access_token: str, *, company_name: str = ""
-) -> None:
+    request: HttpRequest,
+    user: CustomUser,
+    shop_domain: str,
+    access_token: str,
+    *,
+    company_name: str = "",
+    scope: str = "",
+) -> MerchantMeta:
     """Persist Shopify credentials on the merchant's metadata record."""
 
-    normalised_domain = _normalise_shop_domain(shop_domain)
+    normalised_domain = normalise_shop_domain(shop_domain)
     existing = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
         .exclude(user=user)
@@ -113,6 +105,10 @@ def _ensure_shopify_link(
         meta.company_name = company_name.strip()
         fields_to_update.append("company_name")
 
+    if scope:
+        meta.shopify_oauth_authorization_line = _format_authorization_line(scope)
+        fields_to_update.append("shopify_oauth_authorization_line")
+
     meta.shopify_access_token = access_token
     meta.shopify_store_domain = normalised_domain
     meta.business_type = MerchantMeta.BusinessType.SHOPIFY
@@ -121,6 +117,38 @@ def _ensure_shopify_link(
     if not user.is_merchant:
         user.is_merchant = True
         user.save(update_fields=["is_merchant"])
+
+    _bootstrap_shopify_billing(request, meta)
+    return meta
+
+
+def _format_authorization_line(scope: str) -> str:
+    scope_value = ",".join(sorted(part.strip() for part in scope.split(",") if part.strip()))
+    timestamp = timezone.now().isoformat()
+    if scope_value:
+        return f"scope={scope_value};connected_at={timestamp}"
+    return f"connected_at={timestamp}"
+
+
+def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None:
+    monthly_fee = getattr(meta, "monthly_fee", Decimal("0")) or Decimal("0")
+    try:
+        monthly_fee = Decimal(monthly_fee)
+    except (TypeError, ValueError):
+        monthly_fee = Decimal("0")
+
+    if monthly_fee <= 0:
+        return
+
+    try:
+        return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
+    except NoReverseMatch:
+        return_url = request.build_absolute_uri("/")
+
+    try:
+        billing.create_or_update_recurring_charge(meta, return_url=return_url)
+    except ShopifyBillingError as exc:
+        raise ValueError(f"Shopify billing setup failed: {exc}") from exc
 
 
 def _render_shopify_error(request: HttpRequest, message: str, *, status_code: int = 400):
@@ -154,9 +182,10 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
     for key in keys_to_clear:
         request.session.pop(key, None)
 
-    normalised_shop = _normalise_shop_domain(shop_domain)
+    normalised_shop = normalise_shop_domain(shop_domain)
     if normalised_shop:
-        request.session.pop(_session_token_key(normalised_shop), None)
+        request.session.pop(session_token_key(normalised_shop), None)
+        request.session.pop(session_scope_key(normalised_shop), None)
         retry_key = _session_retry_key(normalised_shop)
         request.session.pop(retry_key, None)
 
@@ -164,7 +193,7 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
 def _extract_shop_from_request(request: HttpRequest) -> str:
     """Return the best-effort shop domain found in the callback request."""
 
-    shop_param = _normalise_shop_domain(request.GET.get("shop", ""))
+    shop_param = normalise_shop_domain(request.GET.get("shop", ""))
     if shop_param:
         return shop_param
 
@@ -182,7 +211,7 @@ def _extract_shop_from_request(request: HttpRequest) -> str:
             if len(parts) == 2 and parts[1]:
                 slug = parts[1].split("/", 1)[0]
                 if slug:
-                    return _normalise_shop_domain(f"{slug}.myshopify.com")
+                    return normalise_shop_domain(f"{slug}.myshopify.com")
 
     return ""
 
@@ -196,10 +225,10 @@ def embedded_app_home(request: HttpRequest):
         if not shop:
             return _render_shopify_error(request, "Missing Shopify shop parameter.")
 
-        if not _validate_shopify_hmac(request.GET):
+        if not validate_shopify_hmac(request.GET):
             return HttpResponseBadRequest("Invalid Shopify HMAC signature.")
 
-        normalised_shop = _normalise_shop_domain(shop)
+        normalised_shop = normalise_shop_domain(shop)
         access_token = _resolve_shopify_access_token(request, normalised_shop)
         if not access_token:
             return _render_shopify_error(
@@ -213,7 +242,7 @@ def embedded_app_home(request: HttpRequest):
 
         if request.user.is_authenticated:
             meta = getattr(request.user, "merchantmeta", None)
-            if meta and _normalise_shop_domain(meta.shopify_store_domain) == normalised_shop:
+            if meta and normalise_shop_domain(meta.shopify_store_domain) == normalised_shop:
                 return redirect("merchant_dashboard")
 
         context = {
@@ -232,7 +261,7 @@ def embedded_app_home(request: HttpRequest):
     if not shop_domain:
         return HttpResponseBadRequest("Missing Shopify session context.")
 
-    normalised_shop = _normalise_shop_domain(shop_domain)
+    normalised_shop = normalise_shop_domain(shop_domain)
     access_token = _resolve_shopify_access_token(request, normalised_shop)
     if not access_token:
         return _render_shopify_error(
@@ -240,6 +269,7 @@ def embedded_app_home(request: HttpRequest):
             "We couldn't find an authorized Shopify installation for this store. "
             "Please reinstall the app from Shopify to continue.",
         )
+    scope = request.session.get(session_scope_key(normalised_shop), "")
 
     action = (request.POST.get("action") or "").strip().lower()
     if action not in {"signup", "login"}:
@@ -252,16 +282,19 @@ def embedded_app_home(request: HttpRequest):
             user = signup_form.save()
             try:
                 _ensure_shopify_link(
+                    request,
                     user,
                     normalised_shop,
                     access_token,
                     company_name=signup_form.get_company_name(),
+                    scope=scope,
                 )
             except ValueError as exc:
                 signup_form.add_error(None, str(exc))
             else:
                 auth_login(request, user)
-                request.session.pop(_session_token_key(normalised_shop), None)
+                request.session.pop(session_token_key(normalised_shop), None)
+                request.session.pop(session_scope_key(normalised_shop), None)
                 return redirect("merchant_dashboard")
     else:
         signup_form = ShopifyOAuthSignupForm()
@@ -274,16 +307,19 @@ def embedded_app_home(request: HttpRequest):
                 company_name = meta.company_name
             try:
                 _ensure_shopify_link(
+                    request,
                     user,
                     normalised_shop,
                     access_token,
                     company_name=company_name,
+                    scope=scope,
                 )
             except ValueError as exc:
                 login_form.add_error(None, str(exc))
             else:
                 auth_login(request, user)
-                request.session.pop(_session_token_key(normalised_shop), None)
+                request.session.pop(session_token_key(normalised_shop), None)
+                request.session.pop(session_scope_key(normalised_shop), None)
                 return redirect("merchant_dashboard")
 
     context = {
@@ -346,62 +382,20 @@ def create_discount(request, merchant_uuid):
 
 @require_GET
 def oauth_authorize(request: HttpRequest):
-    """Begin the classic Shopify OAuth flow."""
+    """Begin the Shopify OAuth installation flow."""
 
-    # Shopify requires the merchant's shop domain for OAuth. Reject the request
-    # immediately when the `shop` query parameter is missing.
+    service = ShopifyOAuthService(request)
     shop = (request.GET.get("shop") or "").strip()
-    if not shop:
-        return HttpResponseBadRequest("Missing 'shop' parameter.")
 
-    # Normalise user-supplied shop domain values by removing protocol prefixes
-    # and trailing slashes. Shopify expects `example.myshopify.com` only.
-    if shop.startswith("https://") or shop.startswith("http://"):
-        shop = shop.split("://", 1)[1]
-    shop = shop.strip("/")
+    try:
+        authorization_url = service.begin_installation(shop)
+    except ShopifyOAuthError as exc:
+        message = str(exc)
+        status_code = 400
+        if "credentials" in message.lower():
+            status_code = 500
+        return JsonResponse({"error": message}, status=status_code)
 
-    # Both the public API key and secret must exist before we can start OAuth.
-    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
-        return JsonResponse(
-            {"error": "Shopify API credentials are not configured."},
-            status=500,
-        )
-
-    # Generate a cryptographically secure random string to defend against CSRF
-    # attacks and store it in the session for later validation.
-    state = _generate_state_token()
-    request.session[STATE_SESSION_KEY] = state
-
-    # Build the callback URL that Shopify will redirect the merchant back to.
-    configured_redirect = getattr(settings, "SHOPIFY_REDIRECT_URI", "") or ""
-    if configured_redirect:
-        callback_url = configured_redirect
-    else:
-        callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
-        if callback_url.startswith("http://"):
-            # Shopify requires an HTTPS redirect URI. When developing locally with
-            # tunnelling tools we commonly receive an HTTP request, so upgrade it.
-            callback_url = "https://" + callback_url.split("://", 1)[1]
-
-    request.session[CALLBACK_SESSION_KEY] = callback_url
-
-    # Construct the Shopify authorization URL with the requested scopes.
-    scopes = getattr(settings, "SHOPIFY_SCOPES", "")
-    if isinstance(scopes, (list, tuple, set)):
-        scope_value = ",".join(str(scope) for scope in scopes if scope)
-    else:
-        scope_value = str(scopes)
-    scope_value = scope_value.strip() or "read_products,write_discounts"
-
-    params = {
-        "client_id": settings.SHOPIFY_API_KEY,
-        "scope": scope_value,
-        "redirect_uri": callback_url,
-        "state": state,
-    }
-    authorization_url = f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"
-
-    # Redirect the merchant to Shopify where they can approve the installation.
     return redirect(authorization_url)
 
 
@@ -416,49 +410,13 @@ def oauth_callback(request: HttpRequest):
     if id_token and not request.GET.get("code"):
         return _handle_session_token_callback(request, id_token)
 
-    # Shopify sends all OAuth results as query parameters in the callback URL.
-    # The `shop` and `code` parameters are mandatory for token exchange.
-    shop = (request.GET.get("shop") or "").strip()
-    code = (request.GET.get("code") or "").strip()
-    if not shop or not code:
-        return HttpResponseBadRequest("Missing required OAuth parameters.")
-
-    # Ensure the request genuinely originated from Shopify by validating the
-    # HMAC signature using the shared client secret.
-    if not _validate_shopify_hmac(request.GET):
-        return HttpResponseBadRequest("Invalid Shopify HMAC signature.")
-
-    # Compare the `state` parameter against the value stored in the session to
-    # confirm that the callback matches the session that initiated OAuth.
-    expected_state = request.session.pop(STATE_SESSION_KEY, None)
-    received_state = request.GET.get("state")
-    if not expected_state or expected_state != received_state:
-        return HttpResponseBadRequest("OAuth state mismatch.")
-
-    # Exchange the short-lived authorization code for a permanent access token.
-    callback_url = request.session.pop(CALLBACK_SESSION_KEY, None)
-    if not callback_url:
-        callback_url = request.build_absolute_uri(reverse("shopify_oauth_callback"))
-        if callback_url.startswith("http://"):
-            callback_url = "https://" + callback_url.split("://", 1)[1]
-
+    service = ShopifyOAuthService(request)
     try:
-        access_token = _exchange_code_for_token(shop, code, redirect_uri=callback_url)
-    except requests.RequestException as exc:
-        return JsonResponse(
-            {
-                "error": "Failed to exchange access token with Shopify.",
-                "details": str(exc),
-            },
-            status=500,
-        )
-    except ValueError as exc:
-        return JsonResponse({"error": str(exc)}, status=500)
+        token_response = service.complete_installation(request.GET)
+    except ShopifyOAuthError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
 
-    # Persist the access token so that future API calls can be made on behalf of
-    # the merchant. If the shop already exists we overwrite the stored token.
-    normalised_shop = _normalise_shop_domain(shop)
-    request.session[_session_token_key(normalised_shop)] = access_token
+    normalised_shop = normalise_shop_domain(request.GET.get("shop", ""))
 
     meta = (
         MerchantMeta.objects.select_related("user")
@@ -467,24 +425,79 @@ def oauth_callback(request: HttpRequest):
     )
 
     if meta:
-        meta.shopify_access_token = access_token
+        meta.shopify_access_token = token_response.access_token
         meta.shopify_store_domain = normalised_shop
         meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        update_fields = [
+        fields = [
             "shopify_access_token",
             "shopify_store_domain",
             "business_type",
         ]
-        meta.save(update_fields=update_fields)
+        if token_response.scope:
+            meta.shopify_oauth_authorization_line = _format_authorization_line(
+                token_response.scope
+            )
+            fields.append("shopify_oauth_authorization_line")
+        meta.save(update_fields=fields)
 
         user = getattr(meta, "user", None)
         if user and not user.is_merchant:
             user.is_merchant = True
             user.save(update_fields=["is_merchant"])
 
-    # Provide a simple confirmation payload to the merchant (or installer) so
-    # they know the OAuth process completed successfully.
-    return JsonResponse({"status": "ok", "shop": normalised_shop})
+    redirect_url = request.build_absolute_uri(
+        f"{reverse('shopify_embedded_home')}?{urlencode({'shop': normalised_shop})}"
+    )
+    request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
+    request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
+
+    context = {
+        "shop_domain": normalised_shop,
+        "redirect_url": redirect_url,
+        "scopes": token_response.scope,
+    }
+    return render(
+        request,
+        "shopify_app/oauth_callback_complete.html",
+        context,
+    )
+
+
+@require_GET
+def billing_return(request: HttpRequest) -> HttpResponse:
+    """Display the result of the Shopify billing confirmation."""
+
+    shop = normalise_shop_domain(request.GET.get("shop", ""))
+    status_code = 200
+    message = "Your Shopify subscription is active. You may close this window."
+
+    if not shop:
+        status_code = 400
+        message = "Missing shop identifier in the billing confirmation URL."
+    else:
+        meta = (
+            MerchantMeta.objects.select_related("user")
+            .filter(shopify_store_domain__iexact=shop)
+            .first()
+        )
+
+        if not meta:
+            status_code = 404
+            message = "We could not locate a merchant record for this Shopify store."
+        else:
+            try:
+                billing.ensure_active_charge(meta)
+            except ShopifyBillingError as exc:
+                status_code = 400
+                message = f"Shopify billing is not active: {exc}"
+
+    context = {"shop_domain": shop, "message": message, "status_code": status_code}
+    return render(
+        request,
+        "shopify_app/billing_return.html",
+        context,
+        status=status_code,
+    )
 
 
 def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpResponse:
@@ -495,7 +508,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     except ShopifySessionTokenError as exc:
         shop_from_request = _extract_shop_from_request(request)
         if shop_from_request:
-            normalised_shop = _normalise_shop_domain(shop_from_request)
+            normalised_shop = normalise_shop_domain(shop_from_request)
             retry_key = _session_retry_key(normalised_shop)
             now_ts = timezone.now().timestamp()
             last_retry_ts = 0.0
@@ -517,7 +530,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
 
         return HttpResponseBadRequest(str(exc))
 
-    normalised_shop = _normalise_shop_domain(shop_domain)
+    normalised_shop = normalise_shop_domain(shop_domain)
     access_token = _resolve_shopify_access_token(request, normalised_shop)
 
     if not access_token:
@@ -570,7 +583,7 @@ def _verify_shopify_session_token(id_token: str) -> Tuple[str, Dict[str, Any]]:
 
     destination = payload.get("dest") or payload.get("iss") or ""
     destination = destination.split("://", 1)[-1]
-    shop_domain = _normalise_shop_domain(destination)
+    shop_domain = normalise_shop_domain(destination)
     if not shop_domain:
         raise ShopifySessionTokenError("Shopify session token did not include a shop domain.")
 
@@ -581,60 +594,4 @@ def _verify_shopify_session_token(id_token: str) -> Tuple[str, Dict[str, Any]]:
     return shop_domain, payload
 
 
-def _generate_state_token() -> str:
-    """Return a cryptographically secure random string for OAuth state."""
-
-    return secrets.token_urlsafe(32)
-
-
-def _validate_shopify_hmac(params: Dict[str, str]) -> bool:
-    """Validate the request signature provided by Shopify."""
-
-    provided_hmac = params.get("hmac")
-    if not provided_hmac or not settings.SHOPIFY_API_SECRET:
-        return False
-
-    # Shopify requires that parameters are sorted lexicographically, joined as
-    # `key=value` pairs and concatenated with `&` before signing the message.
-    message_parts = []
-    for key in sorted(k for k in params.keys() if k != "hmac"):
-        values = params.getlist(key) if hasattr(params, "getlist") else [params[key]]
-        message_parts.append(f"{key}={','.join(values)}")
-    message = "&".join(message_parts)
-
-    digest = hmac.new(
-        settings.SHOPIFY_API_SECRET.encode("utf-8"),
-        message.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    return hmac.compare_digest(digest, provided_hmac)
-
-
-def _exchange_code_for_token(
-    shop: str, code: str, *, redirect_uri: Optional[str] = None
-) -> str:
-    """Exchange the OAuth authorization code for an access token."""
-
-    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
-        raise ValueError("Shopify API credentials are not configured.")
-
-    url = f"https://{shop}/admin/oauth/access_token"
-    payload = {
-        "client_id": settings.SHOPIFY_API_KEY,
-        "client_secret": settings.SHOPIFY_API_SECRET,
-        "code": code,
-    }
-
-    if redirect_uri:
-        payload["redirect_uri"] = redirect_uri
-
-    response = requests.post(url, json=payload, timeout=10)
-    response.raise_for_status()
-    data = response.json()
-
-    access_token = data.get("access_token")
-    if not access_token:
-        raise ValueError("Shopify response did not include an access token.")
-
-    return access_token
+    return shop_domain, payload
