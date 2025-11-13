@@ -2,6 +2,7 @@ import uuid
 from datetime import timedelta
 from decimal import Decimal
 import os
+from collections.abc import Iterator, Sequence
 from typing import Optional, List
 
 import requests
@@ -13,7 +14,69 @@ from django.contrib.auth import get_user_model
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
+from django.urls import reverse
+
 from shopify_app import billing as shopify_billing
+
+
+class ShopifyBillingConfirmationRequired(RuntimeError):
+    """Raised when a Shopify merchant must confirm their recurring charge."""
+
+    def __init__(self, merchant, meta: MerchantMeta, message: Optional[str] = None):
+        self.merchant = merchant
+        self.meta = meta
+        display_name = _merchant_display_name(merchant)
+        default_message = (
+            f"Shopify billing confirmation required for {display_name}."
+        )
+        super().__init__(message or default_message)
+
+
+class InvoiceGenerationResult(Sequence):
+    """Container for invoice generation output and Shopify pending state."""
+
+    def __init__(self, created: List[MerchantInvoice], pending_shopify: List[MerchantMeta]):
+        self.created = created
+        self.pending_shopify = pending_shopify
+
+    def __len__(self) -> int:
+        return len(self.created)
+
+    def __getitem__(self, index):
+        return self.created[index]
+
+    def __iter__(self) -> Iterator[MerchantInvoice]:
+        return iter(self.created)
+
+
+def _build_shopify_return_url(request=None) -> str:
+    """Best-effort construction of the Shopify billing return URL."""
+
+    path = reverse("merchant_invoices")
+
+    if request is not None:
+        return request.build_absolute_uri(path)
+
+    candidates = [
+        getattr(settings, "SHOPIFY_APP_URL", ""),
+        getattr(settings, "SHOPIFY_APP_ORIGIN", ""),
+        getattr(settings, "SITE_URL", ""),
+    ]
+
+    for candidate in candidates:
+        if candidate:
+            base = str(candidate).strip().rstrip("/")
+            if base:
+                return f"{base}{path}"
+
+    hosts = getattr(settings, "ALLOWED_HOSTS", []) or []
+    if hosts:
+        host = hosts[0].strip()
+        if host:
+            scheme = "http" if getattr(settings, "DEBUG", False) else "https"
+            return f"{scheme}://{host}{path}"
+
+    raise RuntimeError("Unable to determine Shopify billing return URL. Configure SHOPIFY_APP_URL or provide a request object.")
 
 from .payouts import _get_paypal_access_token
 
@@ -261,6 +324,25 @@ def create_invoice_for_merchant(merchant):
         return None
 
     if business_type == MerchantMeta.BusinessType.SHOPIFY:
+        try:
+            shopify_billing.ensure_active_charge(meta)
+        except shopify_billing.ShopifyBillingError:
+            try:
+                return_url = _build_shopify_return_url()
+            except RuntimeError as exc:
+                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
+
+            try:
+                shopify_billing.create_or_update_recurring_charge(
+                    meta,
+                    return_url=return_url,
+                )
+            except shopify_billing.ShopifyBillingError as exc:
+                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
+
+            meta.refresh_from_db()
+            raise ShopifyBillingConfirmationRequired(merchant, meta)
+
         description_components = [
             f"{name} ${amount.quantize(Decimal('0.01'))}" for name, amount in components
         ]
@@ -409,7 +491,10 @@ def generate_due_invoices():
     merchants = User.objects.filter(is_merchant=True, date_joined__day=today.day)
     created = []
     for merchant in merchants:
-        invoice = create_invoice_for_merchant(merchant)
+        try:
+            invoice = create_invoice_for_merchant(merchant)
+        except ShopifyBillingConfirmationRequired:
+            continue
         if invoice:
             created.append(invoice)
     return created
@@ -421,6 +506,10 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
     When ``shopify_only`` is true, only Shopify merchants are processed and
     PayPal invoice generation is skipped. This is primarily used by the admin
     interface when triggering Shopify billing directly.
+
+    Returns:
+        InvoiceGenerationResult: Created invoices and Shopify merchants still
+        pending billing confirmation.
     """
     today = timezone.now().date()
     if not ignore_date and today.day != 1:
@@ -495,8 +584,15 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
         )
 
     created = []
+    pending_shopify: List[MerchantMeta] = []
     for merchant in ready_merchants:
-        invoice = create_invoice_for_merchant(merchant)
+        try:
+            invoice = create_invoice_for_merchant(merchant)
+        except ShopifyBillingConfirmationRequired as pending:
+            if isinstance(pending.meta, MerchantMeta):
+                pending_shopify.append(pending.meta)
+            continue
+
         if invoice:
             created.append(invoice)
-    return created
+    return InvoiceGenerationResult(created, pending_shopify)
