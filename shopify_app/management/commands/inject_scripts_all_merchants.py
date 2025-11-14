@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from merchants.models import MerchantMeta
 from shopify_app.shopify_client import ShopifyClient
+from shopify_app.token_management import refresh_shopify_token
 
 SCRIPT_SRCS = [
     "https://ac5d731fca38.ngrok-free.app/static/js/referral_tracker.js",
@@ -24,7 +25,11 @@ class Command(BaseCommand):
                 )
                 continue
 
-            client = ShopifyClient(access_token, store_domain)
+            client = ShopifyClient(
+                access_token,
+                store_domain,
+                refresh_handler=lambda m=merchant: refresh_shopify_token(m),
+            )
             try:
                 existing = client.get("/admin/api/2023-07/script_tags.json")
                 tags = existing.get("script_tags", [])
