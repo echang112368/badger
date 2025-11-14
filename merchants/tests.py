@@ -23,7 +23,6 @@ class MerchantSettingsFormTests(TestCase):
             data={
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
                 "paypal_email": "",
-                "shopify_access_token": "",
                 "shopify_store_domain": "",
             },
             instance=self.user.merchantmeta,
@@ -36,29 +35,29 @@ class MerchantSettingsFormTests(TestCase):
             data={
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
-                "shopify_access_token": "",
                 "shopify_store_domain": "",
             },
             instance=self.user.merchantmeta,
         )
         self.assertTrue(form.is_valid())
 
-    def test_requires_domain_when_access_token_present(self):
+    def test_normalizes_shopify_store_domain(self):
         form = MerchantSettingsForm(
             data={
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
-                "shopify_access_token": "token",
-                "shopify_store_domain": "",
+                "shopify_store_domain": "https://Example.myshopify.com/",
             },
             instance=self.user.merchantmeta,
         )
-        self.assertFalse(form.is_valid())
-        self.assertIn("shopify_store_domain", form.errors)
+        self.assertTrue(form.is_valid())
+        meta = form.save()
+        self.user.refresh_from_db()
+        self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
 
 class MerchantSettingsTests(TestCase):
-    def test_saves_shopify_token(self):
+    def test_updates_shopify_store_domain(self):
         user = CustomUser.objects.create_user(
             username="merchant", password="pass", email="merchant1@example.com", is_merchant=True
         )
@@ -67,7 +66,6 @@ class MerchantSettingsTests(TestCase):
             reverse("merchant_settings"),
             {
                 "paypal_email": "merchant@example.com",
-                "shopify_access_token": "token",
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
             },
@@ -76,7 +74,6 @@ class MerchantSettingsTests(TestCase):
         self.assertRedirects(response, reverse("merchant_settings"))
 
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_access_token, "token")
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
 
@@ -119,7 +116,6 @@ class MerchantSettingsTests(TestCase):
                 "first_name": "New",
                 "last_name": "Name",
                 "paypal_email": "merchant4@example.com",
-                "shopify_access_token": "",
                 "shopify_store_domain": "",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
             },
@@ -136,14 +132,18 @@ class MerchantSettingsTests(TestCase):
             email="merchant_tabs@example.com",
             is_merchant=True,
         )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.shopify_access_token = "existing-token"
+        meta.shopify_store_domain = "tabstore.myshopify.com"
+        meta.save()
         self.client.force_login(user)
         response = self.client.post(
             reverse("merchant_settings"),
             {
                 "company_name": "",
                 "paypal_email": "",
-                "shopify_access_token": "tab-token",
                 "shopify_store_domain": "https://TabStore.myshopify.com/",
+                "shopify_oauth_authorization_line": "scope=read_products;connected_at=2024-01-01T00:00:00",
                 "first_name": "",
                 "last_name": "",
                 "active_tab": "api",
@@ -154,7 +154,6 @@ class MerchantSettingsTests(TestCase):
             response, f"{reverse('merchant_settings')}?tab=api"
         )
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_access_token, "tab-token")
         self.assertEqual(meta.shopify_store_domain, "tabstore.myshopify.com")
 
 
@@ -171,8 +170,8 @@ class MerchantSettingsTests(TestCase):
             {
                 "company_name": "",
                 "paypal_email": "",
-                "shopify_access_token": "partial-token",
                 "shopify_store_domain": "partial-store.myshopify.com",
+                "shopify_oauth_authorization_line": "scope=write_discounts;connected_at=2024-01-01T00:00:00",
                 "first_name": "A" * 200,
                 "last_name": "",
                 "active_tab": "api",
@@ -181,7 +180,6 @@ class MerchantSettingsTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_access_token, "partial-token")
         self.assertEqual(
             response.context["active_tab"], "api"
         )
@@ -206,7 +204,6 @@ class MerchantSettingsTests(TestCase):
             {
                 "company_name": "",
                 "paypal_email": "",
-                "shopify_access_token": "",
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "first_name": "",
                 "last_name": "",
