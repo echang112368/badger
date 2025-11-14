@@ -190,6 +190,17 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
         request.session.pop(retry_key, None)
 
 
+def _build_oauth_authorize_url(request: HttpRequest, shop_domain: str) -> str:
+    """Return the absolute OAuth authorization URL for the Shopify store."""
+
+    normalised_shop = normalise_shop_domain(shop_domain)
+    authorize_path = reverse("shopify_oauth_authorize")
+    if normalised_shop:
+        query = urlencode({"shop": normalised_shop})
+        authorize_path = f"{authorize_path}?{query}"
+    return request.build_absolute_uri(authorize_path)
+
+
 def _extract_shop_from_request(request: HttpRequest) -> str:
     """Return the best-effort shop domain found in the callback request."""
 
@@ -424,7 +435,27 @@ def oauth_callback(request: HttpRequest):
         .first()
     )
 
-    if meta:
+    updated_via_authenticated_user = False
+    if request.user.is_authenticated:
+        company_name = ""
+        existing_meta = getattr(request.user, "merchantmeta", None)
+        if existing_meta:
+            company_name = existing_meta.company_name
+        try:
+            meta = _ensure_shopify_link(
+                request,
+                request.user,
+                normalised_shop,
+                token_response.access_token,
+                company_name=company_name,
+                scope=token_response.scope,
+            )
+            updated_via_authenticated_user = True
+        except ValueError as exc:
+            if meta is None:
+                return JsonResponse({"error": str(exc)}, status=400)
+
+    if meta and not updated_via_authenticated_user:
         meta.shopify_access_token = token_response.access_token
         meta.shopify_store_domain = normalised_shop
         meta.business_type = MerchantMeta.BusinessType.SHOPIFY
@@ -532,7 +563,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
 
             _clear_shopify_session_state(request, normalised_shop)
             request.session[retry_key] = str(now_ts)
-            authorize_url = f"{reverse('shopify_oauth_authorize')}?{urlencode({'shop': normalised_shop})}"
+            authorize_url = _build_oauth_authorize_url(request, normalised_shop)
             return redirect(authorize_url)
 
         return HttpResponseBadRequest(str(exc))
@@ -541,8 +572,10 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     access_token = _resolve_shopify_access_token(request, normalised_shop)
 
     if not access_token:
+        _clear_shopify_session_state(request, normalised_shop)
         request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
-        return redirect(f"/onboard/?shop={normalised_shop}")
+        authorize_url = _build_oauth_authorize_url(request, normalised_shop)
+        return redirect(authorize_url)
 
     merchant_meta = (
         MerchantMeta.objects.select_related("user")
@@ -551,8 +584,10 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     )
 
     if not merchant_meta or not merchant_meta.user:
+        _clear_shopify_session_state(request, normalised_shop)
         request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
-        return redirect(f"/onboard/?shop={normalised_shop}")
+        authorize_url = _build_oauth_authorize_url(request, normalised_shop)
+        return redirect(authorize_url)
 
     user = merchant_meta.user
     if not getattr(user, "backend", None):
