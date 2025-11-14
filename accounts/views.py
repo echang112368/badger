@@ -1,16 +1,12 @@
-from urllib.parse import urlencode
-
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
-from django.urls import reverse
 from .forms import (
     CustomLoginForm,
     BusinessSignUpForm,
     CreatorSignUpForm,
     UserSignUpForm,
 )
-from merchants.models import MerchantTeamMember, MerchantMeta
-from shopify_app.oauth import normalise_shop_domain
+from merchants.models import MerchantTeamMember
 
 def custom_login_view(request):
     if request.method == 'POST':
@@ -24,18 +20,6 @@ def custom_login_view(request):
                 membership = MerchantTeamMember.objects.filter(user=user).first()
 
             if user.is_merchant or membership:
-                merchant_account = user if user.is_merchant else membership.merchant
-                meta = getattr(merchant_account, "merchantmeta", None)
-
-                if isinstance(meta, MerchantMeta) and meta.requires_shopify_oauth():
-                    shop_domain = normalise_shop_domain(meta.shopify_store_domain)
-                    if shop_domain:
-                        authorize_url = (
-                            f"{reverse('shopify_oauth_authorize')}?"
-                            f"{urlencode({'shop': shop_domain})}"
-                        )
-                        return redirect(authorize_url)
-
                 return redirect('merchant_dashboard')
             elif user.is_creator:
                 return redirect('creator_earnings')
