@@ -16,6 +16,7 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import redirect, render
+from django.template.response import TemplateResponse
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
@@ -407,7 +408,11 @@ def oauth_authorize(request: HttpRequest):
             status_code = 500
         return JsonResponse({"error": message}, status=status_code)
 
-    return redirect(authorization_url)
+    return TemplateResponse(
+        request,
+        "shopify_app/oauth_authorize_redirect.html",
+        {"redirect_url": authorization_url},
+    )
 
 
 @require_GET
