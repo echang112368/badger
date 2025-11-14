@@ -673,8 +673,10 @@ def merchant_settings(request):
                 return HttpResponseForbidden()
             post_data = request.POST.copy()
             if not permissions.can_manage_api:
-                post_data["shopify_access_token"] = merchant_meta.shopify_access_token
                 post_data["shopify_store_domain"] = merchant_meta.shopify_store_domain
+                post_data["shopify_oauth_authorization_line"] = (
+                    merchant_meta.shopify_oauth_authorization_line
+                )
             form = MerchantSettingsForm(post_data, instance=merchant_meta)
             user_form = UserNameForm(post_data, instance=merchant_user)
             form_valid = form.is_valid()
@@ -709,8 +711,8 @@ def merchant_settings(request):
             field.disabled = True
 
     if not permissions.can_manage_api:
-        form.fields["shopify_access_token"].disabled = True
         form.fields["shopify_store_domain"].disabled = True
+        form.fields["shopify_oauth_authorization_line"].disabled = True
 
     return render(request, 'merchants/settings.html', {
         'merchant': merchant_user,
@@ -749,7 +751,7 @@ def start_shopify_billing(request):
 
     if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
         return JsonResponse(
-            {"error": "Shopify credentials are required before starting billing."},
+            {"error": "Complete the Shopify OAuth connection before starting billing."},
             status=400,
         )
 
