@@ -285,6 +285,73 @@ def ensure_active_charge(meta: MerchantMeta) -> None:
         raise ShopifyBillingError("Shopify recurring charge is not active.")
 
 
+def _fetch_recurring_charge(client: ShopifyClient, charge_id: str) -> dict:
+    data = client.get(
+        f"/admin/api/2024-07/recurring_application_charges/{charge_id}.json"
+    )
+    charge = data.get("recurring_application_charge")
+    if not isinstance(charge, dict):
+        raise ShopifyBillingError(
+            "Unexpected Shopify response when fetching recurring charge details."
+        )
+    return charge
+
+
+def activate_recurring_charge(
+    meta: MerchantMeta, *, charge_id: Optional[str] = None
+) -> dict:
+    """Activate the merchant's Shopify recurring charge if required."""
+
+    client = _require_shopify_credentials(meta)
+    target_charge_id = str(charge_id or meta.shopify_recurring_charge_id or "").strip()
+    if not target_charge_id:
+        raise ShopifyBillingError("Missing Shopify recurring charge identifier.")
+
+    # Refresh the latest charge details prior to attempting activation so the
+    # merchant metadata reflects Shopify's current view of the charge.
+    charge = _fetch_recurring_charge(client, target_charge_id)
+    _update_meta_from_charge(meta, charge)
+
+    if meta.shopify_billing_status.lower() == "active":
+        return charge
+
+    try:
+        response = client.post(
+            f"/admin/api/2024-07/recurring_application_charges/{target_charge_id}/activate.json",
+            json={"recurring_application_charge": {"id": target_charge_id}},
+        )
+        charge_data = response.json()
+    except HTTPError as exc:
+        # If Shopify reports that the charge cannot be activated (for example,
+        # because it is already active), refresh the charge state and only treat
+        # it as an error if the charge still is not active.
+        charge = _fetch_recurring_charge(client, target_charge_id)
+        _update_meta_from_charge(meta, charge)
+        if meta.shopify_billing_status.lower() == "active":
+            return charge
+
+        error_message = str(exc)
+        response = getattr(exc, "response", None)
+        if response is not None:
+            try:
+                error_message = _stringify_error_value(response.json()) or error_message
+            except Exception:  # pragma: no cover - defensive parsing
+                error_message = error_message
+        raise ShopifyBillingError(error_message) from exc
+    else:
+        charge = charge_data.get("recurring_application_charge")
+        if not isinstance(charge, dict):
+            raise ShopifyBillingError(
+                "Unexpected Shopify response when activating recurring charge."
+            )
+        _update_meta_from_charge(meta, charge)
+
+    if meta.shopify_billing_status.lower() != "active":
+        raise ShopifyBillingError("Shopify recurring charge is not active.")
+
+    return charge
+
+
 def create_usage_charge(
     meta: MerchantMeta, *, amount: Decimal, description: str
 ) -> ShopifyChargeDetails:
