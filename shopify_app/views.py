@@ -141,10 +141,18 @@ def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None
     if monthly_fee <= 0:
         return
 
+    shop_domain = normalise_shop_domain(meta.shopify_store_domain)
+    query_string = urlencode({"shop": shop_domain}) if shop_domain else ""
+
     try:
-        return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
+        return_path = reverse("shopify_billing_return")
     except NoReverseMatch:
-        return_url = request.build_absolute_uri("/")
+        return_path = "/"
+
+    if query_string:
+        return_url = request.build_absolute_uri(f"{return_path}?{query_string}")
+    else:
+        return_url = request.build_absolute_uri(return_path)
 
     try:
         billing.create_or_update_recurring_charge(meta, return_url=return_url)
@@ -513,6 +521,7 @@ def billing_return(request: HttpRequest) -> HttpResponse:
     shop = normalise_shop_domain(request.GET.get("shop", ""))
     status_code = 200
     message = "Your Shopify subscription is active. You may close this window."
+    charge_id = request.GET.get("charge_id", "")
 
     if not shop:
         status_code = 400
@@ -529,7 +538,10 @@ def billing_return(request: HttpRequest) -> HttpResponse:
             message = "We could not locate a merchant record for this Shopify store."
         else:
             try:
-                billing.ensure_active_charge(meta)
+                if charge_id:
+                    billing.activate_recurring_charge(meta, charge_id=charge_id)
+                else:
+                    billing.ensure_active_charge(meta)
             except ShopifyBillingError as exc:
                 status_code = 400
                 message = f"Shopify billing is not active: {exc}"
