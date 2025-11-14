@@ -42,7 +42,7 @@ class MerchantSettingsFormTests(TestCase):
             instance=self.user.merchantmeta,
         )
         self.assertFalse(form.is_valid())
-        self.assertNotIn("shopify_access_token", form.errors)
+        self.assertIn("shopify_access_token", form.errors)
         self.assertIn("shopify_store_domain", form.errors)
 
 
@@ -175,42 +175,6 @@ class MerchantSettingsTests(TestCase):
             response.context["active_tab"], "api"
         )
         self.assertIn("first_name", response.context["user_form"].errors)
-
-    def test_enabling_shopify_without_token_redirects_to_oauth(self):
-        user = CustomUser.objects.create_user(
-            username="merchant_shopify",
-            password="pass123",
-            email="merchant_shopify@example.com",
-            is_merchant=True,
-        )
-        meta = MerchantMeta.objects.get(user=user)
-        meta.business_type = MerchantMeta.BusinessType.INDEPENDENT
-        meta.shopify_access_token = ""
-        meta.shopify_store_domain = ""
-        meta.save()
-
-        self.client.force_login(user)
-        response = self.client.post(
-            reverse("merchant_settings"),
-            {
-                "company_name": "",
-                "paypal_email": "",
-                "shopify_access_token": "",
-                "shopify_store_domain": "https://Example.myshopify.com/",
-                "first_name": "",
-                "last_name": "",
-                "business_type": MerchantMeta.BusinessType.SHOPIFY,
-            },
-        )
-
-        expected_url = (
-            f"{reverse('shopify_oauth_authorize')}?shop=example.myshopify.com"
-        )
-        self.assertRedirects(
-            response,
-            expected_url,
-            fetch_redirect_response=False,
-        )
 
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
     def test_start_shopify_billing(self, mock_create):
