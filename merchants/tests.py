@@ -31,7 +31,7 @@ class MerchantSettingsFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("paypal_email", form.errors)
 
-    def test_requires_shopify_credentials(self):
+    def test_allows_shopify_without_credentials(self):
         form = MerchantSettingsForm(
             data={
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
@@ -41,8 +41,19 @@ class MerchantSettingsFormTests(TestCase):
             },
             instance=self.user.merchantmeta,
         )
+        self.assertTrue(form.is_valid())
+
+    def test_requires_domain_when_access_token_present(self):
+        form = MerchantSettingsForm(
+            data={
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "paypal_email": "",
+                "shopify_access_token": "token",
+                "shopify_store_domain": "",
+            },
+            instance=self.user.merchantmeta,
+        )
         self.assertFalse(form.is_valid())
-        self.assertNotIn("shopify_access_token", form.errors)
         self.assertIn("shopify_store_domain", form.errors)
 
 
