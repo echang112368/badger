@@ -23,6 +23,7 @@ from accounts.forms import UserNameForm
 from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from shopify_app.shopify_client import ShopifyClient
+from shopify_app.token_management import refresh_shopify_token
 from shopify_app import billing as shopify_billing
 from shopify_app.oauth import normalise_shop_domain
 from ledger.models import LedgerEntry, MerchantInvoice
@@ -251,7 +252,9 @@ def merchant_items(request):
     ):
         shopify_domain = merchant_meta.shopify_store_domain
         client = ShopifyClient(
-            merchant_meta.shopify_access_token, merchant_meta.shopify_store_domain
+            merchant_meta.shopify_access_token,
+            merchant_meta.shopify_store_domain,
+            refresh_handler=lambda: refresh_shopify_token(merchant_meta),
         )
         try:
             shopify_items = client.get_all_products()

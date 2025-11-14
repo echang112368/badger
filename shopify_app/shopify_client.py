@@ -4,16 +4,32 @@ import requests
 class ShopifyClient:
     """Helper for making authenticated requests to a Shopify store."""
 
-    def __init__(self, access_token: str, store_domain: str):
+    def __init__(self, access_token: str, store_domain: str, *, refresh_handler=None):
         self.access_token = access_token
         self.store_domain = store_domain.rstrip('/')
+        self._refresh_handler = refresh_handler
 
     def request(self, method: str, path: str, **kwargs):
         url = f"https://{self.store_domain}{path}"
-        headers = kwargs.pop("headers", {})
-        headers["X-Shopify-Access-Token"] = self.access_token
-        headers.setdefault("Content-Type", "application/json")
-        response = requests.request(method, url, headers=headers, **kwargs)
+        base_headers = dict(kwargs.pop("headers", {}) or {})
+        base_headers.setdefault("Content-Type", "application/json")
+        request_kwargs = dict(kwargs)
+
+        def send(headers_dict):
+            return requests.request(method, url, headers=headers_dict, **request_kwargs)
+
+        initial_headers = dict(base_headers)
+        initial_headers["X-Shopify-Access-Token"] = self.access_token
+        response = send(initial_headers)
+
+        if response.status_code == 401 and callable(self._refresh_handler):
+            new_token = self._refresh_handler()
+            if new_token and new_token != self.access_token:
+                self.access_token = new_token
+                retry_headers = dict(base_headers)
+                retry_headers["X-Shopify-Access-Token"] = self.access_token
+                response = send(retry_headers)
+
         response.raise_for_status()
         return response
 
