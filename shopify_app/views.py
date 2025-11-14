@@ -62,10 +62,6 @@ def _resolve_shopify_access_token(
 ) -> str:
     """Return the best known access token for the Shopify store."""
 
-    session_token = request.session.get(session_token_key(normalised_domain), "")
-    if session_token:
-        return session_token
-
     meta = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
         .exclude(shopify_access_token="")
@@ -82,10 +78,6 @@ def _resolve_shopify_refresh_token(
     request: HttpRequest, normalised_domain: str
 ) -> str:
     """Return the best known refresh token for the Shopify store."""
-
-    session_token = request.session.get(session_refresh_key(normalised_domain), "")
-    if session_token:
-        return session_token
 
     meta = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
