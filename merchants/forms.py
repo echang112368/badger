@@ -71,10 +71,6 @@ class MerchantItemForm(forms.ModelForm):
 
 
 class MerchantSettingsForm(forms.ModelForm):
-    shopify_access_token = forms.CharField(
-        widget=forms.PasswordInput(render_value=True),
-        required=False,
-    )
     shopify_oauth_authorization_line = forms.CharField(
         required=False,
         help_text="Optional header value used for custom integrations that rely on OAuth.",
@@ -85,7 +81,6 @@ class MerchantSettingsForm(forms.ModelForm):
         fields = [
             "company_name",
             "paypal_email",
-            "shopify_access_token",
             "shopify_store_domain",
             "shopify_oauth_authorization_line",
             "business_type",
@@ -93,7 +88,6 @@ class MerchantSettingsForm(forms.ModelForm):
         labels = {
             "company_name": "Business Name",
             "paypal_email": "PayPal Email (for invoices)",
-            "shopify_access_token": "Access Token",
             "shopify_store_domain": "Shopify URL",
             "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
@@ -124,16 +118,6 @@ class MerchantSettingsForm(forms.ModelForm):
                 "paypal_email",
                 "PayPal email is required for independent merchants.",
             )
-
-        if business_type == MerchantMeta.BusinessType.SHOPIFY:
-            store_domain = (cleaned.get("shopify_store_domain") or "").strip()
-            access_token = (cleaned.get("shopify_access_token") or "").strip()
-
-            if access_token and not store_domain:
-                self.add_error(
-                    "shopify_store_domain",
-                    "A Shopify store URL is required when providing an access token.",
-                )
 
         return cleaned
 
