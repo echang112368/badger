@@ -24,12 +24,11 @@ from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from shopify_app.shopify_client import ShopifyClient
 from shopify_app import billing as shopify_billing
-from shopify_app.oauth import normalise_shop_domain
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
-from urllib.parse import urlparse, urlencode
+from urllib.parse import urlparse
 from django.urls import reverse
 from typing import Optional
 from django.utils.text import slugify
@@ -663,10 +662,9 @@ def merchant_settings(request):
             user_form = UserNameForm(post_data, instance=merchant_user)
             form_valid = form.is_valid()
             user_form_valid = user_form.is_valid()
-            updated_meta = merchant_meta
 
             if form_valid:
-                updated_meta = form.save()
+                form.save()
             if user_form_valid:
                 user_form.save()
 
@@ -675,14 +673,6 @@ def merchant_settings(request):
                 redirect_url = reverse("merchant_settings")
                 if redirect_tab != "profile":
                     redirect_url = f"{redirect_url}?tab={redirect_tab}"
-                if updated_meta.requires_shopify_oauth():
-                    shop_domain = normalise_shop_domain(updated_meta.shopify_store_domain)
-                    if shop_domain:
-                        authorize_url = (
-                            f"{reverse('shopify_oauth_authorize')}?"
-                            f"{urlencode({'shop': shop_domain})}"
-                        )
-                        return redirect(authorize_url)
                 return redirect(redirect_url)
             active_tab = _enforce_tab_permissions(requested_tab, permissions)
 

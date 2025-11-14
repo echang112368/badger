@@ -80,14 +80,6 @@ class MerchantMeta(models.Model):
         from ledger.models import LedgerEntry
         return LedgerEntry.merchant_balance(self.user)
 
-    def requires_shopify_oauth(self) -> bool:
-        """Return ``True`` if the merchant still needs to complete Shopify OAuth."""
-
-        if self.business_type != self.BusinessType.SHOPIFY:
-            return False
-
-        return not self.shopify_access_token or not self.shopify_store_domain
-
 class MerchantItem(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
