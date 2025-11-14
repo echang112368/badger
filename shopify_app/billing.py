@@ -13,6 +13,7 @@ from django.conf import settings
 from merchants.models import MerchantMeta
 
 from .shopify_client import ShopifyClient
+from .token_management import refresh_shopify_token
 
 
 class ShopifyBillingError(RuntimeError):
@@ -69,7 +70,11 @@ class ShopifyBillingConfig:
 def _require_shopify_credentials(meta: MerchantMeta) -> ShopifyClient:
     if not meta.shopify_access_token or not meta.shopify_store_domain:
         raise ShopifyBillingError("Missing Shopify credentials for merchant.")
-    return ShopifyClient(meta.shopify_access_token, meta.shopify_store_domain)
+    return ShopifyClient(
+        meta.shopify_access_token,
+        meta.shopify_store_domain,
+        refresh_handler=lambda: refresh_shopify_token(meta),
+    )
 
 
 def _ensure_monthly_fee(meta: MerchantMeta) -> Decimal:

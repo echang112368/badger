@@ -30,6 +30,7 @@ class AccessTokenResponse:
     scope: str
     associated_user_scope: str
     raw: Mapping[str, object]
+    refresh_token: str = ""
 
 
 def normalise_shop_domain(domain: str) -> str:
@@ -56,6 +57,12 @@ def session_scope_key(domain: str) -> str:
     """Return the session key that stores authorised scopes for a store."""
 
     return f"shopify_install_scope:{normalise_shop_domain(domain)}"
+
+
+def session_refresh_key(domain: str) -> str:
+    """Return the session key that caches refresh tokens for a store."""
+
+    return f"shopify_install_refresh:{normalise_shop_domain(domain)}"
 
 
 def generate_state_token() -> str:
@@ -157,11 +164,58 @@ def exchange_code_for_token(
 
     scope = str(data.get("scope", "") or "")
     associated_scope = str(data.get("associated_user_scope", "") or "")
+    refresh_token = str(data.get("refresh_token", "") or "")
 
     return AccessTokenResponse(
         access_token=str(token),
         scope=scope,
         associated_user_scope=associated_scope,
+        refresh_token=refresh_token,
+        raw=data,
+    )
+
+
+def refresh_access_token(shop: str, refresh_token: str) -> AccessTokenResponse:
+    """Refresh an offline Shopify access token using the refresh token."""
+
+    if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
+        raise ShopifyOAuthError("Shopify API credentials are not configured.")
+
+    refresh_value = (refresh_token or "").strip()
+    if not refresh_value:
+        raise ShopifyOAuthError("Missing Shopify refresh token.")
+
+    payload: MutableMapping[str, object] = {
+        "client_id": settings.SHOPIFY_API_KEY,
+        "client_secret": settings.SHOPIFY_API_SECRET,
+        "refresh_token": refresh_value,
+        "grant_type": "refresh_token",
+    }
+
+    try:
+        response = requests.post(
+            f"https://{shop}/admin/oauth/access_token",
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:  # pragma: no cover - network failures
+        raise ShopifyOAuthError("Failed to refresh Shopify access token.") from exc
+
+    data = response.json()
+    token = data.get("access_token")
+    if not token:
+        raise ShopifyOAuthError("Shopify response did not include an access token.")
+
+    scope = str(data.get("scope", "") or "")
+    associated_scope = str(data.get("associated_user_scope", "") or "")
+    new_refresh = str(data.get("refresh_token", "") or refresh_value)
+
+    return AccessTokenResponse(
+        access_token=str(token),
+        scope=scope,
+        associated_user_scope=associated_scope,
+        refresh_token=new_refresh,
         raw=data,
     )
 
@@ -212,6 +266,8 @@ class ShopifyOAuthService:
         token_response = exchange_code_for_token(shop, code, redirect_uri=redirect_uri)
         self.request.session[session_token_key(shop)] = token_response.access_token
         self.request.session[session_scope_key(shop)] = token_response.scope
+        if token_response.refresh_token:
+            self.request.session[session_refresh_key(shop)] = token_response.refresh_token
 
         return token_response
 
@@ -224,9 +280,11 @@ __all__ = [
     "ShopifyOAuthService",
     "build_authorization_url",
     "exchange_code_for_token",
+    "refresh_access_token",
     "generate_state_token",
     "normalise_shop_domain",
     "session_scope_key",
+    "session_refresh_key",
     "session_token_key",
     "validate_shopify_hmac",
 ]

@@ -37,11 +37,13 @@ from .oauth import (
     ShopifyOAuthError,
     ShopifyOAuthService,
     normalise_shop_domain,
+    session_refresh_key,
     session_scope_key,
     session_token_key,
     validate_shopify_hmac,
 )
 from .shopify_client import ShopifyClient
+from .token_management import refresh_shopify_token
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
@@ -72,6 +74,23 @@ def _resolve_shopify_access_token(
     return request.session.get(session_token_key(normalised_domain), "")
 
 
+def _resolve_shopify_refresh_token(
+    request: HttpRequest, normalised_domain: str
+) -> str:
+    """Return the best known refresh token for the Shopify store."""
+
+    meta = (
+        MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
+        .exclude(shopify_refresh_token="")
+        .exclude(shopify_refresh_token__isnull=True)
+        .first()
+    )
+    if meta and getattr(meta, "shopify_refresh_token", ""):
+        return meta.shopify_refresh_token
+
+    return request.session.get(session_refresh_key(normalised_domain), "")
+
+
 def _ensure_shopify_link(
     request: HttpRequest,
     user: CustomUser,
@@ -80,6 +99,7 @@ def _ensure_shopify_link(
     *,
     company_name: str = "",
     scope: str = "",
+    refresh_token: str = "",
 ) -> MerchantMeta:
     """Persist Shopify credentials on the merchant's metadata record."""
 
@@ -101,6 +121,9 @@ def _ensure_shopify_link(
     )
 
     fields_to_update = ["shopify_access_token", "shopify_store_domain", "business_type"]
+    if refresh_token:
+        meta.shopify_refresh_token = refresh_token
+        fields_to_update.append("shopify_refresh_token")
 
     if company_name and company_name.strip():
         meta.company_name = company_name.strip()
@@ -187,6 +210,7 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
     if normalised_shop:
         request.session.pop(session_token_key(normalised_shop), None)
         request.session.pop(session_scope_key(normalised_shop), None)
+        request.session.pop(session_refresh_key(normalised_shop), None)
         retry_key = _session_retry_key(normalised_shop)
         request.session.pop(retry_key, None)
 
@@ -275,6 +299,7 @@ def embedded_app_home(request: HttpRequest):
 
     normalised_shop = normalise_shop_domain(shop_domain)
     access_token = _resolve_shopify_access_token(request, normalised_shop)
+    refresh_token = _resolve_shopify_refresh_token(request, normalised_shop)
     if not access_token:
         return _render_shopify_error(
             request,
@@ -300,6 +325,7 @@ def embedded_app_home(request: HttpRequest):
                     access_token,
                     company_name=signup_form.get_company_name(),
                     scope=scope,
+                    refresh_token=refresh_token,
                 )
             except ValueError as exc:
                 signup_form.add_error(None, str(exc))
@@ -307,6 +333,7 @@ def embedded_app_home(request: HttpRequest):
                 auth_login(request, user)
                 request.session.pop(session_token_key(normalised_shop), None)
                 request.session.pop(session_scope_key(normalised_shop), None)
+                request.session.pop(session_refresh_key(normalised_shop), None)
                 return redirect("merchant_dashboard")
     else:
         signup_form = ShopifyOAuthSignupForm()
@@ -325,6 +352,7 @@ def embedded_app_home(request: HttpRequest):
                     access_token,
                     company_name=company_name,
                     scope=scope,
+                    refresh_token=refresh_token,
                 )
             except ValueError as exc:
                 login_form.add_error(None, str(exc))
@@ -332,6 +360,7 @@ def embedded_app_home(request: HttpRequest):
                 auth_login(request, user)
                 request.session.pop(session_token_key(normalised_shop), None)
                 request.session.pop(session_scope_key(normalised_shop), None)
+                request.session.pop(session_refresh_key(normalised_shop), None)
                 return redirect("merchant_dashboard")
 
     context = {
@@ -361,7 +390,11 @@ def create_discount(request, merchant_uuid):
     if percentage is None:
         return Response({"discount": None, "message": "No discount awarded"})
 
-    client = ShopifyClient(meta.shopify_access_token, meta.shopify_store_domain)
+    client = ShopifyClient(
+        meta.shopify_access_token,
+        meta.shopify_store_domain,
+        refresh_handler=lambda: refresh_shopify_token(meta),
+    )
 
     coupon_code = f"BADGER-{uuid.uuid4().hex[:8].upper()}"
     now = timezone.now()
@@ -454,6 +487,7 @@ def oauth_callback(request: HttpRequest):
                 token_response.access_token,
                 company_name=company_name,
                 scope=token_response.scope,
+                refresh_token=token_response.refresh_token,
             )
             updated_via_authenticated_user = True
         except ValueError as exc:
@@ -462,10 +496,13 @@ def oauth_callback(request: HttpRequest):
 
     if meta and not updated_via_authenticated_user:
         meta.shopify_access_token = token_response.access_token
+        if hasattr(meta, "shopify_refresh_token"):
+            meta.shopify_refresh_token = token_response.refresh_token
         meta.shopify_store_domain = normalised_shop
         meta.business_type = MerchantMeta.BusinessType.SHOPIFY
         fields = [
             "shopify_access_token",
+            "shopify_refresh_token",
             "shopify_store_domain",
             "business_type",
         ]

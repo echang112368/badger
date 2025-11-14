@@ -11,7 +11,7 @@ import jwt
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib.messages import get_messages
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import CustomUser
@@ -24,10 +24,15 @@ from .oauth import (
     CALLBACK_SESSION_KEY,
     STATE_SESSION_KEY,
     AccessTokenResponse,
+    ShopifyOAuthError,
     exchange_code_for_token,
+    session_refresh_key,
     session_scope_key,
     session_token_key,
 )
+from .shopify_client import ShopifyClient
+from .token_management import refresh_shopify_token
+from requests import HTTPError
 
 
 class CreateDiscountViewTests(TestCase):
@@ -214,6 +219,103 @@ class MerchantInvoiceAdminTests(TestCase):
             any("Generated 2 invoice(s) or Shopify charges" in message for message in messages)
         )
 
+
+class ShopifyClientRefreshTests(SimpleTestCase):
+    @patch("shopify_app.shopify_client.requests.request")
+    def test_request_refreshes_token_on_unauthorized(self, mock_request):
+        first_response = MagicMock(status_code=401)
+        first_response.raise_for_status.side_effect = HTTPError(response=first_response)
+        second_response = MagicMock(status_code=200)
+        second_response.raise_for_status.return_value = None
+        mock_request.side_effect = [first_response, second_response]
+
+        refresh = MagicMock(return_value="new_token")
+        client = ShopifyClient(
+            "old_token",
+            "example.myshopify.com",
+            refresh_handler=refresh,
+        )
+
+        response = client.request("GET", "/admin/api/2024-07/shop.json")
+
+        self.assertIs(response, second_response)
+        self.assertEqual(mock_request.call_count, 2)
+        refresh.assert_called_once_with()
+        first_headers = mock_request.call_args_list[0].kwargs["headers"]
+        second_headers = mock_request.call_args_list[1].kwargs["headers"]
+        self.assertEqual(first_headers["X-Shopify-Access-Token"], "old_token")
+        self.assertEqual(second_headers["X-Shopify-Access-Token"], "new_token")
+
+    @patch("shopify_app.shopify_client.requests.request")
+    def test_request_raises_when_refresh_fails(self, mock_request):
+        response = MagicMock(status_code=401)
+        error = HTTPError(response=response)
+        response.raise_for_status.side_effect = error
+        mock_request.return_value = response
+
+        refresh = MagicMock(return_value=None)
+        client = ShopifyClient(
+            "expired",
+            "example.myshopify.com",
+            refresh_handler=refresh,
+        )
+
+        with self.assertRaises(HTTPError):
+            client.request("GET", "/admin/api/2024-07/shop.json")
+
+        refresh.assert_called_once_with()
+        mock_request.assert_called_once()
+
+
+class ShopifyTokenManagementTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="token-user",
+            email="token@example.com",
+            password="pass12345",
+        )
+
+    @patch("shopify_app.token_management.refresh_access_token")
+    def test_refresh_updates_tokens(self, mock_refresh):
+        meta = MerchantMeta.objects.create(
+            user=self.user,
+            shopify_store_domain="example.myshopify.com",
+            shopify_access_token="old",
+            shopify_refresh_token="refresh_old",
+        )
+
+        mock_refresh.return_value = AccessTokenResponse(
+            access_token="new",
+            scope="read_products",
+            associated_user_scope="",
+            refresh_token="refresh_new",
+            raw={},
+        )
+
+        new_token = refresh_shopify_token(meta)
+
+        self.assertEqual(new_token, "new")
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_access_token, "new")
+        self.assertEqual(meta.shopify_refresh_token, "refresh_new")
+        mock_refresh.assert_called_once()
+
+    @patch("shopify_app.token_management.refresh_access_token")
+    def test_refresh_failure_clears_access_token(self, mock_refresh):
+        mock_refresh.side_effect = ShopifyOAuthError("invalid")
+
+        meta = MerchantMeta.objects.create(
+            user=self.user,
+            shopify_store_domain="example.myshopify.com",
+            shopify_access_token="old",
+            shopify_refresh_token="refresh_old",
+        )
+
+        result = refresh_shopify_token(meta)
+
+        self.assertIsNone(result)
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_access_token, "")
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class ShopifyOAuthAuthorizeTests(TestCase):
@@ -459,6 +561,7 @@ class OAuthCallbackTests(TestCase):
             access_token="shppa_token",
             scope="read_products",
             associated_user_scope="",
+            refresh_token="refresh_abc",
             raw={},
         )
 
@@ -474,6 +577,10 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(session_token_key(self.shop_domain), self.client.session)
         self.assertIn(session_scope_key(self.shop_domain), self.client.session)
+        self.assertEqual(
+            self.client.session.get(session_refresh_key(self.shop_domain)),
+            "refresh_abc",
+        )
         content = response.content.decode()
         self.assertIn("window.top.location.href", content)
         self.assertIn(
@@ -501,6 +608,7 @@ class OAuthCallbackTests(TestCase):
             access_token="shppa_token",
             scope="read_products,write_products",
             associated_user_scope="",
+            refresh_token="refresh_xyz",
             raw={},
         )
 
@@ -518,6 +626,7 @@ class OAuthCallbackTests(TestCase):
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_store_domain, self.shop_domain)
         self.assertEqual(meta.shopify_access_token, "shppa_token")
+        self.assertEqual(meta.shopify_refresh_token, "refresh_xyz")
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
         self.assertIn("connected_at=", meta.shopify_oauth_authorization_line)
 
