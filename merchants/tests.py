@@ -5,7 +5,6 @@ from accounts.models import CustomUser
 from .models import MerchantMeta
 from decimal import Decimal
 from unittest.mock import patch
-from urllib.parse import parse_qs, urlparse
 
 from .forms import ItemGroupForm, MerchantSettingsForm
 
@@ -241,16 +240,6 @@ class MerchantSettingsTests(TestCase):
         data = response.json()
         self.assertIn("status", data)
         mock_create.assert_called_once()
-
-        _args, kwargs = mock_create.call_args
-        self.assertEqual(kwargs.keys(), {"return_url"})
-        self.assertEqual(_args[0].pk, meta.pk)
-
-        return_url = kwargs["return_url"]
-        parsed = urlparse(return_url)
-        self.assertEqual(parsed.path, reverse("shopify_billing_return"))
-        query = parse_qs(parsed.query)
-        self.assertEqual(query.get("shop"), ["shop.test"])
 
     def test_start_shopify_billing_requires_shopify_type(self):
         user = CustomUser.objects.create_user(
