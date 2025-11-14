@@ -755,7 +755,13 @@ def start_shopify_billing(request):
             status=400,
         )
 
-    return_url = request.build_absolute_uri(f"{reverse('merchant_settings')}?tab=billing")
+    shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
+    return_path = reverse('shopify_billing_return')
+    query_string = urlencode({"shop": shop_domain}) if shop_domain else ""
+    if query_string:
+        return_url = request.build_absolute_uri(f"{return_path}?{query_string}")
+    else:
+        return_url = request.build_absolute_uri(return_path)
 
     try:
         charge = shopify_billing.create_or_update_recurring_charge(
