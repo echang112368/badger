@@ -228,8 +228,10 @@ class ShopifyOAuthAuthorizeTests(TestCase):
                 {"shop": "example.myshopify.com"},
             )
 
-        self.assertEqual(response.status_code, 302)
-        redirect_url = urlparse(response["Location"])
+        self.assertEqual(response.status_code, 200)
+        response.render()
+        redirect_target = response.context_data["redirect_url"]
+        redirect_url = urlparse(redirect_target)
         params = parse_qs(redirect_url.query)
 
         self.assertEqual(params["redirect_uri"], [configured_redirect])
@@ -245,11 +247,25 @@ class ShopifyOAuthAuthorizeTests(TestCase):
             secure=False,
         )
 
-        self.assertEqual(response.status_code, 302)
-        redirect_url = urlparse(response["Location"])
+        self.assertEqual(response.status_code, 200)
+        response.render()
+        redirect_url = urlparse(response.context_data["redirect_url"])
         params = parse_qs(redirect_url.query)
 
         self.assertTrue(params["redirect_uri"][0].startswith("https://"))
+
+    def test_response_contains_top_window_redirect_script(self):
+        response = self.client.get(
+            reverse("shopify_oauth_authorize"),
+            {"shop": "example.myshopify.com"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        response.render()
+        content = response.content.decode()
+
+        self.assertIn("window.top", content)
+        self.assertIn("Continue to Shopify", content)
 
 
 class ShopifyExchangeCodeTests(TestCase):
