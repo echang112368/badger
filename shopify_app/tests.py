@@ -424,11 +424,14 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(response["Location"], reverse("merchant_dashboard"))
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
 
-    def test_session_token_redirects_to_onboarding_when_unknown(self):
+    def test_session_token_unknown_store_starts_oauth(self):
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], f"/onboard/?shop={self.shop_domain}")
+        expected_url = (
+            f"http://testserver{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}"
+        )
+        self.assertEqual(response["Location"], expected_url)
         self.assertEqual(
             self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
@@ -462,6 +465,46 @@ class OAuthCallbackTests(TestCase):
             content,
         )
 
+    @patch("shopify_app.oauth.exchange_code_for_token")
+    @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
+    def test_oauth_callback_links_authenticated_user(self, mock_hmac, mock_exchange):
+        user = CustomUser.objects.create_user(
+            username="merchant",
+            email="merchant@example.com",
+            password="pass12345",
+        )
+        meta = MerchantMeta.objects.create(
+            user=user,
+            company_name="Acme",
+            business_type=MerchantMeta.BusinessType.INDEPENDENT,
+        )
+
+        self.client.force_login(user)
+
+        mock_exchange.return_value = AccessTokenResponse(
+            access_token="shppa_token",
+            scope="read_products,write_products",
+            associated_user_scope="",
+            raw={},
+        )
+
+        session = self.client.session
+        session[STATE_SESSION_KEY] = "abc"
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"shop": self.shop_domain, "code": "abc", "state": "abc", "hmac": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_store_domain, self.shop_domain)
+        self.assertEqual(meta.shopify_access_token, "shppa_token")
+        self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
+        self.assertIn("connected_at=", meta.shopify_oauth_authorization_line)
+
     def test_invalid_session_token_triggers_reauthorize(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
         if isinstance(bad_token, bytes):
@@ -477,10 +520,10 @@ class OAuthCallbackTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertIn(
-            f"{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}",
-            response["Location"],
+        expected_url = (
+            f"http://testserver{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}"
         )
+        self.assertEqual(response["Location"], expected_url)
         self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
 
     def test_invalid_session_token_retries_are_throttled(self):
