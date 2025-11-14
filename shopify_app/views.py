@@ -141,10 +141,18 @@ def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None
     if monthly_fee <= 0:
         return
 
+    shop_domain = normalise_shop_domain(meta.shopify_store_domain)
+    query_string = urlencode({"shop": shop_domain}) if shop_domain else ""
+
     try:
-        return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
+        return_path = reverse("shopify_billing_return")
     except NoReverseMatch:
-        return_url = request.build_absolute_uri("/")
+        return_path = "/"
+
+    if query_string:
+        return_url = request.build_absolute_uri(f"{return_path}?{query_string}")
+    else:
+        return_url = request.build_absolute_uri(return_path)
 
     try:
         billing.create_or_update_recurring_charge(meta, return_url=return_url)
