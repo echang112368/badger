@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting to Shopify</title>
+    <meta http-equiv="refresh" content="0;url={{ redirect_url }}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: #f9fafb;
+        color: #111827;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 2rem;
+      }
+
+      .card {
+        background-color: #ffffff;
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 25px rgb(15 23 42 / 0.08);
+        max-width: 420px;
+        width: 100%;
+        padding: 2rem;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 1.25rem;
+        margin-bottom: 0.75rem;
+      }
+
+      p {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 1.5rem;
+      }
+
+      a.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        text-decoration: none;
+        background-color: #4f46e5;
+        color: #ffffff;
+        font-weight: 600;
+        transition: background-color 0.2s ease, transform 0.2s ease;
+      }
+
+      a.button:hover,
+      a.button:focus {
+        background-color: #4338ca;
+        transform: translateY(-1px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Redirecting to Shopify</h1>
+      <p>We're sending you to Shopify so you can approve the Badger app installation.</p>
+      <a class="button" href="{{ redirect_url }}">Continue to Shopify</a>
+    </div>
+    <script>
+      (function () {
+        var target = "{{ redirect_url|escapejs }}";
+        var navigate = function (url) {
+          window.location.href = url;
+        };
+
+        try {
+          if (window.top && window.top !== window.self) {
+            window.top.location.href = target;
+            return;
+          }
+        } catch (error) {
+          // Accessing window.top can throw in sandboxed contexts; fall back to current window.
+        }
+
+        navigate(target);
+      })();
+    </script>
+    <noscript>
+      <p>
+        JavaScript is required to continue automatically. Please select
+        <a href="{{ redirect_url }}">Continue to Shopify</a> to proceed.
+      </p>
+    </noscript>
+  </body>
+</html>
