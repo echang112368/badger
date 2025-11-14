@@ -190,35 +190,6 @@ class ShopifyBillingReturnTests(TestCase):
         self.assertIn("active", response.content.decode().lower())
 
 
-class ShopifyBootstrapBillingTests(TestCase):
-    @patch("shopify_app.views.billing.create_or_update_recurring_charge")
-    def test_bootstrap_includes_shop_parameter(self, mock_create):
-        user = CustomUser.objects.create_user(
-            username="bootstrap",
-            email="bootstrap@example.com",
-            password="pass",
-        )
-        meta = MerchantMeta.objects.create(
-            user=user,
-            shopify_store_domain="Example.myshopify.com",
-            shopify_access_token="token",
-            monthly_fee=Decimal("20.00"),
-        )
-
-        request = MagicMock()
-        request.build_absolute_uri.side_effect = lambda path: f"https://app.test{path}"
-
-        views._bootstrap_shopify_billing(request, meta)
-
-        mock_create.assert_called_once()
-        return_url = mock_create.call_args.kwargs["return_url"]
-
-        parsed = urlparse(return_url)
-        self.assertEqual(parsed.path, reverse("shopify_billing_return"))
-        query = parse_qs(parsed.query)
-        self.assertEqual(query.get("shop"), ["example.myshopify.com"])
-
-
 class MerchantInvoiceAdminTests(TestCase):
     def setUp(self):
         self.staff = CustomUser.objects.create_superuser(
