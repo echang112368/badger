@@ -172,7 +172,7 @@
               </button>
               <p id="shopifyBillingFeedback" class="text-sm text-gray-600 hidden"></p>
             </div>
-            <p class="text-xs text-gray-500">Shopify uses your Admin API credentials (configured under the API tab) to manage billing.</p>
+            <p class="text-xs text-gray-500">Shopify uses your OAuth connection (completed under the Shopify tab) to manage billing.</p>
           </div>
         </div>
       </div>
@@ -345,17 +345,9 @@
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">API</h2>
         <div class="grid gap-6">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Shopify Admin API Access Token</label>
-            <div class="relative">
-              <input type="password" name="shopify_access_token" id="shopify_access_token" value="{{ settings_form.shopify_access_token.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_manage_api %}disabled{% endif %} />
-              <button type="button" id="copyToken" class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500" {% if not permissions.can_manage_api %}disabled{% endif %}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h10a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6a2 2 0 012-2z" />
-                </svg>
-              </button>
-            </div>
+          <div class="rounded-md bg-indigo-50 p-4 text-sm text-indigo-900">
+            <p class="font-medium">Shopify OAuth credentials</p>
+            <p class="mt-1">Complete the Shopify OAuth flow from the Shopify tab to refresh your credentials. Badger automatically reuses these OAuth credentials for billing and API access.</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Shopify URL</label>
@@ -633,13 +625,6 @@
       password.type=password.type==='password'?'text':'password';
     });
   }
-  const copyBtn=document.getElementById('copyToken');
-  if(copyBtn&&!copyBtn.hasAttribute('disabled')){
-    copyBtn.addEventListener('click',()=>{
-      const token=document.getElementById('shopify_access_token');
-      navigator.clipboard.writeText(token.value);
-    });
-  }
 
   const inviteModal=document.getElementById('inviteModal');
   const openInviteButton=document.getElementById('openInviteModal');
@@ -800,7 +785,7 @@
   function describeShopifyBillingError(message){
     const text=(message||'').toString().trim();
     if(!text){
-      return 'Failed to create Shopify billing charge. Confirm that Shopify is selected as your billing business type and that your Shopify Admin API credentials are saved, then try again.';
+      return 'Failed to create Shopify billing charge. Confirm that Shopify is selected as your billing business type and that your Shopify OAuth connection is up to date, then try again.';
     }
 
     const normalized=text.toLowerCase();
@@ -808,7 +793,7 @@
       return `${text} Select Shopify as the billing business type and save your settings before starting billing.`;
     }
     if(normalized.includes('credentials')){
-      return `${text} Add your Shopify Admin API credentials under the API tab and save them first.`;
+      return `${text} Complete the Shopify OAuth connection under the Shopify tab before trying again.`;
     }
     if(normalized.includes('permission')){
       return `${text} Contact an administrator to adjust your permissions or have them start billing for you.`;
