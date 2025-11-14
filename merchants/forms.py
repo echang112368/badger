@@ -126,13 +126,7 @@ class MerchantSettingsForm(forms.ModelForm):
             )
 
         if business_type == MerchantMeta.BusinessType.SHOPIFY:
-            access_token = (cleaned.get("shopify_access_token") or "").strip()
             store_domain = (cleaned.get("shopify_store_domain") or "").strip()
-            if not access_token:
-                self.add_error(
-                    "shopify_access_token",
-                    "A Shopify access token is required for Shopify billing.",
-                )
             if not store_domain:
                 self.add_error(
                     "shopify_store_domain",
