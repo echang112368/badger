@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Optional
@@ -14,6 +15,9 @@ from merchants.models import MerchantMeta
 
 from .shopify_client import ShopifyClient
 from .token_management import refresh_shopify_token
+
+
+logger = logging.getLogger(__name__)
 
 
 class ShopifyBillingError(RuntimeError):
@@ -70,6 +74,17 @@ class ShopifyBillingConfig:
 def _require_shopify_credentials(meta: MerchantMeta) -> ShopifyClient:
     if not meta.shopify_access_token or not meta.shopify_store_domain:
         raise ShopifyBillingError("Missing Shopify credentials for merchant.")
+    logger.info(
+        "Initialising ShopifyClient with access token for %s: %s",
+        meta.shopify_store_domain,
+        meta.shopify_access_token,
+    )
+    if getattr(meta, "shopify_refresh_token", ""):
+        logger.info(
+            "Using Shopify refresh token for %s: %s",
+            meta.shopify_store_domain,
+            meta.shopify_refresh_token,
+        )
     return ShopifyClient(
         meta.shopify_access_token,
         meta.shopify_store_domain,
