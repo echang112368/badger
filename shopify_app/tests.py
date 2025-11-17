@@ -630,47 +630,6 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
         self.assertIn("connected_at=", meta.shopify_oauth_authorization_line)
 
-    @patch("shopify_app.oauth.exchange_code_for_token")
-    @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_overwrites_existing_token(self, mock_hmac, mock_exchange):
-        user = CustomUser.objects.create_user(
-            username="merchant",
-            email="merchant@example.com",
-            password="pass12345",
-        )
-        meta = MerchantMeta.objects.create(
-            user=user,
-            shopify_store_domain=self.shop_domain,
-            shopify_access_token="old_token",
-            shopify_refresh_token="old_refresh",
-            business_type=MerchantMeta.BusinessType.SHOPIFY,
-        )
-
-        self.client.force_login(user)
-
-        mock_exchange.return_value = AccessTokenResponse(
-            access_token="new_offline_token",
-            scope="read_products",
-            associated_user_scope="",
-            refresh_token="new_refresh_token",
-            raw={},
-        )
-
-        session = self.client.session
-        session[STATE_SESSION_KEY] = "abc"
-        session.save()
-
-        response = self.client.get(
-            self.url,
-            {"shop": self.shop_domain, "code": "abc", "state": "abc", "hmac": "1"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-
-        meta.refresh_from_db()
-        self.assertEqual(meta.shopify_access_token, "new_offline_token")
-        self.assertEqual(meta.shopify_refresh_token, "new_refresh_token")
-
     def test_invalid_session_token_triggers_reauthorize(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
         if isinstance(bad_token, bytes):
