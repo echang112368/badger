@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 import json
+import logging
 import secrets
 
 from django.contrib.auth.decorators import login_required
@@ -25,7 +26,7 @@ from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from shopify_app.shopify_client import ShopifyClient
 from shopify_app.token_management import refresh_shopify_token
 from shopify_app import billing as shopify_billing
-from shopify_app.oauth import normalise_shop_domain
+from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
@@ -38,6 +39,9 @@ from django.utils.text import slugify
 from collect.models import AffiliateClick, ReferralVisit
 
 from .access import resolve_merchant_permissions
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_domain(domain: str) -> str:
@@ -758,6 +762,26 @@ def start_shopify_billing(request):
             status=400,
         )
 
+    normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
+    session_access_token = request.session.get(
+        session_token_key(normalised_domain), ""
+    )
+    session_refresh_token = request.session.get(
+        session_refresh_key(normalised_domain), ""
+    )
+
+    logger.info(
+        "Starting Shopify billing for merchant %s (%s). "
+        "MerchantMeta access token=%s refresh token=%s | "
+        "session access token=%s session refresh token=%s",
+        merchant_user.pk,
+        normalised_domain,
+        merchant_meta.shopify_access_token,
+        getattr(merchant_meta, "shopify_refresh_token", ""),
+        session_access_token,
+        session_refresh_token,
+    )
+
     return_url = request.build_absolute_uri(f"{reverse('merchant_settings')}?tab=billing")
 
     try:
@@ -766,6 +790,18 @@ def start_shopify_billing(request):
             return_url=return_url,
         )
     except shopify_billing.ShopifyBillingError as exc:
+        logger.error(
+            "Shopify billing failed for merchant %s (%s). "
+            "MerchantMeta access token=%s refresh token=%s | "
+            "session access token=%s session refresh token=%s | error=%s",
+            merchant_user.pk,
+            normalised_domain,
+            merchant_meta.shopify_access_token,
+            getattr(merchant_meta, "shopify_refresh_token", ""),
+            session_access_token,
+            session_refresh_token,
+            exc,
+        )
         return JsonResponse({"error": str(exc)}, status=400)
 
     merchant_meta.refresh_from_db()
