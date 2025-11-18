@@ -59,6 +59,26 @@ def _normalize_domain(domain: str) -> str:
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
 
 
+def _get_merchant_meta(merchant_user: Optional[CustomUser]) -> Optional[MerchantMeta]:
+    """Safely return the merchant's ``MerchantMeta`` instance if it exists."""
+
+    if merchant_user is None:
+        return None
+
+    try:
+        return merchant_user.merchantmeta
+    except MerchantMeta.DoesNotExist:
+        return None
+
+
+def _should_show_invoices_tab(merchant_meta: Optional[MerchantMeta]) -> bool:
+    """Return ``True`` when the invoices tab should be displayed."""
+
+    if not merchant_meta:
+        return True
+    return merchant_meta.business_type != MerchantMeta.BusinessType.SHOPIFY
+
+
 def _generate_team_email(merchant: CustomUser, username: str) -> str:
     merchant_identifier = slugify(merchant.username) or slugify(getattr(merchant, "email", ""))
     if not merchant_identifier:
@@ -158,12 +178,7 @@ def merchant_dashboard(request):
         return render(request, "403.html", status=403)
 
     merchant_user = permissions.merchant
-    merchant_meta = None
-    if merchant_user is not None:
-        try:
-            merchant_meta = merchant_user.merchantmeta
-        except MerchantMeta.DoesNotExist:
-            merchant_meta = None
+    merchant_meta = _get_merchant_meta(merchant_user)
 
     if merchant_meta and merchant_meta.requires_shopify_oauth():
         shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
@@ -193,6 +208,7 @@ def merchant_dashboard(request):
         'ledger_entries': entries,
         'permissions': permissions,
         'affiliate_total': affiliate_total,
+        'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
     })
 
 
@@ -203,6 +219,13 @@ def merchant_invoices(request):
         return render(request, "403.html", status=403)
 
     merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
+
+    show_invoices_tab = _should_show_invoices_tab(merchant_meta)
+
+    if not show_invoices_tab:
+        return redirect('merchant_dashboard')
+
     invoices_qs = (
         MerchantInvoice.objects.filter(merchant=merchant_user)
         .order_by('-created_at')
@@ -223,12 +246,6 @@ def merchant_invoices(request):
         for invoice in invoices
         if invoice.provider == MerchantInvoice.Provider.SHOPIFY
     ]
-
-    try:
-        merchant_meta = merchant_user.merchantmeta
-    except MerchantMeta.DoesNotExist:
-        merchant_meta = None
-
     is_shopify_merchant = bool(
         merchant_meta
         and merchant_meta.business_type == MerchantMeta.BusinessType.SHOPIFY
@@ -255,6 +272,7 @@ def merchant_invoices(request):
             'merchant_meta': merchant_meta,
             'is_shopify_merchant': is_shopify_merchant,
             'shopify_pending_confirmation': shopify_pending_confirmation,
+            'show_invoices_tab': show_invoices_tab,
         },
     )
 
@@ -268,7 +286,7 @@ def merchant_items(request):
 
     shopify_items = []
     shopify_domain = ""
-    merchant_meta = MerchantMeta.objects.filter(user=merchant_user).first()
+    merchant_meta = _get_merchant_meta(merchant_user)
     if (
         merchant_meta
         and merchant_meta.shopify_access_token
@@ -401,6 +419,7 @@ def merchant_items(request):
             "selected_shopify_items": selected_items,
             "group_modal_open": bool(group_form.errors),
             "permissions": permissions,
+            "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
         },
     )
 
@@ -487,7 +506,7 @@ def merchant_creators(request):
         return render(request, "403.html", status=403)
 
     merchant_user = permissions.merchant
-    merchant_meta = getattr(merchant_user, "merchantmeta", None)
+    merchant_meta = _get_merchant_meta(merchant_user)
 
     active_links = (
         MerchantCreatorLink.objects.filter(
@@ -633,6 +652,7 @@ def merchant_creators(request):
             'inactive_creators': inactive_creators,
             'pending_creators': pending_creators,
             'permissions': permissions,
+            'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         },
     )
 
@@ -768,6 +788,7 @@ def merchant_settings(request):
         'shopify_plan_price': shopify_plan_price,
         'shopify_plan_active': shopify_plan_active,
         'shopify_billing_cancel_url': shopify_cancel_url,
+        'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
     })
 
 
