@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from .forms import ItemGroupForm, MerchantSettingsForm
+from shopify_app import billing as shopify_billing
 
 
 class MerchantSettingsFormTests(TestCase):
@@ -240,6 +241,32 @@ class MerchantSettingsTests(TestCase):
         data = response.json()
         self.assertIn("status", data)
         mock_create.assert_called_once()
+
+    @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
+    def test_start_shopify_billing_prompts_reauth(self, mock_create):
+        user = CustomUser.objects.create_user(
+            username="shopify_reauth",
+            password="pass",
+            email="shopifyreauth@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "shop.test"
+        meta.monthly_fee = Decimal("25.00")
+        meta.save()
+
+        mock_create.side_effect = shopify_billing.ShopifyReauthorizationRequired(
+            "shop.test"
+        )
+
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 401)
+        data = response.json()
+        self.assertIn("authorize_url", data)
+        self.assertIn("error", data)
 
     def test_start_shopify_billing_requires_shopify_type(self):
         user = CustomUser.objects.create_user(
