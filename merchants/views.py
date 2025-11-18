@@ -24,10 +24,9 @@ from accounts.forms import UserNameForm
 from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from shopify_app.shopify_client import ShopifyClient
-from shopify_app.token_management import clear_shopify_token_for_shop, refresh_shopify_token
+from shopify_app.token_management import refresh_shopify_token
 from shopify_app import billing as shopify_billing
 from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
-from shopify_app.views import build_shopify_authorize_url
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
@@ -76,25 +75,6 @@ def _generate_team_email(merchant: CustomUser, username: str) -> str:
         counter += 1
         email = f"{username}{counter}@{domain}"
     return email
-
-
-def _build_shopify_reauth_payload(
-    request, shop_domain: str, message: str = ""
-) -> dict:
-    normalised = normalise_shop_domain(shop_domain)
-    clear_shopify_token_for_shop(normalised)
-    authorize_url = build_shopify_authorize_url(request, normalised)
-    logger.warning(
-        "Shopify credentials for %s are invalid. Prompting merchant to reinstall.",
-        normalised,
-    )
-    return {
-        "error": message
-        or "Shopify rejected the request because the stored credentials are invalid."
-        " Please reinstall the Shopify app to continue.",
-        "authorize_url": authorize_url,
-        "shop_domain": normalised,
-    }
 
 
 def _create_team_member_account(merchant: CustomUser, form: TeamMemberCreateForm):
@@ -809,19 +789,6 @@ def start_shopify_billing(request):
             merchant_meta,
             return_url=return_url,
         )
-    except shopify_billing.ShopifyReauthorizationRequired as exc:
-        logger.error(
-            "Shopify billing requires reauthorization for merchant %s (%s): %s",
-            merchant_user.pk,
-            normalised_domain,
-            exc,
-        )
-        payload = _build_shopify_reauth_payload(
-            request,
-            merchant_meta.shopify_store_domain,
-            str(exc),
-        )
-        return JsonResponse(payload, status=401)
     except shopify_billing.ShopifyBillingError as exc:
         logger.error(
             "Shopify billing failed for merchant %s (%s). "
