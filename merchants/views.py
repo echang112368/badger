@@ -741,17 +741,6 @@ def merchant_settings(request):
         form.fields["shopify_store_domain"].disabled = True
         form.fields["shopify_oauth_authorization_line"].disabled = True
 
-    shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
-    if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
-        shopify_plan_price = Decimal("30.00")
-    shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
-    shopify_plan_active = shopify_status_value.lower() == "active"
-    shopify_cancel_url = ""
-    if merchant_meta.shopify_store_domain:
-        normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
-        if normalised_domain:
-            shopify_cancel_url = f"https://{normalised_domain}/admin/settings/billing"
-
     return render(request, 'merchants/settings.html', {
         'merchant': merchant_user,
         'merchant_meta': merchant_meta,
@@ -765,9 +754,6 @@ def merchant_settings(request):
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
         'start_shopify_billing_url': reverse('merchant_start_shopify_billing'),
-        'shopify_plan_price': shopify_plan_price,
-        'shopify_plan_active': shopify_plan_active,
-        'shopify_billing_cancel_url': shopify_cancel_url,
     })
 
 
