@@ -1,5 +1,7 @@
 """Views for interacting with Shopify."""
 
+import logging
+
 import base64
 import uuid
 from decimal import Decimal
@@ -48,6 +50,9 @@ from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
 
+logger = logging.getLogger(__name__)
+
+
 EMBEDDED_SHOP_SESSION_KEY = "shopify_embedded_shop"
 EMBEDDED_AUTHORIZED_SESSION_KEY = "shopify_embedded_validated"
 PENDING_ONBOARD_SESSION_KEY = "shopify_pending_shop"
@@ -62,6 +67,15 @@ def _resolve_shopify_access_token(
 ) -> str:
     """Return the best known access token for the Shopify store."""
 
+    session_token = request.session.get(session_token_key(normalised_domain), "")
+    if session_token:
+        logger.info(
+            "Using Shopify access token from session for %s: %s",
+            normalised_domain,
+            session_token,
+        )
+        return session_token
+
     meta = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
         .exclude(shopify_access_token="")
@@ -69,15 +83,40 @@ def _resolve_shopify_access_token(
         .first()
     )
     if meta and meta.shopify_access_token:
+        logger.info(
+            "Using Shopify access token from MerchantMeta for %s: %s",
+            normalised_domain,
+            meta.shopify_access_token,
+        )
         return meta.shopify_access_token
 
-    return request.session.get(session_token_key(normalised_domain), "")
+    fallback_token = request.session.get(session_token_key(normalised_domain), "")
+    if fallback_token:
+        logger.info(
+            "Falling back to Shopify access token from session for %s: %s",
+            normalised_domain,
+            fallback_token,
+        )
+    else:
+        logger.info(
+            "No Shopify access token available for %s", normalised_domain
+        )
+    return fallback_token
 
 
 def _resolve_shopify_refresh_token(
     request: HttpRequest, normalised_domain: str
 ) -> str:
     """Return the best known refresh token for the Shopify store."""
+
+    session_token = request.session.get(session_refresh_key(normalised_domain), "")
+    if session_token:
+        logger.info(
+            "Using Shopify refresh token from session for %s: %s",
+            normalised_domain,
+            session_token,
+        )
+        return session_token
 
     meta = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=normalised_domain)
@@ -86,9 +125,25 @@ def _resolve_shopify_refresh_token(
         .first()
     )
     if meta and getattr(meta, "shopify_refresh_token", ""):
+        logger.info(
+            "Using Shopify refresh token from MerchantMeta for %s: %s",
+            normalised_domain,
+            meta.shopify_refresh_token,
+        )
         return meta.shopify_refresh_token
 
-    return request.session.get(session_refresh_key(normalised_domain), "")
+    fallback_refresh = request.session.get(session_refresh_key(normalised_domain), "")
+    if fallback_refresh:
+        logger.info(
+            "Falling back to Shopify refresh token from session for %s: %s",
+            normalised_domain,
+            fallback_refresh,
+        )
+    else:
+        logger.info(
+            "No Shopify refresh token available for %s", normalised_domain
+        )
+    return fallback_refresh
 
 
 def _ensure_shopify_link(
