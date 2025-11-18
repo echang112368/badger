@@ -3,7 +3,6 @@
   <head>
     <meta charset="utf-8" />
     <title>Redirecting to Shopify</title>
-    <meta http-equiv="refresh" content="0;url={{ redirect_url }}" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {
@@ -64,25 +63,46 @@
     <div class="card">
       <h1>Redirecting to Shopify</h1>
       <p>We're sending you to Shopify so you can approve the Badger app installation.</p>
-      <a class="button" href="{{ redirect_url }}">Continue to Shopify</a>
+      <a class="button" href="{{ redirect_url }}" target="_top" rel="noreferrer"
+        >Continue to Shopify</a
+      >
     </div>
     <script>
       (function () {
         var target = "{{ redirect_url|escapejs }}";
-        var navigate = function (url) {
-          window.location.href = url;
+        var attemptRedirect = function () {
+          try {
+            if (window.top && window.top !== window.self) {
+              window.top.location.assign(target);
+              return true;
+            }
+          } catch (error) {
+            // Accessing window.top can throw in sandboxed contexts.
+          }
+
+          try {
+            if (window.parent && window.parent !== window.self) {
+              window.parent.location.assign(target);
+              return true;
+            }
+          } catch (error) {
+            // Accessing window.parent can throw in sandboxed contexts.
+          }
+
+          try {
+            window.open(target, "_top");
+            return true;
+          } catch (error) {
+            // window.open can be blocked; fall through to inline navigation.
+          }
+
+          window.location.assign(target);
+          return false;
         };
 
-        try {
-          if (window.top && window.top !== window.self) {
-            window.top.location.href = target;
-            return;
-          }
-        } catch (error) {
-          // Accessing window.top can throw in sandboxed contexts; fall back to current window.
-        }
-
-        navigate(target);
+        // Delay slightly so Shopify's iframe can finish initialising before we attempt
+        // to redirect the top-level window.
+        setTimeout(attemptRedirect, 50);
       })();
     </script>
     <noscript>
