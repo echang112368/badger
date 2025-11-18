@@ -44,8 +44,8 @@ from .oauth import (
     session_token_key,
     validate_shopify_hmac,
 )
-from .shopify_client import ShopifyClient
-from .token_management import refresh_shopify_token
+from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
+from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
@@ -270,15 +270,49 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
         request.session.pop(retry_key, None)
 
 
-def _build_oauth_authorize_url(request: HttpRequest, shop_domain: str) -> str:
-    """Return the absolute OAuth authorization URL for the Shopify store."""
+def build_shopify_authorize_url(request: HttpRequest, shop_domain: str) -> str:
+    """Return the Shopify OAuth installation URL for the specified store."""
 
     normalised_shop = normalise_shop_domain(shop_domain)
+    service = ShopifyOAuthService(request)
+    api_key = getattr(settings, "SHOPIFY_API_KEY", "")
+    if api_key:
+        try:
+            return service.begin_installation(normalised_shop)
+        except ShopifyOAuthError as exc:
+            logger.error(
+                "Failed to construct Shopify installation URL for %s: %s",
+                normalised_shop,
+                exc,
+            )
+
     authorize_path = reverse("shopify_oauth_authorize")
     if normalised_shop:
         query = urlencode({"shop": normalised_shop})
         authorize_path = f"{authorize_path}?{query}"
     return request.build_absolute_uri(authorize_path)
+
+
+def _build_reauthorization_payload(
+    request: HttpRequest, shop_domain: str, *, message: str = ""
+) -> dict:
+    """Return a payload instructing the caller to restart Shopify OAuth."""
+
+    normalised_shop = normalise_shop_domain(shop_domain)
+    clear_shopify_token_for_shop(normalised_shop)
+    authorize_url = build_shopify_authorize_url(request, normalised_shop)
+    logger.warning(
+        "Shopify access token for %s is invalid. Prompting reinstallation.",
+        normalised_shop,
+    )
+
+    return {
+        "error": message
+        or "Shopify rejected the request because the stored credentials are invalid."
+        " Please reinstall the Shopify app to continue.",
+        "authorize_url": authorize_url,
+        "shop_domain": normalised_shop,
+    }
 
 
 def _extract_shop_from_request(request: HttpRequest) -> str:
@@ -468,14 +502,24 @@ def create_discount(request, merchant_uuid):
         }
     }
 
-    response = client.post("/admin/api/2024-07/price_rules.json", json=price_rule_payload)
-    price_rule_id = response.json()["price_rule"]["id"]
+    try:
+        response = client.post(
+            "/admin/api/2024-07/price_rules.json", json=price_rule_payload
+        )
+        price_rule_id = response.json()["price_rule"]["id"]
 
-    discount_payload = {"discount_code": {"code": coupon_code}}
-    client.post(
-        f"/admin/api/2024-07/price_rules/{price_rule_id}/discount_codes.json",
-        json=discount_payload,
-    )
+        discount_payload = {"discount_code": {"code": coupon_code}}
+        client.post(
+            f"/admin/api/2024-07/price_rules/{price_rule_id}/discount_codes.json",
+            json=discount_payload,
+        )
+    except ShopifyInvalidCredentialsError:
+        payload = _build_reauthorization_payload(
+            request,
+            meta.shopify_store_domain,
+            message="Shopify rejected the discount request because the stored credentials are invalid.",
+        )
+        return Response(payload, status=status.HTTP_401_UNAUTHORIZED)
 
     return Response({"coupon_code": coupon_code, "discount": percentage})
 
@@ -521,6 +565,22 @@ def oauth_callback(request: HttpRequest):
         return JsonResponse({"error": str(exc)}, status=400)
 
     normalised_shop = normalise_shop_domain(request.GET.get("shop", ""))
+    access_token = (token_response.access_token or "").strip()
+    if not access_token:
+        logger.error(
+            "Shopify OAuth callback for %s did not include an access token.",
+            normalised_shop,
+        )
+        return JsonResponse(
+            {"error": "Shopify did not return an access token."}, status=400
+        )
+
+    logger.info(
+        "Received Shopify OAuth tokens for %s: access_token=%s refresh_token=%s",
+        normalised_shop,
+        access_token,
+        token_response.refresh_token,
+    )
 
     meta = (
         MerchantMeta.objects.select_related("user")
@@ -539,7 +599,7 @@ def oauth_callback(request: HttpRequest):
                 request,
                 request.user,
                 normalised_shop,
-                token_response.access_token,
+                access_token,
                 company_name=company_name,
                 scope=token_response.scope,
                 refresh_token=token_response.refresh_token,
@@ -550,23 +610,25 @@ def oauth_callback(request: HttpRequest):
                 return JsonResponse({"error": str(exc)}, status=400)
 
     if meta and not updated_via_authenticated_user:
-        meta.shopify_access_token = token_response.access_token
-        if hasattr(meta, "shopify_refresh_token"):
-            meta.shopify_refresh_token = token_response.refresh_token
-        meta.shopify_store_domain = normalised_shop
-        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        fields = [
-            "shopify_access_token",
-            "shopify_refresh_token",
-            "shopify_store_domain",
-            "business_type",
-        ]
+        defaults = {
+            "shopify_access_token": access_token,
+            "shopify_store_domain": normalised_shop,
+            "business_type": MerchantMeta.BusinessType.SHOPIFY,
+        }
+        if token_response.refresh_token:
+            defaults["shopify_refresh_token"] = token_response.refresh_token
         if token_response.scope:
-            meta.shopify_oauth_authorization_line = _format_authorization_line(
-                token_response.scope
-            )
-            fields.append("shopify_oauth_authorization_line")
-        meta.save(update_fields=fields)
+            defaults[
+                "shopify_oauth_authorization_line"
+            ] = _format_authorization_line(token_response.scope)
+
+        MerchantMeta.objects.update_or_create(pk=meta.pk, defaults=defaults)
+        meta.refresh_from_db()
+        logger.info(
+            "Persisted Shopify OAuth tokens for MerchantMeta %s (%s).",
+            meta.pk,
+            normalised_shop,
+        )
 
         user = getattr(meta, "user", None)
         if user and not user.is_merchant:
@@ -660,7 +722,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
 
             _clear_shopify_session_state(request, normalised_shop)
             request.session[retry_key] = str(now_ts)
-            authorize_url = _build_oauth_authorize_url(request, normalised_shop)
+            authorize_url = build_shopify_authorize_url(request, normalised_shop)
             return redirect(authorize_url)
 
         return HttpResponseBadRequest(str(exc))
@@ -671,7 +733,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     if not access_token:
         _clear_shopify_session_state(request, normalised_shop)
         request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
-        authorize_url = _build_oauth_authorize_url(request, normalised_shop)
+        authorize_url = build_shopify_authorize_url(request, normalised_shop)
         return redirect(authorize_url)
 
     merchant_meta = (
@@ -683,7 +745,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
     if not merchant_meta or not merchant_meta.user:
         _clear_shopify_session_state(request, normalised_shop)
         request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
-        authorize_url = _build_oauth_authorize_url(request, normalised_shop)
+        authorize_url = build_shopify_authorize_url(request, normalised_shop)
         return redirect(authorize_url)
 
     user = merchant_meta.user

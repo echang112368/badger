@@ -13,7 +13,8 @@ from django.conf import settings
 
 from merchants.models import MerchantMeta
 
-from .shopify_client import ShopifyClient
+from .oauth import normalise_shop_domain
+from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
 from .token_management import refresh_shopify_token
 
 
@@ -22,6 +23,17 @@ logger = logging.getLogger(__name__)
 
 class ShopifyBillingError(RuntimeError):
     """Raised when Shopify billing operations fail."""
+
+
+class ShopifyReauthorizationRequired(ShopifyBillingError):
+    """Raised when Shopify rejects billing requests due to invalid tokens."""
+
+    def __init__(self, shop_domain: str, message: str = ""):
+        self.shop_domain = normalise_shop_domain(shop_domain)
+        message = message or (
+            "Shopify rejected the billing request because the stored credentials are invalid."
+        )
+        super().__init__(message)
 
 
 @dataclass
@@ -219,6 +231,8 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
             "/admin/api/2024-07/recurring_application_charges.json",
             json=payload,
         )
+    except ShopifyInvalidCredentialsError as exc:
+        raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
@@ -330,10 +344,13 @@ def create_usage_charge(
         }
     }
 
-    response = client.post(
-        f"/admin/api/2024-07/recurring_application_charges/{charge_id}/usage_charges.json",
-        json=payload,
-    )
+    try:
+        response = client.post(
+            f"/admin/api/2024-07/recurring_application_charges/{charge_id}/usage_charges.json",
+            json=payload,
+        )
+    except ShopifyInvalidCredentialsError as exc:
+        raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
     data = response.json()
     usage_charge = data.get("usage_charge")
     if not isinstance(usage_charge, dict):
