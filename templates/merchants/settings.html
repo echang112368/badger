@@ -120,86 +120,6 @@
               <p class="font-medium">Shopify billing enabled</p>
               <p class="mt-1 text-indigo-700/80">Recurring platform fees and usage charges will be billed through Shopify.</p>
             </div>
-            <div
-              data-shopify-plan-card
-              class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm {% if shopify_plan_active %}hidden{% endif %}"
-            >
-              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Badger billing plan</p>
-                  <h3 class="text-2xl font-bold text-gray-900">Pro platform plan</h3>
-                  <p class="text-sm text-gray-500">Flat monthly platform fee handled entirely inside Shopify.</p>
-                </div>
-                <div class="text-left sm:text-right">
-                  <p class="text-4xl font-semibold text-gray-900">
-                    ${{ shopify_plan_price|default_if_none:"30.00"|floatformat:2 }}
-                    <span class="text-base font-medium text-gray-500">/month</span>
-                  </p>
-                  <p class="text-xs text-gray-500">Cancel anytime from your Shopify billing settings.</p>
-                </div>
-              </div>
-              <ul class="mt-5 space-y-2 text-sm text-gray-700">
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Flat Shopify subscription charge for Badger platform access
-                </li>
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Unlimited affiliates, programs, and usage-based payouts
-                </li>
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Priority merchant support and automated usage charges
-                </li>
-              </ul>
-              <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  id="startShopifyBilling"
-                  data-start-billing-url="{{ start_shopify_billing_url }}"
-                  class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  {% if not permissions.can_edit_settings %}disabled{% endif %}
-                >
-                  Select plan
-                </button>
-                <p id="shopifyBillingFeedback" class="hidden text-sm text-gray-600"></p>
-              </div>
-            </div>
-            <div
-              data-shopify-plan-active
-              class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-sm text-emerald-900 {% if not shopify_plan_active %}hidden{% endif %}"
-            >
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="font-semibold">Badger Pro plan active</p>
-                  <p class="text-emerald-800/80">Recurring billing is managed directly through Shopify.</p>
-                </div>
-                {% if shopify_billing_cancel_url %}
-                <a
-                  href="{{ shopify_billing_cancel_url }}"
-                  target="_blank"
-                  rel="noopener"
-                  class="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-900 shadow-sm transition hover:bg-emerald-50"
-                >
-                  Cancel plan in Shopify
-                </a>
-                {% else %}
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-500"
-                  disabled
-                >
-                  Shopify billing URL unavailable
-                </button>
-                {% endif %}
-              </div>
-            </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Charge status</span>
@@ -239,6 +159,18 @@
               >
                 Open confirmation link
               </a>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                id="startShopifyBilling"
+                data-start-billing-url="{{ start_shopify_billing_url }}"
+                class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {% if not permissions.can_edit_settings %}disabled{% endif %}
+              >
+                Create or refresh Shopify billing charge
+              </button>
+              <p id="shopifyBillingFeedback" class="text-sm text-gray-600 hidden"></p>
             </div>
             <p class="text-xs text-gray-500">Shopify uses your OAuth connection (completed under the Shopify tab) to manage billing.</p>
           </div>
@@ -837,8 +769,6 @@
   const shopifyCappedElement=document.querySelector('[data-shopify-capped]');
   const shopifyConfirmationContainer=document.querySelector('[data-shopify-confirmation-container]');
   const shopifyConfirmationLink=document.querySelector('[data-shopify-confirmation-link]');
-  const shopifyPlanCard=document.querySelector('[data-shopify-plan-card]');
-  const shopifyPlanActive=document.querySelector('[data-shopify-plan-active]');
   const shopifyFeedback=document.getElementById('shopifyBillingFeedback');
   const startShopifyBillingButton=document.getElementById('startShopifyBilling');
 
@@ -851,19 +781,6 @@
     shopifyFeedback.classList.toggle('text-rose-600',Boolean(isError));
     shopifyFeedback.classList.toggle('text-gray-600',!isError);
   }
-
-  function syncShopifyPlanState(statusText){
-    const normalized=(statusText||'').toString().trim().toLowerCase();
-    const isActive=normalized==='active';
-    if(shopifyPlanCard){
-      shopifyPlanCard.classList.toggle('hidden',isActive);
-    }
-    if(shopifyPlanActive){
-      shopifyPlanActive.classList.toggle('hidden',!isActive);
-    }
-  }
-
-  syncShopifyPlanState(shopifyStatusElement?shopifyStatusElement.textContent:'');
 
   function describeShopifyBillingError(message){
     const text=(message||'').toString().trim();
@@ -938,7 +855,6 @@
         const capped=data.raw.capped_amount;
         shopifyCappedElement.textContent=capped?`$${capped}`:'—';
       }
-      syncShopifyPlanState(status);
 
       const confirmation=(data.confirmation_url||'').trim();
       if(shopifyConfirmationContainer){
@@ -952,11 +868,6 @@
         shopifyConfirmationLink.setAttribute('href',confirmation);
       }
 
-      if(confirmation){
-        setShopifyFeedback('Redirecting you to Shopify to confirm your plan…');
-        window.location.href=confirmation;
-        return;
-      }
       setShopifyFeedback('Shopify billing charge created. Complete setup in Shopify if required.');
     }catch(error){
       console.error('Failed to create Shopify billing charge',error);
