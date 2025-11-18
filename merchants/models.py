@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.db import models
-from django.db.models.functions import Lower
 from accounts.models import CustomUser
 import uuid
 
@@ -72,15 +71,6 @@ class MerchantMeta(models.Model):
         default=Decimal("0.00"),
         help_text="Recurring platform fee charged during each PayPal invoice cycle.",
     )
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                Lower("shopify_store_domain"),
-                condition=~models.Q(shopify_store_domain=""),
-                name="unique_shopify_store_domain",
-            )
-        ]
 
 
     def __str__(self):

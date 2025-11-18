@@ -30,8 +30,8 @@ from .oauth import (
     session_scope_key,
     session_token_key,
 )
-from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
-from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
+from .shopify_client import ShopifyClient
+from .token_management import refresh_shopify_token
 from requests import HTTPError
 
 
@@ -251,7 +251,6 @@ class ShopifyClientRefreshTests(SimpleTestCase):
         response = MagicMock(status_code=401)
         error = HTTPError(response=response)
         response.raise_for_status.side_effect = error
-        response.text = ""
         mock_request.return_value = response
 
         refresh = MagicMock(return_value=None)
@@ -266,18 +265,6 @@ class ShopifyClientRefreshTests(SimpleTestCase):
 
         refresh.assert_called_once_with()
         mock_request.assert_called_once()
-
-    @patch("shopify_app.shopify_client.requests.request")
-    def test_request_raises_invalid_credentials_error(self, mock_request):
-        response = MagicMock(status_code=401)
-        response.raise_for_status.side_effect = HTTPError(response=response)
-        response.text = "Invalid API key or access token"
-        mock_request.return_value = response
-
-        client = ShopifyClient("token", "example.myshopify.com")
-
-        with self.assertRaises(ShopifyInvalidCredentialsError):
-            client.request("GET", "/admin/api/2024-07/shop.json")
 
 
 class ShopifyTokenManagementTests(TestCase):
@@ -329,21 +316,6 @@ class ShopifyTokenManagementTests(TestCase):
         self.assertIsNone(result)
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_access_token, "")
-
-    def test_clear_shopify_token_removes_tokens(self):
-        meta = MerchantMeta.objects.create(
-            user=self.user,
-            shopify_store_domain="example.myshopify.com",
-            shopify_access_token="token",
-            shopify_refresh_token="refresh",
-        )
-
-        result = clear_shopify_token_for_shop("example.myshopify.com")
-
-        self.assertEqual(result.pk, meta.pk)
-        meta.refresh_from_db()
-        self.assertEqual(meta.shopify_access_token, "")
-        self.assertEqual(meta.shopify_refresh_token, "")
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class ShopifyOAuthAuthorizeTests(TestCase):
@@ -574,14 +546,10 @@ class OAuthCallbackTests(TestCase):
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
 
         self.assertEqual(response.status_code, 302)
-        location = response["Location"]
-        self.assertTrue(
-            location.startswith(
-                f"https://{self.shop_domain}/admin/oauth/authorize?"
-            )
+        expected_url = (
+            f"http://testserver{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}"
         )
-        self.assertIn("client_id=key", location)
-        self.assertIn("state=", location)
+        self.assertEqual(response["Location"], expected_url)
         self.assertEqual(
             self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
@@ -718,14 +686,10 @@ class OAuthCallbackTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        location = response["Location"]
-        self.assertTrue(
-            location.startswith(
-                f"https://{self.shop_domain}/admin/oauth/authorize?"
-            )
+        expected_url = (
+            f"http://testserver{reverse('shopify_oauth_authorize')}?shop={self.shop_domain}"
         )
-        self.assertIn("client_id=key", location)
-        self.assertIn("state=", location)
+        self.assertEqual(response["Location"], expected_url)
         self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
 
     def test_invalid_session_token_retries_are_throttled(self):
