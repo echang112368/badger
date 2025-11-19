@@ -819,6 +819,19 @@ def start_shopify_billing(request):
             status=400,
         )
 
+    try:
+        payload = json.loads(request.body or "{}")
+    except ValueError:
+        payload = {}
+
+    billing_plan = (payload.get("billing_plan") or "").strip()
+    if billing_plan:
+        try:
+            merchant_meta.billing_plan = MerchantMeta.BillingPlan(billing_plan)
+        except ValueError:
+            return JsonResponse({"error": "Invalid billing plan selected."}, status=400)
+        merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
+
     if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
         return JsonResponse(
             {"error": "Complete the Shopify OAuth connection before starting billing."},
