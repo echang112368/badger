@@ -175,7 +175,7 @@ def store_id_lookup(request):
 def merchant_dashboard(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_dashboard:
-        return render(request, "403.html", status=403)
+        return redirect('login')
 
     merchant_user = permissions.merchant
     merchant_meta = _get_merchant_meta(merchant_user)
@@ -216,7 +216,7 @@ def merchant_dashboard(request):
 def merchant_invoices(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_dashboard:
-        return render(request, "403.html", status=403)
+        return redirect('login')
 
     merchant_user = permissions.merchant
     merchant_meta = _get_merchant_meta(merchant_user)
@@ -280,7 +280,7 @@ def merchant_invoices(request):
 def merchant_items(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_dashboard:
-        return render(request, "403.html", status=403)
+        return redirect('login')
 
     merchant_user = permissions.merchant
 
@@ -323,7 +323,7 @@ def merchant_items(request):
 
     if request.method == "POST":
         if not permissions.can_modify_content:
-            return render(request, "403.html", status=403)
+            return redirect('login')
         if request.POST.get("form_type") == "group":
             group_id = request.POST.get("group_id")
             group = (
@@ -503,7 +503,7 @@ def request_creator(request):
 def merchant_creators(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_dashboard:
-        return render(request, "403.html", status=403)
+        return redirect('login')
 
     merchant_user = permissions.merchant
     merchant_meta = _get_merchant_meta(merchant_user)
@@ -661,7 +661,7 @@ def merchant_creators(request):
 def merchant_settings(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_settings:
-        return render(request, "403.html", status=403)
+        return redirect('login')
 
     merchant_user = permissions.merchant
     merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
