@@ -494,26 +494,6 @@
             <textarea name="shopify_oauth_authorization_line" rows="2" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" {% if not permissions.can_manage_api %}disabled{% endif %}>{{ settings_form.shopify_oauth_authorization_line.value|default_if_none:'' }}</textarea>
             <p class="mt-1 text-xs text-gray-500">Store any custom Authorization header text provided during Shopify OAuth (for example, <code>Authorization: Bearer &lt;token&gt;</code>).</p>
           </div>
-          <div class="border-t border-gray-100 pt-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p class="text-sm font-medium text-gray-900">Reset Shopify OAuth</p>
-                <p class="mt-1 text-xs text-gray-500">Clear stored Shopify OAuth credentials and restart the connection without reinstalling.</p>
-              </div>
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <p id="resetShopifyOAuthFeedback" class="hidden text-sm text-gray-600"></p>
-                <button
-                  type="button"
-                  class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  data-reset-shopify-oauth
-                  data-reset-url="{{ reset_shopify_oauth_url }}"
-                  {% if not permissions.can_manage_api %}disabled{% endif %}
-                >
-                  Reset OAuth connection
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -933,8 +913,6 @@
   const shopifyPlanActive=document.querySelector('[data-shopify-plan-active]');
   const shopifyFeedback=document.getElementById('shopifyBillingFeedback');
   const startShopifyBillingButtons=document.querySelectorAll('[data-start-shopify-plan]');
-  const resetShopifyOAuthButton=document.querySelector('[data-reset-shopify-oauth]');
-  const resetShopifyOAuthFeedback=document.getElementById('resetShopifyOAuthFeedback');
 
   function setShopifyFeedback(message,isError=false){
     if(!shopifyFeedback){
@@ -1085,68 +1063,6 @@
         btn.addEventListener('click',startShopifyBilling);
       }
     });
-  }
-
-  function setResetShopifyOAuthFeedback(message,isError=false){
-    if(!resetShopifyOAuthFeedback){
-      return;
-    }
-    resetShopifyOAuthFeedback.textContent=message||'';
-    resetShopifyOAuthFeedback.classList.toggle('hidden',!message);
-    resetShopifyOAuthFeedback.classList.toggle('text-rose-600',Boolean(isError));
-    resetShopifyOAuthFeedback.classList.toggle('text-gray-600',!isError);
-  }
-
-  async function handleResetShopifyOAuth(){
-    if(!resetShopifyOAuthButton){
-      return;
-    }
-    const endpoint=resetShopifyOAuthButton.dataset.resetUrl;
-    if(!endpoint){
-      setResetShopifyOAuthFeedback('Missing OAuth reset endpoint.',true);
-      return;
-    }
-
-    const originalLabel=resetShopifyOAuthButton.textContent;
-    resetShopifyOAuthButton.disabled=true;
-    resetShopifyOAuthButton.textContent='Resetting…';
-    setResetShopifyOAuthFeedback('Resetting Shopify OAuth connection…');
-
-    try{
-      const response=await fetch(endpoint,{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'X-CSRFToken':getCsrfToken(),
-        },
-      });
-
-      const data=await response.json().catch(()=>({}));
-      if(!response.ok){
-        const message=data&&data.error?data.error:'Unable to reset Shopify OAuth.';
-        setResetShopifyOAuthFeedback(message,true);
-        return;
-      }
-
-      const authorizeUrl=(data&&data.authorize_url||'').trim();
-      if(authorizeUrl){
-        setResetShopifyOAuthFeedback('Redirecting you to restart Shopify OAuth…');
-        window.location.assign(authorizeUrl);
-        return;
-      }
-
-      setResetShopifyOAuthFeedback('Shopify OAuth reset. Start the Shopify OAuth flow again to reconnect.');
-    }catch(error){
-      console.error('Failed to reset Shopify OAuth',error);
-      setResetShopifyOAuthFeedback('Failed to reset Shopify OAuth. Please try again.',true);
-    }finally{
-      resetShopifyOAuthButton.disabled=false;
-      resetShopifyOAuthButton.textContent=originalLabel;
-    }
-  }
-
-  if(resetShopifyOAuthButton&&!resetShopifyOAuthButton.hasAttribute('disabled')){
-    resetShopifyOAuthButton.addEventListener('click',handleResetShopifyOAuth);
   }
 
   function showModal(modal){
