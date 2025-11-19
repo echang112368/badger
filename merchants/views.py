@@ -13,6 +13,7 @@ from links.models import (
     STATUS_ACTIVE,
     STATUS_INACTIVE,
 )
+from links.services import get_automatic_creator_user
 from creators.models import CreatorMeta
 from .forms import (
     MerchantSettingsForm,
@@ -448,9 +449,13 @@ def delete_creators(request):
     merchant_user = permissions.merchant
     if request.method == "POST":
         creator_ids = request.POST.getlist("selected_creators")
-        MerchantCreatorLink.objects.filter(
+        qs = MerchantCreatorLink.objects.filter(
             merchant=merchant_user, creator__id__in=creator_ids
-        ).delete()
+        )
+        auto_creator = get_automatic_creator_user()
+        if auto_creator:
+            qs = qs.exclude(creator=auto_creator)
+        qs.delete()
 
     return redirect("merchant_creators")
 
@@ -466,9 +471,13 @@ def update_creator_status(request):
         creator_ids = request.POST.getlist("selected_creators")
         action = request.POST.get("action")
         if creator_ids and action in ["activate", "deactivate"]:
-            MerchantCreatorLink.objects.filter(
+            qs = MerchantCreatorLink.objects.filter(
                 merchant=merchant_user, creator__id__in=creator_ids
-            ).update(
+            )
+            auto_creator = get_automatic_creator_user()
+            if auto_creator:
+                qs = qs.exclude(creator=auto_creator)
+            qs.update(
                 status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
             )
     return redirect("merchant_creators")
@@ -761,9 +770,7 @@ def merchant_settings(request):
         form.fields["shopify_store_domain"].disabled = True
         form.fields["shopify_oauth_authorization_line"].disabled = True
 
-    shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
-    if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
-        shopify_plan_price = Decimal("30.00")
+    shopify_plan_price = merchant_meta.display_monthly_fee
     shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
     shopify_plan_active = shopify_status_value.lower() == "active"
     shopify_cancel_url = ""
@@ -783,6 +790,8 @@ def merchant_settings(request):
         'active_tab': active_tab,
         'permissions': permissions,
         'team_roles': MerchantTeamMember.Role,
+        'plan_extension_value': MerchantMeta.PlanType.BADGER_EXTENSION,
+        'plan_merchant_only_value': MerchantMeta.PlanType.MERCHANT_ONLY,
         'team_members_payload': team_members_payload,
         'start_shopify_billing_url': reverse('merchant_start_shopify_billing'),
         'shopify_plan_price': shopify_plan_price,

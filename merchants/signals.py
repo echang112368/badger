@@ -15,3 +15,13 @@ def create_merchant_meta(sender, instance, created, **kwargs):
             },
         )
 
+
+@receiver(post_save, sender=MerchantMeta)
+def enforce_plan_creator(sender, instance, **kwargs):
+    from links import services as link_services
+
+    if instance.includes_badger_creator:
+        link_services.ensure_automatic_creator_for_merchant(instance.user)
+    else:
+        link_services.remove_automatic_creator_for_merchant(instance.user)
+

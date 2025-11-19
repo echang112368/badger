@@ -43,6 +43,10 @@ class MerchantMeta(models.Model):
         INDEPENDENT = "independent", "Independent"
         SHOPIFY = "shopify", "Shopify"
 
+    class PlanType(models.TextChoices):
+        BADGER_EXTENSION = "badger_extension", "Badger creator bundle"
+        MERCHANT_ONLY = "merchant_only", "Merchant only"
+
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -72,6 +76,24 @@ class MerchantMeta(models.Model):
         default=Decimal("0.00"),
         help_text="Recurring platform fee charged during each PayPal invoice cycle.",
     )
+    plan_type = models.CharField(
+        max_length=32,
+        choices=PlanType.choices,
+        default=PlanType.BADGER_EXTENSION,
+        help_text=(
+            "Choose the billing plan for this merchant. The Badger bundle includes the "
+            "automatic creator and the merchant-only plan does not."
+        ),
+    )
+
+    PLAN_PRICING = {
+        PlanType.BADGER_EXTENSION: Decimal("30.00"),
+        PlanType.MERCHANT_ONLY: Decimal("80.00"),
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_plan_type = self.plan_type
 
     class Meta:
         constraints = [
@@ -98,6 +120,39 @@ class MerchantMeta(models.Model):
             return False
 
         return not self.shopify_access_token or not self.shopify_store_domain
+
+    def save(self, *args, **kwargs):
+        plan_changed = self.pk is None or (
+            getattr(self, "_original_plan_type", None) != self.plan_type
+        )
+        if plan_changed:
+            self.monthly_fee = self.get_plan_price()
+        super().save(*args, **kwargs)
+        self._original_plan_type = self.plan_type
+
+    def refresh_from_db(self, using=None, fields=None):
+        super().refresh_from_db(using=using, fields=fields)
+        self._original_plan_type = self.plan_type
+
+    def get_plan_price(self) -> Decimal:
+        return self.PLAN_PRICING.get(self.plan_type, Decimal("30.00"))
+
+    @property
+    def includes_badger_creator(self) -> bool:
+        return self.plan_type == self.PlanType.BADGER_EXTENSION
+
+    @property
+    def display_monthly_fee(self) -> Decimal:
+        fee = getattr(self, "monthly_fee", None)
+        if fee is None:
+            return self.get_plan_price()
+        if isinstance(fee, Decimal):
+            current_fee = fee
+        else:
+            current_fee = Decimal(fee)
+        if current_fee <= 0:
+            return self.get_plan_price()
+        return current_fee
 
 class MerchantItem(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)

@@ -17,6 +17,7 @@ db.sqlite3
 *.pyo
 *.pyd
 migrations/
+!accounts/migrations/
 !merchants/migrations/
 !shopify_app/migrations/
 

@@ -1,10 +1,12 @@
 from django.contrib.auth.decorators import login_required
+from django.forms import modelformset_factory
 from django.http import JsonResponse
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET
-from .models import MerchantCreatorLink
-from django.shortcuts import render, redirect
-from links.models import MerchantCreatorLink
+
 from links.forms import MerchantCreatorLinkForm
+from links.models import MerchantCreatorLink
+from links.services import get_automatic_creator_user
 
 
 @login_required
@@ -43,7 +45,10 @@ def merchant_edit_creators(request):
             for obj in instances:
                 obj.merchant = request.user  # auto-assign merchant
                 obj.save()
+            auto_creator = get_automatic_creator_user()
             for obj in formset.deleted_objects:
+                if auto_creator and obj.creator_id == auto_creator.id:
+                    continue
                 obj.delete()
             return redirect('merchant_dashboard')  # or refresh page
     else:
