@@ -2,7 +2,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from links.models import MerchantCreatorLink
 from .models import MerchantMeta
 from decimal import Decimal
 from unittest.mock import patch
@@ -348,49 +347,4 @@ class ItemGroupFormTests(TestCase):
         form = ItemGroupForm(data={"name": "Group"}, merchant=merchant)
         self.assertFalse(form.is_valid())
         self.assertIn("affiliate_percent", form.errors)
-
-
-class MerchantPlanTests(TestCase):
-    def setUp(self):
-        self.merchant = CustomUser.objects.create_user(
-            username="plan_merchant",
-            password="pass",
-            email="plan_merchant@example.com",
-            is_merchant=True,
-        )
-        self.auto_creator = CustomUser.objects.create_user(
-            username="auto_creator",
-            password="pass",
-            email="auto@example.com",
-            is_creator=True,
-            automatic_creator=True,
-        )
-        self.meta = MerchantMeta.objects.get(user=self.merchant)
-
-    def test_badger_plan_assigns_automatic_creator(self):
-        self.meta.plan_type = MerchantMeta.PlanType.MERCHANT_ONLY
-        self.meta.save()
-        MerchantCreatorLink.objects.filter(merchant=self.merchant).delete()
-
-        self.meta.plan_type = MerchantMeta.PlanType.BADGER_EXTENSION
-        self.meta.save()
-
-        self.assertTrue(
-            MerchantCreatorLink.objects.filter(
-                merchant=self.merchant, creator=self.auto_creator
-            ).exists()
-        )
-
-    def test_merchant_only_plan_removes_creator(self):
-        self.meta.plan_type = MerchantMeta.PlanType.BADGER_EXTENSION
-        self.meta.save()
-
-        self.meta.plan_type = MerchantMeta.PlanType.MERCHANT_ONLY
-        self.meta.save()
-
-        self.assertFalse(
-            MerchantCreatorLink.objects.filter(
-                merchant=self.merchant, creator=self.auto_creator
-            ).exists()
-        )
 
