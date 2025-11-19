@@ -25,7 +25,6 @@ class MerchantSettingsFormTests(TestCase):
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
                 "paypal_email": "",
                 "shopify_store_domain": "",
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
             instance=self.user.merchantmeta,
         )
@@ -38,7 +37,6 @@ class MerchantSettingsFormTests(TestCase):
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
                 "shopify_store_domain": "",
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
             instance=self.user.merchantmeta,
         )
@@ -50,7 +48,6 @@ class MerchantSettingsFormTests(TestCase):
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
                 "shopify_store_domain": "https://Example.myshopify.com/",
-                "billing_plan": MerchantMeta.BillingPlan.PLATFORM_ONLY,
             },
             instance=self.user.merchantmeta,
         )
@@ -72,7 +69,6 @@ class MerchantSettingsTests(TestCase):
                 "paypal_email": "merchant@example.com",
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
 
@@ -123,7 +119,6 @@ class MerchantSettingsTests(TestCase):
                 "paypal_email": "merchant4@example.com",
                 "shopify_store_domain": "",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
         self.assertRedirects(response, reverse("merchant_settings"))
@@ -154,7 +149,6 @@ class MerchantSettingsTests(TestCase):
                 "last_name": "",
                 "active_tab": "api",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
         self.assertRedirects(
@@ -183,7 +177,6 @@ class MerchantSettingsTests(TestCase):
                 "last_name": "",
                 "active_tab": "api",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -216,7 +209,6 @@ class MerchantSettingsTests(TestCase):
                 "first_name": "",
                 "last_name": "",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
-                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
 

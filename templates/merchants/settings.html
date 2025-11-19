@@ -75,48 +75,6 @@
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
         <div class="grid gap-6">
           <div>
-            <span class="block text-sm font-medium text-gray-700 mb-2">Billing plan</span>
-            <div class="grid gap-4 sm:grid-cols-2">
-              {% for value, label in settings_form.fields.billing_plan.choices %}
-              <label
-                class="relative flex h-full cursor-pointer flex-col rounded-xl border p-4 shadow-sm transition hover:shadow {% if settings_form.billing_plan.value == value %}border-indigo-500 ring-2 ring-indigo-500{% else %}border-gray-200{% endif %}"
-              >
-                <input
-                  type="radio"
-                  name="billing_plan"
-                  value="{{ value }}"
-                  class="sr-only"
-                  {% if settings_form.billing_plan.value == value %}checked{% endif %}
-                  {% if not permissions.can_edit_settings %}disabled{% endif %}
-                />
-                <div class="flex items-start justify-between gap-2">
-                  <div>
-                    <p class="text-sm font-semibold text-indigo-700">{{ label }}</p>
-                    {% if value == 'platform_only' %}
-                    <p class="text-xs text-gray-600 mt-1">$80/month without the Badger creator extension.</p>
-                    {% else %}
-                    <p class="text-xs text-gray-600 mt-1">$30/month and includes the automatic Badger creator UUID.</p>
-                    {% endif %}
-                  </div>
-                  <div class="text-right text-sm font-semibold text-gray-900">
-                    {% if value == 'platform_only' %}
-                    $80/mo
-                    {% else %}
-                    $30/mo
-                    {% endif %}
-                  </div>
-                </div>
-                {% if value != 'platform_only' %}
-                <p class="mt-3 rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-800">The Badger creator is automatically added to your creators list and cannot be removed.</p>
-                {% endif %}
-              </label>
-              {% endfor %}
-            </div>
-            {% if settings_form.billing_plan.errors %}
-            <p class="mt-2 text-xs text-red-600">{{ settings_form.billing_plan.errors.0 }}</p>
-            {% endif %}
-          </div>
-          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1" for="business_type">Business Type</label>
             <select
               name="business_type"
