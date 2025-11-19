@@ -74,7 +74,7 @@
         <h2 class="text-lg font-semibold text-gray-900">Billing</h2>
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
         <div class="grid gap-6">
-          <div>
+          <div data-billing-plan-section="form" class="{% if settings_form.business_type.value == 'shopify' %}hidden{% endif %}">
             <span class="block text-sm font-medium text-gray-700 mb-2">Billing plan</span>
             <div class="grid gap-4 sm:grid-cols-2">
               {% for value, label in settings_form.fields.billing_plan.choices %}
@@ -164,54 +164,96 @@
             </div>
             <div
               data-shopify-plan-card
-              class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm {% if shopify_plan_active %}hidden{% endif %}"
+              data-billing-plan-section="shopify"
+              class="space-y-4 {% if shopify_plan_active %}hidden{% endif %}"
             >
-              <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">Badger billing plan</p>
-                  <h3 class="text-2xl font-bold text-gray-900">Pro platform plan</h3>
-                  <p class="text-sm text-gray-500">Flat monthly platform fee handled entirely inside Shopify.</p>
+              <div class="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Badger billing plan</p>
+                    <h3 class="text-xl font-bold text-gray-900">Platform only</h3>
+                    <p class="text-sm text-gray-600">Flat monthly platform fee handled entirely inside Shopify.</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-3xl font-bold text-gray-900">$80.00</p>
+                    <p class="text-xs font-medium text-gray-500">per month · no usage-based charges</p>
+                  </div>
                 </div>
-                <div class="text-left sm:text-right">
-                  <p class="text-4xl font-semibold text-gray-900">
-                    ${{ shopify_plan_price|default_if_none:"30.00"|floatformat:2 }}
-                    <span class="text-base font-medium text-gray-500">/month</span>
-                  </p>
-                  <p class="text-xs text-gray-500">Cancel anytime from your Shopify billing settings.</p>
+                <ul class="mt-4 space-y-2 text-sm text-gray-800">
+                  <li class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Flat Shopify subscription charge for Badger platform access
+                  </li>
+                  <li class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Recurring platform fee only (no usage-based billing)
+                  </li>
+                </ul>
+                <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    data-start-shopify-plan="platform_only"
+                    data-start-billing-url="{{ start_shopify_billing_url }}"
+                    {% if not permissions.can_edit_settings %}disabled{% endif %}
+                  >
+                    Select plan
+                  </button>
                 </div>
               </div>
-              <ul class="mt-5 space-y-2 text-sm text-gray-700">
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Flat Shopify subscription charge for Badger platform access
-                </li>
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Unlimited affiliates, programs, and usage-based payouts
-                </li>
-                <li class="flex items-center gap-2">
-                  <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                  </svg>
-                  Priority merchant support and automated usage charges
-                </li>
-              </ul>
-              <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  id="startShopifyBilling"
-                  data-start-billing-url="{{ start_shopify_billing_url }}"
-                  class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  {% if not permissions.can_edit_settings %}disabled{% endif %}
-                >
-                  Select plan
-                </button>
-                <p id="shopifyBillingFeedback" class="hidden text-sm text-gray-600"></p>
+
+              <div class="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600">Badger billing plan</p>
+                    <h3 class="text-xl font-bold text-gray-900">Pro platform plan</h3>
+                    <p class="text-sm text-gray-600">Multi-month platform fee handled entirely inside Shopify.</p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-3xl font-bold text-gray-900">$30.00</p>
+                    <p class="text-xs font-medium text-gray-500">per month · includes usage-based charges</p>
+                  </div>
+                </div>
+                <ul class="mt-4 space-y-2 text-sm text-gray-800">
+                  <li class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Flat Shopify subscription charge for Badger platform access
+                  </li>
+                  <li class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Usage-based payouts and automated charges with a capped amount
+                  </li>
+                  <li class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 8.85a1 1 0 011.414-1.414l3.1 3.1 6.364-6.364a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Includes the automatic Badger creator
+                  </li>
+                </ul>
+                <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    data-start-shopify-plan="badger_creator"
+                    data-start-billing-url="{{ start_shopify_billing_url }}"
+                    {% if not permissions.can_edit_settings %}disabled{% endif %}
+                  >
+                    Select plan
+                  </button>
+                </div>
               </div>
+
+              <p id="shopifyBillingFeedback" class="hidden text-sm text-gray-600"></p>
             </div>
             <div
               data-shopify-plan-active
@@ -637,6 +679,7 @@
   const settingsForm=document.getElementById('settingsForm');
   const businessTypeSelect=document.querySelector('[data-business-type-select]');
   const billingSections=document.querySelectorAll('[data-billing-section]');
+  const billingPlanSections=document.querySelectorAll('[data-billing-plan-section]');
 
   function setActiveTab(tab){
     tabs.forEach(t=>{
@@ -678,20 +721,25 @@
   setActiveTab(initialTab);
 
   function updateBillingSections(value){
-    if(!billingSections){
-      return;
+    if(billingSections){
+      billingSections.forEach(section=>{
+        if(!section){
+          return;
+        }
+        const target=section.dataset.billingSection||'independent';
+        section.classList.toggle('hidden',target!==value);
+      });
     }
-    billingSections.forEach(section=>{
-      if(!section){
-        return;
-      }
-      const target=section.dataset.billingSection||'independent';
-      if(target===value){
-        section.classList.remove('hidden');
-      }else{
-        section.classList.add('hidden');
-      }
-    });
+    if(billingPlanSections){
+      billingPlanSections.forEach(section=>{
+        if(!section){
+          return;
+        }
+        const target=section.dataset.billingPlanSection||'form';
+        const shouldShow=target==='shopify'?value==='shopify':value!=='shopify';
+        section.classList.toggle('hidden',!shouldShow);
+      });
+    }
   }
 
   if(businessTypeSelect){
@@ -864,7 +912,7 @@
   const shopifyPlanCard=document.querySelector('[data-shopify-plan-card]');
   const shopifyPlanActive=document.querySelector('[data-shopify-plan-active]');
   const shopifyFeedback=document.getElementById('shopifyBillingFeedback');
-  const startShopifyBillingButton=document.getElementById('startShopifyBilling');
+  const startShopifyBillingButtons=document.querySelectorAll('[data-start-shopify-plan]');
 
   function setShopifyFeedback(message,isError=false){
     if(!shopifyFeedback){
@@ -918,17 +966,41 @@
     return text;
   }
 
-  async function startShopifyBilling(){
-    if(!startShopifyBillingButton){
+  function syncBillingPlanInputs(plan){
+    if(!plan){
       return;
     }
-    const url=startShopifyBillingButton.dataset.startBillingUrl;
+    const matchingInput=document.querySelector(`input[name="billing_plan"][value="${plan}"]`);
+    if(matchingInput){
+      matchingInput.checked=true;
+    }
+  }
+
+  function togglePlanButtons(disabled){
+    if(!startShopifyBillingButtons){
+      return;
+    }
+    startShopifyBillingButtons.forEach(btn=>{
+      if(btn){
+        btn.disabled=disabled;
+      }
+    });
+  }
+
+  async function startShopifyBilling(event){
+    const trigger=event&&event.currentTarget?event.currentTarget:null;
+    if(!trigger){
+      return;
+    }
+    const planSelection=trigger.dataset.startShopifyPlan||'';
+    syncBillingPlanInputs(planSelection);
+    const url=trigger.dataset.startBillingUrl;
     if(!url){
       setShopifyFeedback('Missing billing endpoint.',true);
       return;
     }
 
-    startShopifyBillingButton.disabled=true;
+    togglePlanButtons(true);
     setShopifyFeedback('Creating billing charge…');
 
     try{
@@ -938,7 +1010,7 @@
           'Content-Type':'application/json',
           'X-CSRFToken':getCsrfToken(),
         },
-        body:JSON.stringify({}),
+        body:JSON.stringify({billing_plan:planSelection}),
       });
 
       const data=await response.json().catch(()=>({}));
@@ -981,12 +1053,16 @@
       console.error('Failed to create Shopify billing charge',error);
       setShopifyFeedback(describeShopifyBillingError(error&&error.message),true);
     }finally{
-      startShopifyBillingButton.disabled=false;
+      togglePlanButtons(false);
     }
   }
 
-  if(startShopifyBillingButton&&!startShopifyBillingButton.hasAttribute('disabled')){
-    startShopifyBillingButton.addEventListener('click',startShopifyBilling);
+  if(startShopifyBillingButtons){
+    startShopifyBillingButtons.forEach(btn=>{
+      if(btn&&!btn.hasAttribute('disabled')){
+        btn.addEventListener('click',startShopifyBilling);
+      }
+    });
   }
 
   function showModal(modal){
