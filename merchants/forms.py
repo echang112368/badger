@@ -81,7 +81,6 @@ class MerchantSettingsForm(forms.ModelForm):
         fields = [
             "company_name",
             "paypal_email",
-            "billing_plan",
             "shopify_store_domain",
             "shopify_oauth_authorization_line",
             "business_type",
@@ -89,7 +88,6 @@ class MerchantSettingsForm(forms.ModelForm):
         labels = {
             "company_name": "Business Name",
             "paypal_email": "PayPal Email (for invoices)",
-            "billing_plan": "Billing Plan",
             "shopify_store_domain": "Shopify URL",
             "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
