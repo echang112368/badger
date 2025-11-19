@@ -138,52 +138,6 @@ def _create_team_member_account(merchant: CustomUser, form: TeamMemberCreateForm
     return user, password, membership
 
 
-@login_required
-@require_POST
-def reset_shopify_oauth(request):
-    permissions = resolve_merchant_permissions(request.user)
-    if not (permissions.can_edit_settings and permissions.can_manage_api):
-        return JsonResponse(
-            {"error": "You do not have permission to reset Shopify OAuth."},
-            status=403,
-        )
-
-    merchant_user = permissions.merchant
-    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
-    if not merchant_meta.shopify_store_domain:
-        return JsonResponse(
-            {"error": "Add a Shopify store domain before resetting OAuth."},
-            status=400,
-        )
-
-    normalised_shop = normalise_shop_domain(merchant_meta.shopify_store_domain)
-    if not normalised_shop:
-        return JsonResponse(
-            {"error": "Enter a valid Shopify store domain before resetting OAuth."},
-            status=400,
-        )
-
-    clear_shopify_token_for_shop(normalised_shop)
-    request.session.pop(session_token_key(normalised_shop), None)
-    request.session.pop(session_refresh_key(normalised_shop), None)
-
-    fields_to_update = []
-    if merchant_meta.shopify_oauth_authorization_line:
-        merchant_meta.shopify_oauth_authorization_line = ""
-        fields_to_update.append("shopify_oauth_authorization_line")
-    if fields_to_update:
-        merchant_meta.save(update_fields=fields_to_update)
-
-    authorize_url = build_shopify_authorize_url(request, normalised_shop)
-    return JsonResponse(
-        {
-            "authorize_url": authorize_url,
-            "shop_domain": normalised_shop,
-            "message": "Shopify OAuth reset. Follow the prompt to reconnect your store.",
-        }
-    )
-
-
 def _resolve_settings_tab(tab: Optional[str]) -> str:
     """Return a valid settings tab slug."""
 
@@ -839,7 +793,6 @@ def merchant_settings(request):
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
         'start_shopify_billing_url': reverse('merchant_start_shopify_billing'),
-        'reset_shopify_oauth_url': reverse('merchant_reset_shopify_oauth'),
         'shopify_plan_price': shopify_plan_price,
         'shopify_plan_active': shopify_plan_active,
         'shopify_billing_cancel_url': shopify_cancel_url,
