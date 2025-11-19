@@ -43,10 +43,6 @@ class MerchantMeta(models.Model):
         INDEPENDENT = "independent", "Independent"
         SHOPIFY = "shopify", "Shopify"
 
-    class BillingPlan(models.TextChoices):
-        PLATFORM_ONLY = "platform_only", "Platform only ($80/mo)"
-        BADGER_CREATOR = "badger_creator", "Badger Creator included ($30/mo)"
-
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -59,15 +55,6 @@ class MerchantMeta(models.Model):
         max_length=20,
         choices=BusinessType.choices,
         default=BusinessType.INDEPENDENT,
-    )
-    billing_plan = models.CharField(
-        max_length=32,
-        choices=BillingPlan.choices,
-        default=BillingPlan.BADGER_CREATOR,
-        help_text=(
-            "Choose between the platform-only plan and the plan that includes "
-            "the automatic Badger creator."
-        ),
     )
     shopify_billing_status = models.CharField(max_length=32, blank=True)
     shopify_recurring_charge_id = models.CharField(max_length=64, blank=True)
@@ -103,50 +90,6 @@ class MerchantMeta(models.Model):
     def balance(self):
         from ledger.models import LedgerEntry
         return LedgerEntry.merchant_balance(self.user)
-
-    @property
-    def plan_price(self) -> Decimal:
-        if self.billing_plan == self.BillingPlan.PLATFORM_ONLY:
-            return Decimal("80.00")
-        return Decimal("30.00")
-
-    @property
-    def includes_badger_creator(self) -> bool:
-        return self.billing_plan == self.BillingPlan.BADGER_CREATOR
-
-    def ensure_badger_creator_link(self):
-        """Ensure the default Badger creator link matches the selected plan."""
-
-        try:
-            from accounts.models import CustomUser
-            from links.models import MerchantCreatorLink, STATUS_ACTIVE
-            from creators.models import CreatorMeta
-        except Exception:
-            return
-
-        default_creator = CustomUser.get_default_badger_creator()
-        if not default_creator:
-            return
-
-        if self.includes_badger_creator:
-            CreatorMeta.objects.get_or_create(user=default_creator)
-            link, created = MerchantCreatorLink.objects.get_or_create(
-                merchant=self.user,
-                creator=default_creator,
-                defaults={"status": STATUS_ACTIVE},
-            )
-            if not created and link.status != STATUS_ACTIVE:
-                link.status = STATUS_ACTIVE
-                link.save(update_fields=["status"])
-        else:
-            MerchantCreatorLink.objects.filter(
-                merchant=self.user, creator=default_creator
-            ).delete()
-
-    def save(self, *args, **kwargs):
-        self.monthly_fee = self.plan_price
-        super().save(*args, **kwargs)
-        self.ensure_badger_creator_link()
 
     def requires_shopify_oauth(self) -> bool:
         """Return ``True`` if the merchant still needs to complete Shopify OAuth."""
