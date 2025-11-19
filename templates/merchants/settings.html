@@ -75,25 +75,6 @@
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
         <div class="grid gap-6">
           <div>
-            <p class="text-sm font-medium text-gray-700 mb-2">Billing Plan</p>
-            <div class="grid gap-4 sm:grid-cols-2">
-              {% with selected_plan=settings_form.billing_plan.value|default_if_none:'badger_extension' %}
-              <label class="relative flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 shadow-sm transition {% if selected_plan == 'badger_extension' %}border-indigo-500 ring-2 ring-indigo-200{% else %}border-gray-200{% endif %}">
-                <input type="radio" name="billing_plan" value="badger_extension" class="sr-only" {% if selected_plan == 'badger_extension' %}checked{% endif %} {% if not permissions.can_edit_settings %}disabled{% endif %}>
-                <span class="text-xs font-semibold uppercase tracking-wide text-indigo-600">$30 / month</span>
-                <span class="text-lg font-semibold text-gray-900">Badger Extension plan</span>
-                <p class="text-sm text-gray-600">Includes the Badger creator integration. The Badger creator is automatically added to your creator list and cannot be removed while this plan is active.</p>
-              </label>
-              <label class="relative flex cursor-pointer flex-col gap-2 rounded-2xl border p-4 shadow-sm transition {% if selected_plan == 'platform_only' %}border-indigo-500 ring-2 ring-indigo-200{% else %}border-gray-200{% endif %}">
-                <input type="radio" name="billing_plan" value="platform_only" class="sr-only" {% if selected_plan == 'platform_only' %}checked{% endif %} {% if not permissions.can_edit_settings %}disabled{% endif %}>
-                <span class="text-xs font-semibold uppercase tracking-wide text-indigo-600">$80 / month</span>
-                <span class="text-lg font-semibold text-gray-900">Platform only plan</span>
-                <p class="text-sm text-gray-600">Keep full control of your creator list without the Badger extension. The Badger creator will not be automatically connected to your account.</p>
-              </label>
-              {% endwith %}
-            </div>
-          </div>
-          <div>
             <label class="block text-sm font-medium text-gray-700 mb-1" for="business_type">Business Type</label>
             <select
               name="business_type"
