@@ -71,6 +71,10 @@ class MerchantItemForm(forms.ModelForm):
 
 
 class MerchantSettingsForm(forms.ModelForm):
+    billing_plan = forms.ChoiceField(
+        choices=MerchantMeta.BillingPlan.choices,
+        required=False,
+    )
     shopify_oauth_authorization_line = forms.CharField(
         required=False,
         help_text="Optional header value used for custom integrations that rely on OAuth.",
@@ -84,6 +88,7 @@ class MerchantSettingsForm(forms.ModelForm):
             "shopify_store_domain",
             "shopify_oauth_authorization_line",
             "business_type",
+            "billing_plan",
         ]
         labels = {
             "company_name": "Business Name",
@@ -91,6 +96,7 @@ class MerchantSettingsForm(forms.ModelForm):
             "shopify_store_domain": "Shopify URL",
             "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
+            "billing_plan": "Billing Plan",
         }
 
     def clean_shopify_store_domain(self):
@@ -120,6 +126,14 @@ class MerchantSettingsForm(forms.ModelForm):
             )
 
         return cleaned
+
+    def clean_billing_plan(self):
+        plan = self.cleaned_data.get("billing_plan")
+        if plan:
+            return plan
+        if self.instance and self.instance.billing_plan:
+            return self.instance.billing_plan
+        return MerchantMeta.BillingPlan.BADGER_EXTENSION
 
 
 class ItemGroupForm(forms.ModelForm):
