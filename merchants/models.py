@@ -43,6 +43,10 @@ class MerchantMeta(models.Model):
         INDEPENDENT = "independent", "Independent"
         SHOPIFY = "shopify", "Shopify"
 
+    class BillingPlan(models.TextChoices):
+        BADGER_EXTENSION = "badger_extension", "Badger Extension ($30/mo)"
+        PLATFORM_ONLY = "platform_only", "Platform Only ($80/mo)"
+
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -72,6 +76,16 @@ class MerchantMeta(models.Model):
         default=Decimal("0.00"),
         help_text="Recurring platform fee charged during each PayPal invoice cycle.",
     )
+    billing_plan = models.CharField(
+        max_length=32,
+        choices=BillingPlan.choices,
+        default=BillingPlan.BADGER_EXTENSION,
+    )
+
+    _PLAN_FEES = {
+        BillingPlan.BADGER_EXTENSION: Decimal("30.00"),
+        BillingPlan.PLATFORM_ONLY: Decimal("80.00"),
+    }
 
     class Meta:
         constraints = [
@@ -98,6 +112,28 @@ class MerchantMeta(models.Model):
             return False
 
         return not self.shopify_access_token or not self.shopify_store_domain
+
+    def requires_badger_creator(self) -> bool:
+        return self.billing_plan == self.BillingPlan.BADGER_EXTENSION
+
+    def billing_plan_fee(self) -> Decimal:
+        return self._PLAN_FEES.get(self.billing_plan, Decimal("30.00"))
+
+    def save(self, *args, **kwargs):
+        self.monthly_fee = self.billing_plan_fee()
+        super().save(*args, **kwargs)
+        self._sync_badger_creator_link()
+
+    def _sync_badger_creator_link(self) -> None:
+        from links.badger import sync_badger_creator_link
+
+        if not self.user_id:
+            return
+
+        sync_badger_creator_link(
+            self.user,
+            should_exist=self.requires_badger_creator(),
+        )
 
 class MerchantItem(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
