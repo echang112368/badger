@@ -448,9 +448,13 @@ def delete_creators(request):
     merchant_user = permissions.merchant
     if request.method == "POST":
         creator_ids = request.POST.getlist("selected_creators")
-        MerchantCreatorLink.objects.filter(
+        qs = MerchantCreatorLink.objects.filter(
             merchant=merchant_user, creator__id__in=creator_ids
-        ).delete()
+        )
+        default_creator = CustomUser.get_default_badger_creator()
+        if default_creator:
+            qs = qs.exclude(creator=default_creator)
+        qs.delete()
 
     return redirect("merchant_creators")
 
@@ -466,9 +470,13 @@ def update_creator_status(request):
         creator_ids = request.POST.getlist("selected_creators")
         action = request.POST.get("action")
         if creator_ids and action in ["activate", "deactivate"]:
-            MerchantCreatorLink.objects.filter(
+            qs = MerchantCreatorLink.objects.filter(
                 merchant=merchant_user, creator__id__in=creator_ids
-            ).update(
+            )
+            default_creator = CustomUser.get_default_badger_creator()
+            if default_creator:
+                qs = qs.exclude(creator=default_creator)
+            qs.update(
                 status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
             )
     return redirect("merchant_creators")
