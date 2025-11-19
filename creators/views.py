@@ -414,6 +414,8 @@ def delete_affiliate_merchants(request):
     if request.method == "POST":
         link_ids = request.POST.getlist("selected_links")
         if link_ids:
+            if request.user.automatic_creator:
+                return redirect("creator_affiliate_companies")
             MerchantCreatorLink.objects.filter(
                 id__in=link_ids, creator=request.user
             ).delete()
@@ -433,6 +435,7 @@ def respond_request(request, link_id):
             link.status = STATUS_ACTIVE
             link.save()
         elif action == "decline":
-            link.delete()
+            if not request.user.automatic_creator:
+                link.delete()
 
     return redirect("creator_affiliate_companies")
