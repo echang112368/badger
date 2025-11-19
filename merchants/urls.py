@@ -16,5 +16,4 @@ urlpatterns = [
     path('team/<int:member_id>/delete/', views.delete_team_member, name='delete_team_member'),
     path('settings/', views.merchant_settings, name='merchant_settings'),
     path('settings/shopify/start-billing/', views.start_shopify_billing, name='merchant_start_shopify_billing'),
-    path('settings/shopify/reset-oauth/', views.reset_shopify_oauth, name='merchant_reset_shopify_oauth'),
 ]
