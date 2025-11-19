@@ -2,9 +2,6 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from creators.models import CreatorMeta
-from links.badger import BADGER_CREATOR_UUID
-from links.models import MerchantCreatorLink, STATUS_ACTIVE
 from .models import MerchantMeta
 from decimal import Decimal
 from unittest.mock import patch
@@ -351,88 +348,3 @@ class ItemGroupFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("affiliate_percent", form.errors)
 
-
-
-class MerchantBillingPlanTests(TestCase):
-    def setUp(self):
-        self.badger_user = CustomUser.objects.create_user(
-            username="badger",
-            email="badger@example.com",
-            password="pass",
-            is_creator=True,
-        )
-        self.badger_meta = self.badger_user.creatormeta
-        self.badger_meta.uuid = BADGER_CREATOR_UUID
-        self.badger_meta.save()
-
-        self.merchant = CustomUser.objects.create_user(
-            username="merchant_plan",
-            email="merchant_plan@example.com",
-            password="pass",
-            is_merchant=True,
-        )
-        self.meta = MerchantMeta.objects.get(user=self.merchant)
-
-    def test_badger_creator_added_for_default_plan(self):
-        link_exists = MerchantCreatorLink.objects.filter(
-            merchant=self.merchant,
-            creator=self.badger_user,
-        ).exists()
-        self.assertTrue(link_exists)
-        self.assertEqual(
-            self.meta.billing_plan, MerchantMeta.BillingPlan.BADGER_EXTENSION
-        )
-        self.assertEqual(self.meta.monthly_fee, Decimal("30.00"))
-
-    def test_badger_creator_cannot_be_deleted(self):
-        self.client.force_login(self.merchant)
-        response = self.client.post(
-            reverse("delete_creators"),
-            {"selected_creators": [self.badger_user.id]},
-        )
-        self.assertRedirects(response, reverse("merchant_creators"))
-        self.assertTrue(
-            MerchantCreatorLink.objects.filter(
-                merchant=self.merchant, creator=self.badger_user
-            ).exists()
-        )
-
-    def test_badger_creator_cannot_be_deactivated(self):
-        self.client.force_login(self.merchant)
-        response = self.client.post(
-            reverse("update_creator_status"),
-            {
-                "selected_creators": [self.badger_user.id],
-                "action": "deactivate",
-            },
-        )
-        self.assertRedirects(response, reverse("merchant_creators"))
-        link = MerchantCreatorLink.objects.get(
-            merchant=self.merchant, creator=self.badger_user
-        )
-        self.assertEqual(link.status, STATUS_ACTIVE)
-
-    def test_switching_to_platform_plan_removes_badger_creator(self):
-        self.meta.billing_plan = MerchantMeta.BillingPlan.PLATFORM_ONLY
-        self.meta.save()
-        self.assertEqual(self.meta.monthly_fee, Decimal("80.00"))
-        self.assertFalse(
-            MerchantCreatorLink.objects.filter(
-                merchant=self.merchant, creator=self.badger_user
-            ).exists()
-        )
-
-    def test_platform_plan_blocks_badger_requests(self):
-        self.meta.billing_plan = MerchantMeta.BillingPlan.PLATFORM_ONLY
-        self.meta.save()
-        self.client.force_login(self.merchant)
-        response = self.client.post(
-            reverse("request_creator"),
-            {"creator_uuid": str(BADGER_CREATOR_UUID)},
-        )
-        self.assertRedirects(response, reverse("merchant_creators"))
-        self.assertFalse(
-            MerchantCreatorLink.objects.filter(
-                merchant=self.merchant, creator=self.badger_user
-            ).exists()
-        )

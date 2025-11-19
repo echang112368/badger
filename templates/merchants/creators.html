@@ -76,15 +76,8 @@
                 <tbody>
                     {% for creator in active_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3">
-                            <input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content or badger_creator_required and creator.is_badger_creator %}disabled{% endif %} />
-                        </td>
-                        <td class="p-3 text-left">
-                            {{ creator.username }}
-                            {% if badger_creator_required and creator.is_badger_creator %}
-                            <span class="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Badger extension</span>
-                            {% endif %}
-                        </td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                         <td class="p-3 text-right font-semibold">${{ creator.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
@@ -121,15 +114,8 @@
                 <tbody>
                     {% for creator in inactive_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3">
-                            <input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content or badger_creator_required and creator.is_badger_creator %}disabled{% endif %} />
-                        </td>
-                        <td class="p-3 text-left">
-                            {{ creator.username }}
-                            {% if badger_creator_required and creator.is_badger_creator %}
-                            <span class="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Badger extension</span>
-                            {% endif %}
-                        </td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                         <td class="p-3 text-right">${{ creator.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
@@ -160,15 +146,8 @@
                 <tbody>
                     {% for creator in pending_creators %}
                     <tr class="odd:bg-white even:bg-gray-50 hover:bg-gray-100">
-                        <td class="p-3">
-                            <input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content or badger_creator_required and creator.is_badger_creator %}disabled{% endif %} />
-                        </td>
-                        <td class="p-3 text-left">
-                            {{ creator.username }}
-                            {% if badger_creator_required and creator.is_badger_creator %}
-                            <span class="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Badger extension</span>
-                            {% endif %}
-                        </td>
+                        <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
+                        <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
                     </tr>
                     {% empty %}
@@ -225,9 +204,7 @@
             document.querySelectorAll('.select-all').forEach(cb => {
                 cb.addEventListener('change', function() {
                     document.querySelectorAll('#' + this.dataset.target + ' input[name="selected_creators"]').forEach(box => {
-                        if (!box.disabled) {
-                            box.checked = this.checked;
-                        }
+                        box.checked = this.checked;
                     });
                     updateBulkToggleState();
                 });
