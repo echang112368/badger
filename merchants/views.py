@@ -13,7 +13,6 @@ from links.models import (
     STATUS_ACTIVE,
     STATUS_INACTIVE,
 )
-from links.badger import BADGER_CREATOR_UUID, get_badger_creator_id
 from creators.models import CreatorMeta
 from .forms import (
     MerchantSettingsForm,
@@ -447,18 +446,11 @@ def delete_creators(request):
         return HttpResponseForbidden()
 
     merchant_user = permissions.merchant
-    merchant_meta = _get_merchant_meta(merchant_user)
-    protected_creator_id = None
-    if merchant_meta and merchant_meta.requires_badger_creator():
-        protected_creator_id = get_badger_creator_id()
     if request.method == "POST":
         creator_ids = request.POST.getlist("selected_creators")
-        links = MerchantCreatorLink.objects.filter(
+        MerchantCreatorLink.objects.filter(
             merchant=merchant_user, creator__id__in=creator_ids
-        )
-        if protected_creator_id:
-            links = links.exclude(creator_id=protected_creator_id)
-        links.delete()
+        ).delete()
 
     return redirect("merchant_creators")
 
@@ -470,20 +462,13 @@ def update_creator_status(request):
         return HttpResponseForbidden()
 
     merchant_user = permissions.merchant
-    merchant_meta = _get_merchant_meta(merchant_user)
-    protected_creator_id = None
-    if merchant_meta and merchant_meta.requires_badger_creator():
-        protected_creator_id = get_badger_creator_id()
     if request.method == "POST":
         creator_ids = request.POST.getlist("selected_creators")
         action = request.POST.get("action")
         if creator_ids and action in ["activate", "deactivate"]:
-            links = MerchantCreatorLink.objects.filter(
+            MerchantCreatorLink.objects.filter(
                 merchant=merchant_user, creator__id__in=creator_ids
-            )
-            if protected_creator_id:
-                links = links.exclude(creator_id=protected_creator_id)
-            links.update(
+            ).update(
                 status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
             )
     return redirect("merchant_creators")
@@ -496,16 +481,9 @@ def request_creator(request):
         return HttpResponseForbidden()
 
     merchant_user = permissions.merchant
-    merchant_meta = _get_merchant_meta(merchant_user)
     if request.method == "POST":
         uuid = request.POST.get("creator_uuid", "").strip()
         if uuid:
-            if (
-                merchant_meta
-                and not merchant_meta.requires_badger_creator()
-                and uuid.lower() == str(BADGER_CREATOR_UUID)
-            ):
-                return redirect("merchant_creators")
             try:
                 creator_meta = CreatorMeta.objects.get(uuid=uuid)
                 link, created = MerchantCreatorLink.objects.get_or_create(
@@ -529,9 +507,6 @@ def merchant_creators(request):
 
     merchant_user = permissions.merchant
     merchant_meta = _get_merchant_meta(merchant_user)
-    badger_creator_required = bool(
-        merchant_meta and merchant_meta.requires_badger_creator()
-    )
 
     active_links = (
         MerchantCreatorLink.objects.filter(
@@ -643,10 +618,6 @@ def merchant_creators(request):
             avg = Decimal("0.00")
             conversion_rate = Decimal("0.00")
 
-        is_badger_creator = bool(
-            creator_meta and creator_meta.uuid == BADGER_CREATOR_UUID
-        )
-
         return {
             "link_id": link.id,
             "creator_id": creator.id,
@@ -658,7 +629,6 @@ def merchant_creators(request):
             "conversions": conversions,
             "avg_earnings_per_visit": avg,
             "conversion_rate": conversion_rate,
-            "is_badger_creator": is_badger_creator,
         }
 
     active_creators = [build_creator_entry(link) for link in active_links]
@@ -669,10 +639,6 @@ def merchant_creators(request):
             "creator_id": link.creator.id,
             "username": link.creator.username,
             "email": link.creator.email,
-            "is_badger_creator": bool(
-                getattr(link.creator, "creatormeta", None)
-                and link.creator.creatormeta.uuid == BADGER_CREATOR_UUID
-            ),
         }
         for link in pending_links
     ]
@@ -687,7 +653,6 @@ def merchant_creators(request):
             'pending_creators': pending_creators,
             'permissions': permissions,
             'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
-            'badger_creator_required': badger_creator_required,
         },
     )
 
