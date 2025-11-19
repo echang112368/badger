@@ -84,7 +84,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "shopify_store_domain",
             "shopify_oauth_authorization_line",
             "business_type",
-            "plan_type",
         ]
         labels = {
             "company_name": "Business Name",
@@ -92,10 +91,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "shopify_store_domain": "Shopify URL",
             "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
-            "plan_type": "Billing plan",
-        }
-        widgets = {
-            "plan_type": forms.RadioSelect,
         }
 
     def clean_shopify_store_domain(self):
