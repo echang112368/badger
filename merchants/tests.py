@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from .forms import ItemGroupForm, MerchantSettingsForm
 from shopify_app import billing as shopify_billing
+from shopify_app.oauth import session_refresh_key, session_token_key
 
 
 class MerchantSettingsFormTests(TestCase):
@@ -282,6 +283,49 @@ class MerchantSettingsTests(TestCase):
         )
         self.client.force_login(user)
         response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_reset_shopify_oauth_clears_tokens_and_returns_authorize_url(self):
+        user = CustomUser.objects.create_user(
+            username="reset_oauth", password="pass", email="reset@example.com", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_store_domain = "ResetStore.myshopify.com"
+        meta.shopify_access_token = "existing-token"
+        meta.shopify_refresh_token = "existing-refresh"
+        meta.shopify_oauth_authorization_line = "scope=write_discounts"
+        meta.save()
+
+        session = self.client.session
+        session[session_token_key("resetstore.myshopify.com")] = "session-token"
+        session[session_refresh_key("resetstore.myshopify.com")] = "session-refresh"
+        session.save()
+
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_reset_shopify_oauth"))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("authorize_url", data)
+        self.assertEqual(data.get("shop_domain"), "resetstore.myshopify.com")
+
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_access_token, "")
+        self.assertEqual(meta.shopify_refresh_token, "")
+        self.assertEqual(meta.shopify_oauth_authorization_line, "")
+
+        session = self.client.session
+        self.assertNotIn(session_token_key("resetstore.myshopify.com"), session)
+        self.assertNotIn(session_refresh_key("resetstore.myshopify.com"), session)
+
+    def test_reset_shopify_oauth_requires_store_domain(self):
+        user = CustomUser.objects.create_user(
+            username="reset_oauth_missing", password="pass", email="resetmissing@example.com", is_merchant=True
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(reverse("merchant_reset_shopify_oauth"))
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
