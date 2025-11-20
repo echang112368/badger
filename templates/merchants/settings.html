@@ -209,7 +209,7 @@
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if shopify_plan_active and merchant_meta.billing_plan == 'platform_only' %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
                     data-start-shopify-plan="platform_only"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
@@ -271,7 +271,7 @@
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if shopify_plan_active and merchant_meta.billing_plan == 'badger_creator' %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
                     data-start-shopify-plan="badger_creator"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
