@@ -1,0 +1,27 @@
+{% extends "accounts/auth_base.html" %}
+
+{% block title %}Verify Email | Badger{% endblock %}
+
+{% block toggle %}
+  <span class="active">Verify email</span>
+{% endblock %}
+
+{% block heading %}
+  <h1>Check your inbox</h1>
+  <p>We sent a 6-digit code to {{ email }}. Enter it below to continue.</p>
+{% endblock %}
+
+{% block divider %}{% endblock %}
+
+{% block form_fields %}
+  {{ block.super }}
+  <div class="auth-subtext">
+    Didn’t get the email? <a href="{% url 'resend_verification' %}">Resend verification code</a>.
+  </div>
+{% endblock %}
+
+{% block submit_label %}Verify email{% endblock %}
+
+{% block footer %}
+  Entered the wrong email? <a href="{% url 'signup_choice' %}">Create a new account</a>
+{% endblock %}

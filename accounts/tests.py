@@ -31,6 +31,7 @@ class LoginRedirectTests(TestCase):
             email="merchant_login@example.com",
             password="pass12345",
             is_merchant=True,
+            email_verified=True,
         )
         meta = MerchantMeta.objects.get(user=user)
         meta.business_type = MerchantMeta.BusinessType.SHOPIFY

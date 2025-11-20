@@ -1,0 +1,9 @@
+<p>Hi {{ user.get_full_name|default:user.username }},</p>
+
+<p>Thanks for creating a Badger account. Please verify your email address using this code:</p>
+
+<p style="font-size:24px; font-weight:bold; letter-spacing:4px;">{{ verification_code }}</p>
+
+<p>Enter the code on the verification page to finish setting up your account.</p>
+
+<p>If you didn’t create this account, you can ignore this email.</p>
