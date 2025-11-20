@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import UserCreationForm
+from django import forms
 
 
 User = get_user_model()
@@ -62,4 +63,19 @@ class UserNameForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ("first_name", "last_name")
+
+
+class EmailVerificationForm(forms.Form):
+    code = forms.CharField(
+        label="Verification code",
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Enter 6-digit code",
+                "autocomplete": "one-time-code",
+                "inputmode": "numeric",
+            }
+        ),
+    )
 
