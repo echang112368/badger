@@ -17,6 +17,11 @@
 {% block submit_label %}Log in{% endblock %}
 
 {% block footer %}
-  Don’t have an account yet?
-  <a href="{% url 'user_signup' %}">Create one</a>
+  <div style="display:flex; flex-direction:column; gap:6px;">
+    <span>
+      Don’t have an account yet?
+      <a href="{% url 'user_signup' %}">Create one</a>
+    </span>
+    <a href="{% url 'password_reset' %}">Forgot your password?</a>
+  </div>
 {% endblock %}

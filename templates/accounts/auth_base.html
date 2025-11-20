@@ -125,6 +125,24 @@
       color: #6b7280;
     }
 
+    .message.success {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #065f46;
+    }
+
+    .message.error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #7f1d1d;
+    }
+
+    .message.info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #1d4ed8;
+    }
+
     .auth-subtext {
       margin: 0 0 20px;
       font-size: 13px;
@@ -336,6 +354,16 @@
         <div class="auth-heading">
           {% block heading %}{% endblock %}
         </div>
+        {% if messages %}
+          <div style="display:flex; flex-direction:column; gap:8px; margin: 0 0 16px;">
+            {% for message in messages %}
+              <div style="padding:12px 14px; border-radius:14px; font-size:13px;"
+                   class="message {{ message.tags }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
         {% block pre_social %}{% endblock %}
         {% block social_section %}{% endblock %}
         {% block divider %}
