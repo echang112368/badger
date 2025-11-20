@@ -167,6 +167,7 @@
               data-billing-plan-section="shopify"
               data-current-plan="{{ merchant_meta.billing_plan }}"
               data-plan-active="{% if shopify_plan_active %}true{% else %}false{% endif %}"
+              data-status-url="{{ shopify_billing_status_url }}"
               class="space-y-4"
             >
               <div class="rounded-2xl border border-indigo-100 bg-white p-6 shadow-sm">
@@ -209,7 +210,7 @@
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if shopify_plan_active and merchant_meta.billing_plan == 'platform_only' %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
                     data-start-shopify-plan="platform_only"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
@@ -271,7 +272,7 @@
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if shopify_plan_active and merchant_meta.billing_plan == 'badger_creator' %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
                     data-start-shopify-plan="badger_creator"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
@@ -288,6 +289,17 @@
               </div>
 
               <p id="shopifyBillingFeedback" class="hidden text-sm text-gray-600"></p>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p class="text-xs text-gray-600">Refresh from Shopify after approving a plan to update the current-plan styling.</p>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-md border border-indigo-200 bg-white px-4 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+                data-refresh-shopify-plan
+                {% if not permissions.can_edit_settings %}disabled{% endif %}
+              >
+                Refresh from Shopify
+              </button>
             </div>
             <div
               data-shopify-plan-active
@@ -956,6 +968,8 @@
   const shopifyFeedback=document.getElementById('shopifyBillingFeedback');
   const startShopifyBillingButtons=document.querySelectorAll('[data-start-shopify-plan]');
   const shopifyPlanBadges=document.querySelectorAll('[data-plan-status]');
+  const refreshShopifyPlanButton=document.querySelector('[data-refresh-shopify-plan]');
+  const shopifyPlanStatusUrl=shopifyPlanCard?shopifyPlanCard.dataset.statusUrl||'':"";
 
   function setShopifyFeedback(message,isError=false){
     if(!shopifyFeedback){
@@ -1001,7 +1015,7 @@
 
   function syncShopifyPlanState(statusText){
     const normalized=(statusText||'').toString().trim().toLowerCase();
-    const statusIsActive=normalized==='active'||normalized.startsWith('active ');
+    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized==='pending'||normalized.startsWith('active ');
     const datasetIsActive=shopifyPlanCard&&shopifyPlanCard.dataset.planActive==='true';
     const isActive=statusIsActive||datasetIsActive;
     const activePlan=isActive&&shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:'';
@@ -1067,6 +1081,66 @@
       const isCurrentPlan=btn.textContent.trim().toLowerCase()==='current plan';
       btn.disabled=disabled||permissionLocked||isCurrentPlan;
     });
+  }
+
+  let shopifyStatusRefreshInFlight=false;
+
+  async function refreshShopifyPlanStatus(event){
+    if(event){
+      event.preventDefault();
+    }
+
+    if(!shopifyPlanStatusUrl||shopifyStatusRefreshInFlight){
+      return;
+    }
+
+    shopifyStatusRefreshInFlight=true;
+    togglePlanButtons(true);
+    setShopifyFeedback('Checking Shopify billing status…');
+
+    try{
+      const response=await fetch(shopifyPlanStatusUrl,{credentials:'same-origin'});
+      const data=await response.json().catch(()=>({}));
+
+      if(response.status===401&&data&&data.authorize_url){
+        setShopifyFeedback(
+          (data.error||'Shopify rejected the request. Please reinstall the app to continue.')+
+            ` Visit ${data.authorize_url} to reconnect.`,
+          true
+        );
+        return;
+      }
+
+      if(!response.ok){
+        const message=data&&data.error?data.error:'';
+        setShopifyFeedback(describeShopifyBillingError(message),true);
+        return;
+      }
+
+      const status=(data.status||'').trim()||'Pending';
+      if(shopifyStatusElement){
+        shopifyStatusElement.textContent=status;
+      }
+      if(shopifyChargeElement){
+        shopifyChargeElement.textContent=data.charge_id||'—';
+      }
+      if(shopifyTermsElement&&data.raw&&data.raw.terms){
+        shopifyTermsElement.textContent=data.raw.terms;
+      }
+      if(shopifyCappedElement){
+        const capped=data.raw&&data.raw.capped_amount;
+        shopifyCappedElement.textContent=capped?`$${capped}`:'—';
+      }
+
+      syncShopifyPlanState(status);
+      setShopifyFeedback('Shopify billing status refreshed.');
+    }catch(error){
+      console.error('Failed to refresh Shopify billing status',error);
+      setShopifyFeedback(describeShopifyBillingError(error&&error.message),true);
+    }finally{
+      shopifyStatusRefreshInFlight=false;
+      togglePlanButtons(false);
+    }
   }
 
   async function startShopifyBilling(event){
@@ -1148,6 +1222,18 @@
         btn.addEventListener('click',startShopifyBilling);
       }
     });
+  }
+
+  if(refreshShopifyPlanButton&&shopifyPlanStatusUrl){
+    refreshShopifyPlanButton.addEventListener('click',refreshShopifyPlanStatus);
+
+    const statusText=shopifyStatusElement?shopifyStatusElement.textContent||'':'';
+    const normalizedStatus=statusText.trim().toLowerCase();
+    const hasChargeId=shopifyChargeElement&&shopifyChargeElement.textContent&&shopifyChargeElement.textContent.trim()!=='—';
+
+    if(hasChargeId&&(!normalizedStatus||!['active','accepted','pending'].includes(normalizedStatus))){
+      refreshShopifyPlanStatus();
+    }
   }
 
   function showModal(modal){

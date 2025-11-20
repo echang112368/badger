@@ -773,7 +773,8 @@ def merchant_settings(request):
     if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
         shopify_plan_price = Decimal("30.00")
     shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
-    shopify_plan_active = shopify_status_value.lower() == "active"
+    status_normalized = shopify_status_value.lower()
+    shopify_plan_active = status_normalized in {"active", "accepted", "pending"}
     shopify_cancel_url = ""
     if merchant_meta.shopify_store_domain:
         normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
@@ -793,6 +794,7 @@ def merchant_settings(request):
         'team_roles': MerchantTeamMember.Role,
         'team_members_payload': team_members_payload,
         'start_shopify_billing_url': reverse('merchant_start_shopify_billing'),
+        'shopify_billing_status_url': reverse('merchant_refresh_shopify_billing_status'),
         'shopify_plan_price': shopify_plan_price,
         'shopify_plan_active': shopify_plan_active,
         'shopify_billing_cancel_url': shopify_cancel_url,
@@ -891,6 +893,59 @@ def start_shopify_billing(request):
             session_refresh_token,
             exc,
         )
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    merchant_meta.refresh_from_db()
+
+    payload = {
+        "status": merchant_meta.shopify_billing_status,
+        "charge_id": merchant_meta.shopify_recurring_charge_id,
+        "confirmation_url": merchant_meta.shopify_billing_confirmation_url,
+    }
+
+    if charge and isinstance(charge, dict):
+        payload["raw"] = charge
+
+    return JsonResponse(payload)
+
+
+@login_required
+@require_GET
+def refresh_shopify_billing_status(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_edit_settings:
+        return JsonResponse(
+            {"error": "You do not have permission to update billing."}, status=403
+        )
+
+    merchant_user = permissions.merchant
+    if merchant_user is None:
+        return JsonResponse({"error": "No merchant account found."}, status=400)
+
+    merchant_meta, _ = MerchantMeta.objects.get_or_create(user=merchant_user)
+
+    if merchant_meta.business_type != MerchantMeta.BusinessType.SHOPIFY:
+        return JsonResponse(
+            {"error": "Shopify billing is not enabled for this merchant."},
+            status=400,
+        )
+
+    if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
+        return JsonResponse(
+            {
+                "error": "Complete the Shopify OAuth connection before checking billing.",
+            },
+            status=400,
+        )
+
+    try:
+        charge = shopify_billing.refresh_recurring_charge(merchant_meta)
+    except shopify_billing.ShopifyReauthorizationRequired as exc:
+        payload = _build_shopify_reauth_payload(
+            request, merchant_meta.shopify_store_domain, str(exc)
+        )
+        return JsonResponse(payload, status=401)
+    except shopify_billing.ShopifyBillingError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
     merchant_meta.refresh_from_db()

@@ -319,6 +319,35 @@ def ensure_active_charge(meta: MerchantMeta) -> None:
         raise ShopifyBillingError("Shopify recurring charge is not active.")
 
 
+def refresh_recurring_charge(meta: MerchantMeta) -> dict:
+    """Fetch the latest recurring charge from Shopify and update the merchant meta."""
+
+    if not meta.shopify_recurring_charge_id:
+        raise ShopifyBillingError("Merchant does not have a Shopify recurring charge.")
+
+    client = _require_shopify_credentials(meta)
+    charge_id = meta.shopify_recurring_charge_id
+
+    try:
+        response = client.get(
+            f"/admin/api/2024-07/recurring_application_charges/{charge_id}.json"
+        )
+    except ShopifyInvalidCredentialsError as exc:
+        raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
+    except HTTPError as exc:
+        raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
+
+    data = response.json()
+    charge = data.get("recurring_application_charge")
+    if not isinstance(charge, dict):
+        raise ShopifyBillingError(
+            "Unexpected Shopify response when loading billing status."
+        )
+
+    _update_meta_from_charge(meta, charge)
+    return charge
+
+
 def create_usage_charge(
     meta: MerchantMeta, *, amount: Decimal, description: str
 ) -> ShopifyChargeDetails:
