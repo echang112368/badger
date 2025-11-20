@@ -8,6 +8,8 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     is_merchant = models.BooleanField(default=False)
     is_creator = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
+    verification_code = models.CharField(max_length=6, blank=True, null=True)
     is_default_badger_creator = models.BooleanField(
         default=False,
         help_text=(
