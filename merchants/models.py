@@ -114,6 +114,18 @@ class MerchantMeta(models.Model):
     def includes_badger_creator(self) -> bool:
         return self.billing_plan == self.BillingPlan.BADGER_CREATOR
 
+    @property
+    def has_active_billing_plan(self) -> bool:
+        """Return ``True`` when the merchant has selected and activated a plan."""
+
+        if not self.billing_plan:
+            return False
+
+        if self.business_type == self.BusinessType.SHOPIFY:
+            return (self.shopify_billing_status or "").strip().lower() == "active"
+
+        return self.monthly_fee > 0
+
     def ensure_badger_creator_link(self):
         """Ensure the default Badger creator link matches the selected plan."""
 

@@ -363,6 +363,15 @@ def orders_create_webhook(request):
         else None
     )
 
+    if merchant_meta and not merchant_meta.has_active_billing_plan:
+        return JsonResponse(
+            {
+                "error": "Merchant does not have an active billing plan.",
+                "status": merchant_meta.shopify_billing_status,
+            },
+            status=402,
+        )
+
     commission_total = Decimal("0")
     order_total = Decimal("0")
 
