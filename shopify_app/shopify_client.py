@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -72,22 +73,49 @@ class ShopifyClient:
     def post(self, path: str, **kwargs):
         return self.request("POST", path, **kwargs)
 
+    def graphql(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute a GraphQL Admin API query and return the parsed JSON body."""
+
+        response = self.post(
+            "/admin/api/2024-07/graphql.json",
+            json={"query": query, "variables": variables or {}},
+        )
+        payload = response.json()
+
+        if not isinstance(payload, dict):
+            raise ShopifyGraphQLError(
+                "Unexpected response type from Shopify GraphQL API.", payload
+            )
+
+        errors = payload.get("errors")
+        if errors:
+            raise ShopifyGraphQLError("Shopify GraphQL request returned errors.", errors)
+
+        return payload
+
     def get_all_products(self):
         """Fetch all products in the store catalog."""
-        products = []
-        params = {"limit": 250}
-        since_id = None
+        products: List[Dict[str, Any]] = []
+        cursor: Optional[str] = None
+
         while True:
-            if since_id:
-                params["since_id"] = since_id
-            data = self.get("/admin/api/2024-07/products.json", params=params)
-            batch = data.get("products", [])
-            if not batch:
+            payload = self.graphql(_PRODUCTS_QUERY, {"cursor": cursor})
+            data = payload.get("data", {}) or {}
+            products_conn = data.get("products") or {}
+            edges = products_conn.get("edges") or []
+            page_info = products_conn.get("pageInfo") or {}
+
+            for edge in edges:
+                node = edge.get("node") or {}
+                products.append(_parse_product_node(node))
+
+            if not page_info.get("hasNextPage"):
                 break
-            products.extend(batch)
-            if len(batch) < 250:
+
+            cursor = page_info.get("endCursor")
+            if not cursor:
                 break
-            since_id = batch[-1]["id"]
+
         return products
 
 
@@ -122,3 +150,94 @@ def _is_invalid_token_response(response) -> bool:
                     return True
 
     return False
+
+
+class ShopifyGraphQLError(RuntimeError):
+    """Raised when Shopify GraphQL API returns an error response."""
+
+    def __init__(self, message: str, details: Any = None):
+        if details:
+            message = f"{message} Details: {details}"
+        super().__init__(message)
+
+
+def _parse_shopify_gid(gid: Optional[str]) -> Optional[str]:
+    """Return the numeric ID from a Shopify GID if possible."""
+
+    if not gid or not isinstance(gid, str):
+        return gid
+
+    if gid.startswith("gid://"):
+        parts = gid.rsplit("/", 1)
+        if len(parts) == 2 and parts[1]:
+            return parts[1]
+
+    return gid
+
+
+def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a Shopify GraphQL product node to resemble REST output."""
+
+    variants = []
+    for edge in (node.get("variants", {}).get("edges") or []):
+        variant_node = edge.get("node") or {}
+        variants.append(
+            {
+                "id": _parse_shopify_gid(variant_node.get("id")),
+                "title": variant_node.get("title"),
+                "price": variant_node.get("price"),
+            }
+        )
+
+    images = []
+    for edge in (node.get("images", {}).get("edges") or []):
+        image_node = edge.get("node") or {}
+        images.append({"src": image_node.get("originalSrc")})
+
+    return {
+        "id": _parse_shopify_gid(node.get("id")),
+        "title": node.get("title"),
+        "status": node.get("status"),
+        "handle": node.get("handle"),
+        "onlineStoreUrl": node.get("onlineStoreUrl"),
+        "variants": variants,
+        "images": images,
+    }
+
+
+_PRODUCTS_QUERY = """
+query getProducts($cursor: String) {
+  products(first: 50, after: $cursor) {
+    edges {
+      cursor
+      node {
+        id
+        title
+        status
+        handle
+        onlineStoreUrl
+        variants(first: 50) {
+          edges {
+            node {
+              id
+              title
+              price
+            }
+          }
+        }
+        images(first: 5) {
+          edges {
+            node {
+              originalSrc
+            }
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+"""
