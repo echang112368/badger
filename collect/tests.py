@@ -42,6 +42,9 @@ class OrdersWebhookTests(TestCase):
         )
 
         merchant_meta = MerchantMeta.objects.get(user=merchant)
+        merchant_meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        merchant_meta.shopify_billing_status = "active"
+        merchant_meta.save()
 
         return (
             merchant,
@@ -146,6 +149,30 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(conversion.merchant, merchant)
         self.assertEqual(conversion.order_amount, Decimal("25.00"))
         self.assertEqual(conversion.commission_amount, Decimal("0.80"))
+
+    def test_inactive_billing_blocks_ledger_updates(self):
+        merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
+            self._setup_users()
+        )
+
+        merchant_meta.shopify_billing_status = ""
+        merchant_meta.save()
+
+        line_items = [
+            {"product_id": 1, "quantity": 1, "price": "10.00"},
+        ]
+
+        response = self._call_webhook(
+            merchant_meta,
+            creator_meta,
+            customer_meta,
+            line_items,
+            Decimal("10.00"),
+        )
+
+        self.assertEqual(response.status_code, 402)
+        self.assertFalse(LedgerEntry.objects.exists())
+        self.assertEqual(ReferralConversion.objects.count(), 0)
 
     def test_inactive_creator_skips_income_and_conversion(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
