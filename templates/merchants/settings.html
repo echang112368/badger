@@ -207,23 +207,21 @@
                 </ul>
                 <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
-                  {% with is_current_plan=shopify_plan_active and merchant_meta.billing_plan == 'platform_only' %}
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if is_current_plan %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
+                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     data-start-shopify-plan="platform_only"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
                     data-permission-locked="{% if not permissions.can_edit_settings %}true{% else %}false{% endif %}"
                     {% if not permissions.can_edit_settings %}disabled{% endif %}
                   >
-                    {% if is_current_plan %}
+                    {% if shopify_plan_active and merchant_meta.billing_plan == 'platform_only' %}
                     Current plan
                     {% else %}
                     Select plan
                     {% endif %}
                   </button>
-                  {% endwith %}
                 </div>
               </div>
 
@@ -271,23 +269,21 @@
                 </ul>
                 <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p class="text-xs text-gray-500">Select a plan to open Shopify and confirm your billing agreement.</p>
-                  {% with is_current_plan=shopify_plan_active and merchant_meta.billing_plan == 'badger_creator' %}
                   <button
                     type="button"
-                    class="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 {% if is_current_plan %}border border-gray-300 bg-white text-gray-700 focus:ring-gray-300{% else %}bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500{% endif %}"
+                    class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                     data-start-shopify-plan="badger_creator"
                     data-start-billing-url="{{ start_shopify_billing_url }}"
                     data-default-label="Select plan"
                     data-permission-locked="{% if not permissions.can_edit_settings %}true{% else %}false{% endif %}"
                     {% if not permissions.can_edit_settings %}disabled{% endif %}
                   >
-                    {% if is_current_plan %}
+                    {% if shopify_plan_active and merchant_meta.billing_plan == 'badger_creator' %}
                     Current plan
                     {% else %}
                     Select plan
                     {% endif %}
                   </button>
-                  {% endwith %}
                 </div>
               </div>
 
