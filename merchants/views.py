@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 import json
+import json
 import logging
 import secrets
 
@@ -23,7 +24,7 @@ from .forms import (
 from accounts.forms import UserNameForm
 from accounts.models import CustomUser
 from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
-from shopify_app.shopify_client import ShopifyClient
+from shopify_app.shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
 from shopify_app.token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from shopify_app import billing as shopify_billing
 from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
@@ -34,7 +35,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse, urlencode
 from django.urls import reverse
-from typing import Optional
+from typing import Iterable, Optional
 from django.utils.text import slugify
 
 from collect.models import AffiliateClick, ReferralVisit
@@ -77,6 +78,42 @@ def _should_show_invoices_tab(merchant_meta: Optional[MerchantMeta]) -> bool:
     if not merchant_meta:
         return True
     return merchant_meta.business_type != MerchantMeta.BusinessType.SHOPIFY
+
+
+def _get_shopify_client(merchant_meta: Optional[MerchantMeta]):
+    if not merchant_meta or not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
+        return None
+
+    return ShopifyClient(
+        merchant_meta.shopify_access_token,
+        merchant_meta.shopify_store_domain,
+        refresh_handler=lambda: refresh_shopify_token(merchant_meta),
+    )
+
+
+def _fetch_shopify_products(client: Optional[ShopifyClient], product_ids: Iterable[str]):
+    if not client:
+        return []
+    try:
+        return client.get_products_by_ids(product_ids)
+    except Exception:
+        logger.exception("Failed to fetch Shopify product details")
+        return []
+
+
+def _build_product_link(product: dict, shopify_domain: str) -> str:
+    if not product:
+        return f"https://{shopify_domain}" if shopify_domain else "https://shopify.com"
+
+    online_store_url = product.get("onlineStoreUrl")
+    if online_store_url:
+        return online_store_url
+
+    handle = product.get("handle")
+    if handle and shopify_domain:
+        return f"https://{shopify_domain}/products/{handle}"
+
+    return f"https://{shopify_domain}" if shopify_domain else "https://shopify.com"
 
 
 def _generate_team_email(merchant: CustomUser, username: str) -> str:
@@ -276,6 +313,82 @@ def merchant_invoices(request):
         },
     )
 
+
+@login_required
+@require_GET
+def search_shopify_products(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
+    client = _get_shopify_client(merchant_meta)
+
+    authorize_url = build_shopify_authorize_url(
+        request, merchant_meta.shopify_store_domain if merchant_meta else ""
+    )
+
+    if not client:
+        return JsonResponse(
+            {
+                "products": [],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "error": "Shopify store not connected.",
+                "authorize_url": authorize_url,
+            },
+            status=400,
+        )
+
+    query = (request.GET.get("q") or "").strip()
+    cursor = request.GET.get("cursor") or None
+    try:
+        limit = int(request.GET.get("limit", 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 50))
+
+    if not query:
+        return JsonResponse(
+            {"products": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}
+        )
+
+    try:
+        results = client.search_products(query=query, cursor=cursor, limit=limit)
+    except ShopifyInvalidCredentialsError:
+        payload = _build_shopify_reauth_payload(
+            request,
+            merchant_meta.shopify_store_domain if merchant_meta else "",
+            message="Shopify disconnected. Please reconnect to search products.",
+        )
+        return JsonResponse(payload, status=401)
+    except Exception:
+        logger.exception("Failed to search Shopify products")
+        return JsonResponse(
+            {"error": "Unable to search products at this time."}, status=502
+        )
+
+    def _serialize_product(product: dict) -> dict:
+        image = (product.get("featuredImage") or {}).get("src")
+        return {
+            "id": product.get("id"),
+            "title": product.get("title"),
+            "handle": product.get("handle"),
+            "image": image,
+            "variants": [
+                variant.get("title")
+                for variant in product.get("variants", [])
+                if variant.get("title")
+            ],
+        }
+
+    return JsonResponse(
+        {
+            "products": [_serialize_product(product) for product in results.get("products", [])],
+            "pageInfo": results.get("pageInfo", {}),
+        }
+    )
+
 @login_required
 def merchant_items(request):
     permissions = resolve_merchant_permissions(request.user)
@@ -284,42 +397,14 @@ def merchant_items(request):
 
     merchant_user = permissions.merchant
 
-    shopify_items = []
     shopify_domain = ""
     merchant_meta = _get_merchant_meta(merchant_user)
-    if (
-        merchant_meta
-        and merchant_meta.shopify_access_token
-        and merchant_meta.shopify_store_domain
-    ):
-        shopify_domain = merchant_meta.shopify_store_domain
-        client = ShopifyClient(
-            merchant_meta.shopify_access_token,
-            merchant_meta.shopify_store_domain,
-            refresh_handler=lambda: refresh_shopify_token(merchant_meta),
-        )
-        try:
-            shopify_items = client.get_all_products()
-        except Exception:
-            shopify_items = []
-
-    # Map shopify product IDs to existing groups so the template can disable
-    # items that are already assigned to a group. This prevents merchants from
-    # selecting items that are in another group before submitting the form.
-    existing_items = (
-        MerchantItem.objects.filter(merchant=merchant_user)
-        .prefetch_related("groups")
+    shopify_client = _get_shopify_client(merchant_meta)
+    shopify_authorize_url = build_shopify_authorize_url(
+        request, merchant_meta.shopify_store_domain if merchant_meta else ""
     )
-    item_group_map = {}
-    for item in existing_items:
-        group = item.groups.first()
-        if group:
-            item_group_map[item.shopify_product_id] = group
-    for product in shopify_items:
-        group = item_group_map.get(str(product["id"]))
-        if group:
-            product["existing_group_id"] = group.id
-            product["existing_group_name"] = group.name
+    if merchant_meta and merchant_meta.shopify_store_domain:
+        shopify_domain = merchant_meta.shopify_store_domain
 
     if request.method == "POST":
         if not permissions.can_modify_content:
@@ -338,24 +423,48 @@ def merchant_items(request):
             if group_form.is_valid():
                 group = group_form.save(commit=False)
                 group.merchant = merchant_user
-                product_map = {str(p["id"]): p for p in shopify_items}
                 items_to_add = []
                 conflicts = []
+                product_details = {
+                    str(product["id"]): product
+                    for product in _fetch_shopify_products(shopify_client, selected_items)
+                }
+                existing_items = {
+                    item.shopify_product_id: item
+                    for item in MerchantItem.objects.filter(
+                        merchant=merchant_user, shopify_product_id__in=selected_items
+                    ).prefetch_related("groups")
+                }
                 for pid in selected_items:
-                    product = product_map.get(pid)
-                    if product:
-                        item, _ = MerchantItem.objects.get_or_create(
+                    product = product_details.get(pid, {})
+                    item = existing_items.get(pid)
+                    if not item:
+                        item = MerchantItem.objects.create(
                             merchant=merchant_user,
-                            shopify_product_id=str(product["id"]),
-                            defaults={
-                                "title": product["title"],
-                                "link": f"https://{shopify_domain}/products/{product['handle']}",
-                            },
+                            shopify_product_id=str(pid),
+                            title=product.get("title") or f"Shopify product {pid}",
+                            link=_build_product_link(product, shopify_domain),
                         )
-                        if item.groups.exclude(pk=group.pk).exists():
-                            conflicts.append(item.title)
-                        else:
-                            items_to_add.append(item)
+                    else:
+                        if product:
+                            updated = False
+                            if product.get("title") and item.title != product["title"]:
+                                item.title = product["title"]
+                                updated = True
+                            product_link = _build_product_link(product, shopify_domain)
+                            if product_link and item.link != product_link:
+                                item.link = product_link
+                                updated = True
+                            if updated:
+                                item.save(update_fields=["title", "link"])
+
+                    conflicting_groups = item.groups
+                    if group:
+                        conflicting_groups = conflicting_groups.exclude(pk=group.pk)
+                    if conflicting_groups.exists():
+                        conflicts.append(item.title)
+                    else:
+                        items_to_add.append(item)
                 if conflicts:
                     post_data = request.POST.dict()
                     post_data.pop("csrfmiddlewaretoken", None)
@@ -407,6 +516,30 @@ def merchant_items(request):
         selected_items = []
 
     groups = ItemGroup.objects.filter(merchant=merchant_user).prefetch_related("items")
+
+    selected_products_data = []
+    if selected_items:
+        products_from_shopify = _fetch_shopify_products(shopify_client, selected_items)
+        products_by_id = {str(prod.get("id")): prod for prod in products_from_shopify}
+        existing_items = {
+            item.shopify_product_id: item
+            for item in MerchantItem.objects.filter(
+                merchant=merchant_user, shopify_product_id__in=selected_items
+            )
+        }
+        for pid in selected_items:
+            product = products_by_id.get(pid)
+            fallback_item = existing_items.get(pid)
+            selected_products_data.append(
+                {
+                    "id": str(pid),
+                    "title": (product or {}).get("title")
+                    or (fallback_item.title if fallback_item else ""),
+                    "image": ((product or {}).get("featuredImage") or {}).get("src"),
+                    "variants": [v.get("title") for v in (product or {}).get("variants", []) if v.get("title")],
+                }
+            )
+
     return render(
         request,
         "merchants/items.html",
@@ -414,12 +547,14 @@ def merchant_items(request):
             "merchant": merchant_user,
             "groups": groups,
             "group_form": group_form,
-            "shopify_items": shopify_items,
             "shopify_domain": shopify_domain,
             "selected_shopify_items": selected_items,
             "group_modal_open": bool(group_form.errors),
             "permissions": permissions,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+            "selected_products_data": json.dumps(selected_products_data),
+            "shopify_connected": bool(shopify_client),
+            "shopify_authorize_url": shopify_authorize_url,
         },
     )
 
