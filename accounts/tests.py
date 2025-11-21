@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from merchants.models import MerchantMeta
 
@@ -52,3 +55,80 @@ class LoginRedirectTests(TestCase):
             expected_url,
             fetch_redirect_response=False,
         )
+
+
+class EmailVerificationFlowTests(TestCase):
+    def test_login_requires_verification_when_last_login_stale(self):
+        user = CustomUser.objects.create_user(
+            username="stale_user",
+            email="stale@example.com",
+            password="pass12345",
+            email_verified=False,
+        )
+        user.last_login = timezone.now() - timedelta(days=8)
+        user.save(update_fields=["last_login"])
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": user.email, "password": "pass12345"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("verify_email"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.client.session.get("verification_user_id"), user.pk)
+
+    def test_login_skips_verification_when_recently_active(self):
+        user = CustomUser.objects.create_user(
+            username="recent_user",
+            email="recent@example.com",
+            password="pass12345",
+            email_verified=False,
+        )
+        user.last_login = timezone.now() - timedelta(days=1)
+        user.save(update_fields=["last_login"])
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": user.email, "password": "pass12345"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("user_dashboard"),
+            fetch_redirect_response=False,
+        )
+
+    def test_middleware_blocks_stale_unverified_users(self):
+        user = CustomUser.objects.create_user(
+            username="stale_middleware",
+            email="stale_middleware@example.com",
+            password="pass12345",
+            email_verified=False,
+        )
+        self.client.force_login(user)
+        user.last_login = timezone.now() - timedelta(days=10)
+        user.save(update_fields=["last_login"])
+        response = self.client.get(reverse("user_dashboard"))
+
+        self.assertRedirects(
+            response,
+            reverse("verify_email"),
+            fetch_redirect_response=False,
+        )
+
+    def test_middleware_allows_recent_unverified_users(self):
+        user = CustomUser.objects.create_user(
+            username="recent_middleware",
+            email="recent_middleware@example.com",
+            password="pass12345",
+            email_verified=False,
+        )
+        self.client.force_login(user)
+        user.last_login = timezone.now() - timedelta(days=2)
+        user.save(update_fields=["last_login"])
+        response = self.client.get(reverse("user_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
