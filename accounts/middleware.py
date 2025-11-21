@@ -3,6 +3,8 @@
 from django.shortcuts import redirect
 from django.urls import resolve, reverse
 
+from accounts.services.verification import needs_email_verification
+
 
 class EmailVerificationRequiredMiddleware:
     """Redirect authenticated users without verified email to verification flow."""
@@ -11,7 +13,7 @@ class EmailVerificationRequiredMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated and not getattr(request.user, "email_verified", True):
+        if request.user.is_authenticated and needs_email_verification(request.user):
             try:
                 resolver_match = resolve(request.path)
                 view_name = resolver_match.view_name

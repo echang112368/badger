@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import get_user_model, login, logout
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from .forms import (
@@ -15,6 +15,7 @@ from merchants.models import MerchantTeamMember, MerchantMeta
 from shopify_app.oauth import normalise_shop_domain
 from accounts.services.verification import (
     get_user_by_pk,
+    needs_email_verification,
     send_user_verification_email,
     verify_user_code,
 )
@@ -36,7 +37,7 @@ def custom_login_view(request):
         form = CustomLoginForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            if not user.email_verified:
+            if needs_email_verification(user):
                 send_user_verification_email(user)
                 _remember_verification_user(request, user)
                 messages.info(
