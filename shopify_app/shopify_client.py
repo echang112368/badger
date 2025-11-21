@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -93,49 +93,6 @@ class ShopifyClient:
 
         return payload
 
-    def search_products(
-        self, query: Optional[str], *, cursor: Optional[str] = None, limit: int = 20
-    ) -> Dict[str, Any]:
-        """Search products using the Admin API GraphQL ``products`` connection."""
-
-        variables = {"query": query or None, "cursor": cursor, "pageSize": limit}
-        payload = self.graphql(_PRODUCT_SEARCH_QUERY, variables)
-        data = payload.get("data", {}) or {}
-        products_conn = data.get("products") or {}
-        edges = products_conn.get("edges") or []
-        page_info = products_conn.get("pageInfo") or {}
-
-        products: List[Dict[str, Any]] = []
-        last_cursor = None
-        for edge in edges:
-            last_cursor = edge.get("cursor") or last_cursor
-            node = edge.get("node") or {}
-            products.append(_parse_product_node(node))
-
-        return {
-            "products": products,
-            "pageInfo": {
-                "hasNextPage": bool(page_info.get("hasNextPage")),
-                "endCursor": page_info.get("endCursor") or last_cursor,
-            },
-        }
-
-    def get_products_by_ids(self, product_ids: Iterable[str]) -> List[Dict[str, Any]]:
-        """Return a list of product details for the given numeric Shopify IDs."""
-
-        ids = [_build_product_gid(pid) for pid in product_ids if pid]
-        if not ids:
-            return []
-
-        payload = self.graphql(_PRODUCTS_BY_ID_QUERY, {"ids": ids})
-        nodes = payload.get("data", {}).get("nodes") or []
-
-        products: List[Dict[str, Any]] = []
-        for node in nodes:
-            if node and node.get("__typename") == "Product":
-                products.append(_parse_product_node(node))
-        return products
-
     def get_all_products(self):
         """Fetch all products in the store catalog."""
         products: List[Dict[str, Any]] = []
@@ -218,14 +175,6 @@ def _parse_shopify_gid(gid: Optional[str]) -> Optional[str]:
     return gid
 
 
-def _build_product_gid(product_id: str) -> str:
-    """Return the Shopify GID for a numeric product ID."""
-
-    if str(product_id).startswith("gid://"):
-        return str(product_id)
-    return f"gid://shopify/Product/{product_id}"
-
-
 def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize a Shopify GraphQL product node to resemble REST output."""
 
@@ -245,15 +194,12 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
         image_node = edge.get("node") or {}
         images.append({"src": image_node.get("originalSrc")})
 
-    featured_image = node.get("featuredImage") or {}
-
     return {
         "id": _parse_shopify_gid(node.get("id")),
         "title": node.get("title"),
         "status": node.get("status"),
         "handle": node.get("handle"),
         "onlineStoreUrl": node.get("onlineStoreUrl"),
-        "featuredImage": {"src": featured_image.get("url") or featured_image.get("originalSrc")},
         "variants": variants,
         "images": images,
     }
@@ -302,80 +248,6 @@ query getProducts($cursor: String) {
     pageInfo {
       hasNextPage
       endCursor
-    }
-  }
-}
-"""
-
-_PRODUCT_SEARCH_QUERY = """
-query searchProducts($query: String, $cursor: String, $pageSize: Int) {
-  products(first: $pageSize, query: $query, after: $cursor) {
-    edges {
-      cursor
-      node {
-        id
-        title
-        status
-        handle
-        onlineStoreUrl
-        featuredImage {
-          url
-          originalSrc
-        }
-        variants(first: 20) {
-          edges {
-            node {
-              id
-              title
-            }
-          }
-        }
-        images(first: 5) {
-          edges {
-            node {
-              originalSrc
-            }
-          }
-        }
-      }
-    }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
-  }
-}
-"""
-
-_PRODUCTS_BY_ID_QUERY = """
-query getProductsById($ids: [ID!]!) {
-  nodes(ids: $ids) {
-    __typename
-    ... on Product {
-      id
-      title
-      status
-      handle
-      onlineStoreUrl
-      featuredImage {
-        url
-        originalSrc
-      }
-      variants(first: 20) {
-        edges {
-          node {
-            id
-            title
-          }
-        }
-      }
-      images(first: 5) {
-        edges {
-          node {
-            originalSrc
-          }
-        }
-      }
     }
   }
 }
