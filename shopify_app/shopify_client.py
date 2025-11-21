@@ -185,7 +185,7 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
             {
                 "id": _parse_shopify_gid(variant_node.get("id")),
                 "title": variant_node.get("title"),
-                "price": variant_node.get("price"),
+                "price": _parse_money_value(variant_node.get("price")),
             }
         )
 
@@ -205,6 +205,14 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _parse_money_value(value):
+    """Return a simple money amount from a Shopify money field."""
+
+    if isinstance(value, dict):
+        return value.get("amount")
+    return value
+
+
 _PRODUCTS_QUERY = """
 query getProducts($cursor: String) {
   products(first: 50, after: $cursor) {
@@ -221,7 +229,10 @@ query getProducts($cursor: String) {
             node {
               id
               title
-              price
+              price {
+                amount
+                currencyCode
+              }
             }
           }
         }

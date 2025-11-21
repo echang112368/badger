@@ -30,7 +30,11 @@ from .oauth import (
     session_scope_key,
     session_token_key,
 )
-from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
+from .shopify_client import (
+    ShopifyClient,
+    ShopifyInvalidCredentialsError,
+    _PRODUCTS_QUERY,
+)
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from requests import HTTPError
 
@@ -278,6 +282,75 @@ class ShopifyClientRefreshTests(SimpleTestCase):
 
         with self.assertRaises(ShopifyInvalidCredentialsError):
             client.request("GET", "/admin/api/2024-07/shop.json")
+
+
+class ShopifyClientProductsTests(SimpleTestCase):
+    def test_get_all_products_parses_money_values(self):
+        client = ShopifyClient("token", "example.myshopify.com")
+
+        client.graphql = MagicMock(
+            return_value={
+                "data": {
+                    "products": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "id": "gid://shopify/Product/123",
+                                    "title": "Snowboard",
+                                    "status": "ACTIVE",
+                                    "handle": "snowboard",
+                                    "onlineStoreUrl": "https://example.myshopify.com/products/snowboard",
+                                    "variants": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    "id": "gid://shopify/ProductVariant/345",
+                                                    "title": "Default",
+                                                    "price": {
+                                                        "amount": "125.00",
+                                                        "currencyCode": "USD",
+                                                    },
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "images": {
+                                        "edges": [
+                                            {
+                                                "node": {
+                                                    "originalSrc": "https://example.myshopify.com/img.jpg",
+                                                }
+                                            }
+                                        ]
+                                    },
+                                }
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        )
+
+        products = client.get_all_products()
+
+        self.assertEqual(
+            products,
+            [
+                {
+                    "id": "123",
+                    "title": "Snowboard",
+                    "status": "ACTIVE",
+                    "handle": "snowboard",
+                    "onlineStoreUrl": "https://example.myshopify.com/products/snowboard",
+                    "variants": [
+                        {"id": "345", "title": "Default", "price": "125.00"}
+                    ],
+                    "images": [{"src": "https://example.myshopify.com/img.jpg"}],
+                }
+            ],
+        )
+        client.graphql.assert_called_with(_PRODUCTS_QUERY, {"cursor": None})
 
 
 class ShopifyTokenManagementTests(TestCase):
