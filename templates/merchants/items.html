@@ -22,7 +22,7 @@
                         </small></div>
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.shopify_product_id }}{% if not forloop.last %},{% endif %}{% endfor %}" data-group-products='[{% for gitem in group.items.all %}{"id":"{{ gitem.shopify_product_id }}","title":"{{ gitem.title|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]' {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Edit</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.shopify_product_id }}{% if not forloop.last %},{% endif %}{% endfor %}" {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Edit</button>
                         <button type="button" class="btn btn-outline-danger btn-sm delete-group-btn" data-bs-toggle="modal" data-bs-target="#deleteGroupModal" data-group-id="{{ group.id }}" {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Delete</button>
                     </div>
                 </li>
@@ -33,6 +33,41 @@
             {% if not permissions.can_modify_content %}
             <div class="alert alert-info mt-3 mb-0">You can view groups but do not have permission to change them.</div>
             {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded mt-4">
+        <div class="card-body">
+            <h5 class="card-title">Shopify Store Items</h5>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="text-end">View</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in shopify_items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ product.title }}</div>
+                                <small class="text-muted">ID: {{ product.id }}</small>
+                            </td>
+                            <td class="text-end">
+                                <a href="https://{{ shopify_domain }}/products/{{ product.handle }}" target="_blank" class="text-decoration-none" title="View on store">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center">No Shopify items.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </section>
@@ -56,16 +91,15 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Select items</label>
-            <div class="position-relative mb-2">
-              <input type="text" class="form-control" id="item-search" placeholder="Search by title, SKU, or keyword" autocomplete="off" {% if not shopify_connected %}disabled{% endif %}>
-              <div id="search-results" class="list-group position-absolute w-100 d-none" style="z-index: 1055; max-height: 260px; overflow-y: auto;"></div>
+            <input type="text" class="form-control mb-2" id="item-search" placeholder="Search items">
+            <div id="items-container" class="border p-2" style="max-height:200px; overflow-y:auto;">
+              {% for product in shopify_items %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="shopify_items" value="{{ product.id }}" id="product-{{ product.id }}" data-existing-group-id="{{ product.existing_group_id|default:'' }}" {% if product.existing_group_id %}disabled{% endif %} {% if product.id|stringformat:"s" in selected_shopify_items %}checked{% endif %}>
+                <label class="form-check-label" for="product-{{ product.id }}">{{ product.title }} <small class="text-muted">(ID: {{ product.id }})</small>{% if product.existing_group_name %} <small class="text-muted">(Already in {{ product.existing_group_name }})</small>{% endif %}</label>
+              </div>
+              {% endfor %}
             </div>
-            <div id="selected-products" class="d-flex flex-wrap gap-2"></div>
-            <div id="selected-product-inputs"></div>
-            <div class="form-text">Start typing to search your Shopify catalog without loading everything at once.</div>
-            {% if not shopify_connected %}
-            <div class="alert alert-warning mt-2 mb-0">Connect your Shopify store to search and select products.</div>
-            {% endif %}
           </div>
           <div class="mb-3">
             <label for="id_group-affiliate_percent" class="form-label">Affiliate Percentage</label>
@@ -121,181 +155,21 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var searchInput = document.getElementById('item-search');
-    var resultsList = document.getElementById('search-results');
-    var selectedProductsContainer = document.getElementById('selected-products');
-    var selectedInputsContainer = document.getElementById('selected-product-inputs');
+    var itemSearchInput = document.getElementById('item-search');
+    if (!itemSearchInput) {
+        return;
+    }
+
     var groupModalElement = document.getElementById('groupModal');
     var deleteGroupModalElement = document.getElementById('deleteGroupModal');
-    var searchDebounce;
-    var activeQuery = '';
-    var selectedProducts = [];
-    var initialSelections = [];
 
-    try {
-        initialSelections = JSON.parse('{{ selected_products_data|default:"[]"|escapejs }}');
-    } catch (e) {
-        initialSelections = [];
-    }
-
-    function renderSelectedProducts() {
-        if (!selectedProductsContainer || !selectedInputsContainer) {
-            return;
-        }
-        selectedProductsContainer.innerHTML = '';
-        selectedInputsContainer.innerHTML = '';
-
-        selectedProducts.forEach(function (product) {
-            var pill = document.createElement('span');
-            pill.className = 'badge bg-light text-dark border d-flex align-items-center gap-1';
-            pill.innerHTML = '<span class="fw-semibold">' + (product.title || 'Untitled product') + '</span>';
-
-            var removeBtn = document.createElement('button');
-            removeBtn.type = 'button';
-            removeBtn.className = 'btn btn-sm btn-outline-secondary border-0';
-            removeBtn.setAttribute('aria-label', 'Remove ' + (product.title || 'product'));
-            removeBtn.innerHTML = '&times;';
-            removeBtn.addEventListener('click', function () {
-                selectedProducts = selectedProducts.filter(function (p) { return p.id !== product.id; });
-                renderSelectedProducts();
-            });
-
-            pill.appendChild(removeBtn);
-            selectedProductsContainer.appendChild(pill);
-
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'shopify_items';
-            input.value = product.id;
-            selectedInputsContainer.appendChild(input);
+    itemSearchInput.addEventListener('input', function () {
+        var filter = this.value.toLowerCase();
+        document.querySelectorAll('#items-container .form-check').forEach(function (el) {
+            var text = el.innerText.toLowerCase();
+            el.style.display = text.indexOf(filter) > -1 ? '' : 'none';
         });
-    }
-
-    function showResults(products, pageInfo) {
-        if (!resultsList) {
-            return;
-        }
-        resultsList.innerHTML = '';
-        if (!products.length) {
-            resultsList.classList.add('d-none');
-            return;
-        }
-
-        products.forEach(function (product) {
-            var item = document.createElement('button');
-            item.type = 'button';
-            item.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
-            item.dataset.product = JSON.stringify(product);
-
-            var img = document.createElement('div');
-            img.className = 'rounded bg-light flex-shrink-0';
-            img.style.width = '40px';
-            img.style.height = '40px';
-            img.style.backgroundSize = 'cover';
-            img.style.backgroundPosition = 'center';
-            if (product.image) {
-                img.style.backgroundImage = 'url(' + product.image + ')';
-            } else {
-                img.classList.add('d-flex', 'justify-content-center', 'align-items-center');
-                img.innerHTML = '<i class="bi bi-box"></i>';
-            }
-
-            var textWrapper = document.createElement('div');
-            var title = document.createElement('div');
-            title.className = 'fw-semibold';
-            title.textContent = product.title || 'Untitled product';
-            var subtitle = document.createElement('div');
-            subtitle.className = 'text-muted small';
-            var variantText = (product.variants || []).slice(0, 3).join(', ');
-            subtitle.textContent = variantText || 'Variants unavailable';
-
-            textWrapper.appendChild(title);
-            textWrapper.appendChild(subtitle);
-
-            item.appendChild(img);
-            item.appendChild(textWrapper);
-
-            item.addEventListener('click', function () {
-                var parsedProduct = {};
-                try {
-                    parsedProduct = JSON.parse(this.dataset.product);
-                } catch (e) {
-                    parsedProduct = product;
-                }
-                var exists = selectedProducts.some(function (p) { return p.id === parsedProduct.id; });
-                if (!exists) {
-                    selectedProducts.push(parsedProduct);
-                    renderSelectedProducts();
-                }
-                resultsList.classList.add('d-none');
-            });
-
-            resultsList.appendChild(item);
-        });
-
-        if (pageInfo && pageInfo.hasNextPage && pageInfo.endCursor) {
-            var loadMore = document.createElement('button');
-            loadMore.type = 'button';
-            loadMore.className = 'list-group-item list-group-item-action text-center';
-            loadMore.textContent = 'Load more results';
-            loadMore.addEventListener('click', function () {
-                performSearch(activeQuery, pageInfo.endCursor, true);
-            });
-            resultsList.appendChild(loadMore);
-        }
-
-        resultsList.classList.remove('d-none');
-    }
-
-    function performSearch(query, cursor, append) {
-        if (!searchInput) {
-            return;
-        }
-        activeQuery = query;
-        if (!query) {
-            resultsList.classList.add('d-none');
-            resultsList.innerHTML = '';
-            return;
-        }
-
-        var url = new URL('/api/products/search/', window.location.origin);
-        url.searchParams.set('q', query);
-        if (cursor) {
-            url.searchParams.set('cursor', cursor);
-        }
-
-        fetch(url.toString(), {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        })
-            .then(function (response) { return response.json(); })
-            .then(function (data) {
-                var products = data.products || [];
-                var pageInfo = data.pageInfo || {};
-                if (append && resultsList && !resultsList.classList.contains('d-none')) {
-                    var existingProducts = Array.from(resultsList.querySelectorAll('[data-product]')).map(function (node) {
-                        try { return JSON.parse(node.dataset.product); } catch (e) { return null; }
-                    }).filter(Boolean);
-                    showResults(existingProducts.concat(products), pageInfo);
-                } else {
-                    showResults(products, pageInfo);
-                }
-            })
-            .catch(function () {
-                resultsList.classList.add('d-none');
-            });
-    }
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function (event) {
-            var query = event.target.value.trim();
-            clearTimeout(searchDebounce);
-            searchDebounce = setTimeout(function () {
-                performSearch(query);
-            }, 250);
-        });
-    }
+    });
 
     document.querySelectorAll('.edit-group-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -309,14 +183,15 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
             groupModalElement.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
             groupModalElement.querySelector('#group-error').innerHTML = '';
-
-            var productsData = this.getAttribute('data-group-products') || '[]';
-            try {
-                selectedProducts = JSON.parse(productsData);
-            } catch (e) {
-                selectedProducts = [];
-            }
-            renderSelectedProducts();
+            var itemsAttr = this.getAttribute('data-group-items') || '';
+            var items = itemsAttr ? itemsAttr.split(',').filter(function (value) {
+                return value.trim() !== '';
+            }) : [];
+            groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
+                cb.checked = items.includes(cb.value);
+                var existingGroupId = cb.getAttribute('data-existing-group-id');
+                cb.disabled = Boolean(existingGroupId && existingGroupId !== groupId);
+            });
         });
     });
 
@@ -332,11 +207,14 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#id_group-name').value = '';
             groupModalElement.querySelector('#id_group-affiliate_percent').value = '';
             groupModalElement.querySelector('#group-error').innerHTML = '';
-            selectedProducts = [];
-            renderSelectedProducts();
-            if (searchInput) {
-                searchInput.value = '';
-            }
+            groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
+                cb.checked = false;
+                cb.disabled = Boolean(cb.getAttribute('data-existing-group-id'));
+            });
+            itemSearchInput.value = '';
+            document.querySelectorAll('#items-container .form-check').forEach(function (el) {
+                el.style.display = '';
+            });
         });
     }
 
@@ -350,9 +228,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    selectedProducts = initialSelections.slice();
-    renderSelectedProducts();
-
     {% if group_modal_open %}
     if (groupModalElement) {
         if (window.bootstrap && typeof bootstrap.Modal === 'function') {
@@ -364,6 +239,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             bootstrapModal.show();
         }
+        var currentGroupId = '{{ group_form.instance.pk|default:"" }}';
+        groupModalElement.querySelectorAll('#items-container input[type=checkbox]').forEach(function (cb) {
+            var existingGroupId = cb.getAttribute('data-existing-group-id');
+            if (currentGroupId) {
+                cb.disabled = Boolean(existingGroupId && existingGroupId !== currentGroupId);
+            } else {
+                cb.disabled = Boolean(existingGroupId);
+            }
+        });
     }
     {% endif %}
 });
