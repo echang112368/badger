@@ -13,6 +13,8 @@ def send_verification_email(user, verification_code: str) -> None:
     message = render_to_string("accounts/emails/verification_email.txt", context)
     html_message = render_to_string("accounts/emails/verification_email.html", context)
 
+    print(message)
+    
     send_mail(
         subject=subject,
         message=message,
