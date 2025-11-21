@@ -1,9 +1,11 @@
 """Email verification helpers."""
 
 import random
+from datetime import timedelta
 from typing import Optional
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from accounts.utils.email import send_verification_email
 
@@ -57,3 +59,13 @@ def get_user_by_pk(user_id: Optional[int]) -> Optional[User]:
         return User.objects.get(pk=user_id)
     except User.DoesNotExist:
         return None
+
+
+def needs_email_verification(user: User) -> bool:
+    """Determine whether an unverified user must verify their email now."""
+
+    if user.email_verified:
+        return False
+
+    cutoff = timezone.now() - timedelta(days=7)
+    return user.last_login is None or user.last_login <= cutoff
