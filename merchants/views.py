@@ -374,6 +374,7 @@ def search_shopify_products(request):
             "id": product.get("id"),
             "title": product.get("title"),
             "handle": product.get("handle"),
+            "category": product.get("productType"),
             "image": image,
             "variants": [
                 variant.get("title")
@@ -517,26 +518,50 @@ def merchant_items(request):
 
     groups = ItemGroup.objects.filter(merchant=merchant_user).prefetch_related("items")
 
+    available_products: list[dict] = []
+    if shopify_client:
+        try:
+            available_products = shopify_client.get_all_products()
+        except Exception:
+            logger.exception("Failed to fetch Shopify catalog for selection table")
+
     selected_products_data = []
+    available_products_by_id = {str(prod.get("id")): prod for prod in available_products}
     if selected_items:
-        products_from_shopify = _fetch_shopify_products(shopify_client, selected_items)
-        products_by_id = {str(prod.get("id")): prod for prod in products_from_shopify}
+        missing_ids = []
+        for pid in selected_items:
+            if str(pid) not in available_products_by_id:
+                missing_ids.append(pid)
+
+        products_from_shopify = []
+        if missing_ids:
+            products_from_shopify = _fetch_shopify_products(shopify_client, missing_ids)
+            available_products_by_id.update(
+                {str(prod.get("id")): prod for prod in products_from_shopify}
+            )
+
         existing_items = {
             item.shopify_product_id: item
             for item in MerchantItem.objects.filter(
                 merchant=merchant_user, shopify_product_id__in=selected_items
             )
         }
+
         for pid in selected_items:
-            product = products_by_id.get(pid)
+            product = available_products_by_id.get(str(pid))
             fallback_item = existing_items.get(pid)
             selected_products_data.append(
                 {
                     "id": str(pid),
                     "title": (product or {}).get("title")
                     or (fallback_item.title if fallback_item else ""),
+                    "category": (product or {}).get("productType"),
                     "image": ((product or {}).get("featuredImage") or {}).get("src"),
-                    "variants": [v.get("title") for v in (product or {}).get("variants", []) if v.get("title")],
+                    "variants": [
+                        v.get("title")
+                        for v in (product or {}).get("variants", [])
+                        if v.get("title")
+                    ],
                 }
             )
 
@@ -553,6 +578,7 @@ def merchant_items(request):
             "permissions": permissions,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
             "selected_products_data": json.dumps(selected_products_data),
+            "available_products_data": json.dumps(available_products),
             "shopify_connected": bool(shopify_client),
             "shopify_authorize_url": shopify_authorize_url,
         },
