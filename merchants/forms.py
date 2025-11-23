@@ -95,17 +95,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "business_type": "Business Type",
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk:
-            business_type_field = self.fields.get("business_type")
-            if business_type_field:
-                business_type_field.disabled = True
-                business_type_field.required = False
-                business_type_field.help_text = (
-                    "Your business type was selected during sign-up and cannot be changed."
-                )
-
     def clean_shopify_store_domain(self):
         """Normalize the Shopify domain to its hostname."""
         domain = self.cleaned_data.get("shopify_store_domain", "").strip()
@@ -133,11 +122,6 @@ class MerchantSettingsForm(forms.ModelForm):
             )
 
         return cleaned
-
-    def clean_business_type(self):
-        if self.instance and self.instance.pk:
-            return self.instance.business_type
-        return self.cleaned_data.get("business_type") or MerchantMeta.BusinessType.INDEPENDENT
 
 
 class ItemGroupForm(forms.ModelForm):
