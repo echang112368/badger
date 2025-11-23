@@ -252,6 +252,7 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
         "title": node.get("title"),
         "status": node.get("status"),
         "handle": node.get("handle"),
+        "productType": node.get("productType"),
         "onlineStoreUrl": node.get("onlineStoreUrl"),
         "featuredImage": {"src": featured_image.get("url") or featured_image.get("originalSrc")},
         "variants": variants,
@@ -277,6 +278,7 @@ query getProducts($cursor: String) {
         title
         status
         handle
+        productType
         onlineStoreUrl
         variants(first: 50) {
           edges {
@@ -317,6 +319,7 @@ query searchProducts($query: String, $cursor: String, $pageSize: Int) {
         title
         status
         handle
+        productType
         onlineStoreUrl
         featuredImage {
           url
@@ -356,6 +359,7 @@ query getProductsById($ids: [ID!]!) {
       title
       status
       handle
+      productType
       onlineStoreUrl
       featuredImage {
         url
