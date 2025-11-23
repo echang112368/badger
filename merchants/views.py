@@ -374,6 +374,7 @@ def search_shopify_products(request):
             "id": product.get("id"),
             "title": product.get("title"),
             "handle": product.get("handle"),
+            "category": product.get("productType"),
             "image": image,
             "variants": [
                 variant.get("title")
@@ -535,6 +536,7 @@ def merchant_items(request):
                     "id": str(pid),
                     "title": (product or {}).get("title")
                     or (fallback_item.title if fallback_item else ""),
+                    "category": (product or {}).get("productType"),
                     "image": ((product or {}).get("featuredImage") or {}).get("src"),
                     "variants": [v.get("title") for v in (product or {}).get("variants", []) if v.get("title")],
                 }
