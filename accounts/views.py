@@ -87,6 +87,10 @@ def business_signup_view(request):
             user.is_merchant = True
             user.is_active = True
             user.save()
+            MerchantMeta.objects.update_or_create(
+                user=user,
+                defaults={"business_type": form.cleaned_data["business_type"]},
+            )
             send_user_verification_email(user)
             _remember_verification_user(request, user)
             messages.success(
