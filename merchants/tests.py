@@ -33,6 +33,10 @@ class MerchantSettingsFormTests(TestCase):
         self.assertIn("paypal_email", form.errors)
 
     def test_allows_shopify_without_credentials(self):
+        meta = self.user.merchantmeta
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.save()
+
         form = MerchantSettingsForm(
             data={
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
@@ -45,6 +49,10 @@ class MerchantSettingsFormTests(TestCase):
         self.assertTrue(form.is_valid())
 
     def test_normalizes_shopify_store_domain(self):
+        meta = self.user.merchantmeta
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.save()
+
         form = MerchantSettingsForm(
             data={
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
@@ -52,12 +60,49 @@ class MerchantSettingsFormTests(TestCase):
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "billing_plan": MerchantMeta.BillingPlan.PLATFORM_ONLY,
             },
-            instance=self.user.merchantmeta,
+            instance=meta,
         )
         self.assertTrue(form.is_valid())
         meta = form.save()
         self.user.refresh_from_db()
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
+
+    def test_business_type_cannot_be_changed(self):
+        meta = self.user.merchantmeta
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.save()
+
+        form = MerchantSettingsForm(
+            data={
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
+                "paypal_email": "merchant@example.com",
+                "shopify_store_domain": "example.myshopify.com",
+                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
+            },
+            instance=meta,
+        )
+
+        self.assertTrue(form.is_valid())
+        saved = form.save()
+        self.assertEqual(saved.business_type, MerchantMeta.BusinessType.SHOPIFY)
+
+    def test_business_type_defaults_to_existing_when_omitted(self):
+        meta = self.user.merchantmeta
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.save()
+
+        form = MerchantSettingsForm(
+            data={
+                "paypal_email": "merchant@example.com",
+                "shopify_store_domain": "example.myshopify.com",
+                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
+            },
+            instance=meta,
+        )
+
+        self.assertTrue(form.is_valid())
+        saved = form.save()
+        self.assertEqual(saved.business_type, MerchantMeta.BusinessType.SHOPIFY)
 
 
 class MerchantSettingsTests(TestCase):
@@ -96,7 +141,8 @@ class MerchantSettingsTests(TestCase):
         )
         self.client.force_login(user)
         response = self.client.get(reverse("merchant_settings"))
-        self.assertContains(response, user.password)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, user.password)
 
     def test_settings_displays_uuid(self):
         user = CustomUser.objects.create_user(
@@ -139,6 +185,7 @@ class MerchantSettingsTests(TestCase):
             is_merchant=True,
         )
         meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
         meta.shopify_access_token = "existing-token"
         meta.shopify_store_domain = "tabstore.myshopify.com"
         meta.save()
@@ -219,15 +266,9 @@ class MerchantSettingsTests(TestCase):
                 "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
-
-        expected_url = (
-            f"{reverse('shopify_oauth_authorize')}?shop=example.myshopify.com"
-        )
-        self.assertRedirects(
-            response,
-            expected_url,
-            fetch_redirect_response=False,
-        )
+        meta.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(meta.business_type, MerchantMeta.BusinessType.INDEPENDENT)
 
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
     def test_start_shopify_billing(self, mock_create):
