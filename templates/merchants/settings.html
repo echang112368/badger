@@ -106,18 +106,22 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1" for="business_type">Business Type</label>
-            <select
+            <input
+              type="hidden"
               name="business_type"
               id="business_type"
-              class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value="{{ merchant_meta.business_type }}"
               data-business-type-select
-              {% if not permissions.can_edit_settings %}disabled{% endif %}
-            >
-              {% for value, label in settings_form.fields.business_type.choices %}
-              <option value="{{ value }}" {% if settings_form.business_type.value == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <p class="mt-1 text-xs text-gray-500">Choose how you prefer to be billed for platform fees.</p>
+              aria-hidden="true"
+            />
+            <div class="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <div>
+                <p class="text-sm font-semibold text-gray-900">{{ merchant_meta.get_business_type_display }}</p>
+                <p class="mt-1 text-xs text-gray-500">Billing is configured for this business type.</p>
+              </div>
+              <p class="text-xs font-medium text-indigo-700">Locked</p>
+            </div>
+            <p class="mt-2 text-xs text-indigo-700">This selection was made during sign-up and cannot be changed.</p>
             {% if settings_form.business_type.errors %}
             <p class="mt-1 text-xs text-red-600">{{ settings_form.business_type.errors.0 }}</p>
             {% endif %}
@@ -817,7 +821,8 @@
   if(businessTypeSelect){
     const initialValue=businessTypeSelect.value||'independent';
     updateBillingSections(initialValue);
-    if(!businessTypeSelect.hasAttribute('disabled')){
+    const canChange=businessTypeSelect.tagName==='SELECT'&&!businessTypeSelect.hasAttribute('disabled');
+    if(canChange){
       businessTypeSelect.addEventListener('change',()=>{
         const selectedValue=businessTypeSelect.value||'independent';
         updateBillingSections(selectedValue);
