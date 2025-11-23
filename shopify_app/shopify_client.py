@@ -148,14 +148,17 @@ class ShopifyClient:
             edges = products_conn.get("edges") or []
             page_info = products_conn.get("pageInfo") or {}
 
+            last_cursor = None
+
             for edge in edges:
+                last_cursor = edge.get("cursor") or last_cursor
                 node = edge.get("node") or {}
                 products.append(_parse_product_node(node))
 
             if not page_info.get("hasNextPage"):
                 break
 
-            cursor = page_info.get("endCursor")
+            cursor = page_info.get("endCursor") or last_cursor
             if not cursor:
                 break
 
@@ -252,6 +255,7 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
         "title": node.get("title"),
         "status": node.get("status"),
         "handle": node.get("handle"),
+        "productType": node.get("productType"),
         "onlineStoreUrl": node.get("onlineStoreUrl"),
         "featuredImage": {"src": featured_image.get("url") or featured_image.get("originalSrc")},
         "variants": variants,
@@ -277,6 +281,7 @@ query getProducts($cursor: String) {
         title
         status
         handle
+        productType
         onlineStoreUrl
         variants(first: 50) {
           edges {
@@ -317,6 +322,7 @@ query searchProducts($query: String, $cursor: String, $pageSize: Int) {
         title
         status
         handle
+        productType
         onlineStoreUrl
         featuredImage {
           url
@@ -356,6 +362,7 @@ query getProductsById($ids: [ID!]!) {
       title
       status
       handle
+      productType
       onlineStoreUrl
       featuredImage {
         url
