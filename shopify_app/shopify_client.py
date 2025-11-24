@@ -100,25 +100,16 @@ class ShopifyClient:
 
         variables = {"query": query or None, "cursor": cursor, "pageSize": limit}
         payload = self.graphql(_PRODUCT_SEARCH_QUERY, variables)
-        data = payload.get("data", {}) or {}
-        products_conn = data.get("products") or {}
-        edges = products_conn.get("edges") or []
-        page_info = products_conn.get("pageInfo") or {}
+        return _parse_products_response(payload)
 
-        products: List[Dict[str, Any]] = []
-        last_cursor = None
-        for edge in edges:
-            last_cursor = edge.get("cursor") or last_cursor
-            node = edge.get("node") or {}
-            products.append(_parse_product_node(node))
+    def list_products(
+        self, *, cursor: Optional[str] = None, limit: int = 20
+    ) -> Dict[str, Any]:
+        """Return a paginated list of products without a search query."""
 
-        return {
-            "products": products,
-            "pageInfo": {
-                "hasNextPage": bool(page_info.get("hasNextPage")),
-                "endCursor": page_info.get("endCursor") or last_cursor,
-            },
-        }
+        variables = {"cursor": cursor, "pageSize": limit}
+        payload = self.graphql(_PRODUCTS_QUERY, variables)
+        return _parse_products_response(payload)
 
     def get_products_by_ids(self, product_ids: Iterable[str]) -> List[Dict[str, Any]]:
         """Return a list of product details for the given numeric Shopify IDs."""
@@ -142,21 +133,13 @@ class ShopifyClient:
         cursor: Optional[str] = None
 
         while True:
-            payload = self.graphql(_PRODUCTS_QUERY, {"cursor": cursor})
-            data = payload.get("data", {}) or {}
-            products_conn = data.get("products") or {}
-            edges = products_conn.get("edges") or []
-            page_info = products_conn.get("pageInfo") or {}
+            page = self.list_products(cursor=cursor, limit=50)
+            products.extend(page.get("products", []))
 
-            for edge in edges:
-                node = edge.get("node") or {}
-                products.append(_parse_product_node(node))
-
-            if not page_info.get("hasNextPage"):
-                break
-
+            page_info = page.get("pageInfo", {}) or {}
             cursor = page_info.get("endCursor")
-            if not cursor:
+
+            if not page_info.get("hasNextPage") or not cursor:
                 break
 
         return products
@@ -253,9 +236,32 @@ def _parse_product_node(node: Dict[str, Any]) -> Dict[str, Any]:
         "status": node.get("status"),
         "handle": node.get("handle"),
         "onlineStoreUrl": node.get("onlineStoreUrl"),
+        "productType": node.get("productType"),
         "featuredImage": {"src": featured_image.get("url") or featured_image.get("originalSrc")},
         "variants": variants,
         "images": images,
+    }
+
+
+def _parse_products_response(payload: Dict[str, Any]) -> Dict[str, Any]:
+    data = payload.get("data", {}) or {}
+    products_conn = data.get("products") or {}
+    edges = products_conn.get("edges") or []
+    page_info = products_conn.get("pageInfo") or {}
+
+    products: List[Dict[str, Any]] = []
+    last_cursor = None
+    for edge in edges:
+        last_cursor = edge.get("cursor") or last_cursor
+        node = edge.get("node") or {}
+        products.append(_parse_product_node(node))
+
+    return {
+        "products": products,
+        "pageInfo": {
+            "hasNextPage": bool(page_info.get("hasNextPage")),
+            "endCursor": page_info.get("endCursor") or last_cursor,
+        },
     }
 
 
@@ -268,13 +274,14 @@ def _parse_money_value(value):
 
 
 _PRODUCTS_QUERY = """
-query getProducts($cursor: String) {
-  products(first: 50, after: $cursor) {
+query getProducts($cursor: String, $pageSize: Int) {
+  products(first: $pageSize, after: $cursor) {
     edges {
       cursor
       node {
         id
         title
+        productType
         status
         handle
         onlineStoreUrl
@@ -315,6 +322,7 @@ query searchProducts($query: String, $cursor: String, $pageSize: Int) {
       node {
         id
         title
+        productType
         status
         handle
         onlineStoreUrl

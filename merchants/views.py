@@ -373,6 +373,78 @@ def search_shopify_products(request):
         return {
             "id": product.get("id"),
             "title": product.get("title"),
+            "productType": product.get("productType"),
+            "handle": product.get("handle"),
+            "image": image,
+            "variants": [
+                variant.get("title")
+                for variant in product.get("variants", [])
+                if variant.get("title")
+            ],
+        }
+
+    return JsonResponse(
+        {
+            "products": [_serialize_product(product) for product in results.get("products", [])],
+            "pageInfo": results.get("pageInfo", {}),
+        }
+    )
+
+
+@login_required
+@require_GET
+def list_shopify_products(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return JsonResponse({"error": "Forbidden"}, status=403)
+
+    merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
+    client = _get_shopify_client(merchant_meta)
+
+    authorize_url = build_shopify_authorize_url(
+        request, merchant_meta.shopify_store_domain if merchant_meta else ""
+    )
+
+    if not client:
+        return JsonResponse(
+            {
+                "products": [],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+                "error": "Shopify store not connected.",
+                "authorize_url": authorize_url,
+            },
+            status=400,
+        )
+
+    cursor = request.GET.get("cursor") or None
+    try:
+        limit = int(request.GET.get("limit", 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 50))
+
+    try:
+        results = client.list_products(cursor=cursor, limit=limit)
+    except ShopifyInvalidCredentialsError:
+        payload = _build_shopify_reauth_payload(
+            request,
+            merchant_meta.shopify_store_domain if merchant_meta else "",
+            message="Shopify disconnected. Please reconnect to load products.",
+        )
+        return JsonResponse(payload, status=401)
+    except Exception:
+        logger.exception("Failed to list Shopify products")
+        return JsonResponse(
+            {"error": "Unable to load products at this time."}, status=502
+        )
+
+    def _serialize_product(product: dict) -> dict:
+        image = (product.get("featuredImage") or {}).get("src")
+        return {
+            "id": product.get("id"),
+            "title": product.get("title"),
+            "productType": product.get("productType"),
             "handle": product.get("handle"),
             "image": image,
             "variants": [
