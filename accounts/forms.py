@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import UserCreationForm
-from django import forms
+from merchants.models import MerchantMeta
 
 
 User = get_user_model()
@@ -43,9 +43,24 @@ class CustomLoginForm(AuthenticationForm):
         return self.cleaned_data
 
 class BusinessSignUpForm(UserCreationForm):
+    business_type = forms.ChoiceField(
+        label="Business Type",
+        choices=MerchantMeta.BusinessType.choices,
+        initial=MerchantMeta.BusinessType.INDEPENDENT,
+        widget=forms.RadioSelect,
+        help_text="This selection determines how you'll be billed and cannot be changed later.",
+    )
+
     class Meta:
         model = User
-        fields = ("username", "first_name", "last_name", 'email', 'password1', 'password2')
+        fields = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "password1",
+            "password2",
+        )
 
 class CreatorSignUpForm(UserCreationForm):
     class Meta:
