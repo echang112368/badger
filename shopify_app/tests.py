@@ -306,7 +306,10 @@ class ShopifyClientProductsTests(SimpleTestCase):
                                                 "node": {
                                                     "id": "gid://shopify/ProductVariant/345",
                                                     "title": "Default",
-                                                    "price": "125.00",
+                                                    "price": {
+                                                        "amount": "125.00",
+                                                        "currencyCode": "USD",
+                                                    },
                                                 }
                                             }
                                         ]
@@ -340,8 +343,6 @@ class ShopifyClientProductsTests(SimpleTestCase):
                     "status": "ACTIVE",
                     "handle": "snowboard",
                     "onlineStoreUrl": "https://example.myshopify.com/products/snowboard",
-                    "productType": None,
-                    "featuredImage": {"src": None},
                     "variants": [
                         {"id": "345", "title": "Default", "price": "125.00"}
                     ],
@@ -349,7 +350,7 @@ class ShopifyClientProductsTests(SimpleTestCase):
                 }
             ],
         )
-        client.graphql.assert_called_with(_PRODUCTS_QUERY, {"cursor": None, "pageSize": 50})
+        client.graphql.assert_called_with(_PRODUCTS_QUERY, {"cursor": None})
 
 
 class ShopifyTokenManagementTests(TestCase):
