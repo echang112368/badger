@@ -495,19 +495,39 @@ def merchant_items(request):
             if group_form.is_valid():
                 group = group_form.save(commit=False)
                 group.merchant = merchant_user
-                items_to_add = []
-                conflicts = []
-                product_details = {
-                    str(product["id"]): product
-                    for product in _fetch_shopify_products(shopify_client, selected_items)
-                }
                 existing_items = {
                     item.shopify_product_id: item
                     for item in MerchantItem.objects.filter(
                         merchant=merchant_user, shopify_product_id__in=selected_items
                     ).prefetch_related("groups")
                 }
+                conflicts = []
+                non_conflicting_items = []
                 for pid in selected_items:
+                    item = existing_items.get(pid)
+                    if item:
+                        conflicting_groups = item.groups
+                        if group:
+                            conflicting_groups = conflicting_groups.exclude(pk=group.pk)
+                        if conflicting_groups.exists():
+                            conflicts.append(item.title or f"Shopify product {pid}")
+                            continue
+                    non_conflicting_items.append(pid)
+
+                if conflicts:
+                    post_data = request.POST.dict()
+                    post_data.pop("csrfmiddlewaretoken", None)
+                    request.session["group_form_post"] = post_data
+                    request.session["group_form_selected"] = selected_items
+                    request.session["group_form_conflicts"] = conflicts
+                    return redirect("merchant_items")
+
+                items_to_add = []
+                product_details = {
+                    str(product["id"]): product
+                    for product in _fetch_shopify_products(shopify_client, non_conflicting_items)
+                }
+                for pid in non_conflicting_items:
                     product = product_details.get(pid, {})
                     item = existing_items.get(pid)
                     if not item:
@@ -530,24 +550,10 @@ def merchant_items(request):
                             if updated:
                                 item.save(update_fields=["title", "link"])
 
-                    conflicting_groups = item.groups
-                    if group:
-                        conflicting_groups = conflicting_groups.exclude(pk=group.pk)
-                    if conflicting_groups.exists():
-                        conflicts.append(item.title)
-                    else:
-                        items_to_add.append(item)
-                if conflicts:
-                    post_data = request.POST.dict()
-                    post_data.pop("csrfmiddlewaretoken", None)
-                    request.session["group_form_post"] = post_data
-                    request.session["group_form_selected"] = selected_items
-                    request.session["group_form_conflicts"] = conflicts
-                    return redirect("merchant_items")
-                else:
-                    group.save()
-                    group.items.set(items_to_add)
-                    return redirect("merchant_items")
+                    items_to_add.append(item)
+                group.save()
+                group.items.set(items_to_add)
+                return redirect("merchant_items")
             else:
                 post_data = request.POST.dict()
                 post_data.pop("csrfmiddlewaretoken", None)
