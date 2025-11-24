@@ -23,6 +23,288 @@
 
 {% block submit_label %}Create business account{% endblock %}
 
+{% block form_fields %}
+  <style>
+    .form-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .form-grid.two-col {
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+    }
+
+    .business-type-field .helptext {
+      margin-top: 4px;
+    }
+
+    .business-type-options {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .business-type-card {
+      position: relative;
+      display: flex;
+      gap: 12px;
+      padding: 14px 14px 14px 46px;
+      border-radius: 16px;
+      border: 1px solid rgba(203, 213, 225, 0.9);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.99));
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+      align-items: flex-start;
+    }
+
+    .business-type-card:hover {
+      border-color: rgba(252, 217, 101, 0.65);
+      box-shadow: 0 8px 18px rgba(252, 217, 101, 0.18);
+      transform: translateY(-1px);
+    }
+
+    .business-type-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .business-type-card .radio-indicator {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(203, 213, 225, 0.9);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .business-type-card .radio-indicator::after {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .business-type-card .card-title {
+      font-weight: 600;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .business-type-card.is-selected {
+      border-color: rgba(252, 217, 101, 0.8);
+      box-shadow: 0 12px 26px rgba(252, 217, 101, 0.28);
+      background: linear-gradient(180deg, rgba(255, 251, 235, 0.82), #fff);
+    }
+
+    .business-type-card.is-selected .radio-indicator {
+      border-color: rgba(252, 217, 101, 0.9);
+      box-shadow: 0 0 0 4px rgba(252, 217, 101, 0.2);
+    }
+
+    .business-type-card.is-selected .radio-indicator::after {
+      opacity: 1;
+    }
+
+    .business-type-card .card-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    @media (max-width: 520px) {
+      .form-grid.two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .business-type-card {
+        padding: 14px 14px 14px 42px;
+      }
+    }
+  </style>
+
+  {% for hidden in form.hidden_fields %}
+    {{ hidden }}
+  {% endfor %}
+
+  {% with field=form.username %}
+    <div class="form-field{% if field.errors %} has-error{% endif %}">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}
+        <div class="helptext">{{ field.help_text|safe }}</div>
+      {% endif %}
+      {% if field.errors %}
+        <ul class="errorlist">
+          {% for error in field.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endwith %}
+
+  {% with field=form.first_name %}
+    <div class="form-field{% if field.errors %} has-error{% endif %}">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}
+        <div class="helptext">{{ field.help_text|safe }}</div>
+      {% endif %}
+      {% if field.errors %}
+        <ul class="errorlist">
+          {% for error in field.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endwith %}
+
+  {% with field=form.last_name %}
+    <div class="form-field{% if field.errors %} has-error{% endif %}">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}
+        <div class="helptext">{{ field.help_text|safe }}</div>
+      {% endif %}
+      {% if field.errors %}
+        <ul class="errorlist">
+          {% for error in field.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endwith %}
+
+  {% with field=form.email %}
+    <div class="form-field{% if field.errors %} has-error{% endif %}">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}
+        <div class="helptext">{{ field.help_text|safe }}</div>
+      {% endif %}
+      {% if field.errors %}
+        <ul class="errorlist">
+          {% for error in field.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endwith %}
+
+  <div class="form-grid two-col">
+    {% with field=form.password1 %}
+      <div class="form-field{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+          <div class="helptext">{{ field.help_text|safe }}</div>
+        {% endif %}
+        {% if field.errors %}
+          <ul class="errorlist">
+            {% for error in field.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endwith %}
+
+    {% with field=form.password2 %}
+      <div class="form-field{% if field.errors %} has-error{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}
+          <div class="helptext">{{ field.help_text|safe }}</div>
+        {% endif %}
+        {% if field.errors %}
+          <ul class="errorlist">
+            {% for error in field.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endwith %}
+  </div>
+
+  <div class="form-field business-type-field{% if form.business_type.errors %} has-error{% endif %}">
+    <label>Business Type</label>
+    <div class="helptext">This selection determines how you'll be billed and cannot be changed later.</div>
+    <div class="business-type-options">
+      {% for radio in form.business_type %}
+        {% with value=radio.choice_value %}
+          <label class="business-type-card{% if value|stringformat:'s' == form.business_type.value|stringformat:'s' %} is-selected{% endif %}" for="{{ radio.id_for_label }}">
+            {{ radio.tag }}
+            <span class="radio-indicator" aria-hidden="true"></span>
+            <div class="card-details">
+              <div class="card-title">
+                {{ radio.choice_label }}
+              </div>
+            </div>
+          </label>
+        {% endwith %}
+      {% endfor %}
+    </div>
+    {% if form.business_type.errors %}
+      <ul class="errorlist">
+        {% for error in form.business_type.errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+  <script>
+    (function () {
+      const cards = Array.from(document.querySelectorAll('.business-type-card'));
+
+      if (!cards.length) {
+        return;
+      }
+
+      const updateSelection = () => {
+        cards.forEach((card) => {
+          const input = card.querySelector('input[type="radio"]');
+
+          if (!input) {
+            return;
+          }
+
+          card.classList.toggle('is-selected', input.checked);
+        });
+      };
+
+      cards.forEach((card) => {
+        const input = card.querySelector('input[type="radio"]');
+
+        if (!input) {
+          return;
+        }
+
+        input.addEventListener('change', updateSelection);
+      });
+
+      updateSelection();
+    })();
+  </script>
+{% endblock %}
+
 {% block footer %}
   Already have an account?
   <a href="{% url 'login' %}">Log in</a>
