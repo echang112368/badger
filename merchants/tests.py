@@ -46,7 +46,8 @@ class MerchantSettingsFormTests(TestCase):
             },
             instance=self.user.merchantmeta,
         )
-        self.assertTrue(form.is_valid())
+        self.assertFalse(form.is_valid())
+        self.assertIn("shopify_store_domain", form.errors)
 
     def test_normalizes_shopify_store_domain(self):
         meta = self.user.merchantmeta
@@ -127,6 +128,51 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
 
+    def test_rejects_invalid_shopify_store_domain(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_invalid", password="pass", email="merchant_invalid@example.com", is_merchant=True
+        )
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_settings"),
+            {
+                "paypal_email": "merchant_invalid@example.com",
+                "shopify_store_domain": "shop.test",
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
+                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context["settings_form"]
+        self.assertIn("shopify_store_domain", form.errors)
+
+    def test_shopify_store_domain_locked_for_shopify_merchants(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_locked", password="pass", email="merchant_locked@example.com", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_store_domain = "locked.myshopify.com"
+        meta.shopify_access_token = "token"
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_settings"),
+            {
+                "paypal_email": "merchant_locked@example.com",
+                "shopify_store_domain": "new-shop.myshopify.com",
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
+            },
+        )
+
+        self.assertRedirects(response, reverse("merchant_settings"))
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_store_domain, "locked.myshopify.com")
+
+
     def test_settings_displays_email(self):
         user = CustomUser.objects.create_user(
             username="merchant", password="pass", email="merchant@example.com", is_merchant=True
@@ -196,7 +242,6 @@ class MerchantSettingsTests(TestCase):
                 "company_name": "",
                 "paypal_email": "",
                 "shopify_store_domain": "https://TabStore.myshopify.com/",
-                "shopify_oauth_authorization_line": "scope=read_products;connected_at=2024-01-01T00:00:00",
                 "first_name": "",
                 "last_name": "",
                 "active_tab": "api",
@@ -225,7 +270,6 @@ class MerchantSettingsTests(TestCase):
                 "company_name": "",
                 "paypal_email": "",
                 "shopify_store_domain": "partial-store.myshopify.com",
-                "shopify_oauth_authorization_line": "scope=write_discounts;connected_at=2024-01-01T00:00:00",
                 "first_name": "A" * 200,
                 "last_name": "",
                 "active_tab": "api",
