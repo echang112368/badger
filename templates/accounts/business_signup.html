@@ -270,9 +270,22 @@
       </ul>
     {% endif %}
   </div>
+  <div class="form-field{% if form.shopify_store_domain.errors %} has-error{% endif %}" id="shopify-url-field"{% if form.business_type.value|stringformat:'s' != 'shopify' %} style="display:none;"{% endif %}>
+    <label for="{{ form.shopify_store_domain.id_for_label }}">{{ form.shopify_store_domain.label }}</label>
+    {{ form.shopify_store_domain }}
+    <div class="helptext">Enter the Shopify URL you'll use to install the embedded app (for example, mystore.myshopify.com).</div>
+    {% if form.shopify_store_domain.errors %}
+      <ul class="errorlist">
+        {% for error in form.shopify_store_domain.errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
   <script>
     (function () {
       const cards = Array.from(document.querySelectorAll('.business-type-card'));
+      const shopifyField = document.getElementById('shopify-url-field');
 
       if (!cards.length) {
         return;
@@ -287,6 +300,15 @@
           }
 
           card.classList.toggle('is-selected', input.checked);
+
+          if (shopifyField) {
+            const isShopify = input.checked && input.value === 'shopify';
+            shopifyField.style.display = isShopify ? 'block' : 'none';
+            const inputEl = shopifyField.querySelector('input');
+            if (inputEl) {
+              inputEl.required = isShopify;
+            }
+          }
         });
       };
 

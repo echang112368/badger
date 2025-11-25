@@ -87,9 +87,15 @@ def business_signup_view(request):
             user.is_merchant = True
             user.is_active = True
             user.save()
+            shopify_domain = ""
+            if form.cleaned_data.get("business_type") == MerchantMeta.BusinessType.SHOPIFY:
+                shopify_domain = form.cleaned_data.get("shopify_store_domain", "")
             MerchantMeta.objects.update_or_create(
                 user=user,
-                defaults={"business_type": form.cleaned_data["business_type"]},
+                defaults={
+                    "business_type": form.cleaned_data["business_type"],
+                    "shopify_store_domain": shopify_domain,
+                },
             )
             send_user_verification_email(user)
             _remember_verification_user(request, user)
