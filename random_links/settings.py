@@ -218,6 +218,10 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                # Ensure custom admin dashboard tags are always discoverable.
+                'admin_dashboard': 'ledger.templatetags.admin_dashboard',
+            },
         },
     },
 ]
