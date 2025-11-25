@@ -1,0 +1,80 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_list admin_urls admin_dashboard %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  :root {
+    --card-bg: #0f172a;
+    --card-stroke: #1e293b;
+    --accent: #22c55e;
+    --muted: #94a3b8;
+  }
+  .admin-ops-dashboard { gap: 1.5rem; margin-bottom: 2rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .kpi-card { background: var(--card-bg); border: 1px solid var(--card-stroke); border-radius: 12px; padding: 1rem; color: #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+  .kpi-label { text-transform: uppercase; letter-spacing: .08em; font-size: 0.75rem; color: var(--muted); margin: 0 0 .5rem; }
+  .kpi-value { font-size: 1.75rem; margin: 0 0 .25rem; font-weight: 700; }
+  .kpi-sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .dashboard-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+  .panel { background: #0b1220; border: 1px solid var(--card-stroke); border-radius: 12px; padding: 1.25rem; color: #e2e8f0; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+  .panel header { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; }
+  .panel h2 { margin: 0; font-size: 1.1rem; }
+  .panel-sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .stat-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+  .stat-list div { background: rgba(255,255,255,0.02); border: 1px solid var(--card-stroke); padding: 0.75rem; border-radius: 10px; }
+  .stat-list dt { margin: 0; color: var(--muted); font-size: 0.85rem; }
+  .stat-list dd { margin: 0.35rem 0 0; font-size: 1.25rem; font-weight: 700; }
+  .alerts { display: grid; gap: 0.75rem; margin-top: 1rem; }
+  .alert-card { border-left: 4px solid #fbbf24; background: rgba(251,191,36,0.08); border-radius: 8px; padding: 0.75rem; }
+  .alert-title { margin: 0 0 0.25rem; font-weight: 700; }
+  .alert-body { margin: 0; color: var(--muted); }
+  .split-table { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .split-table h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .split-table ul { list-style: none; padding: 0; margin: 0; }
+  .split-table li { padding: 0.5rem; border: 1px solid var(--card-stroke); border-radius: 8px; margin-bottom: 0.5rem; background: rgba(255,255,255,0.02); }
+  .split-table .row { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .split-table .label { font-weight: 600; }
+  .split-table .value { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .earnings-list { list-style: none; margin: 0; padding: 0; }
+  .earnings-list li { padding: 0.5rem 0; border-bottom: 1px solid var(--card-stroke); }
+  .earnings-list li:last-child { border-bottom: none; }
+  .earnings-list .row { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .earnings-list .label { font-weight: 600; }
+  .earnings-list .value { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); margin: 0.5rem 0 0; }
+  .app-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .app-card { border: 1px solid var(--card-stroke); border-radius: 10px; padding: 1rem; background: #0b1220; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+  .app-card h3 { margin-top: 0; }
+  .app-card ul { list-style: none; padding: 0; margin: 0; }
+  .app-card li { margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+  .app-card a { color: #93c5fd; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-ops-dashboard">
+  {% admin_dashboard %}
+</div>
+
+<section aria-label="Admin apps" class="app-section">
+  <h2>Manage data</h2>
+  <div class="app-grid">
+    {% for app in app_list %}
+      <div class="app-card">
+        <h3><a href="{{ app.app_url }}">{{ app.name }}</a></h3>
+        <ul>
+          {% for model in app.models %}
+            <li>
+              <a href="{{ model.admin_url }}">{{ model.name }}</a>
+              {% if model.perms.add %}
+                <a class="addlink" href="{{ model.add_url }}" aria-label="Add {{ model.name }}">＋</a>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
