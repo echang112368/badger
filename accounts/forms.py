@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.forms import UserCreationForm
 from merchants.models import MerchantMeta
+from merchants.forms import normalize_shopify_store_domain
 
 
 User = get_user_model()
@@ -50,6 +51,14 @@ class BusinessSignUpForm(UserCreationForm):
         widget=forms.RadioSelect,
         help_text="This selection determines how you'll be billed and cannot be changed later.",
     )
+    shopify_store_domain = forms.CharField(
+        label="Shopify store URL",
+        required=False,
+        help_text="Enter the myshopify.com URL for your store.",
+        widget=forms.TextInput(
+            attrs={"placeholder": "mystore.myshopify.com", "inputmode": "url"}
+        ),
+    )
 
     class Meta:
         model = User
@@ -61,6 +70,26 @@ class BusinessSignUpForm(UserCreationForm):
             "password1",
             "password2",
         )
+
+    def clean(self):
+        cleaned = super().clean()
+        business_type = cleaned.get("business_type")
+        shopify_domain = cleaned.get("shopify_store_domain") or ""
+
+        if business_type == MerchantMeta.BusinessType.SHOPIFY:
+            try:
+                cleaned["shopify_store_domain"] = normalize_shopify_store_domain(shopify_domain)
+            except forms.ValidationError as exc:
+                self.add_error("shopify_store_domain", exc)
+            if not shopify_domain:
+                self.add_error(
+                    "shopify_store_domain",
+                    "Shopify store URL is required for Shopify businesses.",
+                )
+        else:
+            cleaned["shopify_store_domain"] = ""
+
+        return cleaned
 
 class CreatorSignUpForm(UserCreationForm):
     class Meta:

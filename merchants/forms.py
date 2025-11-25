@@ -1,7 +1,13 @@
+import re
+
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
 from django.utils.text import slugify
+
+from shopify_app.oauth import normalise_shop_domain
+
+from .models import ItemGroup, MerchantItem, MerchantMeta, MerchantTeamMember
 
 
 class TeamMemberCreateForm(forms.Form):
@@ -70,11 +76,30 @@ class MerchantItemForm(forms.ModelForm):
         fields = ["title", "link"]
 
 
+SHOPIFY_DOMAIN_ERROR = "Enter a valid Shopify store URL ending in .myshopify.com."
+
+
+def normalize_shopify_store_domain(value: str) -> str:
+    """Return a validated, normalised Shopify domain or raise ``ValidationError``."""
+
+    candidate = (value or "").strip()
+    if not candidate:
+        return ""
+
+    normalised = normalise_shop_domain(candidate)
+    if not normalised:
+        raise ValidationError(SHOPIFY_DOMAIN_ERROR)
+
+    if "/" in normalised or " " in normalised:
+        raise ValidationError(SHOPIFY_DOMAIN_ERROR)
+
+    if not re.match(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.myshopify\.com$", normalised):
+        raise ValidationError(SHOPIFY_DOMAIN_ERROR)
+
+    return normalised
+
+
 class MerchantSettingsForm(forms.ModelForm):
-    shopify_oauth_authorization_line = forms.CharField(
-        required=False,
-        help_text="Optional header value used for custom integrations that rely on OAuth.",
-    )
 
     class Meta:
         model = MerchantMeta
@@ -83,7 +108,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email",
             "billing_plan",
             "shopify_store_domain",
-            "shopify_oauth_authorization_line",
             "business_type",
         ]
         labels = {
@@ -91,7 +115,6 @@ class MerchantSettingsForm(forms.ModelForm):
             "paypal_email": "PayPal Email (for invoices)",
             "billing_plan": "Billing Plan",
             "shopify_store_domain": "Shopify URL",
-            "shopify_oauth_authorization_line": "OAuth Authorization Line",
             "business_type": "Business Type",
         }
 
@@ -106,30 +129,49 @@ class MerchantSettingsForm(forms.ModelForm):
                     "Your business type was selected during sign-up and cannot be changed."
                 )
 
+        if (
+            self.instance
+            and self.instance.pk
+            and self.instance.business_type == MerchantMeta.BusinessType.SHOPIFY
+            and self.instance.shopify_store_domain
+        ):
+            shopify_field = self.fields.get("shopify_store_domain")
+            if shopify_field:
+                shopify_field.disabled = True
+                shopify_field.help_text = "Your Shopify store URL is locked after it is linked."
+
     def clean_shopify_store_domain(self):
         """Normalize the Shopify domain to its hostname."""
-        domain = self.cleaned_data.get("shopify_store_domain", "").strip()
-        if not domain:
-            return domain
+        if (
+            self.instance
+            and self.instance.pk
+            and self.instance.business_type == MerchantMeta.BusinessType.SHOPIFY
+            and self.instance.shopify_store_domain
+        ):
+            return self.instance.shopify_store_domain
 
-        from urllib.parse import urlparse
-
-        parsed = urlparse(domain if "://" in domain else f"//{domain}")
-        host = parsed.netloc or parsed.path
-        host = host.lower()
-        if host.startswith("www."):
-            host = host[4:]
-        return host
+        domain = self.cleaned_data.get("shopify_store_domain", "")
+        return normalize_shopify_store_domain(domain)
 
     def clean(self):
         cleaned = super().clean()
         business_type = cleaned.get("business_type") or MerchantMeta.BusinessType.INDEPENDENT
         paypal_email = (cleaned.get("paypal_email") or "").strip()
+        shopify_domain = cleaned.get("shopify_store_domain") or ""
 
         if business_type == MerchantMeta.BusinessType.INDEPENDENT and not paypal_email:
             self.add_error(
                 "paypal_email",
                 "PayPal email is required for independent merchants.",
+            )
+
+        if (
+            business_type == MerchantMeta.BusinessType.SHOPIFY
+            and not (self.instance.shopify_store_domain or shopify_domain)
+        ):
+            self.add_error(
+                "shopify_store_domain",
+                "Shopify store URL is required for Shopify businesses.",
             )
 
         return cleaned
