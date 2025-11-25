@@ -942,9 +942,6 @@ def merchant_settings(request):
             post_data = request.POST.copy()
             if not permissions.can_manage_api:
                 post_data["shopify_store_domain"] = merchant_meta.shopify_store_domain
-                post_data["shopify_oauth_authorization_line"] = (
-                    merchant_meta.shopify_oauth_authorization_line
-                )
             form = MerchantSettingsForm(post_data, instance=merchant_meta)
             user_form = UserNameForm(post_data, instance=merchant_user)
             form_valid = form.is_valid()
@@ -980,7 +977,6 @@ def merchant_settings(request):
 
     if not permissions.can_manage_api:
         form.fields["shopify_store_domain"].disabled = True
-        form.fields["shopify_oauth_authorization_line"].disabled = True
 
     shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
     if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:

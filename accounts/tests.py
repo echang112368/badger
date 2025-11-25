@@ -39,6 +39,7 @@ class BusinessSignupTests(TestCase):
                 "password1": "strongpass123",
                 "password2": "strongpass123",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "shopify_store_domain": "merchant-shop.myshopify.com",
             },
         )
 
@@ -51,6 +52,55 @@ class BusinessSignupTests(TestCase):
         user = CustomUser.objects.get(username="merchant_signup")
         meta = MerchantMeta.objects.get(user=user)
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
+        self.assertEqual(meta.shopify_store_domain, "merchant-shop.myshopify.com")
+
+    def test_shopify_business_signup_requires_store_url(self):
+        response = self.client.post(
+            reverse("business_signup"),
+            {
+                "username": "shopify_missing_url",
+                "first_name": "Shop",
+                "last_name": "Owner",
+                "email": "shopify_missing@example.com",
+                "password1": "strongpass123",
+                "password2": "strongpass123",
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "shopify_store_domain": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertFalse(form.is_valid())
+        self.assertIn("shopify_store_domain", form.errors)
+        self.assertFalse(
+            CustomUser.objects.filter(username="shopify_missing_url").exists()
+        )
+
+    def test_shopify_business_signup_normalizes_store_url(self):
+        response = self.client.post(
+            reverse("business_signup"),
+            {
+                "username": "shopify_signup",
+                "first_name": "Shopify",
+                "last_name": "Owner",
+                "email": "shopify_signup@example.com",
+                "password1": "strongpass123",
+                "password2": "strongpass123",
+                "business_type": MerchantMeta.BusinessType.SHOPIFY,
+                "shopify_store_domain": "https://Example.myshopify.com/",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("verify_email"),
+            fetch_redirect_response=False,
+        )
+
+        user = CustomUser.objects.get(username="shopify_signup")
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
 
     def test_business_signup_rejects_weak_password(self):
         response = self.client.post(
