@@ -235,7 +235,7 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    result = payload.get("data", {}).get("appSubscriptionCreateV2") or {}
+    result = payload.get("data", {}).get("appSubscriptionCreate") or {}
     user_errors = result.get("userErrors") or []
     if user_errors:
         raise ShopifyBillingError(_stringify_error_value(user_errors))
@@ -433,22 +433,13 @@ def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -
 
     recurring_line = None
     usage_line = None
-
-    # Support both legacy ``lineItems`` responses and the 2024+ ``lines``
-    # connection returned by ``appSubscriptionCreateV2``.
-    lines = subscription.get("lineItems") or subscription.get("lines") or []
-    if isinstance(lines, dict):
-        lines = lines.get("edges", []) or []
-    for line in lines:
-        node = line.get("node") if isinstance(line, dict) else None
-        line_value = node if node is not None else line
-        plan = (line_value or {}).get("plan", {}) or {}
-        pricing = plan.get("pricingDetails") or plan
-        typename = pricing.get("__typename", "")
+    for line in subscription.get("lineItems", []) or []:
+        plan = line.get("plan", {}) or {}
+        typename = plan.get("__typename", "")
         if typename == "AppRecurringPricing":
-            recurring_line = pricing
+            recurring_line = plan
         elif typename == "AppUsagePricing":
-            usage_line = pricing
+            usage_line = plan
 
     price_info = (recurring_line or {}).get("price") or {}
     capped_info = (usage_line or {}).get("cappedAmount") or {}
@@ -465,17 +456,10 @@ def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -
 
 
 def _extract_usage_line_item_id(subscription: dict) -> Optional[str]:
-    lines = subscription.get("lineItems") or subscription.get("lines") or []
-    if isinstance(lines, dict):
-        lines = lines.get("edges", []) or []
-
-    for line in lines:
-        node = line.get("node") if isinstance(line, dict) else None
-        line_value = node if node is not None else line
-        plan = line_value.get("plan", {}) or {}
-        pricing = plan.get("pricingDetails") or plan
-        if pricing.get("__typename") == "AppUsagePricing" and line_value.get("id"):
-            return line_value.get("id")
+    for line in subscription.get("lineItems", []) or []:
+        plan = line.get("plan", {}) or {}
+        if plan.get("__typename") == "AppUsagePricing" and line.get("id"):
+            return line.get("id")
     return None
 
 
@@ -485,28 +469,22 @@ query SubscriptionById($id: ID!) {
     id
     status
     confirmationUrl
-    lines(first: 10) {
-      edges {
-        node {
-          id
-          plan {
-            pricingDetails {
-              __typename
-              ... on AppRecurringPricing {
-                interval
-                price {
-                  amount
-                  currencyCode
-                }
-              }
-              ... on AppUsagePricing {
-                terms
-                cappedAmount {
-                  amount
-                  currencyCode
-                }
-              }
-            }
+    lineItems {
+      id
+      plan {
+        __typename
+        ... on AppRecurringPricing {
+          interval
+          price {
+            amount
+            currencyCode
+          }
+        }
+        ... on AppUsagePricing {
+          terms
+          cappedAmount {
+            amount
+            currencyCode
           }
         }
       }
@@ -526,14 +504,14 @@ mutation CreateSubscription(
   $cappedAmount: Decimal!
   $terms: String!
 ) {
-  appSubscriptionCreateV2(
+  appSubscriptionCreate(
     name: $name
     returnUrl: $returnUrl
     trialDays: $trialDays
     test: $test
-    plans: [
-      { appRecurringPricingDetails: { interval: EVERY_30_DAYS, price: { amount: $price, currencyCode: USD } } }
-      { appUsagePricingDetails: { cappedAmount: { amount: $cappedAmount, currencyCode: USD }, terms: $terms } }
+    lineItems: [
+      { plan: { appRecurringPricingDetails: { interval: EVERY_30_DAYS, price: { amount: $price, currencyCode: USD } } } }
+      { plan: { appUsagePricingDetails: { cappedAmount: { amount: $cappedAmount, currencyCode: USD }, terms: $terms } } }
     ]
   ) {
     confirmationUrl
@@ -545,22 +523,16 @@ mutation CreateSubscription(
       id
       status
       confirmationUrl
-      lines(first: 10) {
-        edges {
-          node {
-            id
-            plan {
-              pricingDetails {
-                __typename
-                ... on AppRecurringPricing {
-                  price { amount currencyCode }
-                }
-                ... on AppUsagePricing {
-                  terms
-                  cappedAmount { amount currencyCode }
-                }
-              }
-            }
+      lineItems {
+        id
+        plan {
+          __typename
+          ... on AppRecurringPricing {
+            price { amount currencyCode }
+          }
+          ... on AppUsagePricing {
+            terms
+            cappedAmount { amount currencyCode }
           }
         }
       }
