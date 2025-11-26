@@ -11,7 +11,6 @@ from urllib.parse import urlencode
 import jwt
 from django.conf import settings
 from django.contrib.auth import login as auth_login
-from django.contrib.auth import logout as auth_logout
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -271,33 +270,6 @@ def _clear_shopify_session_state(request: HttpRequest, shop_domain: str = "") ->
         request.session.pop(retry_key, None)
 
 
-def _enforce_shop_isolation(request: HttpRequest, shop_domain: str) -> None:
-    """Reset session state when the visitor switches between Shopify stores.
-
-    Django's session cookie is shared for all shops because the app lives on a
-    single domain. Without extra guardrails, a merchant authenticated for Store A
-    would carry the same session into Store B and appear logged in incorrectly.
-    This helper clears the authenticated user and cached Shopify session data
-    whenever the incoming request's shop differs from what is stored in the
-    session. That forces each shop to establish its own login state.
-    """
-
-    normalised_shop = normalise_shop_domain(shop_domain)
-    if not normalised_shop:
-        return
-
-    previous_shop = normalise_shop_domain(
-        request.session.get(EMBEDDED_SHOP_SESSION_KEY, "")
-    )
-    if previous_shop and previous_shop != normalised_shop:
-        auth_logout(request)
-        _clear_shopify_session_state(request, previous_shop)
-        request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = False
-        request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
-    elif not previous_shop:
-        request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
-
-
 def build_shopify_authorize_url(request: HttpRequest, shop_domain: str) -> str:
     """Return the Shopify OAuth installation URL for the specified store."""
 
@@ -382,7 +354,6 @@ def embedded_app_home(request: HttpRequest):
             return HttpResponseBadRequest("Invalid Shopify HMAC signature.")
 
         normalised_shop = normalise_shop_domain(shop)
-        _enforce_shop_isolation(request, normalised_shop)
         access_token = _resolve_shopify_access_token(request, normalised_shop)
         if not access_token:
             return _render_shopify_error(
@@ -606,7 +577,6 @@ def oauth_callback(request: HttpRequest):
         return JsonResponse({"error": str(exc)}, status=400)
 
     normalised_shop = normalise_shop_domain(request.GET.get("shop", ""))
-    _enforce_shop_isolation(request, normalised_shop)
     access_token = (token_response.access_token or "").strip()
     if not access_token:
         logger.error(
@@ -770,7 +740,6 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
         return HttpResponseBadRequest(str(exc))
 
     normalised_shop = normalise_shop_domain(shop_domain)
-    _enforce_shop_isolation(request, normalised_shop)
     access_token = _resolve_shopify_access_token(request, normalised_shop)
 
     if not access_token:
