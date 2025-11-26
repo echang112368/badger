@@ -71,13 +71,14 @@ class CreateDiscountViewTests(TestCase):
         mock_uuid4.return_value = uuid.UUID("87654321876543218765432187654321")
         mock_client = mock_client_cls.return_value
 
-        price_rule_response = MagicMock()
-        price_rule_response.json.return_value = {"price_rule": {"id": 222}}
-        discount_response = MagicMock()
-        discount_response.json.return_value = {
-            "discount_code": {"code": "BADGER-87654321"}
+        mock_client.graphql.return_value = {
+            "data": {
+                "discountCodeBasicCreate": {
+                    "codeDiscountNode": {"id": "gid://shopify/DiscountCodeNode/123"},
+                    "userErrors": [],
+                }
+            }
         }
-        mock_client.post.side_effect = [price_rule_response, discount_response]
 
         url = reverse("create_discount", args=[self.meta.uuid])
         response = self.client.post(url, HTTP_AUTHORIZATION=f"Bearer {self.token}")
@@ -87,17 +88,13 @@ class CreateDiscountViewTests(TestCase):
             response.json(), {"coupon_code": "BADGER-87654321", "discount": 10}
         )
 
-        first_call = mock_client.post.call_args_list[0]
-        rule_payload = first_call.kwargs["json"]["price_rule"]
-        self.assertEqual(rule_payload["value"], "-10.0")
-        start = datetime.fromisoformat(rule_payload["starts_at"])
-        end = datetime.fromisoformat(rule_payload["ends_at"])
+        first_call = mock_client.graphql.call_args_list[0]
+        variables = first_call.args[1]
+        rule_payload = variables["basicCodeDiscount"]
+        self.assertEqual(rule_payload["customerGets"]["value"], {"percentage": 10})
+        start = datetime.fromisoformat(rule_payload["startsAt"])
+        end = datetime.fromisoformat(rule_payload["endsAt"])
         self.assertEqual(end - start, timedelta(days=1))
-
-        mock_client.post.assert_any_call(
-            "/admin/api/2024-07/price_rules/222/discount_codes.json",
-            json=ANY,
-        )
 
 
 class ShopifyBillingTests(TestCase):
@@ -116,19 +113,38 @@ class ShopifyBillingTests(TestCase):
 
     @patch("shopify_app.billing.ShopifyClient")
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "recurring_application_charge": {
-                "id": 123,
-                "status": "pending",
-                "confirmation_url": "https://confirm",
-                "terms": "Usage terms",
-                "capped_amount": "500.00",
-                "price": "30.00",
-                "currency": "USD",
+        mock_client_cls.return_value.graphql.return_value = {
+            "data": {
+                "appSubscriptionCreate": {
+                    "confirmationUrl": "https://confirm",
+                    "userErrors": [],
+                    "appSubscription": {
+                        "id": "gid://shopify/AppSubscription/123",
+                        "status": "PENDING",
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/1",
+                                "plan": {
+                                    "__typename": "AppRecurringPricing",
+                                    "price": {"amount": "30.00", "currencyCode": "USD"},
+                                },
+                            },
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/2",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                }
             }
         }
-        mock_client_cls.return_value.post.return_value = mock_response
 
         result = billing.create_or_update_recurring_charge(
             self.meta, return_url="https://return"
@@ -136,9 +152,9 @@ class ShopifyBillingTests(TestCase):
 
         self.meta.refresh_from_db()
         self.assertEqual(self.meta.shopify_recurring_charge_id, "123")
-        self.assertEqual(self.meta.shopify_billing_status, "pending")
+        self.assertEqual(self.meta.shopify_billing_status, "PENDING")
         self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
-        self.assertEqual(result["id"], 123)
+        self.assertEqual(result["id"], "123")
 
     def test_ensure_active_charge_requires_status(self):
         self.meta.shopify_recurring_charge_id = ""
@@ -154,10 +170,41 @@ class ShopifyBillingTests(TestCase):
         self.meta.shopify_billing_status = "active"
         self.meta.save()
 
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"usage_charge": {"id": 55}}
         mock_client = mock_client_cls.return_value
-        mock_client.post.return_value = mock_response
+        mock_client.graphql.side_effect = [
+            {
+                "data": {
+                    "appSubscription": {
+                        "id": "gid://shopify/AppSubscription/999",
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/usage",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+            {
+                "data": {
+                    "appUsageRecordCreate": {
+                        "appUsageRecord": {
+                            "id": "gid://shopify/AppUsageRecord/55",
+                            "description": "Test charge",
+                            "price": {"amount": "10.25", "currencyCode": "USD"},
+                        },
+                        "userErrors": [],
+                    }
+                }
+            },
+        ]
 
         details = billing.create_usage_charge(
             self.meta,
@@ -165,9 +212,7 @@ class ShopifyBillingTests(TestCase):
             description="Test charge",
         )
 
-        mock_client.post.assert_called_once()
-        path = mock_client.post.call_args[0][0]
-        self.assertIn("usage_charges", path)
+        mock_client.graphql.assert_called()
         self.assertEqual(details.charge_id, "55")
         self.assertEqual(details.amount, Decimal("10.25"))
 
@@ -501,11 +546,19 @@ class EmbeddedAppHomeTests(TestCase):
     def setUp(self):
         self.shop_domain = "example.myshopify.com"
         self.access_token = "shpua_token"
+        self.billing_patcher = patch(
+            "shopify_app.views.billing.create_or_update_recurring_charge",
+            return_value={},
+        )
+        self.billing_patcher.start()
 
     def _store_session_token(self):
         session = self.client.session
         session[session_token_key(self.shop_domain)] = self.access_token
         session.save()
+
+    def tearDown(self):
+        self.billing_patcher.stop()
 
     def _signed_params(self, **params):
         base = {"shop": self.shop_domain, "timestamp": "1234567890"}
@@ -605,6 +658,14 @@ class OAuthCallbackTests(TestCase):
         self.url = reverse("shopify_oauth_callback")
         self.shop_domain = "example.myshopify.com"
         self.access_token = "shppa_token"
+        self.billing_patcher = patch(
+            "shopify_app.views.billing.create_or_update_recurring_charge",
+            return_value={},
+        )
+        self.billing_patcher.start()
+
+    def tearDown(self):
+        self.billing_patcher.stop()
 
     def _build_id_token(self, **extra_claims):
         now = datetime.utcnow()

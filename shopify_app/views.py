@@ -44,7 +44,7 @@ from .oauth import (
     session_token_key,
     validate_shopify_hmac,
 )
-from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
+from .shopify_client import ShopifyClient, ShopifyGraphQLError, ShopifyInvalidCredentialsError
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
@@ -487,32 +487,29 @@ def create_discount(request, merchant_uuid):
 
     coupon_code = f"BADGER-{uuid.uuid4().hex[:8].upper()}"
     now = timezone.now()
-    price_rule_payload = {
-        "price_rule": {
-            "title": coupon_code,
-            "target_type": "line_item",
-            "target_selection": "all",
-            "allocation_method": "across",
-            "value_type": "percentage",
-            "value": f"-{float(percentage):.1f}",
-            "customer_selection": "all",
-            "starts_at": now.isoformat(),
-            "ends_at": (now + timezone.timedelta(days=1)).isoformat(),
-            "usage_limit": 1,
-        }
+    discount_payload = {
+        "title": coupon_code,
+        "code": coupon_code,
+        "usageLimit": 1,
+        "startsAt": now.isoformat(),
+        "endsAt": (now + timezone.timedelta(days=1)).isoformat(),
+        "combinesWith": {"orderDiscounts": True, "productDiscounts": True, "shippingDiscounts": True},
+        "customerSelection": {"all": True},
+        "customerGets": {
+            "value": {"percentage": float(percentage)},
+            "items": {"all": True},
+        },
     }
 
     try:
-        response = client.post(
-            "/admin/api/2024-07/price_rules.json", json=price_rule_payload
+        payload = client.graphql(
+            _DISCOUNT_CODE_CREATE_MUTATION,
+            {"basicCodeDiscount": discount_payload},
         )
-        price_rule_id = response.json()["price_rule"]["id"]
-
-        discount_payload = {"discount_code": {"code": coupon_code}}
-        client.post(
-            f"/admin/api/2024-07/price_rules/{price_rule_id}/discount_codes.json",
-            json=discount_payload,
-        )
+        result = payload.get("data", {}).get("discountCodeBasicCreate") or {}
+        user_errors = result.get("userErrors") or []
+        if user_errors:
+            raise ShopifyGraphQLError("Shopify rejected the discount creation.", user_errors)
     except ShopifyInvalidCredentialsError:
         payload = _build_reauthorization_payload(
             request,
@@ -522,6 +519,21 @@ def create_discount(request, merchant_uuid):
         return Response(payload, status=status.HTTP_401_UNAUTHORIZED)
 
     return Response({"coupon_code": coupon_code, "discount": percentage})
+
+
+_DISCOUNT_CODE_CREATE_MUTATION = """
+mutation CreateBasicDiscount($basicCodeDiscount: DiscountCodeBasicInput!) {
+  discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+    codeDiscountNode {
+      id
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
 
 
 @require_GET
