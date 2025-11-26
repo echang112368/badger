@@ -586,7 +586,8 @@ class EmbeddedAppHomeTests(TestCase):
         response = self.client.get(url, self._signed_params())
         self.assertEqual(response.status_code, 200)
 
-    def test_signup_links_shopify_store(self):
+    @patch("shopify_app.views.billing.create_or_update_recurring_charge")
+    def test_signup_links_shopify_store(self, mock_billing):
         url = reverse("shopify_embedded_home")
         self._store_session_token()
         self.client.get(url, self._signed_params())
@@ -616,8 +617,10 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
         self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
         self.assertNotIn(session_scope_key(self.shop_domain), self.client.session)
+        mock_billing.assert_called()
 
-    def test_login_attaches_existing_user(self):
+    @patch("shopify_app.views.billing.create_or_update_recurring_charge")
+    def test_login_attaches_existing_user(self, mock_billing):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
@@ -650,6 +653,7 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(meta.shopify_access_token, self.access_token)
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
         self.assertNotIn(session_scope_key(self.shop_domain), self.client.session)
+        mock_billing.assert_called()
 
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
@@ -755,7 +759,9 @@ class OAuthCallbackTests(TestCase):
 
     @patch("shopify_app.oauth.exchange_code_for_token")
     @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_links_authenticated_user(self, mock_hmac, mock_exchange):
+    def test_oauth_callback_does_not_link_new_store_for_logged_in_user(
+        self, mock_hmac, mock_exchange
+    ):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
@@ -789,15 +795,20 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         meta.refresh_from_db()
-        self.assertEqual(meta.shopify_store_domain, self.shop_domain)
-        self.assertEqual(meta.shopify_access_token, "shppa_token")
-        self.assertEqual(meta.shopify_refresh_token, "refresh_xyz")
-        self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
-        self.assertIn("connected_at=", meta.shopify_oauth_authorization_line)
+        self.assertEqual(meta.shopify_store_domain, "")
+        self.assertEqual(meta.shopify_access_token, "")
+        self.assertEqual(meta.business_type, MerchantMeta.BusinessType.INDEPENDENT)
+        self.assertIn(session_token_key(self.shop_domain), self.client.session)
+        self.assertEqual(
+            self.client.session.get(session_refresh_key(self.shop_domain)), "refresh_xyz"
+        )
 
-    @patch("shopify_app.oauth.exchange_code_for_token")
     @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_overwrites_existing_token(self, mock_hmac, mock_exchange):
+    @patch("shopify_app.oauth.exchange_code_for_token")
+    @patch("shopify_app.views.billing.create_or_update_recurring_charge")
+    def test_oauth_callback_overwrites_existing_token(
+        self, mock_billing, mock_exchange, mock_hmac
+    ):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
@@ -835,6 +846,7 @@ class OAuthCallbackTests(TestCase):
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_access_token, "new_offline_token")
         self.assertEqual(meta.shopify_refresh_token, "new_refresh_token")
+        mock_billing.assert_called()
 
     def test_invalid_session_token_triggers_reauthorize(self):
         bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
