@@ -446,6 +446,7 @@ class ShopifyTokenManagementTests(TestCase):
         self.assertIsNone(result)
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_access_token, "")
+        self.assertEqual(meta.shopify_refresh_token, "")
 
     def test_clear_shopify_token_removes_tokens(self):
         meta = MerchantMeta.objects.create(
@@ -704,6 +705,23 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
 
     def test_session_token_unknown_store_starts_oauth(self):
+        response = self.client.get(self.url, {"id_token": self._build_id_token()})
+
+        self.assertEqual(response.status_code, 302)
+        location = response["Location"]
+        self.assertTrue(
+            location.startswith(
+                f"https://{self.shop_domain}/admin/oauth/authorize?"
+            )
+        )
+        self.assertIn("client_id=key", location)
+        self.assertIn("state=", location)
+        self.assertEqual(
+            self.client.session.get("shopify_pending_shop"), self.shop_domain
+        )
+
+    @override_settings(SHOPIFY_API_SECRET="")
+    def test_session_token_error_with_shop_falls_back_to_oauth(self):
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
 
         self.assertEqual(response.status_code, 302)
