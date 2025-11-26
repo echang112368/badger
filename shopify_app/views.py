@@ -601,20 +601,25 @@ def oauth_callback(request: HttpRequest):
     )
 
     updated_via_authenticated_user = False
-    if request.user.is_authenticated and meta and meta.user_id == request.user.id:
+    if request.user.is_authenticated:
+        company_name = ""
+        existing_meta = getattr(request.user, "merchantmeta", None)
+        if existing_meta:
+            company_name = existing_meta.company_name
         try:
             meta = _ensure_shopify_link(
                 request,
                 request.user,
                 normalised_shop,
                 access_token,
-                company_name=meta.company_name,
+                company_name=company_name,
                 scope=token_response.scope,
                 refresh_token=token_response.refresh_token,
             )
             updated_via_authenticated_user = True
         except ValueError as exc:
-            return JsonResponse({"error": str(exc)}, status=400)
+            if meta is None:
+                return JsonResponse({"error": str(exc)}, status=400)
 
     if meta and not updated_via_authenticated_user:
         defaults = {
