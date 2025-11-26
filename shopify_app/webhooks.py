@@ -1,31 +1,53 @@
-import json
-import requests
+from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
 
 
-def register_orders_create_webhook(shop_domain: str, access_token: str,
-                                    webhook_url: str = "https://50f494970026.ngrok-free.app/shopify/webhooks/orders-create/"):
+WEBHOOK_CREATE_MUTATION = """
+mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
+  webhookSubscriptionCreate(
+    topic: $topic
+    webhookSubscription: {callbackUrl: $callbackUrl, format: JSON}
+  ) {
+    webhookSubscription {
+      id
+      topic
+      callbackUrl
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
+
+def register_orders_create_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str = "https://50f494970026.ngrok-free.app/shopify/webhooks/orders-create/",
+):
     """Register an orders/create webhook for the given shop."""
-    url = f"https://{shop_domain}/admin/api/2024-07/webhooks.json"
-    payload = {
-        "webhook": {
-            "topic": "orders/create",
-            "address": webhook_url,
-            "format": "json"
-        }
-    }
-    headers = {
-        "X-Shopify-Access-Token": access_token,
-        "Content-Type": "application/json",
-    }
+
+    client = ShopifyClient(access_token, shop_domain)
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        print(response.status_code)
-        print(response.text)
-        response.raise_for_status()
-    except requests.RequestException as exc:
+        payload = client.graphql(
+            WEBHOOK_CREATE_MUTATION,
+            {"topic": "ORDERS_CREATE", "callbackUrl": webhook_url},
+        )
+    except Exception as exc:  # pragma: no cover - network errors
         print(f"Error registering webhook: {exc}")
-        if hasattr(exc, 'response') and exc.response is not None:
-            print(exc.response.status_code)
-            print(exc.response.text)
         return False
+
+    result = payload.get("data", {}).get("webhookSubscriptionCreate") or {}
+    user_errors = result.get("userErrors") or []
+    if user_errors:
+        print(f"Error registering webhook: {user_errors}")
+        return False
+
+    subscription = result.get("webhookSubscription")
+    if not subscription:
+        raise ShopifyGraphQLError(
+            "Shopify webhook creation did not return a subscription.", payload
+        )
+
     return True
