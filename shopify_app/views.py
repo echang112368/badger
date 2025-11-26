@@ -338,6 +338,23 @@ def _extract_shop_from_request(request: HttpRequest) -> str:
                 if slug:
                     return normalise_shop_domain(f"{slug}.myshopify.com")
 
+
+def _extract_shop_from_id_token(id_token: str) -> str:
+    """Parse the shop domain from a Shopify session token without verifying it."""
+
+    token = (id_token or "").strip()
+    if not token:
+        return ""
+
+    try:
+        payload = jwt.decode(token, options={"verify_signature": False})
+    except jwt.InvalidTokenError:
+        return ""
+
+    destination = payload.get("dest") or payload.get("iss") or ""
+    destination = destination.split("://", 1)[-1]
+    return normalise_shop_domain(destination)
+
     return ""
 
 
@@ -716,8 +733,10 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
         shop_domain, _payload = _verify_shopify_session_token(id_token)
     except ShopifySessionTokenError as exc:
         shop_from_request = _extract_shop_from_request(request)
-        if shop_from_request:
-            normalised_shop = normalise_shop_domain(shop_from_request)
+        shop_from_token = _extract_shop_from_id_token(id_token)
+        shop_hint = shop_from_request or shop_from_token
+        if shop_hint:
+            normalised_shop = normalise_shop_domain(shop_hint)
             retry_key = _session_retry_key(normalised_shop)
             now_ts = timezone.now().timestamp()
             last_retry_ts = 0.0
@@ -733,6 +752,7 @@ def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpR
                 )
 
             _clear_shopify_session_state(request, normalised_shop)
+            request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
             request.session[retry_key] = str(now_ts)
             authorize_url = build_shopify_authorize_url(request, normalised_shop)
             return redirect(authorize_url)
