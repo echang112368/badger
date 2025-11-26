@@ -14,7 +14,11 @@ from django.conf import settings
 from merchants.models import MerchantMeta
 
 from .oauth import normalise_shop_domain
-from .shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
+from .shopify_client import (
+    ShopifyClient,
+    ShopifyInvalidCredentialsError,
+    _parse_shopify_gid,
+)
 from .token_management import refresh_shopify_token
 
 
@@ -214,32 +218,35 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     price = _ensure_monthly_fee(meta)
     config = ShopifyBillingConfig.from_settings()
 
-    payload = {
-        "recurring_application_charge": {
-            "name": config.name,
-            "price": str(price.quantize(Decimal("0.01"))),
-            "return_url": return_url,
-            "trial_days": config.trial_days,
-            "test": config.test_mode,
-            "capped_amount": str(config.capped_amount.quantize(Decimal("0.01"))),
-            "terms": config.terms,
-        }
+    variables = {
+        "name": config.name,
+        "returnUrl": return_url,
+        "trialDays": config.trial_days,
+        "test": config.test_mode,
+        "price": str(price.quantize(Decimal("0.01"))),
+        "cappedAmount": str(config.capped_amount.quantize(Decimal("0.01"))),
+        "terms": config.terms,
     }
 
     try:
-        response = client.post(
-            "/admin/api/2024-07/recurring_application_charges.json",
-            json=payload,
-        )
+        payload = client.graphql(_APP_SUBSCRIPTION_CREATE_MUTATION, variables)
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    data = response.json()
-    charge = data.get("recurring_application_charge")
-    if not isinstance(charge, dict):
-        raise ShopifyBillingError("Unexpected response from Shopify when creating recurring charge.")
+    result = payload.get("data", {}).get("appSubscriptionCreate") or {}
+    user_errors = result.get("userErrors") or []
+    if user_errors:
+        raise ShopifyBillingError(_stringify_error_value(user_errors))
+
+    subscription = result.get("appSubscription")
+    if not isinstance(subscription, dict):
+        raise ShopifyBillingError(
+            "Unexpected response from Shopify when creating recurring charge."
+        )
+
+    charge = _parse_app_subscription(subscription, confirmation_url=result.get("confirmationUrl"))
 
     _update_meta_from_charge(meta, charge)
     return charge
@@ -329,21 +336,15 @@ def refresh_recurring_charge(meta: MerchantMeta) -> dict:
     charge_id = meta.shopify_recurring_charge_id
 
     try:
-        response = client.get(
-            f"/admin/api/2024-07/recurring_application_charges/{charge_id}.json"
+        subscription = _load_subscription(
+            client, _build_subscription_gid(charge_id)
         )
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    data = response.json()
-    charge = data.get("recurring_application_charge")
-    if not isinstance(charge, dict):
-        raise ShopifyBillingError(
-            "Unexpected Shopify response when loading billing status."
-        )
-
+    charge = _parse_app_subscription(subscription)
     _update_meta_from_charge(meta, charge)
     return charge
 
@@ -366,27 +367,204 @@ def create_usage_charge(
     client = _require_shopify_credentials(meta)
     charge_id = meta.shopify_recurring_charge_id
 
-    payload = {
-        "usage_charge": {
-            "description": description or "Badger usage charge",
-            "price": str(normalized_amount.quantize(Decimal("0.01"))),
-        }
-    }
+    subscription_gid = _build_subscription_gid(charge_id)
 
     try:
-        response = client.post(
-            f"/admin/api/2024-07/recurring_application_charges/{charge_id}/usage_charges.json",
-            json=payload,
-        )
+        subscription = _load_subscription(client, subscription_gid)
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
-    data = response.json()
-    usage_charge = data.get("usage_charge")
-    if not isinstance(usage_charge, dict):
-        raise ShopifyBillingError("Unexpected Shopify response when creating usage charge.")
+    except HTTPError as exc:
+        raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
+
+    usage_line_item_id = _extract_usage_line_item_id(subscription)
+    if not usage_line_item_id:
+        raise ShopifyBillingError(
+            "Unable to locate a usage-based line item for the active subscription."
+        )
+
+    variables = {
+        "subscriptionLineItemId": usage_line_item_id,
+        "price": {
+            "amount": str(normalized_amount.quantize(Decimal("0.01"))),
+            "currencyCode": "USD",
+        },
+        "description": description or "Badger usage charge",
+    }
+
+    payload = client.graphql(_USAGE_RECORD_CREATE_MUTATION, variables)
+    result = payload.get("data", {}).get("appUsageRecordCreate") or {}
+    user_errors = result.get("userErrors") or []
+    if user_errors:
+        raise ShopifyBillingError(_stringify_error_value(user_errors))
+
+    record = result.get("appUsageRecord") or {}
+    usage_charge = {
+        "id": _parse_shopify_gid(record.get("id")),
+        "price": record.get("price", {}).get("amount"),
+        "currency": record.get("price", {}).get("currencyCode"),
+        "description": record.get("description", ""),
+    }
 
     return _build_charge_details(
         usage_charge,
         fallback_amount=normalized_amount,
         default_description=description,
     )
+
+
+def _build_subscription_gid(charge_id: str) -> str:
+    charge_value = str(charge_id)
+    if charge_value.startswith("gid://"):
+        return charge_value
+    return f"gid://shopify/AppSubscription/{charge_value}"
+
+
+def _load_subscription(client: ShopifyClient, subscription_gid: str) -> dict:
+    payload = client.graphql(_APP_SUBSCRIPTION_QUERY, {"id": subscription_gid})
+    subscription = payload.get("data", {}).get("appSubscription")
+    if not isinstance(subscription, dict):
+        raise ShopifyBillingError("Shopify did not return a subscription record.")
+    return subscription
+
+
+def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -> dict:
+    if not isinstance(subscription, dict):
+        return {}
+
+    recurring_line = None
+    usage_line = None
+    for line in subscription.get("lineItems", []) or []:
+        plan = line.get("plan", {}) or {}
+        typename = plan.get("__typename", "")
+        if typename == "AppRecurringPricing":
+            recurring_line = plan
+        elif typename == "AppUsagePricing":
+            usage_line = plan
+
+    price_info = (recurring_line or {}).get("price") or {}
+    capped_info = (usage_line or {}).get("cappedAmount") or {}
+
+    return {
+        "id": _parse_shopify_gid(subscription.get("id")),
+        "status": subscription.get("status"),
+        "confirmation_url": confirmation_url or subscription.get("confirmationUrl", ""),
+        "terms": (usage_line or {}).get("terms", ""),
+        "capped_amount": capped_info.get("amount"),
+        "price": price_info.get("amount"),
+        "currency": price_info.get("currencyCode") or capped_info.get("currencyCode") or "USD",
+    }
+
+
+def _extract_usage_line_item_id(subscription: dict) -> Optional[str]:
+    for line in subscription.get("lineItems", []) or []:
+        plan = line.get("plan", {}) or {}
+        if plan.get("__typename") == "AppUsagePricing" and line.get("id"):
+            return line.get("id")
+    return None
+
+
+_APP_SUBSCRIPTION_QUERY = """
+query SubscriptionById($id: ID!) {
+  appSubscription(id: $id) {
+    id
+    status
+    confirmationUrl
+    lineItems {
+      id
+      plan {
+        __typename
+        ... on AppRecurringPricing {
+          interval
+          price {
+            amount
+            currencyCode
+          }
+        }
+        ... on AppUsagePricing {
+          terms
+          cappedAmount {
+            amount
+            currencyCode
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+_APP_SUBSCRIPTION_CREATE_MUTATION = """
+mutation CreateSubscription(
+  $name: String!
+  $returnUrl: URL!
+  $trialDays: Int!
+  $test: Boolean!
+  $price: Decimal!
+  $cappedAmount: Decimal!
+  $terms: String!
+) {
+  appSubscriptionCreate(
+    name: $name
+    returnUrl: $returnUrl
+    trialDays: $trialDays
+    test: $test
+    lineItems: [
+      { plan: { appRecurringPricingDetails: { interval: EVERY_30_DAYS, price: { amount: $price, currencyCode: USD } } } }
+      { plan: { appUsagePricingDetails: { cappedAmount: { amount: $cappedAmount, currencyCode: USD }, terms: $terms } } }
+    ]
+  ) {
+    confirmationUrl
+    userErrors {
+      field
+      message
+    }
+    appSubscription {
+      id
+      status
+      confirmationUrl
+      lineItems {
+        id
+        plan {
+          __typename
+          ... on AppRecurringPricing {
+            price { amount currencyCode }
+          }
+          ... on AppUsagePricing {
+            terms
+            cappedAmount { amount currencyCode }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+_USAGE_RECORD_CREATE_MUTATION = """
+mutation CreateUsageRecord(
+  $subscriptionLineItemId: ID!
+  $price: MoneyInput!
+  $description: String!
+) {
+  appUsageRecordCreate(
+    subscriptionLineItemId: $subscriptionLineItemId
+    price: $price
+    description: $description
+  ) {
+    appUsageRecord {
+      id
+      description
+      price {
+        amount
+        currencyCode
+      }
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""

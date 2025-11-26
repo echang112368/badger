@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from merchants.models import MerchantMeta
-from shopify_app.shopify_client import ShopifyClient
+from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
 from shopify_app.token_management import refresh_shopify_token
 
 SCRIPT_SRCS = [
@@ -31,8 +31,7 @@ class Command(BaseCommand):
                 refresh_handler=lambda m=merchant: refresh_shopify_token(m),
             )
             try:
-                existing = client.get("/admin/api/2023-07/script_tags.json")
-                tags = existing.get("script_tags", [])
+                tags = _fetch_script_tags(client)
                 for src in SCRIPT_SRCS:
                     if any(tag.get("src") == src for tag in tags):
                         self.stdout.write(
@@ -40,15 +39,55 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    payload = {
-                        "script_tag": {
-                            "event": "onload",
-                            "src": src,
-                        }
-                    }
-                    client.post("/admin/api/2023-07/script_tags.json", json=payload)
+                    _create_script_tag(client, src)
                     self.stdout.write(f"Injected script {src} for {store_domain}")
             except Exception as exc:
                 self.stderr.write(
                     f"Failed to inject script for {store_domain}: {exc}"
                 )
+
+
+SCRIPT_TAGS_QUERY = """
+query ScriptTags {
+  scriptTags(first: 100) {
+    edges {
+      node {
+        id
+        src
+        displayScope
+      }
+    }
+  }
+}
+"""
+
+
+SCRIPT_TAG_CREATE_MUTATION = """
+mutation CreateScriptTag($src: URL!) {
+  scriptTagCreate(input: {src: $src, displayScope: ONLINE_STORE}) {
+    scriptTag {
+      id
+      src
+      displayScope
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
+
+def _fetch_script_tags(client: ShopifyClient):
+    payload = client.graphql(SCRIPT_TAGS_QUERY)
+    edges = (payload.get("data", {}).get("scriptTags", {}).get("edges") or [])
+    return [edge.get("node") or {} for edge in edges]
+
+
+def _create_script_tag(client: ShopifyClient, src: str) -> None:
+    payload = client.graphql(SCRIPT_TAG_CREATE_MUTATION, {"src": src})
+    result = payload.get("data", {}).get("scriptTagCreate") or {}
+    errors = result.get("userErrors") or []
+    if errors:
+        raise ShopifyGraphQLError("Failed to create script tag.", errors)
