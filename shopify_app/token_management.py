@@ -36,13 +36,20 @@ def refresh_shopify_token(meta: MerchantMeta) -> Optional[str]:
     try:
         response = refresh_access_token(shop, refresh_token)
     except ShopifyOAuthError:
-        # Clear the invalid token so future requests prompt a reinstallation.
+        # Clear the invalid tokens so future requests prompt a reinstallation and
+        # we stop retrying with a bad refresh token.
         logger.warning(
             "Failed to refresh Shopify access token for %s. Clearing stored token.",
             shop,
         )
+
+        update_fields = ["shopify_access_token"]
         meta.shopify_access_token = ""
-        meta.save(update_fields=["shopify_access_token"])
+        if hasattr(meta, "shopify_refresh_token") and meta.shopify_refresh_token:
+            meta.shopify_refresh_token = ""
+            update_fields.append("shopify_refresh_token")
+
+        meta.save(update_fields=update_fields)
         return None
 
     new_access_token = response.access_token
