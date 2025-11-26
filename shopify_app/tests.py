@@ -115,45 +115,32 @@ class ShopifyBillingTests(TestCase):
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
         mock_client_cls.return_value.graphql.return_value = {
             "data": {
-                "appSubscriptionCreateV2": {
+                "appSubscriptionCreate": {
                     "confirmationUrl": "https://confirm",
                     "userErrors": [],
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/123",
                         "status": "PENDING",
-                        "lines": {
-                            "edges": [
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/1",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppRecurringPricing",
-                                                "price": {
-                                                    "amount": "30.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
-                                    }
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/1",
+                                "plan": {
+                                    "__typename": "AppRecurringPricing",
+                                    "price": {"amount": "30.00", "currencyCode": "USD"},
                                 },
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/2",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppUsagePricing",
-                                                "terms": "Usage terms",
-                                                "cappedAmount": {
-                                                    "amount": "500.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
-                                    }
+                            },
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/2",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
+                                    },
                                 },
-                            ]
-                        },
+                            },
+                        ],
                     },
                 }
             }
@@ -189,25 +176,19 @@ class ShopifyBillingTests(TestCase):
                 "data": {
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/999",
-                        "lines": {
-                            "edges": [
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/usage",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppUsagePricing",
-                                                "terms": "Usage terms",
-                                                "cappedAmount": {
-                                                    "amount": "500.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/usage",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
                                     },
-                                }
-                            ]
-                        },
+                                },
+                            }
+                        ],
                     }
                 }
             },
