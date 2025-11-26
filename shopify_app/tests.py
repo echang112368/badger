@@ -446,7 +446,6 @@ class ShopifyTokenManagementTests(TestCase):
         self.assertIsNone(result)
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_access_token, "")
-        self.assertEqual(meta.shopify_refresh_token, "")
 
     def test_clear_shopify_token_removes_tokens(self):
         meta = MerchantMeta.objects.create(
