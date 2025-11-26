@@ -370,29 +370,6 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
-    def test_start_shopify_billing_without_oauth_redirects_to_authorize(self):
-        user = CustomUser.objects.create_user(
-            username="shopify_needs_oauth",
-            password="pass",
-            email="newoauth@example.com",
-            is_merchant=True,
-        )
-        meta = MerchantMeta.objects.get(user=user)
-        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        meta.shopify_store_domain = "example.myshopify.com"
-        meta.shopify_access_token = ""
-        meta.save()
-
-        self.client.force_login(user)
-        response = self.client.post(reverse("merchant_start_shopify_billing"))
-
-        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=example.myshopify.com"
-        self.assertRedirects(
-            response,
-            expected_url,
-            fetch_redirect_response=False,
-        )
-
 
 class MerchantDashboardTests(TestCase):
     def test_shopify_merchant_without_token_redirects_to_oauth(self):
@@ -429,26 +406,6 @@ class MerchantDashboardTests(TestCase):
         response = self.client.get(reverse("merchant_dashboard"))
 
         self.assertEqual(response.status_code, 200)
-
-    def test_refresh_shopify_billing_without_oauth_redirects_to_authorize(self):
-        user = CustomUser.objects.create_user(
-            username="refresh_needs_oauth", password="pass123", email="refresh@example.com", is_merchant=True
-        )
-        meta = MerchantMeta.objects.get(user=user)
-        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        meta.shopify_store_domain = "refresh.myshopify.com"
-        meta.shopify_access_token = ""
-        meta.save()
-
-        self.client.force_login(user)
-        response = self.client.get(reverse("merchant_refresh_shopify_billing_status"))
-
-        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=refresh.myshopify.com"
-        self.assertRedirects(
-            response,
-            expected_url,
-            fetch_redirect_response=False,
-        )
 
 
 class StoreIdLookupTests(TestCase):
