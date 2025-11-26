@@ -1044,13 +1044,6 @@ def start_shopify_billing(request):
         merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
 
     if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
-        shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
-        if shop_domain:
-            authorize_url = (
-                f"{reverse('shopify_oauth_authorize')}?{urlencode({'shop': shop_domain})}"
-            )
-            return redirect(authorize_url)
-
         return JsonResponse(
             {"error": "Complete the Shopify OAuth connection before starting billing."},
             status=400,
@@ -1095,7 +1088,7 @@ def start_shopify_billing(request):
             merchant_meta.shopify_store_domain,
             str(exc),
         )
-        return redirect(payload.get("authorize_url") or "")
+        return JsonResponse(payload, status=401)
     except shopify_billing.ShopifyBillingError as exc:
         logger.error(
             "Shopify billing failed for merchant %s (%s). "
@@ -1147,13 +1140,6 @@ def refresh_shopify_billing_status(request):
         )
 
     if not merchant_meta.shopify_access_token or not merchant_meta.shopify_store_domain:
-        shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
-        if shop_domain:
-            authorize_url = (
-                f"{reverse('shopify_oauth_authorize')}?{urlencode({'shop': shop_domain})}"
-            )
-            return redirect(authorize_url)
-
         return JsonResponse(
             {
                 "error": "Complete the Shopify OAuth connection before checking billing.",
@@ -1167,7 +1153,7 @@ def refresh_shopify_billing_status(request):
         payload = _build_shopify_reauth_payload(
             request, merchant_meta.shopify_store_domain, str(exc)
         )
-        return redirect(payload.get("authorize_url") or "")
+        return JsonResponse(payload, status=401)
     except shopify_billing.ShopifyBillingError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
