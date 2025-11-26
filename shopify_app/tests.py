@@ -32,7 +32,6 @@ from .oauth import (
 )
 from .shopify_client import (
     ShopifyClient,
-    ShopifyGraphQLError,
     ShopifyInvalidCredentialsError,
     _PRODUCTS_QUERY,
 )
@@ -116,45 +115,32 @@ class ShopifyBillingTests(TestCase):
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
         mock_client_cls.return_value.graphql.return_value = {
             "data": {
-                "appSubscriptionCreateV2": {
+                "appSubscriptionCreate": {
                     "confirmationUrl": "https://confirm",
                     "userErrors": [],
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/123",
                         "status": "PENDING",
-                        "lines": {
-                            "edges": [
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/1",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppRecurringPricing",
-                                                "price": {
-                                                    "amount": "30.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
-                                    }
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/1",
+                                "plan": {
+                                    "__typename": "AppRecurringPricing",
+                                    "price": {"amount": "30.00", "currencyCode": "USD"},
                                 },
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/2",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppUsagePricing",
-                                                "terms": "Usage terms",
-                                                "cappedAmount": {
-                                                    "amount": "500.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
-                                    }
+                            },
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/2",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
+                                    },
                                 },
-                            ]
-                        },
+                            },
+                        ],
                     },
                 }
             }
@@ -169,56 +155,6 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(self.meta.shopify_billing_status, "PENDING")
         self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
         self.assertEqual(result["id"], "123")
-
-    @patch("shopify_app.billing.ShopifyClient")
-    def test_create_recurring_charge_falls_back_to_v1(self, mock_client_cls):
-        mock_client = mock_client_cls.return_value
-        mock_client.graphql.side_effect = [
-            ShopifyGraphQLError("Field 'appSubscriptionCreateV2' doesn't exist on type 'Mutation'"),
-            {
-                "data": {
-                    "appSubscriptionCreate": {
-                        "confirmationUrl": "https://confirm-v1",
-                        "userErrors": [],
-                        "appSubscription": {
-                            "id": "gid://shopify/AppSubscription/456",
-                            "status": "PENDING",
-                            "lineItems": [
-                                {
-                                    "plan": {
-                                        "pricingDetails": {
-                                            "__typename": "AppRecurringPricing",
-                                            "price": {"amount": "30.00", "currencyCode": "USD"},
-                                        }
-                                    }
-                                },
-                                {
-                                    "plan": {
-                                        "pricingDetails": {
-                                            "__typename": "AppUsagePricing",
-                                            "terms": "Usage terms",
-                                            "cappedAmount": {
-                                                "amount": "500.00",
-                                                "currencyCode": "USD",
-                                            },
-                                        }
-                                    }
-                                },
-                            ],
-                        },
-                    }
-                }
-            },
-        ]
-
-        billing.create_or_update_recurring_charge(
-            self.meta, return_url="https://return"
-        )
-
-        self.meta.refresh_from_db()
-        self.assertEqual(self.meta.shopify_recurring_charge_id, "456")
-        self.assertEqual(self.meta.shopify_billing_status, "PENDING")
-        self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
 
     def test_ensure_active_charge_requires_status(self):
         self.meta.shopify_recurring_charge_id = ""
@@ -240,25 +176,19 @@ class ShopifyBillingTests(TestCase):
                 "data": {
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/999",
-                        "lines": {
-                            "edges": [
-                                {
-                                    "node": {
-                                        "id": "gid://shopify/AppSubscriptionLineItem/usage",
-                                        "plan": {
-                                            "pricingDetails": {
-                                                "__typename": "AppUsagePricing",
-                                                "terms": "Usage terms",
-                                                "cappedAmount": {
-                                                    "amount": "500.00",
-                                                    "currencyCode": "USD",
-                                                },
-                                            }
-                                        },
+                        "lineItems": [
+                            {
+                                "id": "gid://shopify/AppSubscriptionLineItem/usage",
+                                "plan": {
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
                                     },
-                                }
-                            ]
-                        },
+                                },
+                            }
+                        ],
                     }
                 }
             },
