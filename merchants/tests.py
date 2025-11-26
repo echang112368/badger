@@ -356,10 +356,12 @@ class MerchantSettingsTests(TestCase):
 
         self.client.force_login(user)
         response = self.client.post(reverse("merchant_start_shopify_billing"))
-        self.assertEqual(response.status_code, 401)
-        data = response.json()
-        self.assertIn("authorize_url", data)
-        self.assertIn("error", data)
+        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=shop.test"
+        self.assertRedirects(
+            response,
+            expected_url,
+            fetch_redirect_response=False,
+        )
 
     def test_start_shopify_billing_requires_shopify_type(self):
         user = CustomUser.objects.create_user(
@@ -369,6 +371,29 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(reverse("merchant_start_shopify_billing"))
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
+
+    def test_start_shopify_billing_without_oauth_redirects_to_authorize(self):
+        user = CustomUser.objects.create_user(
+            username="shopify_needs_oauth",
+            password="pass",
+            email="newoauth@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_store_domain = "example.myshopify.com"
+        meta.shopify_access_token = ""
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_start_shopify_billing"))
+
+        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=example.myshopify.com"
+        self.assertRedirects(
+            response,
+            expected_url,
+            fetch_redirect_response=False,
+        )
 
 
 class MerchantDashboardTests(TestCase):
@@ -406,6 +431,51 @@ class MerchantDashboardTests(TestCase):
         response = self.client.get(reverse("merchant_dashboard"))
 
         self.assertEqual(response.status_code, 200)
+
+    def test_refresh_shopify_billing_without_oauth_redirects_to_authorize(self):
+        user = CustomUser.objects.create_user(
+            username="refresh_needs_oauth", password="pass123", email="refresh@example.com", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_store_domain = "refresh.myshopify.com"
+        meta.shopify_access_token = ""
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_refresh_shopify_billing_status"))
+
+        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=refresh.myshopify.com"
+        self.assertRedirects(
+            response,
+            expected_url,
+            fetch_redirect_response=False,
+        )
+
+    @patch("merchants.views.shopify_billing.refresh_recurring_charge")
+    def test_refresh_shopify_billing_reauth_redirects_to_authorize(self, mock_refresh):
+        user = CustomUser.objects.create_user(
+            username="refresh_reauth", password="pass123", email="refreshreauth@example.com", is_merchant=True
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_store_domain = "reauth.myshopify.com"
+        meta.shopify_access_token = "token"
+        meta.save()
+
+        mock_refresh.side_effect = shopify_billing.ShopifyReauthorizationRequired(
+            "reauth.myshopify.com"
+        )
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_refresh_shopify_billing_status"))
+
+        expected_url = f"{reverse('shopify_oauth_authorize')}?shop=reauth.myshopify.com"
+        self.assertRedirects(
+            response,
+            expected_url,
+            fetch_redirect_response=False,
+        )
 
 
 class StoreIdLookupTests(TestCase):
