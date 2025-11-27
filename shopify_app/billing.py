@@ -59,31 +59,14 @@ class ShopifyBillingConfig:
     """Configuration for creating recurring charges."""
 
     name: str = "Badger Platform Subscription"
-    trial_days: int = 0
-    capped_amount: Decimal = Decimal("1000.00")
-    terms: str = "Usage charges are billed through the Badger platform."
     test_mode: bool = True
 
     @classmethod
     def from_settings(cls) -> "ShopifyBillingConfig":
-        capped = getattr(settings, "SHOPIFY_BILLING_CAPPED_AMOUNT", None)
-        terms = getattr(settings, "SHOPIFY_BILLING_TERMS", None)
         test_mode = getattr(settings, "SHOPIFY_BILLING_TEST_MODE", True)
-        trial_days = getattr(settings, "SHOPIFY_BILLING_TRIAL_DAYS", 0)
         name = getattr(settings, "SHOPIFY_BILLING_PLAN_NAME", cls.name)
-
-        capped_amount = cls.capped_amount
-        if capped is not None:
-            try:
-                capped_amount = Decimal(str(capped))
-            except (InvalidOperation, ValueError) as exc:
-                raise ShopifyBillingError("Invalid SHOPIFY_BILLING_CAPPED_AMOUNT setting") from exc
-
         return cls(
             name=name,
-            trial_days=int(trial_days),
-            capped_amount=capped_amount,
-            terms=terms or cls.terms,
             test_mode=bool(test_mode),
         )
 
@@ -180,22 +163,14 @@ def _build_charge_details(
     )
 
 
-def _update_meta_from_charge(meta: MerchantMeta, charge: dict) -> None:
-    capped_amount = charge.get("capped_amount")
-    try:
-        capped_value: Optional[Decimal]
-        if capped_amount is None:
-            capped_value = None
-        else:
-            capped_value = Decimal(str(capped_amount))
-    except (InvalidOperation, ValueError) as exc:
-        raise ShopifyBillingError("Shopify returned an invalid capped amount.") from exc
-
-    meta.shopify_recurring_charge_id = str(charge.get("id", ""))
-    meta.shopify_billing_status = charge.get("status", "") or ""
-    meta.shopify_billing_confirmation_url = charge.get("confirmation_url", "") or ""
-    meta.shopify_usage_terms = charge.get("terms", "") or ""
-    meta.shopify_usage_capped_amount = capped_value
+def _update_meta_from_subscription(meta: MerchantMeta, subscription: dict) -> None:
+    meta.shopify_recurring_charge_id = str(subscription.get("id", ""))
+    meta.shopify_billing_status = subscription.get("status", "") or ""
+    meta.shopify_billing_confirmation_url = (
+        subscription.get("confirmation_url", "") or ""
+    )
+    meta.shopify_usage_terms = ""
+    meta.shopify_usage_capped_amount = None
     meta.save(
         update_fields=[
             "shopify_recurring_charge_id",
@@ -220,14 +195,8 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     config = ShopifyBillingConfig.from_settings()
 
     try:
-        creation = client.create_app_subscription(
-            config.name,
-            price,
-            config.trial_days,
-            return_url,
-            test_mode=config.test_mode,
-            usage_capped_amount=config.capped_amount,
-            usage_terms=config.terms,
+        creation_result = client.create_app_subscription(
+            config.name, price, return_url, test_mode=config.test_mode
         )
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
@@ -238,17 +207,19 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    subscription = creation.get("subscription")
-    confirmation_url = creation.get("confirmation_url") or ""
+    subscription = creation_result.get("appSubscription")
+    confirmation_url = creation_result.get("confirmationUrl") or ""
     if not isinstance(subscription, dict):
         raise ShopifyBillingError(
             "Unexpected response from Shopify when creating recurring charge."
         )
 
-    charge = _parse_app_subscription(subscription, confirmation_url=confirmation_url)
+    subscription_details = _parse_app_subscription(
+        subscription, confirmation_url=confirmation_url
+    )
 
-    _update_meta_from_charge(meta, charge)
-    return charge
+    _update_meta_from_subscription(meta, subscription_details)
+    return subscription_details
 
 
 def _describe_shopify_http_error(error: HTTPError) -> str:
@@ -343,9 +314,9 @@ def refresh_recurring_charge(meta: MerchantMeta) -> dict:
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    charge = _parse_app_subscription(subscription)
-    _update_meta_from_charge(meta, charge)
-    return charge
+    subscription_details = _parse_app_subscription(subscription)
+    _update_meta_from_subscription(meta, subscription_details)
+    return subscription_details
 
 
 def create_usage_charge(
@@ -353,62 +324,7 @@ def create_usage_charge(
 ) -> ShopifyChargeDetails:
     """Create a usage charge for the merchant's active recurring charge."""
 
-    ensure_active_charge(meta)
-
-    try:
-        normalized_amount = Decimal(amount)
-    except (InvalidOperation, ValueError) as exc:
-        raise ShopifyBillingError("Invalid usage charge amount.") from exc
-
-    if normalized_amount <= 0:
-        raise ShopifyBillingError("Usage charge amount must be greater than zero.")
-
-    client = _require_shopify_credentials(meta)
-    charge_id = meta.shopify_recurring_charge_id
-
-    subscription_gid = _build_subscription_gid(charge_id)
-
-    try:
-        subscription = _load_subscription(client, subscription_gid)
-    except ShopifyInvalidCredentialsError as exc:
-        raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
-    except HTTPError as exc:
-        raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
-
-    usage_line_item_id = _extract_usage_line_item_id(subscription)
-    if not usage_line_item_id:
-        raise ShopifyBillingError(
-            "Unable to locate a usage-based line item for the active subscription."
-        )
-
-    variables = {
-        "subscriptionLineItemId": usage_line_item_id,
-        "price": {
-            "amount": str(normalized_amount.quantize(Decimal("0.01"))),
-            "currencyCode": "USD",
-        },
-        "description": description or "Badger usage charge",
-    }
-
-    payload = client.graphql(_USAGE_RECORD_CREATE_MUTATION, variables)
-    result = payload.get("data", {}).get("appUsageRecordCreate") or {}
-    user_errors = result.get("userErrors") or []
-    if user_errors:
-        raise ShopifyBillingError(_stringify_error_value(user_errors))
-
-    record = result.get("appUsageRecord") or {}
-    usage_charge = {
-        "id": _parse_shopify_gid(record.get("id")),
-        "price": record.get("price", {}).get("amount"),
-        "currency": record.get("price", {}).get("currencyCode"),
-        "description": record.get("description", ""),
-    }
-
-    return _build_charge_details(
-        usage_charge,
-        fallback_amount=normalized_amount,
-        default_description=description,
-    )
+    raise ShopifyBillingError("Usage charges are not supported with Shopify Billing V2.")
 
 
 def _build_subscription_gid(charge_id: str) -> str:
@@ -430,36 +346,11 @@ def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -
     if not isinstance(subscription, dict):
         return {}
 
-    recurring_line = None
-    usage_line = None
-    for line in subscription.get("lineItems", []) or []:
-        plan = line.get("plan", {}) or {}
-        typename = plan.get("__typename", "")
-        if typename == "AppRecurringPricing":
-            recurring_line = plan
-        elif typename == "AppUsagePricing":
-            usage_line = plan
-
-    price_info = (recurring_line or {}).get("price") or {}
-    capped_info = (usage_line or {}).get("cappedAmount") or {}
-
     return {
         "id": _parse_shopify_gid(subscription.get("id")),
         "status": subscription.get("status"),
-        "confirmation_url": confirmation_url or subscription.get("confirmationUrl", ""),
-        "terms": (usage_line or {}).get("terms", ""),
-        "capped_amount": capped_info.get("amount"),
-        "price": price_info.get("amount"),
-        "currency": price_info.get("currencyCode") or capped_info.get("currencyCode") or "USD",
+        "confirmation_url": confirmation_url or "",
     }
-
-
-def _extract_usage_line_item_id(subscription: dict) -> Optional[str]:
-    for line in subscription.get("lineItems", []) or []:
-        plan = line.get("plan", {}) or {}
-        if plan.get("__typename") == "AppUsagePricing" and line.get("id"):
-            return line.get("id")
-    return None
 
 
 _APP_SUBSCRIPTION_QUERY = """
@@ -467,27 +358,6 @@ query SubscriptionById($id: ID!) {
   appSubscription(id: $id) {
     id
     status
-    confirmationUrl
-    lineItems {
-      id
-      plan {
-        __typename
-        ... on AppRecurringPricing {
-          interval
-          price {
-            amount
-            currencyCode
-          }
-        }
-        ... on AppUsagePricing {
-          terms
-          cappedAmount {
-            amount
-            currencyCode
-          }
-        }
-      }
-    }
   }
 }
 """
