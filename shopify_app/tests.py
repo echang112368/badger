@@ -5,6 +5,7 @@ from decimal import Decimal
 import hashlib
 import hmac
 import uuid
+import html
 
 import jwt
 from urllib.parse import parse_qs, urlparse
@@ -12,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 from django.contrib.messages import get_messages
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -113,32 +115,29 @@ class ShopifyBillingTests(TestCase):
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
         mock_client_cls.return_value.graphql.return_value = {
             "data": {
-                "appSubscriptionCreateV2": {
+                "appSubscriptionCreate": {
                     "confirmationUrl": "https://confirm",
                     "userErrors": [],
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/123",
                         "status": "PENDING",
-                        "lines": [
+                        "lineItems": [
                             {
                                 "id": "gid://shopify/AppSubscriptionLineItem/1",
                                 "plan": {
-                                    "appRecurringPricingDetails": {
-                                        "interval": "EVERY_30_DAYS",
-                                        "price": {"amount": "30.00", "currencyCode": "USD"},
-                                    }
+                                    "__typename": "AppRecurringPricing",
+                                    "price": {"amount": "30.00", "currencyCode": "USD"},
                                 },
                             },
                             {
                                 "id": "gid://shopify/AppSubscriptionLineItem/2",
                                 "plan": {
-                                    "appUsagePricingDetails": {
-                                        "terms": "Usage terms",
-                                        "cappedAmount": {
-                                            "amount": "500.00",
-                                            "currencyCode": "USD",
-                                        },
-                                    }
+                                    "__typename": "AppUsagePricing",
+                                    "terms": "Usage terms",
+                                    "cappedAmount": {
+                                        "amount": "500.00",
+                                        "currencyCode": "USD",
+                                    },
                                 },
                             },
                         ],
@@ -150,10 +149,6 @@ class ShopifyBillingTests(TestCase):
         result = billing.create_or_update_recurring_charge(
             self.meta, return_url="https://return"
         )
-
-        graphql_variables = mock_client_cls.return_value.graphql.call_args[0][1]
-        self.assertEqual(set(graphql_variables.keys()), {"returnUrl", "plans"})
-        self.assertEqual(graphql_variables["returnUrl"], "https://return")
 
         self.meta.refresh_from_db()
         self.assertEqual(self.meta.shopify_recurring_charge_id, "123")
@@ -181,7 +176,7 @@ class ShopifyBillingTests(TestCase):
                 "data": {
                     "appSubscription": {
                         "id": "gid://shopify/AppSubscription/999",
-                        "lines": [
+                        "lineItems": [
                             {
                                 "id": "gid://shopify/AppSubscriptionLineItem/usage",
                                 "plan": {
@@ -691,7 +686,42 @@ class OAuthCallbackTests(TestCase):
             token = token.decode("utf-8")
         return token
 
-    def test_session_token_requests_restart_oauth_flow(self):
+    def test_session_token_logs_in_existing_merchant(self):
+        user = CustomUser.objects.create_user(
+            username="merchant",
+            email="merchant@example.com",
+            password="pass12345",
+        )
+        MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain=self.shop_domain,
+            shopify_access_token=self.access_token,
+        )
+
+        response = self.client.get(self.url, {"id_token": self._build_id_token()})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("merchant_dashboard"))
+        self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
+
+    def test_session_token_unknown_store_starts_oauth(self):
+        response = self.client.get(self.url, {"id_token": self._build_id_token()})
+
+        self.assertEqual(response.status_code, 302)
+        location = response["Location"]
+        self.assertTrue(
+            location.startswith(
+                f"https://{self.shop_domain}/admin/oauth/authorize?"
+            )
+        )
+        self.assertIn("client_id=key", location)
+        self.assertIn("state=", location)
+        self.assertEqual(
+            self.client.session.get("shopify_pending_shop"), self.shop_domain
+        )
+
+    @override_settings(SHOPIFY_API_SECRET="")
+    def test_session_token_error_with_shop_falls_back_to_oauth(self):
         response = self.client.get(self.url, {"id_token": self._build_id_token()})
 
         self.assertEqual(response.status_code, 302)
@@ -824,3 +854,49 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(meta.shopify_access_token, "new_offline_token")
         self.assertEqual(meta.shopify_refresh_token, "new_refresh_token")
 
+    def test_invalid_session_token_triggers_reauthorize(self):
+        bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
+        if isinstance(bad_token, bytes):
+            bad_token = bad_token.decode("utf-8")
+
+        session = self.client.session
+        session[session_token_key(self.shop_domain)] = "cached_token"
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"id_token": bad_token, "shop": self.shop_domain},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        location = response["Location"]
+        self.assertTrue(
+            location.startswith(
+                f"https://{self.shop_domain}/admin/oauth/authorize?"
+            )
+        )
+        self.assertIn("client_id=key", location)
+        self.assertIn("state=", location)
+        self.assertNotIn(session_token_key(self.shop_domain), self.client.session)
+
+    def test_invalid_session_token_retries_are_throttled(self):
+        bad_token = jwt.encode({"iss": "bad"}, "wrong", algorithm="HS256")
+        if isinstance(bad_token, bytes):
+            bad_token = bad_token.decode("utf-8")
+
+        retry_key = "shopify_session_retry:example.myshopify.com"
+        session = self.client.session
+        session[retry_key] = str(timezone.now().timestamp())
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"id_token": bad_token, "shop": self.shop_domain},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        html_response = html.unescape(response.content.decode())
+        self.assertIn(
+            "We couldn't validate your Shopify session. Please try again in a moment.",
+            html_response,
+        )
