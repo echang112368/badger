@@ -197,7 +197,6 @@ def _ensure_shopify_link(
         user.is_merchant = True
         user.save(update_fields=["is_merchant"])
 
-    _bootstrap_shopify_billing(request, meta)
     return meta
 
 
@@ -209,7 +208,9 @@ def _format_authorization_line(scope: str) -> str:
     return f"connected_at={timestamp}"
 
 
-def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None:
+def _bootstrap_shopify_billing(
+    request: HttpRequest, meta: MerchantMeta
+) -> Optional[str]:
     monthly_fee = getattr(meta, "monthly_fee", Decimal("0")) or Decimal("0")
     try:
         monthly_fee = Decimal(monthly_fee)
@@ -217,7 +218,7 @@ def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None
         monthly_fee = Decimal("0")
 
     if monthly_fee <= 0:
-        return
+        return None
 
     try:
         return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
@@ -225,9 +226,17 @@ def _bootstrap_shopify_billing(request: HttpRequest, meta: MerchantMeta) -> None
         return_url = request.build_absolute_uri("/")
 
     try:
-        billing.create_or_update_recurring_charge(meta, return_url=return_url)
+        charge = billing.create_or_update_recurring_charge(meta, return_url=return_url)
     except ShopifyBillingError as exc:
-        raise ValueError(f"Shopify billing setup failed: {exc}") from exc
+        logger.warning("Shopify billing setup failed for %s: %s", meta.pk, exc)
+        return None
+
+    confirmation_url = charge.get("confirmation_url") or meta.shopify_billing_confirmation_url
+    if not confirmation_url:
+        logger.info(
+            "Shopify billing created for %s but no confirmation URL was returned.", meta.pk
+        )
+    return confirmation_url
 
 
 def _render_shopify_error(request: HttpRequest, message: str, *, status_code: int = 400):
@@ -664,16 +673,27 @@ def oauth_callback(request: HttpRequest):
             user.is_merchant = True
             user.save(update_fields=["is_merchant"])
 
+    confirmation_url: Optional[str] = None
+    if meta:
+        confirmation_url = _bootstrap_shopify_billing(request, meta)
+
     app_key = getattr(settings, "SHOPIFY_API_KEY", "").strip()
     if not app_key:
         # This should not happen because the OAuth service guards against it,
         # but fall back to redirecting directly to the embedded app so that we
         # at least return the user to the onboarding screen.
-        redirect_url = request.build_absolute_uri(
+        dashboard_url = request.build_absolute_uri(
             f"{reverse('shopify_embedded_home')}?{urlencode({'shop': normalised_shop})}"
         )
     else:
-        redirect_url = f"https://{normalised_shop}/admin/apps/{app_key}"
+        dashboard_url = f"https://{normalised_shop}/admin/apps/{app_key}"
+
+    redirect_url = confirmation_url or dashboard_url
+    if not confirmation_url:
+        logger.warning(
+            "No Shopify billing confirmation URL for %s; redirecting to app dashboard.",
+            normalised_shop,
+        )
     request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
     request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
 

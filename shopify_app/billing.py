@@ -17,6 +17,7 @@ from .oauth import normalise_shop_domain
 from .shopify_client import (
     ShopifyClient,
     ShopifyInvalidCredentialsError,
+    ShopifyGraphQLError,
     _parse_shopify_gid,
 )
 from .token_management import refresh_shopify_token
@@ -218,35 +219,33 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     price = _ensure_monthly_fee(meta)
     config = ShopifyBillingConfig.from_settings()
 
-    variables = {
-        "name": config.name,
-        "returnUrl": return_url,
-        "trialDays": config.trial_days,
-        "test": config.test_mode,
-        "price": str(price.quantize(Decimal("0.01"))),
-        "cappedAmount": str(config.capped_amount.quantize(Decimal("0.01"))),
-        "terms": config.terms,
-    }
-
     try:
-        payload = client.graphql(_APP_SUBSCRIPTION_CREATE_MUTATION, variables)
+        creation = client.create_app_subscription(
+            config.name,
+            price,
+            config.trial_days,
+            return_url,
+            test_mode=config.test_mode,
+            usage_capped_amount=config.capped_amount,
+            usage_terms=config.terms,
+        )
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
+    except ShopifyGraphQLError as exc:
+        raise ShopifyBillingError(str(exc)) from exc
+    except ShopifyBillingError:
+        raise
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    result = payload.get("data", {}).get("appSubscriptionCreate") or {}
-    user_errors = result.get("userErrors") or []
-    if user_errors:
-        raise ShopifyBillingError(_stringify_error_value(user_errors))
-
-    subscription = result.get("appSubscription")
+    subscription = creation.get("subscription")
+    confirmation_url = creation.get("confirmation_url") or ""
     if not isinstance(subscription, dict):
         raise ShopifyBillingError(
             "Unexpected response from Shopify when creating recurring charge."
         )
 
-    charge = _parse_app_subscription(subscription, confirmation_url=result.get("confirmationUrl"))
+    charge = _parse_app_subscription(subscription, confirmation_url=confirmation_url)
 
     _update_meta_from_charge(meta, charge)
     return charge
@@ -485,54 +484,6 @@ query SubscriptionById($id: ID!) {
           cappedAmount {
             amount
             currencyCode
-          }
-        }
-      }
-    }
-  }
-}
-"""
-
-
-_APP_SUBSCRIPTION_CREATE_MUTATION = """
-mutation CreateSubscription(
-  $name: String!
-  $returnUrl: URL!
-  $trialDays: Int!
-  $test: Boolean!
-  $price: Decimal!
-  $cappedAmount: Decimal!
-  $terms: String!
-) {
-  appSubscriptionCreate(
-    name: $name
-    returnUrl: $returnUrl
-    trialDays: $trialDays
-    test: $test
-    lineItems: [
-      { plan: { appRecurringPricingDetails: { interval: EVERY_30_DAYS, price: { amount: $price, currencyCode: USD } } } }
-      { plan: { appUsagePricingDetails: { cappedAmount: { amount: $cappedAmount, currencyCode: USD }, terms: $terms } } }
-    ]
-  ) {
-    confirmationUrl
-    userErrors {
-      field
-      message
-    }
-    appSubscription {
-      id
-      status
-      confirmationUrl
-      lineItems {
-        id
-        plan {
-          __typename
-          ... on AppRecurringPricing {
-            price { amount currencyCode }
-          }
-          ... on AppUsagePricing {
-            terms
-            cappedAmount { amount currencyCode }
           }
         }
       }
