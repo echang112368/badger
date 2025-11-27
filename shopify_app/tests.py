@@ -113,37 +113,32 @@ class ShopifyBillingTests(TestCase):
 
     @patch("shopify_app.billing.ShopifyClient")
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
-        mock_client_cls.return_value.graphql.return_value = {
-            "data": {
-                "appSubscriptionCreate": {
-                    "confirmationUrl": "https://confirm",
-                    "userErrors": [],
-                    "appSubscription": {
-                        "id": "gid://shopify/AppSubscription/123",
-                        "status": "PENDING",
-                        "lineItems": [
-                            {
-                                "id": "gid://shopify/AppSubscriptionLineItem/1",
-                                "plan": {
-                                    "__typename": "AppRecurringPricing",
-                                    "price": {"amount": "30.00", "currencyCode": "USD"},
-                                },
-                            },
-                            {
-                                "id": "gid://shopify/AppSubscriptionLineItem/2",
-                                "plan": {
-                                    "__typename": "AppUsagePricing",
-                                    "terms": "Usage terms",
-                                    "cappedAmount": {
-                                        "amount": "500.00",
-                                        "currencyCode": "USD",
-                                    },
-                                },
-                            },
-                        ],
+        mock_client_cls.return_value.create_app_subscription.return_value = {
+            "confirmation_url": "https://confirm",
+            "subscription": {
+                "id": "gid://shopify/AppSubscription/123",
+                "status": "PENDING",
+                "lineItems": [
+                    {
+                        "id": "gid://shopify/AppSubscriptionLineItem/1",
+                        "plan": {
+                            "__typename": "AppRecurringPricing",
+                            "price": {"amount": "30.00", "currencyCode": "USD"},
+                        },
                     },
-                }
-            }
+                    {
+                        "id": "gid://shopify/AppSubscriptionLineItem/2",
+                        "plan": {
+                            "__typename": "AppUsagePricing",
+                            "terms": "Usage terms",
+                            "cappedAmount": {
+                                "amount": "500.00",
+                                "currencyCode": "USD",
+                            },
+                        },
+                    },
+                ],
+            },
         }
 
         result = billing.create_or_update_recurring_charge(

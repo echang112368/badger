@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 import requests
@@ -89,9 +90,132 @@ class ShopifyClient:
 
         errors = payload.get("errors")
         if errors:
+            logger.error("Shopify GraphQL returned errors for %s: %s", query, errors)
             raise ShopifyGraphQLError("Shopify GraphQL request returned errors.", errors)
 
         return payload
+
+    def create_app_subscription(
+        self,
+        plan_name: str,
+        price_amount: Decimal,
+        trial_days: int,
+        return_url: str,
+        *,
+        test_mode: bool = True,
+        usage_capped_amount: Optional[Decimal] = None,
+        usage_terms: str = "",
+    ) -> Dict[str, Any]:
+        """Create a Shopify app subscription using the latest billing schema.
+
+        GraphQL errors are logged and re-raised as ``ShopifyGraphQError`` so that
+        callers can wrap them in billing-specific exceptions.
+        """
+
+        from .billing import ShopifyBillingError  # imported lazily to avoid cycles
+
+        if not plan_name or not return_url:
+            raise ShopifyBillingError(
+                "A plan name and return URL are required to create a Shopify subscription."
+            )
+
+        try:
+            normalized_price = Decimal(str(price_amount))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ShopifyBillingError("Invalid recurring price for Shopify subscription.") from exc
+
+        if normalized_price <= 0:
+            raise ShopifyBillingError("Recurring price must be greater than zero.")
+
+        recurring_line_item = {
+            "plan": {
+                "appRecurringPricingDetails": {
+                    "price": {"amount": str(normalized_price), "currencyCode": "USD"}
+                }
+            }
+        }
+
+        plan: Dict[str, Any] = {
+            "appRecurringPricingDetails": recurring_line_item["plan"][
+                "appRecurringPricingDetails"
+            ]
+        }
+
+        if usage_capped_amount is not None:
+            try:
+                normalized_cap = Decimal(str(usage_capped_amount))
+            except (InvalidOperation, TypeError, ValueError) as exc:
+                raise ShopifyBillingError("Invalid capped amount for usage pricing.") from exc
+
+            if normalized_cap <= 0:
+                raise ShopifyBillingError("Usage pricing capped amount must be positive.")
+
+            plan["appUsagePricingDetails"] = {
+                "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
+                "terms": usage_terms or "",
+            }
+
+        variables: Dict[str, Any] = {
+            "name": plan_name,
+            "returnUrl": return_url,
+            "trialDays": int(trial_days),
+            "test": bool(test_mode),
+            "plan": plan,
+        }
+
+        sanitized_plan = {
+            "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
+        }
+        if "appUsagePricingDetails" in plan:
+            sanitized_plan["appUsagePricingDetails"] = {
+                "terms": plan["appUsagePricingDetails"].get("terms", ""),
+                "cappedAmount": plan["appUsagePricingDetails"].get("cappedAmount"),
+            }
+
+        logger.info(
+            "Creating Shopify subscription for %s with variables: %s",
+            self.store_domain,
+            {**{k: v for k, v in variables.items() if k != "plan"}, "plan": sanitized_plan},
+        )
+
+        try:
+            payload = self.graphql(_APP_SUBSCRIPTION_CREATE_MUTATION, variables)
+        except ShopifyGraphQLError:
+            logger.exception(
+                "Shopify GraphQL billing mutation failed for %s.", self.store_domain
+            )
+            raise
+
+        result = payload.get("data", {}).get("appSubscriptionCreate") or {}
+        user_errors = result.get("userErrors") or []
+        if user_errors:
+            logger.warning(
+                "Shopify returned userErrors during subscription creation for %s: %s",
+                self.store_domain,
+                user_errors,
+            )
+            raise ShopifyBillingError(_stringify_graphql_errors(user_errors))
+
+        subscription = result.get("appSubscription") or {}
+        confirmation_url = result.get("confirmationUrl") or subscription.get(
+            "confirmationUrl", ""
+        )
+
+        if not subscription:
+            raise ShopifyBillingError(
+                "Shopify did not return a subscription record when creating billing."
+            )
+
+        if not confirmation_url:
+            logger.warning(
+                "Shopify subscription created for %s without confirmation URL.",
+                self.store_domain,
+            )
+
+        return {
+            "subscription": subscription,
+            "confirmation_url": confirmation_url,
+        }
 
     def search_products(
         self, query: Optional[str], *, cursor: Optional[str] = None, limit: int = 20
@@ -271,6 +395,67 @@ def _parse_money_value(value):
     if isinstance(value, dict):
         return value.get("amount")
     return value
+
+
+def _stringify_graphql_errors(value: Any) -> str:
+    """Return a string representation of nested GraphQL errors for logging."""
+
+    if isinstance(value, dict):
+        parts = []
+        for key, inner in value.items():
+            nested = _stringify_graphql_errors(inner)
+            if nested:
+                parts.append(f"{key}: {nested}")
+        return "; ".join(parts)
+
+    if isinstance(value, (list, tuple, set)):
+        parts = [_stringify_graphql_errors(item) for item in value]
+        return "; ".join(part for part in parts if part)
+
+    return str(value)
+
+
+_APP_SUBSCRIPTION_CREATE_MUTATION = """
+mutation AppSubscriptionCreate(
+  $name: String!,
+  $returnUrl: URL!,
+  $test: Boolean!,
+  $trialDays: Int,
+  $plan: AppPlanV2Input!
+) {
+  appSubscriptionCreateV2(
+    name: $name
+    returnUrl: $returnUrl
+    test: $test
+    trialDays: $trialDays
+    plan: $plan
+  ) {
+    confirmationUrl
+    userErrors {
+      field
+      message
+    }
+    appSubscription {
+      id
+      status
+      confirmationUrl
+      lineItems {
+        id
+        plan {
+          __typename
+          ... on AppRecurringPricing {
+            price { amount currencyCode }
+          }
+          ... on AppUsagePricing {
+            terms
+            cappedAmount { amount currencyCode }
+          }
+        }
+      }
+    }
+  }
+}
+"""
 
 
 _PRODUCTS_QUERY = """
