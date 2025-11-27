@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 import requests
@@ -89,9 +90,91 @@ class ShopifyClient:
 
         errors = payload.get("errors")
         if errors:
+            logger.error("Shopify GraphQL returned errors for %s: %s", query, errors)
             raise ShopifyGraphQLError("Shopify GraphQL request returned errors.", errors)
 
         return payload
+
+    def create_app_subscription(
+        self,
+        *,
+        return_url: str,
+        price_amount: Decimal,
+        interval: str = "EVERY_30_DAYS",
+        currency_code: str = "USD",
+    ) -> Dict[str, Any]:
+        """Create a Shopify app subscription using Billing V2.
+
+        Billing V2 replaces the legacy line-item based payload with
+        ``appSubscriptionCreateV2`` that accepts a list of ``AppPlanV2Input``
+        entries. Only the confirmation URL and any user errors are returned, so
+        callers must rely on the redirect flow rather than subscription fields
+        that no longer exist in the response body.
+        """
+
+        from .billing import ShopifyBillingError  # imported lazily to avoid cycles
+
+        if not return_url:
+            raise ShopifyBillingError(
+                "A return URL is required to create a Shopify subscription."
+            )
+
+        try:
+            normalized_price = Decimal(str(price_amount))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ShopifyBillingError("Invalid recurring price for Shopify subscription.") from exc
+
+        if normalized_price <= 0:
+            raise ShopifyBillingError("Recurring price must be greater than zero.")
+
+        variables: Dict[str, Any] = {
+            "returnUrl": return_url,
+            "plans": [
+                {
+                    "appRecurringPricingDetails": {
+                        "interval": interval,
+                        "price": {
+                            "amount": str(normalized_price),
+                            "currencyCode": currency_code,
+                        },
+                    }
+                }
+            ],
+        }
+
+        logger.info(
+            "Creating Shopify subscription (Billing V2) for %s with variables: %s",
+            self.store_domain,
+            {**variables, "plans": ["<redacted>"]},
+        )
+
+        try:
+            payload = self.graphql(_APP_SUBSCRIPTION_CREATE_MUTATION, variables)
+        except ShopifyGraphQLError as exc:
+            logger.exception(
+                "Shopify GraphQL billing mutation failed for %s.", self.store_domain
+            )
+            raise ShopifyBillingError("Shopify GraphQL request failed during billing.") from exc
+
+        result = payload.get("data", {}).get("appSubscriptionCreateV2") or {}
+        user_errors = result.get("userErrors") or []
+        if user_errors:
+            logger.warning(
+                "Shopify returned userErrors during subscription creation for %s: %s",
+                self.store_domain,
+                user_errors,
+            )
+            raise ShopifyBillingError(_stringify_graphql_errors(user_errors))
+
+        confirmation_url = result.get("confirmationUrl", "")
+
+        if not confirmation_url:
+            logger.warning(
+                "Shopify subscription created for %s without confirmation URL (Billing V2).",
+                self.store_domain,
+            )
+
+        return {"confirmation_url": confirmation_url}
 
     def search_products(
         self, query: Optional[str], *, cursor: Optional[str] = None, limit: int = 20
@@ -271,6 +354,44 @@ def _parse_money_value(value):
     if isinstance(value, dict):
         return value.get("amount")
     return value
+
+
+def _stringify_graphql_errors(value: Any) -> str:
+    """Return a string representation of nested GraphQL errors for logging."""
+
+    if isinstance(value, dict):
+        parts = []
+        for key, inner in value.items():
+            nested = _stringify_graphql_errors(inner)
+            if nested:
+                parts.append(f"{key}: {nested}")
+        return "; ".join(parts)
+
+    if isinstance(value, (list, tuple, set)):
+        parts = [_stringify_graphql_errors(item) for item in value]
+        return "; ".join(part for part in parts if part)
+
+    return str(value)
+
+
+_APP_SUBSCRIPTION_CREATE_MUTATION = """
+mutation AppSubscriptionCreate(
+  $returnUrl: URL!,
+  $plans: [AppPlanV2Input!]!
+) {
+  appSubscriptionCreateV2(
+    returnUrl: $returnUrl
+    plans: $plans
+  ) {
+    confirmationUrl
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
 
 
 _PRODUCTS_QUERY = """
