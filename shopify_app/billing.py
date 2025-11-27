@@ -16,6 +16,7 @@ from merchants.models import MerchantMeta
 from .oauth import normalise_shop_domain
 from .shopify_client import (
     ShopifyClient,
+    ShopifyGraphQLError,
     ShopifyInvalidCredentialsError,
     _parse_shopify_gid,
 )
@@ -218,24 +219,41 @@ def create_or_update_recurring_charge(meta: MerchantMeta, *, return_url: str) ->
     price = _ensure_monthly_fee(meta)
     config = ShopifyBillingConfig.from_settings()
 
+    price_value = str(price.quantize(Decimal("0.01")))
+    capped_amount_value = str(config.capped_amount.quantize(Decimal("0.01")))
     variables = {
-        "name": config.name,
+        # Shopify API 2024-07+ expects only the return URL and plans built from AppPlanV2Input.
         "returnUrl": return_url,
-        "trialDays": config.trial_days,
-        "test": config.test_mode,
-        "price": str(price.quantize(Decimal("0.01"))),
-        "cappedAmount": str(config.capped_amount.quantize(Decimal("0.01"))),
-        "terms": config.terms,
+        "plans": [
+            {
+                "appRecurringPricingDetails": {
+                    "interval": "EVERY_30_DAYS",
+                    "price": {"amount": price_value, "currencyCode": "USD"},
+                }
+            },
+            {
+                "appUsagePricingDetails": {
+                    "cappedAmount": {
+                        "amount": capped_amount_value,
+                        "currencyCode": "USD",
+                    },
+                    "terms": config.terms,
+                }
+            },
+        ],
     }
 
     try:
         payload = client.graphql(_APP_SUBSCRIPTION_CREATE_MUTATION, variables)
+    except ShopifyGraphQLError as exc:
+        raise ShopifyBillingError(str(exc)) from exc
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(meta.shopify_store_domain) from exc
     except HTTPError as exc:
         raise ShopifyBillingError(_describe_shopify_http_error(exc)) from exc
 
-    result = payload.get("data", {}).get("appSubscriptionCreate") or {}
+    # Shopify API 2024-07 replaces appSubscriptionCreate with appSubscriptionCreateV2
+    result = payload.get("data", {}).get("appSubscriptionCreateV2") or {}
     user_errors = result.get("userErrors") or []
     if user_errors:
         raise ShopifyBillingError(_stringify_error_value(user_errors))
@@ -427,14 +445,32 @@ def _load_subscription(client: ShopifyClient, subscription_gid: str) -> dict:
     return subscription
 
 
+def _iter_subscription_lines(subscription: dict):
+    """Iterate over subscription lines regardless of legacy or V2 naming."""
+
+    lines = subscription.get("lines")
+    if not lines:
+        lines = subscription.get("lineItems")
+
+    for line in lines or []:
+        yield line or {}
+
+
 def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -> dict:
     if not isinstance(subscription, dict):
         return {}
 
     recurring_line = None
     usage_line = None
-    for line in subscription.get("lineItems", []) or []:
+    for line in _iter_subscription_lines(subscription):
         plan = line.get("plan", {}) or {}
+
+        # Shopify API 2024-07 exposes pricing via AppPlanV2 which nests pricing details
+        if "appRecurringPricingDetails" in plan:
+            recurring_line = plan.get("appRecurringPricingDetails") or {}
+        if "appUsagePricingDetails" in plan:
+            usage_line = plan.get("appUsagePricingDetails") or {}
+
         typename = plan.get("__typename", "")
         if typename == "AppRecurringPricing":
             recurring_line = plan
@@ -447,6 +483,8 @@ def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -
     return {
         "id": _parse_shopify_gid(subscription.get("id")),
         "status": subscription.get("status"),
+        # appSubscriptionCreateV2 returns confirmationUrl on the mutation result; older API
+        # responses may also include it on the subscription record.
         "confirmation_url": confirmation_url or subscription.get("confirmationUrl", ""),
         "terms": (usage_line or {}).get("terms", ""),
         "capped_amount": capped_info.get("amount"),
@@ -456,7 +494,7 @@ def _parse_app_subscription(subscription: dict, *, confirmation_url: str = "") -
 
 
 def _extract_usage_line_item_id(subscription: dict) -> Optional[str]:
-    for line in subscription.get("lineItems", []) or []:
+    for line in _iter_subscription_lines(subscription):
         plan = line.get("plan", {}) or {}
         if plan.get("__typename") == "AppUsagePricing" and line.get("id"):
             return line.get("id")
@@ -468,24 +506,16 @@ query SubscriptionById($id: ID!) {
   appSubscription(id: $id) {
     id
     status
-    confirmationUrl
-    lineItems {
+    lines {
       id
       plan {
-        __typename
-        ... on AppRecurringPricing {
+        appRecurringPricingDetails {
           interval
-          price {
-            amount
-            currencyCode
-          }
+          price { amount currencyCode }
         }
-        ... on AppUsagePricing {
+        appUsagePricingDetails {
           terms
-          cappedAmount {
-            amount
-            currencyCode
-          }
+          cappedAmount { amount currencyCode }
         }
       }
     }
@@ -494,25 +524,17 @@ query SubscriptionById($id: ID!) {
 """
 
 
+# Shopify API 2024-07 removed the legacy billing types; use the V2 mutation
+# with AppPlanV2Input-based plans to avoid deprecated fragments and unused
+# variables.
 _APP_SUBSCRIPTION_CREATE_MUTATION = """
 mutation CreateSubscription(
-  $name: String!
-  $returnUrl: URL!
-  $trialDays: Int!
-  $test: Boolean!
-  $price: Decimal!
-  $cappedAmount: Decimal!
-  $terms: String!
+  $returnUrl: URL!,
+  $plans: [AppPlanV2Input!]!,
 ) {
-  appSubscriptionCreate(
-    name: $name
+  appSubscriptionCreateV2(
     returnUrl: $returnUrl
-    trialDays: $trialDays
-    test: $test
-    lineItems: [
-      { plan: { appRecurringPricingDetails: { interval: EVERY_30_DAYS, price: { amount: $price, currencyCode: USD } } } }
-      { plan: { appUsagePricingDetails: { cappedAmount: { amount: $cappedAmount, currencyCode: USD }, terms: $terms } } }
-    ]
+    plans: $plans
   ) {
     confirmationUrl
     userErrors {
@@ -522,15 +544,14 @@ mutation CreateSubscription(
     appSubscription {
       id
       status
-      confirmationUrl
-      lineItems {
+      lines {
         id
         plan {
-          __typename
-          ... on AppRecurringPricing {
+          appRecurringPricingDetails {
+            interval
             price { amount currencyCode }
           }
-          ... on AppUsagePricing {
+          appUsagePricingDetails {
             terms
             cappedAmount { amount currencyCode }
           }
