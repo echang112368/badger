@@ -96,7 +96,15 @@ class ShopifyClient:
         return payload
 
     def create_app_subscription(
-        self, plan_name: str, price_amount: Decimal, return_url: str, *, test_mode: bool = True
+        self,
+        plan_name: str,
+        price_amount: Decimal,
+        trial_days: int,
+        return_url: str,
+        *,
+        test_mode: bool = True,
+        usage_capped_amount: Optional[Decimal] = None,
+        usage_terms: str = "",
     ) -> Dict[str, Any]:
         """Create a Shopify app subscription using the latest billing schema.
 
@@ -119,36 +127,55 @@ class ShopifyClient:
         if normalized_price <= 0:
             raise ShopifyBillingError("Recurring price must be greater than zero.")
 
+        recurring_line_item = {
+            "plan": {
+                "appRecurringPricingDetails": {
+                    "price": {"amount": str(normalized_price), "currencyCode": "USD"}
+                }
+            }
+        }
+
+        plan: Dict[str, Any] = {
+            "appRecurringPricingDetails": recurring_line_item["plan"][
+                "appRecurringPricingDetails"
+            ]
+        }
+
+        if usage_capped_amount is not None:
+            try:
+                normalized_cap = Decimal(str(usage_capped_amount))
+            except (InvalidOperation, TypeError, ValueError) as exc:
+                raise ShopifyBillingError("Invalid capped amount for usage pricing.") from exc
+
+            if normalized_cap <= 0:
+                raise ShopifyBillingError("Usage pricing capped amount must be positive.")
+
+            plan["appUsagePricingDetails"] = {
+                "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
+                "terms": usage_terms or "",
+            }
+
         variables: Dict[str, Any] = {
             "name": plan_name,
             "returnUrl": return_url,
+            "trialDays": int(trial_days),
             "test": bool(test_mode),
-            "plans": [
-                {
-                    "appRecurringPricingDetails": {
-                        "interval": "EVERY_30_DAYS",
-                        "price": {
-                            "amount": str(normalized_price),
-                            "currencyCode": "USD",
-                        },
-                    }
-                }
-            ],
+            "plan": plan,
         }
+
+        sanitized_plan = {
+            "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
+        }
+        if "appUsagePricingDetails" in plan:
+            sanitized_plan["appUsagePricingDetails"] = {
+                "terms": plan["appUsagePricingDetails"].get("terms", ""),
+                "cappedAmount": plan["appUsagePricingDetails"].get("cappedAmount"),
+            }
 
         logger.info(
             "Creating Shopify subscription for %s with variables: %s",
             self.store_domain,
-            {
-                **{k: v for k, v in variables.items() if k != "plans"},
-                "plans": [
-                    {
-                        "appRecurringPricingDetails": variables["plans"][0][
-                            "appRecurringPricingDetails"
-                        ]
-                    }
-                ],
-            },
+            {**{k: v for k, v in variables.items() if k != "plan"}, "plan": sanitized_plan},
         )
 
         try:
@@ -159,7 +186,7 @@ class ShopifyClient:
             )
             raise
 
-        result = payload.get("data", {}).get("appSubscriptionCreateV2") or {}
+        result = payload.get("data", {}).get("appSubscriptionCreate") or {}
         user_errors = result.get("userErrors") or []
         if user_errors:
             logger.warning(
@@ -170,7 +197,9 @@ class ShopifyClient:
             raise ShopifyBillingError(_stringify_graphql_errors(user_errors))
 
         subscription = result.get("appSubscription") or {}
-        confirmation_url = result.get("confirmationUrl") or ""
+        confirmation_url = result.get("confirmationUrl") or subscription.get(
+            "confirmationUrl", ""
+        )
 
         if not subscription:
             raise ShopifyBillingError(
@@ -184,8 +213,8 @@ class ShopifyClient:
             )
 
         return {
-            "appSubscription": subscription,
-            "confirmationUrl": confirmation_url,
+            "subscription": subscription,
+            "confirmation_url": confirmation_url,
         }
 
     def search_products(
@@ -390,14 +419,16 @@ _APP_SUBSCRIPTION_CREATE_MUTATION = """
 mutation AppSubscriptionCreate(
   $name: String!,
   $returnUrl: URL!,
-  $plans: [AppPlanV2Input!]!,
-  $test: Boolean
+  $test: Boolean!,
+  $trialDays: Int,
+  $plan: AppPlanV2Input!
 ) {
   appSubscriptionCreateV2(
     name: $name
     returnUrl: $returnUrl
-    plans: $plans
     test: $test
+    trialDays: $trialDays
+    plan: $plan
   ) {
     confirmationUrl
     userErrors {
@@ -407,6 +438,20 @@ mutation AppSubscriptionCreate(
     appSubscription {
       id
       status
+      confirmationUrl
+      lineItems {
+        id
+        plan {
+          __typename
+          ... on AppRecurringPricing {
+            price { amount currencyCode }
+          }
+          ... on AppUsagePricing {
+            terms
+            cappedAmount { amount currencyCode }
+          }
+        }
+      }
     }
   }
 }
