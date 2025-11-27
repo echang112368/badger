@@ -356,10 +356,8 @@ class MerchantSettingsTests(TestCase):
 
         self.client.force_login(user)
         response = self.client.post(reverse("merchant_start_shopify_billing"))
-        self.assertEqual(response.status_code, 401)
-        data = response.json()
-        self.assertIn("authorize_url", data)
-        self.assertIn("error", data)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url)
 
     def test_start_shopify_billing_requires_shopify_type(self):
         user = CustomUser.objects.create_user(
