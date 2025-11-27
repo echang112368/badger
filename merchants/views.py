@@ -30,7 +30,7 @@ from shopify_app import billing as shopify_billing
 from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
 from shopify_app.views import build_shopify_authorize_url
 from ledger.models import LedgerEntry, MerchantInvoice
-from django.http import HttpResponseForbidden, JsonResponse, QueryDict
+from django.http import HttpResponseForbidden, HttpResponseRedirect, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from urllib.parse import urlparse, urlencode
@@ -1088,6 +1088,9 @@ def start_shopify_billing(request):
             merchant_meta.shopify_store_domain,
             str(exc),
         )
+        authorize_url = payload.get("authorize_url")
+        if authorize_url:
+            return HttpResponseRedirect(authorize_url)
         return JsonResponse(payload, status=401)
     except shopify_billing.ShopifyBillingError as exc:
         logger.error(
