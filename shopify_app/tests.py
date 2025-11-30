@@ -114,29 +114,21 @@ class ShopifyBillingTests(TestCase):
     @patch("shopify_app.billing.ShopifyClient")
     def test_create_recurring_charge_updates_meta(self, mock_client_cls):
         mock_client_cls.return_value.create_app_subscription.return_value = {
-            "confirmation_url": "https://confirm",
-            "subscription": {
+            "confirmationUrl": "https://confirm",
+            "appSubscription": {
                 "id": "gid://shopify/AppSubscription/123",
                 "status": "PENDING",
-                "lineItems": [
+                "lines": [
                     {
                         "id": "gid://shopify/AppSubscriptionLineItem/1",
                         "plan": {
-                            "__typename": "AppRecurringPricing",
-                            "price": {"amount": "30.00", "currencyCode": "USD"},
+                            "pricingDetails": {
+                                "__typename": "AppRecurringPricing",
+                                "interval": "EVERY_30_DAYS",
+                                "price": {"amount": "30.00", "currencyCode": "USD"},
+                            }
                         },
-                    },
-                    {
-                        "id": "gid://shopify/AppSubscriptionLineItem/2",
-                        "plan": {
-                            "__typename": "AppUsagePricing",
-                            "terms": "Usage terms",
-                            "cappedAmount": {
-                                "amount": "500.00",
-                                "currencyCode": "USD",
-                            },
-                        },
-                    },
+                    }
                 ],
             },
         }
@@ -148,7 +140,6 @@ class ShopifyBillingTests(TestCase):
         self.meta.refresh_from_db()
         self.assertEqual(self.meta.shopify_recurring_charge_id, "123")
         self.assertEqual(self.meta.shopify_billing_status, "PENDING")
-        self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
         self.assertEqual(result["id"], "123")
 
     def test_ensure_active_charge_requires_status(self):
@@ -159,57 +150,13 @@ class ShopifyBillingTests(TestCase):
         with self.assertRaises(billing.ShopifyBillingError):
             billing.ensure_active_charge(self.meta)
 
-    @patch("shopify_app.billing.ShopifyClient")
-    def test_create_usage_charge(self, mock_client_cls):
-        self.meta.shopify_recurring_charge_id = "999"
-        self.meta.shopify_billing_status = "active"
-        self.meta.save()
-
-        mock_client = mock_client_cls.return_value
-        mock_client.graphql.side_effect = [
-            {
-                "data": {
-                    "appSubscription": {
-                        "id": "gid://shopify/AppSubscription/999",
-                        "lineItems": [
-                            {
-                                "id": "gid://shopify/AppSubscriptionLineItem/usage",
-                                "plan": {
-                                    "__typename": "AppUsagePricing",
-                                    "terms": "Usage terms",
-                                    "cappedAmount": {
-                                        "amount": "500.00",
-                                        "currencyCode": "USD",
-                                    },
-                                },
-                            }
-                        ],
-                    }
-                }
-            },
-            {
-                "data": {
-                    "appUsageRecordCreate": {
-                        "appUsageRecord": {
-                            "id": "gid://shopify/AppUsageRecord/55",
-                            "description": "Test charge",
-                            "price": {"amount": "10.25", "currencyCode": "USD"},
-                        },
-                        "userErrors": [],
-                    }
-                }
-            },
-        ]
-
-        details = billing.create_usage_charge(
-            self.meta,
-            amount=Decimal("10.25"),
-            description="Test charge",
-        )
-
-        mock_client.graphql.assert_called()
-        self.assertEqual(details.charge_id, "55")
-        self.assertEqual(details.amount, Decimal("10.25"))
+    def test_create_usage_charge_rejected(self):
+        with self.assertRaises(billing.ShopifyBillingError):
+            billing.create_usage_charge(
+                self.meta,
+                amount=Decimal("10.25"),
+                description="Test charge",
+            )
 
 
 class ShopifyBillingReturnTests(TestCase):
