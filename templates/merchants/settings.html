@@ -981,26 +981,6 @@
     return text;
   }
 
-  function redirectToShopifyAuthorize(authorizeUrl,message){
-    if(!authorizeUrl){
-      return false;
-    }
-
-    if(typeof setShopifyFeedback==='function'){
-      setShopifyFeedback(message||'Redirecting you to Shopify to reconnect your store…');
-    }
-
-    const targetWindow=window.top||window;
-    try{
-      targetWindow.location.assign(authorizeUrl);
-    }catch(assignError){
-      console.warn('Failed to assign top-level location, falling back to window.open',assignError);
-      window.open(authorizeUrl,'_blank','noopener');
-    }
-
-    return true;
-  }
-
   function syncBillingPlanInputs(plan){
     if(!plan){
       return;
@@ -1045,9 +1025,10 @@
       const data=await response.json().catch(()=>({}));
 
       if(response.status===401&&data&&data.authorize_url){
-        redirectToShopifyAuthorize(
-          data.authorize_url,
-          data.error||'Shopify rejected the request. Redirecting to reconnect your store…'
+        setShopifyFeedback(
+          (data.error||'Shopify rejected the request. Please reinstall the app to continue.')+
+            ` Visit ${data.authorize_url} to reconnect.`,
+          true
         );
         return;
       }
@@ -1114,13 +1095,6 @@
       });
 
       const data=await response.json().catch(()=>({}));
-      if(response.status===401&&data&&data.authorize_url){
-        redirectToShopifyAuthorize(
-          data.authorize_url,
-          data.error||'Shopify rejected the request. Redirecting to reconnect your store…'
-        );
-        return;
-      }
       if(!response.ok){
         const message=data&&data.error?data.error:'';
         setShopifyFeedback(describeShopifyBillingError(message),true);
