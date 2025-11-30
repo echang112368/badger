@@ -16,7 +16,6 @@ from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
 from django.urls import reverse
 
-from shopify_app import billing as shopify_billing
 
 
 class ShopifyBillingConfirmationRequired(RuntimeError):
@@ -324,54 +323,9 @@ def create_invoice_for_merchant(merchant):
         return None
 
     if business_type == MerchantMeta.BusinessType.SHOPIFY:
-        try:
-            shopify_billing.ensure_active_charge(meta)
-        except shopify_billing.ShopifyBillingError:
-            try:
-                return_url = _build_shopify_return_url()
-            except RuntimeError as exc:
-                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
-
-            try:
-                shopify_billing.create_or_update_recurring_charge(
-                    meta,
-                    return_url=return_url,
-                )
-            except shopify_billing.ShopifyBillingError as exc:
-                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
-
-            meta.refresh_from_db()
-            raise ShopifyBillingConfirmationRequired(merchant, meta)
-
-        description_components = [
-            f"{name} ${amount.quantize(Decimal('0.01'))}" for name, amount in components
-        ]
-        description = "Badger usage charge"
-        if description_components:
-            description = f"{description} ({'; '.join(description_components)})"
-
-        charge_details = shopify_billing.create_usage_charge(
-            meta,
-            amount=total,
-            description=description,
-        )
-
-        total_amount = charge_details.amount.quantize(Decimal("0.01"))
-
-        with transaction.atomic():
-            invoice = MerchantInvoice.objects.create(
-                merchant=merchant,
-                provider=MerchantInvoice.Provider.SHOPIFY,
-                status="CHARGED",
-                due_date=timezone.now().date(),
-                total_amount=total_amount,
-                shopify_charge_id=charge_details.charge_id or None,
-                shopify_status=charge_details.status,
-                shopify_payload=charge_details.raw,
-            )
-            entries.update(invoice=invoice, paid=True)
-
-        return invoice
+        # Shopify billing is now handled by the Node.js module in shopify_billing/.
+        # Skip invoice creation here and let the external service manage charges.
+        return None
 
     access_token = _get_paypal_access_token()
     headers = {
