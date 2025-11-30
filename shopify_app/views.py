@@ -19,7 +19,7 @@ from django.http import (
 )
 from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods
 from rest_framework import status
@@ -29,8 +29,6 @@ from rest_framework.response import Response
 
 from merchants.models import MerchantMeta
 
-from . import billing
-from .billing import ShopifyBillingError
 from .discounts import select_discount_percentage
 from .forms import ShopifyOAuthSignupForm
 from .oauth import (
@@ -206,37 +204,6 @@ def _format_authorization_line(scope: str) -> str:
     if scope_value:
         return f"scope={scope_value};connected_at={timestamp}"
     return f"connected_at={timestamp}"
-
-
-def _bootstrap_shopify_billing(
-    request: HttpRequest, meta: MerchantMeta
-) -> Optional[str]:
-    monthly_fee = getattr(meta, "monthly_fee", Decimal("0")) or Decimal("0")
-    try:
-        monthly_fee = Decimal(monthly_fee)
-    except (TypeError, ValueError):
-        monthly_fee = Decimal("0")
-
-    if monthly_fee <= 0:
-        return None
-
-    try:
-        return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
-    except NoReverseMatch:
-        return_url = request.build_absolute_uri("/")
-
-    try:
-        charge = billing.create_or_update_recurring_charge(meta, return_url=return_url)
-    except ShopifyBillingError as exc:
-        logger.warning("Shopify billing setup failed for %s: %s", meta.pk, exc)
-        return None
-
-    confirmation_url = charge.get("confirmation_url") or meta.shopify_billing_confirmation_url
-    if not confirmation_url:
-        logger.info(
-            "Shopify billing created for %s but no confirmation URL was returned.", meta.pk
-        )
-    return confirmation_url
 
 
 def _render_shopify_error(request: HttpRequest, message: str, *, status_code: int = 400):
@@ -674,8 +641,6 @@ def oauth_callback(request: HttpRequest):
             user.save(update_fields=["is_merchant"])
 
     confirmation_url: Optional[str] = None
-    if meta:
-        confirmation_url = _bootstrap_shopify_billing(request, meta)
 
     app_key = getattr(settings, "SHOPIFY_API_KEY", "").strip()
     if not app_key:
@@ -715,27 +680,12 @@ def billing_return(request: HttpRequest) -> HttpResponse:
 
     shop = normalise_shop_domain(request.GET.get("shop", ""))
     status_code = 200
-    message = "Your Shopify subscription is active. You may close this window."
-
     if not shop:
         status_code = 400
-        message = "Missing shop identifier in the billing confirmation URL."
-    else:
-        meta = (
-            MerchantMeta.objects.select_related("user")
-            .filter(shopify_store_domain__iexact=shop)
-            .first()
-        )
-
-        if not meta:
-            status_code = 404
-            message = "We could not locate a merchant record for this Shopify store."
-        else:
-            try:
-                billing.ensure_active_charge(meta)
-            except ShopifyBillingError as exc:
-                status_code = 400
-                message = f"Shopify billing is not active: {exc}"
+    message = (
+        "Billing confirmation is now handled by the new Node.js billing module. "
+        "You can close this window."
+    )
 
     context = {"shop_domain": shop, "message": message, "status_code": status_code}
     return render(
