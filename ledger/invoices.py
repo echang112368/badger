@@ -11,13 +11,12 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Sum
 from django.contrib.auth import get_user_model
-from django.urls import reverse
-
-from shopify_app import billing as shopify_billing
 
 from .models import LedgerEntry, MerchantInvoice
 from merchants.models import MerchantMeta
+from django.urls import reverse
 
+from shopify_app import billing as shopify_billing
 
 
 class ShopifyBillingConfirmationRequired(RuntimeError):
@@ -216,11 +215,7 @@ def create_invoice_for_merchant(merchant):
     entries = _pending_entries()
 
     monthly_fee = Decimal("0.00")
-    affiliate_exists = entries.filter(entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT).exists()
-
-    if meta and meta.monthly_fee and (
-        not shopify_business or affiliate_exists or not entries.exists()
-    ):
+    if meta and meta.monthly_fee:
         monthly_fee = meta.monthly_fee.quantize(Decimal("0.01"))
         if monthly_fee > 0:
             has_monthly_fee = entries.filter(
@@ -332,31 +327,47 @@ def create_invoice_for_merchant(merchant):
         try:
             shopify_billing.ensure_active_charge(meta)
         except shopify_billing.ShopifyBillingError:
-            # Initiate or refresh the subscription and ask the merchant to confirm.
-            return_url = _build_shopify_return_url()
-            shopify_billing.create_or_update_recurring_charge(
-                meta,
-                return_url=return_url,
-            )
+            try:
+                return_url = _build_shopify_return_url()
+            except RuntimeError as exc:
+                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
+
+            try:
+                shopify_billing.create_or_update_recurring_charge(
+                    meta,
+                    return_url=return_url,
+                )
+            except shopify_billing.ShopifyBillingError as exc:
+                raise ShopifyBillingConfirmationRequired(merchant, meta, str(exc)) from exc
+
+            meta.refresh_from_db()
             raise ShopifyBillingConfirmationRequired(merchant, meta)
 
-        description = "Badger monthly invoice"
-        charge = shopify_billing.create_usage_charge(
+        description_components = [
+            f"{name} ${amount.quantize(Decimal('0.01'))}" for name, amount in components
+        ]
+        description = "Badger usage charge"
+        if description_components:
+            description = f"{description} ({'; '.join(description_components)})"
+
+        charge_details = shopify_billing.create_usage_charge(
             meta,
             amount=total,
             description=description,
         )
 
+        total_amount = charge_details.amount.quantize(Decimal("0.01"))
+
         with transaction.atomic():
             invoice = MerchantInvoice.objects.create(
                 merchant=merchant,
                 provider=MerchantInvoice.Provider.SHOPIFY,
-                status=charge.status or "processed",
+                status="CHARGED",
                 due_date=timezone.now().date(),
-                total_amount=total.quantize(Decimal("0.01")),
-                shopify_charge_id=charge.charge_id,
-                shopify_status=charge.status,
-                shopify_payload=charge.raw or {},
+                total_amount=total_amount,
+                shopify_charge_id=charge_details.charge_id or None,
+                shopify_status=charge_details.status,
+                shopify_payload=charge_details.raw,
             )
             entries.update(invoice=invoice, paid=True)
 
