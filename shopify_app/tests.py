@@ -122,18 +122,22 @@ class ShopifyBillingTests(TestCase):
                     {
                         "id": "gid://shopify/AppSubscriptionLineItem/1",
                         "plan": {
-                            "__typename": "AppRecurringPricing",
-                            "price": {"amount": "30.00", "currencyCode": "USD"},
+                            "pricingDetails": {
+                                "__typename": "AppRecurringPricing",
+                                "price": {"amount": "30.00", "currencyCode": "USD"},
+                            },
                         },
                     },
                     {
                         "id": "gid://shopify/AppSubscriptionLineItem/2",
                         "plan": {
-                            "__typename": "AppUsagePricing",
-                            "terms": "Usage terms",
-                            "cappedAmount": {
-                                "amount": "500.00",
-                                "currencyCode": "USD",
+                            "pricingDetails": {
+                                "__typename": "AppUsagePricing",
+                                "terms": "Usage terms",
+                                "cappedAmount": {
+                                    "amount": "500.00",
+                                    "currencyCode": "USD",
+                                },
                             },
                         },
                     },
@@ -175,11 +179,13 @@ class ShopifyBillingTests(TestCase):
                             {
                                 "id": "gid://shopify/AppSubscriptionLineItem/usage",
                                 "plan": {
-                                    "__typename": "AppUsagePricing",
-                                    "terms": "Usage terms",
-                                    "cappedAmount": {
-                                        "amount": "500.00",
-                                        "currencyCode": "USD",
+                                    "pricingDetails": {
+                                        "__typename": "AppUsagePricing",
+                                        "terms": "Usage terms",
+                                        "cappedAmount": {
+                                            "amount": "500.00",
+                                            "currencyCode": "USD",
+                                        },
                                     },
                                 },
                             }
