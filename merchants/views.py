@@ -1027,6 +1027,21 @@ def start_shopify_billing(request):
         return JsonResponse({"error": "Shopify billing is not enabled for this merchant."}, status=400)
 
     try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    selected_plan = payload.get("billing_plan") or merchant_meta.billing_plan
+    valid_plans = {choice for choice, _ in MerchantMeta.BillingPlan.choices}
+    if selected_plan not in valid_plans:
+        return JsonResponse({"error": "Invalid billing plan selected."}, status=400)
+
+    if selected_plan != merchant_meta.billing_plan:
+        merchant_meta.billing_plan = selected_plan
+        merchant_meta.monthly_fee = merchant_meta.plan_price
+        merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
+
+    try:
         result = shopify_billing.create_or_update_recurring_charge(
             merchant_meta,
             return_url=request.build_absolute_uri(reverse("shopify_billing_return")),
