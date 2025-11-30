@@ -127,18 +127,10 @@ class ShopifyClient:
         if normalized_price <= 0:
             raise ShopifyBillingError("Recurring price must be greater than zero.")
 
-        recurring_line_item = {
-            "plan": {
-                "appRecurringPricingDetails": {
-                    "price": {"amount": str(normalized_price), "currencyCode": "USD"}
-                }
+        recurring_plan: Dict[str, Any] = {
+            "appRecurringPricingDetails": {
+                "price": {"amount": str(normalized_price), "currencyCode": "USD"}
             }
-        }
-
-        plan: Dict[str, Any] = {
-            "appRecurringPricingDetails": recurring_line_item["plan"][
-                "appRecurringPricingDetails"
-            ]
         }
 
         if usage_capped_amount is not None:
@@ -150,32 +142,37 @@ class ShopifyClient:
             if normalized_cap <= 0:
                 raise ShopifyBillingError("Usage pricing capped amount must be positive.")
 
-            plan["appUsagePricingDetails"] = {
+            recurring_plan["appUsagePricingDetails"] = {
                 "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
                 "terms": usage_terms or "",
             }
+
+        line_items = [{"plan": recurring_plan}]
 
         variables: Dict[str, Any] = {
             "name": plan_name,
             "returnUrl": return_url,
             "trialDays": int(trial_days),
             "test": bool(test_mode),
-            "plan": plan,
+            "lineItems": line_items,
         }
 
-        sanitized_plan = {
-            "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
-        }
-        if "appUsagePricingDetails" in plan:
-            sanitized_plan["appUsagePricingDetails"] = {
-                "terms": plan["appUsagePricingDetails"].get("terms", ""),
-                "cappedAmount": plan["appUsagePricingDetails"].get("cappedAmount"),
-            }
+        sanitized_line_items = []
+        for item in line_items:
+            plan = item.get("plan", {})
+            sanitized_line_items.append(
+                {
+                    "plan": {
+                        "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
+                        "appUsagePricingDetails": plan.get("appUsagePricingDetails"),
+                    }
+                }
+            )
 
         logger.info(
             "Creating Shopify subscription for %s with variables: %s",
             self.store_domain,
-            {**{k: v for k, v in variables.items() if k != "plan"}, "plan": sanitized_plan},
+            {**{k: v for k, v in variables.items() if k != "lineItems"}, "lineItems": sanitized_line_items},
         )
 
         try:
@@ -415,20 +412,22 @@ def _stringify_graphql_errors(value: Any) -> str:
     return str(value)
 
 
+# Shopify Admin GraphQL appSubscriptionCreate mutation
+# https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate
 _APP_SUBSCRIPTION_CREATE_MUTATION = """
 mutation AppSubscriptionCreate(
   $name: String!,
   $returnUrl: URL!,
   $test: Boolean!,
   $trialDays: Int,
-  $plan: AppPlanV2Input!
+  $lineItems: [AppSubscriptionLineItemInput!]!
 ) {
-  appSubscriptionCreateV2(
+  appSubscriptionCreate(
     name: $name
     returnUrl: $returnUrl
     test: $test
     trialDays: $trialDays
-    plan: $plan
+    lineItems: $lineItems
   ) {
     confirmationUrl
     userErrors {
