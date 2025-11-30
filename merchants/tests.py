@@ -1,4 +1,6 @@
 from django.test import TestCase
+import json
+
 from django.urls import reverse
 
 from accounts.models import CustomUser
@@ -329,11 +331,18 @@ class MerchantSettingsTests(TestCase):
         mock_create.return_value = {"id": 1, "status": "pending", "capped_amount": "100.00"}
 
         self.client.force_login(user)
-        response = self.client.post(reverse("merchant_start_shopify_billing"))
+        response = self.client.post(
+            reverse("merchant_start_shopify_billing"),
+            data=json.dumps({"billing_plan": MerchantMeta.BillingPlan.PLATFORM_ONLY}),
+            content_type="application/json",
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("status", data)
         mock_create.assert_called_once()
+        meta.refresh_from_db()
+        self.assertEqual(meta.billing_plan, MerchantMeta.BillingPlan.PLATFORM_ONLY)
+        self.assertEqual(meta.monthly_fee, meta.plan_price)
 
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
     def test_start_shopify_billing_prompts_reauth(self, mock_create):
@@ -367,6 +376,28 @@ class MerchantSettingsTests(TestCase):
         )
         self.client.force_login(user)
         response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.json())
+
+    def test_start_shopify_billing_rejects_invalid_plan(self):
+        user = CustomUser.objects.create_user(
+            username="shopify_invalid_plan",
+            password="pass",
+            email="shopifyinvalid@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "shop.test"
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_start_shopify_billing"),
+            data=json.dumps({"billing_plan": "not-a-plan"}),
+            content_type="application/json",
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
