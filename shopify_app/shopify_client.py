@@ -106,10 +106,12 @@ class ShopifyClient:
         usage_capped_amount: Optional[Decimal] = None,
         usage_terms: str = "",
     ) -> Dict[str, Any]:
-        """Create a Shopify app subscription using the 2024-07 billing schema."""
+        """Create a Shopify app subscription using the latest billing schema.
 
-        # Shopify Admin GraphQL appSubscriptionCreate
-        # https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate
+        GraphQL errors are logged and re-raised as ``ShopifyGraphQError`` so that
+        callers can wrap them in billing-specific exceptions.
+        """
+
         from .billing import ShopifyBillingError  # imported lazily to avoid cycles
 
         if not plan_name or not return_url:
@@ -125,11 +127,18 @@ class ShopifyClient:
         if normalized_price <= 0:
             raise ShopifyBillingError("Recurring price must be greater than zero.")
 
-        plan_input: Dict[str, Any] = {
-            "appRecurringPricingDetails": {
-                "interval": "EVERY_30_DAYS",
-                "price": {"amount": str(normalized_price), "currencyCode": "USD"},
+        recurring_line_item = {
+            "plan": {
+                "appRecurringPricingDetails": {
+                    "price": {"amount": str(normalized_price), "currencyCode": "USD"}
+                }
             }
+        }
+
+        plan: Dict[str, Any] = {
+            "appRecurringPricingDetails": recurring_line_item["plan"][
+                "appRecurringPricingDetails"
+            ]
         }
 
         if usage_capped_amount is not None:
@@ -141,7 +150,7 @@ class ShopifyClient:
             if normalized_cap <= 0:
                 raise ShopifyBillingError("Usage pricing capped amount must be positive.")
 
-            plan_input["appUsagePricingDetails"] = {
+            plan["appUsagePricingDetails"] = {
                 "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
                 "terms": usage_terms or "",
             }
@@ -151,25 +160,22 @@ class ShopifyClient:
             "returnUrl": return_url,
             "trialDays": int(trial_days),
             "test": bool(test_mode),
-            "lineItems": [{"plan": plan_input}],
+            "plan": plan,
         }
 
-        sanitized_variables = {
-            **{k: v for k, v in variables.items() if k != "lineItems"},
-            "lineItems": [
-                {
-                    "plan": {
-                        "appRecurringPricingDetails": plan_input.get("appRecurringPricingDetails"),
-                        "appUsagePricingDetails": plan_input.get("appUsagePricingDetails"),
-                    }
-                }
-            ],
+        sanitized_plan = {
+            "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
         }
+        if "appUsagePricingDetails" in plan:
+            sanitized_plan["appUsagePricingDetails"] = {
+                "terms": plan["appUsagePricingDetails"].get("terms", ""),
+                "cappedAmount": plan["appUsagePricingDetails"].get("cappedAmount"),
+            }
 
         logger.info(
             "Creating Shopify subscription for %s with variables: %s",
             self.store_domain,
-            sanitized_variables,
+            {**{k: v for k, v in variables.items() if k != "plan"}, "plan": sanitized_plan},
         )
 
         try:
@@ -191,7 +197,9 @@ class ShopifyClient:
             raise ShopifyBillingError(_stringify_graphql_errors(user_errors))
 
         subscription = result.get("appSubscription") or {}
-        confirmation_url = result.get("confirmationUrl") or ""
+        confirmation_url = result.get("confirmationUrl") or subscription.get(
+            "confirmationUrl", ""
+        )
 
         if not subscription:
             raise ShopifyBillingError(
@@ -407,22 +415,20 @@ def _stringify_graphql_errors(value: Any) -> str:
     return str(value)
 
 
-# Shopify Admin GraphQL appSubscriptionCreate mutation
-# https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate
 _APP_SUBSCRIPTION_CREATE_MUTATION = """
 mutation AppSubscriptionCreate(
   $name: String!,
   $returnUrl: URL!,
   $test: Boolean!,
   $trialDays: Int,
-  $lineItems: [AppSubscriptionLineItemInput!]!,
+  $plan: AppPlanV2Input!
 ) {
-  appSubscriptionCreate(
+  appSubscriptionCreateV2(
     name: $name
     returnUrl: $returnUrl
     test: $test
     trialDays: $trialDays
-    lineItems: $lineItems
+    plan: $plan
   ) {
     confirmationUrl
     userErrors {
@@ -432,12 +438,12 @@ mutation AppSubscriptionCreate(
     appSubscription {
       id
       status
+      confirmationUrl
       lineItems {
         id
         plan {
           __typename
           ... on AppRecurringPricing {
-            interval
             price { amount currencyCode }
           }
           ... on AppUsagePricing {
