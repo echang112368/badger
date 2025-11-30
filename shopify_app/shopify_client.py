@@ -127,18 +127,10 @@ class ShopifyClient:
         if normalized_price <= 0:
             raise ShopifyBillingError("Recurring price must be greater than zero.")
 
-        recurring_line_item = {
-            "plan": {
-                "appRecurringPricingDetails": {
-                    "price": {"amount": str(normalized_price), "currencyCode": "USD"}
-                }
+        plan_input: Dict[str, Any] = {
+            "appRecurringPricingDetails": {
+                "price": {"amount": str(normalized_price), "currencyCode": "USD"}
             }
-        }
-
-        plan: Dict[str, Any] = {
-            "appRecurringPricingDetails": recurring_line_item["plan"][
-                "appRecurringPricingDetails"
-            ]
         }
 
         if usage_capped_amount is not None:
@@ -150,7 +142,7 @@ class ShopifyClient:
             if normalized_cap <= 0:
                 raise ShopifyBillingError("Usage pricing capped amount must be positive.")
 
-            plan["appUsagePricingDetails"] = {
+            plan_input["appUsagePricingDetails"] = {
                 "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
                 "terms": usage_terms or "",
             }
@@ -160,22 +152,21 @@ class ShopifyClient:
             "returnUrl": return_url,
             "trialDays": int(trial_days),
             "test": bool(test_mode),
-            "plan": plan,
+            "plans": [plan_input],
         }
-
-        sanitized_plan = {
-            "appRecurringPricingDetails": plan.get("appRecurringPricingDetails"),
-        }
-        if "appUsagePricingDetails" in plan:
-            sanitized_plan["appUsagePricingDetails"] = {
-                "terms": plan["appUsagePricingDetails"].get("terms", ""),
-                "cappedAmount": plan["appUsagePricingDetails"].get("cappedAmount"),
-            }
 
         logger.info(
             "Creating Shopify subscription for %s with variables: %s",
             self.store_domain,
-            {**{k: v for k, v in variables.items() if k != "plan"}, "plan": sanitized_plan},
+            {
+                **{k: v for k, v in variables.items() if k != "plans"},
+                "plans": [
+                    {
+                        "appRecurringPricingDetails": plan_input.get("appRecurringPricingDetails"),
+                        "appUsagePricingDetails": plan_input.get("appUsagePricingDetails"),
+                    }
+                ],
+            },
         )
 
         try:
@@ -186,7 +177,7 @@ class ShopifyClient:
             )
             raise
 
-        result = payload.get("data", {}).get("appSubscriptionCreate") or {}
+        result = payload.get("data", {}).get("appSubscriptionCreateV2") or {}
         user_errors = result.get("userErrors") or []
         if user_errors:
             logger.warning(
@@ -197,9 +188,7 @@ class ShopifyClient:
             raise ShopifyBillingError(_stringify_graphql_errors(user_errors))
 
         subscription = result.get("appSubscription") or {}
-        confirmation_url = result.get("confirmationUrl") or subscription.get(
-            "confirmationUrl", ""
-        )
+        confirmation_url = result.get("confirmationUrl") or ""
 
         if not subscription:
             raise ShopifyBillingError(
@@ -415,20 +404,22 @@ def _stringify_graphql_errors(value: Any) -> str:
     return str(value)
 
 
+# Shopify Admin GraphQL appSubscriptionCreateV2 mutation
+# https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate
 _APP_SUBSCRIPTION_CREATE_MUTATION = """
 mutation AppSubscriptionCreate(
   $name: String!,
   $returnUrl: URL!,
   $test: Boolean!,
   $trialDays: Int,
-  $plan: AppPlanV2Input!
+  $plans: [AppPlanV2Input!]!,
 ) {
   appSubscriptionCreateV2(
     name: $name
     returnUrl: $returnUrl
     test: $test
     trialDays: $trialDays
-    plan: $plan
+    plans: $plans
   ) {
     confirmationUrl
     userErrors {
@@ -438,20 +429,6 @@ mutation AppSubscriptionCreate(
     appSubscription {
       id
       status
-      confirmationUrl
-      lineItems {
-        id
-        plan {
-          __typename
-          ... on AppRecurringPricing {
-            price { amount currencyCode }
-          }
-          ... on AppUsagePricing {
-            terms
-            cappedAmount { amount currencyCode }
-          }
-        }
-      }
     }
   }
 }
