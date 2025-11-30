@@ -156,7 +156,8 @@ class MerchantMeta(models.Model):
             ).delete()
 
     def save(self, *args, **kwargs):
-        self.monthly_fee = self.plan_price
+        if self.pk is None and (self.monthly_fee is None or self.monthly_fee == 0):
+            self.monthly_fee = self.plan_price
         super().save(*args, **kwargs)
         self.ensure_badger_creator_link()
 
