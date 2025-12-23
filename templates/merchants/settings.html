@@ -937,7 +937,9 @@
 
   function syncShopifyPlanState(statusText){
     const normalized=(statusText||'').toString().trim().toLowerCase();
-    const isActive=normalized==='active';
+    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized==='pending'||normalized.startsWith('active ');
+    const datasetIsActive=shopifyPlanCard&&shopifyPlanCard.dataset.planActive==='true';
+    const isActive=statusIsActive||datasetIsActive;
     const activePlan=isActive&&shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:'';
     if(shopifyPlanCard){
       shopifyPlanCard.dataset.planActive=isActive?'true':'false';
@@ -997,6 +999,16 @@
     }
 
     return true;
+  }
+
+  function syncBillingPlanInputs(plan){
+    if(!plan){
+      return;
+    }
+    const matchingInput=document.querySelector(`input[name="billing_plan"][value="${plan}"]`);
+    if(matchingInput){
+      matchingInput.checked=true;
+    }
   }
 
   function togglePlanButtons(disabled){
@@ -1078,6 +1090,10 @@
       return;
     }
     const planSelection=trigger.dataset.startShopifyPlan||'';
+    if(shopifyPlanCard&&planSelection){
+      shopifyPlanCard.dataset.currentPlan=planSelection;
+    }
+    syncBillingPlanInputs(planSelection);
     const url=trigger.dataset.startBillingUrl;
     if(!url){
       setShopifyFeedback('Missing billing endpoint.',true);
@@ -1111,6 +1127,22 @@
         return;
       }
 
+      const status=(data.status||'').trim()||'Pending';
+      if(shopifyStatusElement){
+        shopifyStatusElement.textContent=status;
+      }
+      if(shopifyChargeElement){
+        shopifyChargeElement.textContent=data.charge_id||'—';
+      }
+      if(shopifyTermsElement&&data.raw&&data.raw.terms){
+        shopifyTermsElement.textContent=data.raw.terms;
+      }
+      if(shopifyCappedElement&&data.raw){
+        const capped=data.raw.capped_amount;
+        shopifyCappedElement.textContent=capped?`$${capped}`:'—';
+      }
+      syncShopifyPlanState(status);
+
       const confirmation=(data.confirmation_url||'').trim();
       if(confirmation){
         setShopifyFeedback('Redirecting you to Shopify to confirm your plan…');
@@ -1142,10 +1174,14 @@
 
   if(refreshShopifyPlanButton&&shopifyPlanStatusUrl){
     refreshShopifyPlanButton.addEventListener('click',refreshShopifyPlanStatus);
-  }
 
-  if(shopifyPlanStatusUrl){
-    refreshShopifyPlanStatus();
+    const statusText=shopifyStatusElement?shopifyStatusElement.textContent||'':'';
+    const normalizedStatus=statusText.trim().toLowerCase();
+    const hasChargeId=shopifyChargeElement&&shopifyChargeElement.textContent&&shopifyChargeElement.textContent.trim()!=='—';
+
+    if(hasChargeId&&(!normalizedStatus||!['active','accepted','pending'].includes(normalizedStatus))){
+      refreshShopifyPlanStatus();
+    }
   }
 
   function showModal(modal){
