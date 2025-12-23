@@ -9,7 +9,6 @@ reference pages.
 import logging
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from django.utils import timezone
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 from django.conf import settings
@@ -143,16 +142,6 @@ def _parse_usage_line_item(line_items: Iterable[Dict[str, Any]]) -> Tuple[str, s
     return "", "", None
 
 
-def _resolve_billing_plan(subscription_name: str, fallback: str) -> str:
-    """Resolve the billing plan identifier from a Shopify subscription name."""
-
-    normalized = (subscription_name or "").lower()
-    for plan_value, _label in MerchantMeta.BillingPlan.choices:
-        if plan_value in normalized:
-            return plan_value
-    return fallback or ""
-
-
 def create_or_update_recurring_charge(
     meta: MerchantMeta,
     *,
@@ -220,11 +209,6 @@ def create_or_update_recurring_charge(
 
     meta.shopify_recurring_charge_id = _strip_gid(subscription.get("id", ""))
     meta.shopify_billing_status = subscription.get("status", "") or ""
-    meta.shopify_billing_plan = _resolve_billing_plan(
-        subscription.get("name", ""),
-        fallback=meta.billing_plan,
-    )
-    meta.shopify_billing_status_updated_at = timezone.now()
     meta.shopify_billing_confirmation_url = result.get("confirmation_url", "") or ""
     meta.shopify_usage_terms = terms
     meta.shopify_usage_capped_amount = capped_amount
@@ -232,8 +216,6 @@ def create_or_update_recurring_charge(
         update_fields=[
             "shopify_recurring_charge_id",
             "shopify_billing_status",
-            "shopify_billing_plan",
-            "shopify_billing_status_updated_at",
             "shopify_billing_confirmation_url",
             "shopify_usage_terms",
             "shopify_usage_capped_amount",
@@ -280,21 +262,10 @@ def refresh_recurring_charge(meta: MerchantMeta) -> Dict[str, Any]:
 
     _, terms, capped_amount = _parse_usage_line_item(subscription.get("lineItems") or [])
     meta.shopify_billing_status = subscription.get("status", "") or ""
-    meta.shopify_billing_plan = _resolve_billing_plan(
-        subscription.get("name", ""),
-        fallback=meta.shopify_billing_plan or meta.billing_plan,
-    )
-    meta.shopify_billing_status_updated_at = timezone.now()
     meta.shopify_usage_terms = terms
     meta.shopify_usage_capped_amount = capped_amount
     meta.save(
-        update_fields=[
-            "shopify_billing_status",
-            "shopify_billing_plan",
-            "shopify_billing_status_updated_at",
-            "shopify_usage_terms",
-            "shopify_usage_capped_amount",
-        ],
+        update_fields=["shopify_billing_status", "shopify_usage_terms", "shopify_usage_capped_amount"],
     )
 
     return {

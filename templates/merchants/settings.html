@@ -157,7 +157,7 @@
             <div
               data-shopify-plan-card
               data-billing-plan-section="shopify"
-              data-current-plan="{{ merchant_meta.shopify_billing_plan }}"
+              data-current-plan="{{ merchant_meta.billing_plan }}"
               data-plan-active="{% if shopify_plan_active %}true{% else %}false{% endif %}"
               data-status-url="{{ shopify_billing_status_url }}"
               class="space-y-5"
@@ -935,20 +935,14 @@
     }
   }
 
-  function syncShopifyPlanState(statusText,planActiveOverride,activePlanOverride){
+  function syncShopifyPlanState(statusText){
     const normalized=(statusText||'').toString().trim().toLowerCase();
-    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized.startsWith('active ');
+    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized==='pending'||normalized.startsWith('active ');
     const datasetIsActive=shopifyPlanCard&&shopifyPlanCard.dataset.planActive==='true';
-    const hasPlanOverride=typeof planActiveOverride==='boolean';
-    const isActive=hasPlanOverride?planActiveOverride:(statusIsActive||datasetIsActive);
-    const activePlan=isActive
-      ?(activePlanOverride||(shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:''))
-      :'';
+    const isActive=statusIsActive||datasetIsActive;
+    const activePlan=isActive&&shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:'';
     if(shopifyPlanCard){
       shopifyPlanCard.dataset.planActive=isActive?'true':'false';
-      if(activePlanOverride){
-        shopifyPlanCard.dataset.currentPlan=activePlanOverride;
-      }
     }
     if(shopifyPlanActive){
       shopifyPlanActive.classList.toggle('hidden',!isActive);
@@ -956,11 +950,7 @@
     updateShopifyPlanButtons(isActive,activePlan);
   }
 
-  syncShopifyPlanState(
-    shopifyStatusElement?shopifyStatusElement.textContent:'',
-    shopifyPlanCard?shopifyPlanCard.dataset.planActive==='true':undefined,
-    shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:''
-  );
+  syncShopifyPlanState(shopifyStatusElement?shopifyStatusElement.textContent:'');
 
   function describeShopifyBillingError(message){
     const text=(message||'').toString().trim();
@@ -1083,9 +1073,7 @@
         shopifyCappedElement.textContent=capped?`$${capped}`:'—';
       }
 
-      const backendPlan=(data.plan||'').trim();
-      const planActive=typeof data.plan_active==='boolean'?data.plan_active:undefined;
-      syncShopifyPlanState(status,planActive,backendPlan);
+      syncShopifyPlanState(status);
       setShopifyFeedback('Shopify billing status refreshed.');
     }catch(error){
       console.error('Failed to refresh Shopify billing status',error);
@@ -1102,6 +1090,9 @@
       return;
     }
     const planSelection=trigger.dataset.startShopifyPlan||'';
+    if(shopifyPlanCard&&planSelection){
+      shopifyPlanCard.dataset.currentPlan=planSelection;
+    }
     syncBillingPlanInputs(planSelection);
     const url=trigger.dataset.startBillingUrl;
     if(!url){
@@ -1150,9 +1141,7 @@
         const capped=data.raw.capped_amount;
         shopifyCappedElement.textContent=capped?`$${capped}`:'—';
       }
-      const backendPlan=(data.plan||'').trim();
-      const planActive=typeof data.plan_active==='boolean'?data.plan_active:undefined;
-      syncShopifyPlanState(status,planActive,backendPlan);
+      syncShopifyPlanState(status);
 
       const confirmation=(data.confirmation_url||'').trim();
       if(confirmation){
@@ -1183,11 +1172,16 @@
     });
   }
 
-  if(shopifyPlanStatusUrl){
-    if(refreshShopifyPlanButton){
-      refreshShopifyPlanButton.addEventListener('click',refreshShopifyPlanStatus);
+  if(refreshShopifyPlanButton&&shopifyPlanStatusUrl){
+    refreshShopifyPlanButton.addEventListener('click',refreshShopifyPlanStatus);
+
+    const statusText=shopifyStatusElement?shopifyStatusElement.textContent||'':'';
+    const normalizedStatus=statusText.trim().toLowerCase();
+    const hasChargeId=shopifyChargeElement&&shopifyChargeElement.textContent&&shopifyChargeElement.textContent.trim()!=='—';
+
+    if(hasChargeId&&(!normalizedStatus||!['active','accepted','pending'].includes(normalizedStatus))){
+      refreshShopifyPlanStatus();
     }
-    refreshShopifyPlanStatus();
   }
 
   function showModal(modal){
