@@ -983,7 +983,7 @@ def merchant_settings(request):
         shopify_plan_price = Decimal("30.00")
     shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
     status_normalized = shopify_status_value.lower()
-    shopify_plan_active = status_normalized in {"active", "accepted", "pending"}
+    shopify_plan_active = status_normalized == "active"
     shopify_cancel_url = ""
     if merchant_meta.shopify_store_domain:
         normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
