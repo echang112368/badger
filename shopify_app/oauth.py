@@ -1,23 +1,18 @@
-"""Shopify OAuth helpers and state management aligned with current standards."""
+"""Shopify OAuth helpers and state management."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import hmac
-import json
-import logging
 import secrets
-from dataclasses import dataclass
 from typing import Mapping, MutableMapping, Optional
 from urllib.parse import urlencode
 
-import jwt
 import requests
 from django.conf import settings
 from django.urls import reverse
 
-
-logger = logging.getLogger(__name__)
 
 STATE_SESSION_KEY = "shopify_oauth_state"
 CALLBACK_SESSION_KEY = "shopify_oauth_redirect"
@@ -77,12 +72,11 @@ def generate_state_token() -> str:
 
 
 def validate_shopify_hmac(params: Mapping[str, str]) -> bool:
-    """Validate the request signature provided by Shopify using the latest spec."""
+    """Validate the request signature provided by Shopify."""
 
     provided_hmac = params.get("hmac")
     secret = getattr(settings, "SHOPIFY_API_SECRET", "")
     if not provided_hmac or not secret:
-        logger.error("OAUTH_FAILED", extra={"reason": "missing_hmac_or_secret"})
         return False
 
     message_parts = []
@@ -99,13 +93,8 @@ def validate_shopify_hmac(params: Mapping[str, str]) -> bool:
         message_parts.append(f"{key}={','.join(values)}")
 
     message = "&".join(message_parts)
-    digest = hmac.new(
-        secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
-    valid = hmac.compare_digest(digest, provided_hmac)
-    if not valid:
-        logger.error("OAUTH_FAILED", extra={"reason": "hmac_mismatch"})
-    return valid
+    digest = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(digest, provided_hmac)
 
 
 def _build_redirect_uri(request) -> str:
@@ -143,7 +132,7 @@ def build_authorization_url(shop: str, state: str, redirect_uri: str) -> str:
 def exchange_code_for_token(
     shop: str, code: str, *, redirect_uri: Optional[str] = None
 ) -> AccessTokenResponse:
-    """Exchange the OAuth authorization code for an offline access token."""
+    """Exchange the OAuth authorization code for an access token."""
 
     if not settings.SHOPIFY_API_KEY or not settings.SHOPIFY_API_SECRET:
         raise ShopifyOAuthError("Shopify API credentials are not configured.")
@@ -166,7 +155,6 @@ def exchange_code_for_token(
         )
         response.raise_for_status()
     except requests.RequestException as exc:  # pragma: no cover - network failures
-        logger.error("OAUTH_FAILED", extra={"reason": "token_exchange_error"})
         raise ShopifyOAuthError("Failed to exchange access token with Shopify.") from exc
 
     data = response.json()
@@ -232,34 +220,6 @@ def refresh_access_token(shop: str, refresh_token: str) -> AccessTokenResponse:
     )
 
 
-def verify_session_token(session_token: str) -> Mapping[str, object]:
-    """Validate an App Bridge session token using configured JWKS."""
-
-    jwks_raw = getattr(settings, "SHOPIFY_APP_JWKS", "")
-    if not jwks_raw:
-        raise ShopifyOAuthError("Missing Shopify JWKS configuration for session tokens.")
-
-    jwks = json.loads(jwks_raw)
-    unverified = jwt.get_unverified_header(session_token)
-    kid = unverified.get("kid")
-    key_candidates = [
-        key for key in jwks.get("keys", []) if key.get("kid") == kid or len(jwks.get("keys", [])) == 1
-    ]
-    if not key_candidates:
-        raise ShopifyOAuthError("Unable to resolve signing key for session token.")
-
-    key = key_candidates[0]
-    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(key))
-
-    payload = jwt.decode(
-        session_token,
-        key=public_key,
-        algorithms=["RS256"],
-        audience=settings.SHOPIFY_API_KEY,
-    )
-    return payload
-
-
 class ShopifyOAuthService:
     """Encapsulates Shopify OAuth state transitions."""
 
@@ -280,10 +240,6 @@ class ShopifyOAuthService:
         if not settings.SHOPIFY_API_KEY:
             raise ShopifyOAuthError("Shopify API credentials are not configured.")
 
-        logger.info(
-            "INSTALL_START",
-            extra={"shop": normalised, "request_id": getattr(self.request, "request_id", "")},
-        )
         return build_authorization_url(normalised, state, redirect_uri)
 
     def complete_installation(self, params: Mapping[str, str]) -> AccessTokenResponse:
@@ -308,18 +264,11 @@ class ShopifyOAuthService:
             redirect_uri = _build_redirect_uri(self.request)
 
         token_response = exchange_code_for_token(shop, code, redirect_uri=redirect_uri)
-        scopes = [s.strip() for s in (token_response.scope or "").split(",") if s.strip()]
-        assert "write_discounts" in scopes
-
         self.request.session[session_token_key(shop)] = token_response.access_token
         self.request.session[session_scope_key(shop)] = token_response.scope
         if token_response.refresh_token:
             self.request.session[session_refresh_key(shop)] = token_response.refresh_token
 
-        logger.info(
-            "OAUTH_SUCCESS",
-            extra={"shop": shop, "scopes": scopes, "request_id": getattr(self.request, "request_id", "")},
-        )
         return token_response
 
 
@@ -338,5 +287,4 @@ __all__ = [
     "session_refresh_key",
     "session_token_key",
     "validate_shopify_hmac",
-    "verify_session_token",
 ]
