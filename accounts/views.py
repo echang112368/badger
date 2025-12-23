@@ -32,6 +32,32 @@ def _get_verification_user(request):
         return request.user
     return get_user_by_pk(request.session.get("verification_user_id"))
 
+
+def _redirect_after_login(request, user):
+    membership = getattr(user, "merchant_team_membership", None)
+    if membership is None:
+        membership = MerchantTeamMember.objects.filter(user=user).first()
+
+    if user.is_merchant or membership:
+        merchant_account = user if user.is_merchant else membership.merchant
+        meta = getattr(merchant_account, "merchantmeta", None)
+
+        if isinstance(meta, MerchantMeta) and meta.requires_shopify_oauth():
+            shop_domain = normalise_shop_domain(meta.shopify_store_domain)
+            if shop_domain:
+                authorize_url = (
+                    f"{reverse('shopify_oauth_authorize')}?"
+                    f"{urlencode({'shop': shop_domain})}"
+                )
+                return redirect(authorize_url)
+
+        return redirect('merchant_dashboard')
+
+    if user.is_creator:
+        return redirect('creator_earnings')
+
+    return redirect('user_dashboard')
+
 def custom_login_view(request):
     if request.method == 'POST':
         form = CustomLoginForm(request, data=request.POST)
@@ -48,29 +74,7 @@ def custom_login_view(request):
                 return redirect('verify_email')
 
             login(request, user)
-
-            membership = getattr(user, "merchant_team_membership", None)
-            if membership is None:
-                membership = MerchantTeamMember.objects.filter(user=user).first()
-
-            if user.is_merchant or membership:
-                merchant_account = user if user.is_merchant else membership.merchant
-                meta = getattr(merchant_account, "merchantmeta", None)
-
-                if isinstance(meta, MerchantMeta) and meta.requires_shopify_oauth():
-                    shop_domain = normalise_shop_domain(meta.shopify_store_domain)
-                    if shop_domain:
-                        authorize_url = (
-                            f"{reverse('shopify_oauth_authorize')}?"
-                            f"{urlencode({'shop': shop_domain})}"
-                        )
-                        return redirect(authorize_url)
-
-                return redirect('merchant_dashboard')
-            elif user.is_creator:
-                return redirect('creator_earnings')
-            else:
-                return redirect('user_dashboard')
+            return _redirect_after_login(request, user)
     else:
         form = CustomLoginForm()
 
@@ -169,9 +173,10 @@ def verify_email_view(request):
     if request.method == "POST" and form.is_valid():
         if verify_user_code(user, form.cleaned_data["code"]):
             request.session.pop("verification_user_id", None)
-            messages.success(request, "Email verified! You can now log in.")
-            logout(request)
-            return redirect('login')
+            user.backend = "django.contrib.auth.backends.ModelBackend"
+            login(request, user)
+            messages.success(request, "Email verified! You're now signed in.")
+            return _redirect_after_login(request, user)
         messages.error(request, "That code was not correct. Please try again or resend.")
 
     return render(
