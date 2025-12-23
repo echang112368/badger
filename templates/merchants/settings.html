@@ -937,7 +937,7 @@
 
   function syncShopifyPlanState(statusText){
     const normalized=(statusText||'').toString().trim().toLowerCase();
-    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized==='pending'||normalized.startsWith('active ');
+    const statusIsActive=normalized==='active'||normalized==='accepted'||normalized.startsWith('active ');
     const datasetIsActive=shopifyPlanCard&&shopifyPlanCard.dataset.planActive==='true';
     const isActive=statusIsActive||datasetIsActive;
     const activePlan=isActive&&shopifyPlanCard?shopifyPlanCard.dataset.currentPlan:'';
