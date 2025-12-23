@@ -125,14 +125,13 @@ class ShopifyClient:
         if normalized_price <= 0:
             raise ShopifyBillingError("Recurring price must be greater than zero.")
 
-        recurring_plan: Dict[str, Any] = {
+        plan_input: Dict[str, Any] = {
             "appRecurringPricingDetails": {
                 "interval": "EVERY_30_DAYS",
                 "price": {"amount": str(normalized_price), "currencyCode": "USD"},
             }
         }
 
-        usage_plan: Optional[Dict[str, Any]] = None
         if usage_capped_amount is not None:
             try:
                 normalized_cap = Decimal(str(usage_capped_amount))
@@ -142,30 +141,29 @@ class ShopifyClient:
             if normalized_cap <= 0:
                 raise ShopifyBillingError("Usage pricing capped amount must be positive.")
 
-            usage_plan = {
-                "appUsagePricingDetails": {
-                    "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
-                    "terms": usage_terms or "",
-                }
+            plan_input["appUsagePricingDetails"] = {
+                "cappedAmount": {"amount": str(normalized_cap), "currencyCode": "USD"},
+                "terms": usage_terms or "",
             }
-
-        line_items: List[Dict[str, Any]] = [
-            {"plan": recurring_plan, "lineItemName": plan_name}
-        ]
-        if usage_plan:
-            line_items.append({"plan": usage_plan, "lineItemName": plan_name})
 
         variables: Dict[str, Any] = {
             "name": plan_name,
             "returnUrl": return_url,
             "trialDays": int(trial_days),
             "test": bool(test_mode),
-            "lineItems": line_items,
+            "lineItems": [{"plan": plan_input}],
         }
 
         sanitized_variables = {
             **{k: v for k, v in variables.items() if k != "lineItems"},
-            "lineItems": line_items,
+            "lineItems": [
+                {
+                    "plan": {
+                        "appRecurringPricingDetails": plan_input.get("appRecurringPricingDetails"),
+                        "appUsagePricingDetails": plan_input.get("appUsagePricingDetails"),
+                    }
+                }
+            ],
         }
 
         logger.info(
