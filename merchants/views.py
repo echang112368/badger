@@ -1041,10 +1041,18 @@ def start_shopify_billing(request):
         merchant_meta.monthly_fee = merchant_meta.plan_price
         merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
 
+    shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain or "")
+    if not shop_domain:
+        return JsonResponse({"error": "Shopify store domain is required."}, status=400)
+
+    return_url = request.build_absolute_uri(
+        f"{reverse('shopify_billing_return')}?{urlencode({'shop': shop_domain})}"
+    )
+
     try:
         result = shopify_billing.create_or_update_recurring_charge(
             merchant_meta,
-            return_url=request.build_absolute_uri(reverse("shopify_billing_return")),
+            return_url=return_url,
         )
     except shopify_billing.ShopifyReauthorizationRequired:
         authorize_url = build_shopify_authorize_url(

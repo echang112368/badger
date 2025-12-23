@@ -339,7 +339,8 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("status", data)
-        mock_create.assert_called_once()
+        expected_return_url = f"http://testserver{reverse('shopify_billing_return')}?shop=shop.test"
+        mock_create.assert_called_once_with(meta, return_url=expected_return_url)
         meta.refresh_from_db()
         self.assertEqual(meta.billing_plan, MerchantMeta.BillingPlan.PLATFORM_ONLY)
         self.assertEqual(meta.monthly_fee, meta.plan_price)
@@ -369,6 +370,24 @@ class MerchantSettingsTests(TestCase):
         data = response.json()
         self.assertIn("authorize_url", data)
         self.assertIn("error", data)
+
+    def test_start_shopify_billing_requires_shop_domain(self):
+        user = CustomUser.objects.create_user(
+            username="shopify_missing_shop",
+            password="pass",
+            email="shopify_missing@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = ""
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.post(reverse("merchant_start_shopify_billing"))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Shopify store domain is required", response.json().get("error", ""))
 
     def test_start_shopify_billing_requires_shopify_type(self):
         user = CustomUser.objects.create_user(
