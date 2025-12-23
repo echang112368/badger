@@ -218,6 +218,7 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(details.amount, Decimal("10.25"))
 
 
+@override_settings(SHOPIFY_API_KEY="key")
 class ShopifyBillingReturnTests(TestCase):
     def setUp(self):
         self.url = reverse("shopify_billing_return")
@@ -227,7 +228,7 @@ class ShopifyBillingReturnTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Missing shop identifier", response.content.decode())
 
-    def test_active_charge_success(self):
+    def test_active_charge_success_redirects(self):
         user = CustomUser.objects.create_user(
             username="merchant", email="merchant@example.com", password="pass"
         )
@@ -241,8 +242,11 @@ class ShopifyBillingReturnTests(TestCase):
         )
 
         response = self.client.get(self.url, {"shop": meta.shopify_store_domain})
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("active", response.content.decode().lower())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"https://{meta.shopify_store_domain}/admin/apps/key",
+        )
 
 
 class MerchantInvoiceAdminTests(TestCase):
