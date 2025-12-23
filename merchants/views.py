@@ -983,7 +983,7 @@ def merchant_settings(request):
         shopify_plan_price = Decimal("30.00")
     shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
     status_normalized = shopify_status_value.lower()
-    shopify_plan_active = status_normalized in {"active", "accepted", "pending"}
+    shopify_plan_active = status_normalized == "active"
     shopify_cancel_url = ""
     if merchant_meta.shopify_store_domain:
         normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
@@ -1042,9 +1042,15 @@ def start_shopify_billing(request):
         merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
 
     try:
+        billing_return_url = request.build_absolute_uri(reverse("shopify_billing_return"))
+        billing_settings_url = request.build_absolute_uri(
+            f"{reverse('merchant_settings')}?tab=billing"
+        )
+        return_url = f"{billing_return_url}?{urlencode({'next': billing_settings_url})}"
+
         result = shopify_billing.create_or_update_recurring_charge(
             merchant_meta,
-            return_url=request.build_absolute_uri(reverse("shopify_billing_return")),
+            return_url=return_url,
         )
     except shopify_billing.ShopifyReauthorizationRequired:
         authorize_url = build_shopify_authorize_url(

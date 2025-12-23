@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
 import jwt
+from django.contrib import messages
 from django.conf import settings
 from django.contrib.auth import login as auth_login
 from django.http import (
@@ -21,6 +22,7 @@ from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -680,6 +682,7 @@ def billing_return(request: HttpRequest) -> HttpResponse:
     """Display the result of the Shopify billing confirmation."""
 
     shop = normalise_shop_domain(request.GET.get("shop", ""))
+    redirect_target = request.GET.get("next") or ""
     status_code = 200
     message = "Your Shopify subscription is active."
 
@@ -695,18 +698,34 @@ def billing_return(request: HttpRequest) -> HttpResponse:
         return HttpResponseBadRequest("Unknown Shopify store.")
 
     try:
-        billing.ensure_active_charge(meta)
+        billing.refresh_recurring_charge(meta)
     except billing.ShopifyBillingError as exc:
         message = str(exc) or "Shopify billing is not yet active."
         status_code = 400
+    else:
+        try:
+            billing.ensure_active_charge(meta)
+        except billing.ShopifyBillingError as exc:
+            message = str(exc) or "Shopify billing is not yet active."
+            status_code = 400
 
-    context = {"shop_domain": shop, "message": message, "status_code": status_code}
-    return render(
-        request,
-        "shopify_app/billing_return.html",
-        context,
-        status=status_code,
+    billing_settings_url = request.build_absolute_uri(
+        f"{reverse('merchant_settings')}?tab=billing"
     )
+    allowed_hosts = {request.get_host()}
+    is_secure = request.is_secure()
+    next_url = redirect_target if url_has_allowed_host_and_scheme(
+        url=redirect_target,
+        allowed_hosts=allowed_hosts,
+        require_https=is_secure,
+    ) else billing_settings_url
+
+    if status_code == 200:
+        messages.success(request, message)
+    else:
+        messages.warning(request, message)
+
+    return redirect(next_url)
 
 
 def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpResponse:

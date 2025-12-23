@@ -2,6 +2,7 @@ from django.test import TestCase
 import json
 
 from django.urls import reverse
+from urllib.parse import parse_qs, urlparse
 
 from accounts.models import CustomUser
 from .models import MerchantMeta
@@ -340,6 +341,15 @@ class MerchantSettingsTests(TestCase):
         data = response.json()
         self.assertIn("status", data)
         mock_create.assert_called_once()
+        _, kwargs = mock_create.call_args
+        return_url = kwargs.get("return_url", "")
+        parsed_return = urlparse(return_url)
+        self.assertEqual(parsed_return.path, reverse("shopify_billing_return"))
+        parsed_query = parse_qs(parsed_return.query)
+        self.assertEqual(
+            parsed_query.get("next", [""])[0],
+            f"http://testserver{reverse('merchant_settings')}?tab=billing",
+        )
         meta.refresh_from_db()
         self.assertEqual(meta.billing_plan, MerchantMeta.BillingPlan.PLATFORM_ONLY)
         self.assertEqual(meta.monthly_fee, meta.plan_price)
