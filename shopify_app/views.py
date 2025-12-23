@@ -677,12 +677,9 @@ def oauth_callback(request: HttpRequest):
 
 @require_GET
 def billing_return(request: HttpRequest) -> HttpResponse:
-    """Display the result of the Shopify billing confirmation."""
+    """Redirect the merchant back to the app dashboard after billing."""
 
     shop = normalise_shop_domain(request.GET.get("shop", ""))
-    status_code = 200
-    message = "Your Shopify subscription is active."
-
     if not shop:
         return HttpResponseBadRequest("Missing shop identifier.")
 
@@ -694,19 +691,14 @@ def billing_return(request: HttpRequest) -> HttpResponse:
     if not meta:
         return HttpResponseBadRequest("Unknown Shopify store.")
 
-    try:
-        billing.ensure_active_charge(meta)
-    except billing.ShopifyBillingError as exc:
-        message = str(exc) or "Shopify billing is not yet active."
-        status_code = 400
-
-    context = {"shop_domain": shop, "message": message, "status_code": status_code}
-    return render(
-        request,
-        "shopify_app/billing_return.html",
-        context,
-        status=status_code,
+    app_key = getattr(settings, "SHOPIFY_API_KEY", "").strip()
+    dashboard_url = request.build_absolute_uri(
+        f"{reverse('shopify_embedded_home')}?{urlencode({'shop': shop})}"
     )
+    if app_key:
+        dashboard_url = f"https://{shop}/admin/apps/{app_key}"
+
+    return redirect(dashboard_url)
 
 
 def _handle_session_token_callback(request: HttpRequest, id_token: str) -> HttpResponse:
