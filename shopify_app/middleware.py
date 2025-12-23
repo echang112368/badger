@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-import logging
 from django.conf import settings
-from django.http import JsonResponse
-
-from .oauth import ShopifyOAuthError, normalise_shop_domain, verify_session_token
-
-logger = logging.getLogger(__name__)
 
 
 class ShopifyEmbeddedAppSecurityMiddleware:
@@ -47,45 +41,4 @@ class ShopifyEmbeddedAppSecurityMiddleware:
             response.headers["Content-Security-Policy"] = frame_ancestors_directive
 
         response.headers["X-Frame-Options"] = "ALLOWALL"
-        return response
-
-
-class ShopifySessionTokenMiddleware:
-    """Validate App Bridge session tokens on every request."""
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def _build_error(self, reason: str, status_code: int = 401):
-        logger.error(
-            "SESSION_TOKEN_INVALID",
-            extra={"reason": reason},
-        )
-        return JsonResponse({"error": reason}, status=status_code)
-
-    def __call__(self, request):
-        auth_header = request.headers.get("Authorization") or ""
-        if not auth_header.startswith("Bearer "):
-            return self._build_error("missing_token")
-
-        token = auth_header.split(" ", 1)[1].strip()
-        try:
-            payload = verify_session_token(token)
-        except ShopifyOAuthError as exc:
-            return self._build_error(str(exc))
-        except Exception:
-            return self._build_error("invalid_token")
-
-        shop = normalise_shop_domain(payload.get("dest", "").replace("https://", ""))
-        if not shop:
-            return self._build_error("shop_missing")
-
-        request.shop_domain = shop
-        request.shopify_session = payload
-        logger.info(
-            "SESSION_TOKEN_VERIFIED",
-            extra={"shop": shop, "request_id": getattr(request, "request_id", "")},
-        )
-
-        response = self.get_response(request)
         return response
