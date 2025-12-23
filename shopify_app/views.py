@@ -695,16 +695,10 @@ def billing_return(request: HttpRequest) -> HttpResponse:
         return HttpResponseBadRequest("Unknown Shopify store.")
 
     try:
-        billing.refresh_recurring_charge(meta)
+        billing.ensure_active_charge(meta)
     except billing.ShopifyBillingError as exc:
         message = str(exc) or "Shopify billing is not yet active."
         status_code = 400
-    else:
-        try:
-            billing.ensure_active_charge(meta)
-        except billing.ShopifyBillingError as exc:
-            message = str(exc) or "Shopify billing is not yet active."
-            status_code = 400
 
     context = {"shop_domain": shop, "message": message, "status_code": status_code}
     return render(
