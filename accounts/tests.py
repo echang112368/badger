@@ -248,3 +248,32 @@ class EmailVerificationFlowTests(TestCase):
         response = self.client.get(reverse("user_dashboard"))
 
         self.assertEqual(response.status_code, 200)
+
+    def test_verification_logs_in_user_and_redirects(self):
+        user = CustomUser.objects.create_user(
+            username="verify_me",
+            email="verify_me@example.com",
+            password="pass12345",
+            email_verified=False,
+        )
+        user.verification_code = "123456"
+        user.save(update_fields=["verification_code"])
+
+        session = self.client.session
+        session["verification_user_id"] = user.pk
+        session.save()
+
+        response = self.client.post(
+            reverse("verify_email"),
+            {"code": "123456"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("user_dashboard"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.client.session.get("_auth_user_id"), str(user.pk))
+
+        user.refresh_from_db()
+        self.assertTrue(user.email_verified)
