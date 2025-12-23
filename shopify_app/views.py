@@ -681,7 +681,7 @@ def billing_return(request: HttpRequest) -> HttpResponse:
 
     shop = normalise_shop_domain(request.GET.get("shop", ""))
     if not shop:
-        return HttpResponseBadRequest("Missing shop identifier.")
+        return redirect(reverse("merchant_settings"))
 
     meta = (
         MerchantMeta.objects.filter(shopify_store_domain__iexact=shop)
@@ -689,7 +689,9 @@ def billing_return(request: HttpRequest) -> HttpResponse:
         .first()
     )
     if not meta:
-        return HttpResponseBadRequest("Unknown Shopify store.")
+        return redirect(reverse("merchant_settings"))
+
+    request.session["shopify_billing_refresh"] = True
 
     app_key = getattr(settings, "SHOPIFY_API_KEY", "").strip()
     dashboard_url = request.build_absolute_uri(
