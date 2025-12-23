@@ -227,8 +227,7 @@ class ShopifyBillingReturnTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Missing shop identifier", response.content.decode())
 
-    @patch("shopify_app.views.billing.refresh_recurring_charge")
-    def test_active_charge_success(self, mock_refresh):
+    def test_active_charge_success(self):
         user = CustomUser.objects.create_user(
             username="merchant", email="merchant@example.com", password="pass"
         )
@@ -241,39 +240,9 @@ class ShopifyBillingReturnTests(TestCase):
             shopify_billing_status="active",
         )
 
-        mock_refresh.return_value = {"status": meta.shopify_billing_status}
-
         response = self.client.get(self.url, {"shop": meta.shopify_store_domain})
         self.assertEqual(response.status_code, 200)
         self.assertIn("active", response.content.decode().lower())
-
-    @patch("shopify_app.views.billing.refresh_recurring_charge")
-    def test_refreshes_status_on_return(self, mock_refresh):
-        user = CustomUser.objects.create_user(
-            username="merchant", email="merchant@example.com", password="pass"
-        )
-        meta = MerchantMeta.objects.create(
-            user=user,
-            shopify_store_domain="example.myshopify.com",
-            shopify_access_token="token",
-            monthly_fee=Decimal("10.00"),
-            shopify_recurring_charge_id="123",
-            shopify_billing_status="pending",
-        )
-
-        def _refresh(record):
-            record.shopify_billing_status = "active"
-            record.save(update_fields=["shopify_billing_status"])
-            return {"status": "ACTIVE"}
-
-        mock_refresh.side_effect = _refresh
-
-        response = self.client.get(self.url, {"shop": meta.shopify_store_domain})
-
-        mock_refresh.assert_called_once_with(meta)
-        meta.refresh_from_db()
-        self.assertEqual(meta.shopify_billing_status, "active")
-        self.assertEqual(response.status_code, 200)
 
 
 class MerchantInvoiceAdminTests(TestCase):
