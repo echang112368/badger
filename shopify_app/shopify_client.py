@@ -2,6 +2,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
+import time
 import requests
 
 
@@ -77,23 +78,50 @@ class ShopifyClient:
     def graphql(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a GraphQL Admin API query and return the parsed JSON body."""
 
-        response = self.post(
-            "/admin/api/2024-07/graphql.json",
-            json={"query": query, "variables": variables or {}},
-        )
-        payload = response.json()
-
-        if not isinstance(payload, dict):
-            raise ShopifyGraphQLError(
-                "Unexpected response type from Shopify GraphQL API.", payload
+        retries = 2
+        last_error = None
+        for attempt in range(retries + 1):
+            response = self.post(
+                f"/admin/api/{API_VERSION}/graphql.json",
+                json={"query": query, "variables": variables or {}},
             )
 
-        errors = payload.get("errors")
-        if errors:
-            logger.error("Shopify GraphQL returned errors for %s: %s", query, errors)
-            raise ShopifyGraphQLError("Shopify GraphQL request returned errors.", errors)
+            if response.status_code == 429 and attempt < retries:
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    delay = 0.5
+                time.sleep(delay)
+                continue
 
-        return payload
+            payload = response.json()
+
+            if not isinstance(payload, dict):
+                last_error = ShopifyGraphQLError(
+                    "Unexpected response type from Shopify GraphQL API.", payload
+                )
+                break
+
+            errors = payload.get("errors")
+            if errors:
+                logger.error(
+                    "SHOPIFY_GRAPHQL_CALL", extra={"shop": self.store_domain, "query": query}
+                )
+                last_error = ShopifyGraphQLError(
+                    "Shopify GraphQL request returned errors.", errors
+                )
+                break
+
+            logger.debug(
+                "SHOPIFY_GRAPHQL_CALL",
+                extra={"shop": self.store_domain, "query": query},
+            )
+            return payload
+
+        if last_error:
+            raise last_error
+        raise ShopifyGraphQLError("Unknown GraphQL failure")
 
     def create_app_subscription(
         self,
@@ -409,6 +437,13 @@ def _stringify_graphql_errors(value: Any) -> str:
     return str(value)
 
 
+def graphql(shop: str, token: str, query: str, variables: Optional[Dict[str, Any]] = None):
+    """Facade for invoking Shopify GraphQL Admin API with retries and logging."""
+
+    client = ShopifyClient(token, shop)
+    return client.graphql(query, variables)
+
+
 # Shopify Admin GraphQL appSubscriptionCreate mutation
 # https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate
 _APP_SUBSCRIPTION_CREATE_MUTATION = """
@@ -568,3 +603,4 @@ query getProductsById($ids: [ID!]!) {
   }
 }
 """
+API_VERSION = "2024-10"
