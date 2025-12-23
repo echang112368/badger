@@ -70,6 +70,8 @@ class MerchantMeta(models.Model):
         ),
     )
     shopify_billing_status = models.CharField(max_length=32, blank=True)
+    shopify_billing_plan = models.CharField(max_length=32, blank=True)
+    shopify_billing_status_updated_at = models.DateTimeField(null=True, blank=True)
     shopify_recurring_charge_id = models.CharField(max_length=64, blank=True)
     shopify_billing_confirmation_url = models.URLField(blank=True)
     shopify_usage_terms = models.CharField(max_length=255, blank=True)
@@ -122,7 +124,10 @@ class MerchantMeta(models.Model):
             return False
 
         if self.business_type == self.BusinessType.SHOPIFY:
-            return (self.shopify_billing_status or "").strip().lower() == "active"
+            return (
+                (self.shopify_billing_status or "").strip().lower() == "active"
+                and (self.shopify_billing_plan or "") == self.billing_plan
+            )
 
         return self.monthly_fee > 0
 
