@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count
 from django.shortcuts import render, redirect, get_object_or_404
@@ -1066,10 +1067,31 @@ def start_shopify_billing(request):
     if selected_plan not in valid_plans:
         return JsonResponse({"error": "Invalid billing plan selected."}, status=400)
 
+    update_fields = []
     if selected_plan != merchant_meta.billing_plan:
         merchant_meta.billing_plan = selected_plan
         merchant_meta.monthly_fee = merchant_meta.plan_price
-        merchant_meta.save(update_fields=["billing_plan", "monthly_fee"])
+        update_fields.extend(["billing_plan", "monthly_fee"])
+
+    if selected_plan == MerchantMeta.BillingPlan.BADGER_CREATOR:
+        usage_cap = getattr(settings, "SHOPIFY_USAGE_CAPPED_AMOUNT", None)
+        usage_terms = getattr(settings, "SHOPIFY_USAGE_TERMS", "")
+        if merchant_meta.shopify_usage_capped_amount != usage_cap:
+            merchant_meta.shopify_usage_capped_amount = usage_cap
+            update_fields.append("shopify_usage_capped_amount")
+        if merchant_meta.shopify_usage_terms != usage_terms:
+            merchant_meta.shopify_usage_terms = usage_terms
+            update_fields.append("shopify_usage_terms")
+    else:
+        if merchant_meta.shopify_usage_capped_amount is not None:
+            merchant_meta.shopify_usage_capped_amount = None
+            update_fields.append("shopify_usage_capped_amount")
+        if merchant_meta.shopify_usage_terms:
+            merchant_meta.shopify_usage_terms = ""
+            update_fields.append("shopify_usage_terms")
+
+    if update_fields:
+        merchant_meta.save(update_fields=update_fields)
 
     shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain or "")
     if not shop_domain:
