@@ -1,7 +1,7 @@
 import random
 
 # Probability configuration
-P_TRIGGER = .35  # 35% chance the lottery triggers
+P_TRIGGER = 1 #.35  # 35% chance the lottery triggers
 P_HIGH = 0.08     # high tier relative to triggered
 P_MID = 0.40      # mid tier relative to triggered
 P_LOW = 0.52      # low tier relative to triggered
