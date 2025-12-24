@@ -698,6 +698,7 @@ def billing_return(request: HttpRequest) -> HttpResponse:
     if app_key:
         dashboard_url = f"https://{shop}/admin/apps/{app_key}"
 
+    request.session["shopify_billing_refresh_required"] = True
     return redirect(dashboard_url)
 
 
