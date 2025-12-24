@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import json
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -193,6 +194,28 @@ SHOPIFY_SCOPES = os.environ.get(
     "read_products,write_discounts",
 )
 
+
+def _parse_decimal_setting(value: str | None, default: Decimal) -> Decimal:
+    if value is None:
+        return default
+    candidate = str(value).strip()
+    if not candidate:
+        return default
+    try:
+        return Decimal(candidate)
+    except (InvalidOperation, ValueError):
+        return default
+
+
+SHOPIFY_USAGE_CAPPED_AMOUNT = _parse_decimal_setting(
+    os.environ.get("SHOPIFY_USAGE_CAPPED_AMOUNT"),
+    Decimal("500.00"),
+)
+SHOPIFY_USAGE_TERMS = os.environ.get(
+    "SHOPIFY_USAGE_TERMS",
+    "Usage-based payouts and automated charges with a capped amount.",
+)
+
 _shopify_base = SHOPIFY_APP_ORIGIN.rstrip("/") if SHOPIFY_APP_ORIGIN else None
 _default_shopify_app_url = (
     f"{_shopify_base}/shopify/" if _shopify_base else ""
@@ -347,4 +370,3 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
 }
-

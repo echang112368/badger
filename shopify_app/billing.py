@@ -176,6 +176,14 @@ def create_or_update_recurring_charge(
 
     usage_cap = getattr(meta, "shopify_usage_capped_amount", None)
     usage_terms = getattr(meta, "shopify_usage_terms", "")
+    if meta.billing_plan == MerchantMeta.BillingPlan.PLATFORM_ONLY:
+        usage_cap = None
+        usage_terms = ""
+    elif meta.billing_plan == MerchantMeta.BillingPlan.BADGER_CREATOR:
+        if usage_cap is None:
+            usage_cap = getattr(settings, "SHOPIFY_USAGE_CAPPED_AMOUNT", None)
+        if not usage_terms:
+            usage_terms = getattr(settings, "SHOPIFY_USAGE_TERMS", "")
 
     client = _shopify_client(meta)
     try:
