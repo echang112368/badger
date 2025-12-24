@@ -1,4 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import timedelta
 import json
 import json
 import logging
@@ -58,6 +59,7 @@ def _normalize_domain(domain: str) -> str:
 
 
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
+SHOPIFY_BILLING_STATUS_TTL = timedelta(minutes=5)
 
 
 def _get_merchant_meta(merchant_user: Optional[CustomUser]) -> Optional[MerchantMeta]:
@@ -70,6 +72,19 @@ def _get_merchant_meta(merchant_user: Optional[CustomUser]) -> Optional[Merchant
         return merchant_user.merchantmeta
     except MerchantMeta.DoesNotExist:
         return None
+
+
+def _should_refresh_shopify_billing(request, meta: Optional[MerchantMeta]) -> bool:
+    if not meta or meta.business_type != MerchantMeta.BusinessType.SHOPIFY:
+        return False
+    if meta.requires_shopify_oauth():
+        return False
+    if request.session.pop("shopify_billing_refresh_required", False):
+        return True
+    verified_at = getattr(meta, "shopify_billing_verified_at", None)
+    if not verified_at:
+        return True
+    return timezone.now() - verified_at > SHOPIFY_BILLING_STATUS_TTL
 
 
 def _should_show_invoices_tab(merchant_meta: Optional[MerchantMeta]) -> bool:
@@ -981,9 +996,24 @@ def merchant_settings(request):
     shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
     if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
         shopify_plan_price = Decimal("30.00")
-    shopify_status_value = (merchant_meta.shopify_billing_status or "").strip()
-    status_normalized = shopify_status_value.lower()
-    shopify_plan_active = status_normalized in {"active", "accepted", "pending"}
+    if _should_refresh_shopify_billing(request, merchant_meta):
+        try:
+            shopify_billing.refresh_active_subscriptions(
+                merchant_meta,
+                expected_plan_name=shopify_billing.expected_shopify_plan_name(merchant_meta),
+            )
+        except shopify_billing.ShopifyReauthorizationRequired:
+            logger.warning(
+                "Shopify billing refresh requires reauthorization for %s.",
+                merchant_meta.shopify_store_domain,
+            )
+        except shopify_billing.ShopifyBillingError:
+            logger.exception("Failed to refresh Shopify billing status for settings view.")
+
+    shopify_plan_active = (
+        merchant_meta.shopify_billing_status == "ACTIVE"
+        and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
+    )
     shopify_cancel_url = ""
     if merchant_meta.shopify_store_domain:
         normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
@@ -1065,7 +1095,17 @@ def start_shopify_billing(request):
     except shopify_billing.ShopifyBillingError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    return JsonResponse(result)
+    plan_active = (
+        merchant_meta.shopify_billing_status == "ACTIVE"
+        and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
+    )
+    return JsonResponse(
+        {
+            **result,
+            "plan_active": plan_active,
+            "plan": merchant_meta.shopify_billing_plan or "",
+        }
+    )
 
 @login_required
 @require_GET
@@ -1085,11 +1125,44 @@ def refresh_shopify_billing_status(request):
         return JsonResponse({"error": "Shopify billing is not enabled for this merchant."}, status=400)
 
     try:
-        result = shopify_billing.refresh_recurring_charge(merchant_meta)
+        result = shopify_billing.refresh_active_subscriptions(
+            merchant_meta,
+            expected_plan_name=shopify_billing.expected_shopify_plan_name(merchant_meta),
+        )
+    except shopify_billing.ShopifyReauthorizationRequired as exc:
+        authorize_url = build_shopify_authorize_url(
+            request, merchant_meta.shopify_store_domain or ""
+        )
+        return JsonResponse(
+            {"error": str(exc), "authorize_url": authorize_url},
+            status=401,
+        )
     except shopify_billing.ShopifyBillingError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
 
-    return JsonResponse(result)
+    plan_active = (
+        merchant_meta.shopify_billing_status == "ACTIVE"
+        and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
+    )
+    return JsonResponse(
+        {
+            "status": merchant_meta.shopify_billing_status or "",
+            "charge_id": merchant_meta.shopify_recurring_charge_id or "",
+            "plan": merchant_meta.shopify_billing_plan or "",
+            "plan_active": plan_active,
+            "verified_at": (
+                merchant_meta.shopify_billing_verified_at.isoformat()
+                if merchant_meta.shopify_billing_verified_at
+                else ""
+            ),
+            "raw": {
+                "terms": merchant_meta.shopify_usage_terms or "",
+                "capped_amount": str(merchant_meta.shopify_usage_capped_amount)
+                if merchant_meta.shopify_usage_capped_amount
+                else "",
+            },
+        }
+    )
 
 @login_required
 @require_POST
