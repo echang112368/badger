@@ -155,6 +155,62 @@ class ShopifyBillingTests(TestCase):
         self.assertEqual(self.meta.shopify_usage_terms, "Usage terms")
         self.assertEqual(result["id"], "123")
 
+    @override_settings(
+        SHOPIFY_USAGE_CAPPED_AMOUNT=Decimal("500.00"),
+        SHOPIFY_USAGE_TERMS="Usage-based charges",
+    )
+    @patch("shopify_app.billing.ShopifyClient")
+    def test_create_recurring_charge_uses_default_usage_pricing(self, mock_client_cls):
+        mock_client = mock_client_cls.return_value
+        mock_client.create_app_subscription.return_value = {
+            "confirmation_url": "https://confirm",
+            "subscription": {
+                "id": "gid://shopify/AppSubscription/234",
+                "status": "PENDING",
+                "lineItems": [
+                    {
+                        "id": "gid://shopify/AppSubscriptionLineItem/1",
+                        "plan": {
+                            "pricingDetails": {
+                                "__typename": "AppRecurringPricing",
+                                "price": {"amount": "30.00", "currencyCode": "USD"},
+                            },
+                        },
+                    },
+                    {
+                        "id": "gid://shopify/AppSubscriptionLineItem/2",
+                        "plan": {
+                            "pricingDetails": {
+                                "__typename": "AppUsagePricing",
+                                "terms": "Usage-based charges",
+                                "cappedAmount": {
+                                    "amount": "500.00",
+                                    "currencyCode": "USD",
+                                },
+                            },
+                        },
+                    },
+                ],
+            },
+        }
+
+        self.meta.billing_plan = MerchantMeta.BillingPlan.BADGER_CREATOR
+        self.meta.shopify_usage_capped_amount = None
+        self.meta.shopify_usage_terms = ""
+        self.meta.save()
+
+        billing.create_or_update_recurring_charge(self.meta, return_url="https://return")
+
+        mock_client.create_app_subscription.assert_called_once_with(
+            plan_name=billing.expected_shopify_plan_name(self.meta),
+            price_amount=self.meta.monthly_fee,
+            trial_days=0,
+            return_url="https://return",
+            test_mode=ANY,
+            usage_capped_amount=Decimal("500.00"),
+            usage_terms="Usage-based charges",
+        )
+
     def test_ensure_active_charge_requires_status(self):
         self.meta.shopify_recurring_charge_id = ""
         self.meta.shopify_billing_status = "pending"
