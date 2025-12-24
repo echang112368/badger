@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 import json
 
 from django.urls import reverse
@@ -345,6 +345,41 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(meta.billing_plan, MerchantMeta.BillingPlan.PLATFORM_ONLY)
         self.assertEqual(meta.monthly_fee, meta.plan_price)
 
+    @override_settings(
+        SHOPIFY_USAGE_CAPPED_AMOUNT=Decimal("500.00"),
+        SHOPIFY_USAGE_TERMS="Usage-based charges",
+    )
+    @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
+    def test_start_shopify_billing_sets_usage_defaults(self, mock_create):
+        user = CustomUser.objects.create_user(
+            username="shopify_usage",
+            password="pass",
+            email="shopify_usage@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "shop.test"
+        meta.monthly_fee = Decimal("30.00")
+        meta.shopify_usage_capped_amount = None
+        meta.shopify_usage_terms = ""
+        meta.save()
+
+        mock_create.return_value = {"id": 1, "status": "pending", "capped_amount": "500.00"}
+
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse("merchant_start_shopify_billing"),
+            data=json.dumps({"billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        meta.refresh_from_db()
+        self.assertEqual(meta.shopify_usage_capped_amount, Decimal("500.00"))
+        self.assertEqual(meta.shopify_usage_terms, "Usage-based charges")
+
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
     def test_start_shopify_billing_prompts_reauth(self, mock_create):
         user = CustomUser.objects.create_user(
@@ -490,4 +525,3 @@ class ItemGroupFormTests(TestCase):
         form = ItemGroupForm(data={"name": "Group"}, merchant=merchant)
         self.assertFalse(form.is_valid())
         self.assertIn("affiliate_percent", form.errors)
-
