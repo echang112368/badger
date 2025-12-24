@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 from django.conf import settings
+from django.utils import timezone
 
 from merchants.models import MerchantMeta
 from .oauth import ShopifyOAuthError, refresh_access_token
@@ -99,6 +100,12 @@ def _shopify_client(meta: MerchantMeta) -> ShopifyClient:
     )
 
 
+def expected_shopify_plan_name(meta: MerchantMeta) -> str:
+    """Return the Shopify subscription name for the merchant's selected plan."""
+
+    return f"Badger {meta.billing_plan}"
+
+
 def _parse_usage_line_item(line_items: Iterable[Dict[str, Any]]) -> Tuple[str, str, Optional[Decimal]]:
     """Return the subscription usage line item ID, terms, and capped amount.
 
@@ -173,7 +180,7 @@ def create_or_update_recurring_charge(
     client = _shopify_client(meta)
     try:
         result = client.create_app_subscription(
-            plan_name=f"Badger {meta.billing_plan}",
+            plan_name=expected_shopify_plan_name(meta),
             price_amount=normalized_fee,
             trial_days=int(trial_days),
             return_url=return_url,
@@ -207,8 +214,11 @@ def create_or_update_recurring_charge(
         except (InvalidOperation, TypeError, ValueError):
             capped_amount = None
 
+    subscription_status = subscription.get("status", "") or ""
     meta.shopify_recurring_charge_id = _strip_gid(subscription.get("id", ""))
-    meta.shopify_billing_status = subscription.get("status", "") or ""
+    meta.shopify_billing_status = ""
+    meta.shopify_billing_plan = ""
+    meta.shopify_billing_verified_at = None
     meta.shopify_billing_confirmation_url = result.get("confirmation_url", "") or ""
     meta.shopify_usage_terms = terms
     meta.shopify_usage_capped_amount = capped_amount
@@ -216,6 +226,8 @@ def create_or_update_recurring_charge(
         update_fields=[
             "shopify_recurring_charge_id",
             "shopify_billing_status",
+            "shopify_billing_plan",
+            "shopify_billing_verified_at",
             "shopify_billing_confirmation_url",
             "shopify_usage_terms",
             "shopify_usage_capped_amount",
@@ -226,12 +238,12 @@ def create_or_update_recurring_charge(
         "Created Shopify subscription %s for %s with status %s",
         subscription.get("id"),
         meta.shopify_store_domain,
-        meta.shopify_billing_status,
+        subscription_status,
     )
 
     return {
         "id": meta.shopify_recurring_charge_id,
-        "status": meta.shopify_billing_status,
+        "status": subscription_status,
         "confirmation_url": meta.shopify_billing_confirmation_url,
         "usage_line_item_id": _strip_gid(usage_line_id),
         "usage_terms": terms,
@@ -276,11 +288,78 @@ def refresh_recurring_charge(meta: MerchantMeta) -> Dict[str, Any]:
     }
 
 
+def refresh_active_subscriptions(
+    meta: MerchantMeta,
+    *,
+    expected_plan_name: str,
+) -> Dict[str, Any]:
+    """Refresh billing status using currentAppInstallation.activeSubscriptions."""
+
+    _assert_shopify_credentials(meta)
+    client = _shopify_client(meta)
+
+    try:
+        payload = client.graphql(_ACTIVE_SUBSCRIPTIONS_QUERY)
+    except ShopifyInvalidCredentialsError as exc:
+        raise ShopifyReauthorizationRequired(str(exc))
+
+    subscriptions = (
+        payload.get("data", {})
+        .get("currentAppInstallation", {})
+        .get("activeSubscriptions")
+        or []
+    )
+    matched_subscription = None
+    for subscription in subscriptions:
+        if not isinstance(subscription, dict):
+            continue
+        if subscription.get("name") == expected_plan_name:
+            matched_subscription = subscription
+            break
+
+    status = ""
+    plan_value = ""
+    charge_id = meta.shopify_recurring_charge_id
+    if matched_subscription:
+        status = matched_subscription.get("status", "") or ""
+        plan_value = meta.billing_plan
+        charge_id = _strip_gid(matched_subscription.get("id", "")) or charge_id
+
+    meta.shopify_billing_status = status
+    meta.shopify_billing_plan = plan_value
+    meta.shopify_billing_verified_at = timezone.now()
+    if charge_id != meta.shopify_recurring_charge_id:
+        meta.shopify_recurring_charge_id = charge_id
+        update_fields = [
+            "shopify_billing_status",
+            "shopify_billing_plan",
+            "shopify_billing_verified_at",
+            "shopify_recurring_charge_id",
+        ]
+    else:
+        update_fields = [
+            "shopify_billing_status",
+            "shopify_billing_plan",
+            "shopify_billing_verified_at",
+        ]
+    meta.save(update_fields=update_fields)
+
+    return {
+        "status": status,
+        "plan": plan_value,
+        "subscription": matched_subscription,
+    }
+
+
 def ensure_active_charge(meta: MerchantMeta) -> None:
     """Raise when the merchant does not have an active Shopify subscription."""
 
     status = (meta.shopify_billing_status or "").lower()
-    if not meta.shopify_recurring_charge_id or status != "active":
+    if (
+        not meta.shopify_recurring_charge_id
+        or status != "active"
+        or meta.shopify_billing_plan != meta.billing_plan
+    ):
         raise ShopifyBillingError("Shopify billing is not active for this merchant.")
 
 
@@ -388,6 +467,18 @@ query GetSubscription($id: ID!) {
           }
         }
       }
+    }
+  }
+}
+"""
+
+_ACTIVE_SUBSCRIPTIONS_QUERY = """
+query GetActiveSubscriptions {
+  currentAppInstallation {
+    activeSubscriptions {
+      id
+      name
+      status
     }
   }
 }
