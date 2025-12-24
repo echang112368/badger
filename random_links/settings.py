@@ -209,7 +209,7 @@ def _parse_decimal_setting(value: str | None, default: Decimal) -> Decimal:
 
 SHOPIFY_USAGE_CAPPED_AMOUNT = _parse_decimal_setting(
     os.environ.get("SHOPIFY_USAGE_CAPPED_AMOUNT"),
-    Decimal("500.00"),
+    Decimal("10000.00"),
 )
 SHOPIFY_USAGE_TERMS = os.environ.get(
     "SHOPIFY_USAGE_TERMS",
