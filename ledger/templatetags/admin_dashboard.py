@@ -28,7 +28,7 @@ def _quantize_amount(value: Decimal | None) -> Decimal:
     return value.quantize(Decimal("0.01"))
 
 
-@register.inclusion_tag("admin/dashboard/overview.html", takes_context=False)
+@register.inclusion_tag("admin/dashboard.html", takes_context=False)
 def admin_dashboard():
     """Render an operational snapshot for the Django admin landing page."""
 
