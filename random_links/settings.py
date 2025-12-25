@@ -149,7 +149,7 @@ SHOPIFY_ORIGIN_CANDIDATES = [
     os.environ.get("NGROK_HOST"),
     os.environ.get("SHOPIFY_APP_HOST"),
     os.environ.get("SHOPIFY_APP_DOMAIN"),
-    "https://5b8e7c862a72.ngrok-free.app",
+    "https://4173244c6495.ngrok-free.app",
 ]
 
 SHOPIFY_APP_HOST = None
