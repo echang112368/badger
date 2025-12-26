@@ -481,6 +481,7 @@ def create_discount(request, merchant_uuid):
 
     coupon_code = f"BADGER-{uuid.uuid4().hex[:8].upper()}"
     now = timezone.now()
+    percentage_value = float(Decimal(percentage) / Decimal("100"))
     discount_payload = {
         "title": coupon_code,
         "code": coupon_code,
@@ -490,7 +491,7 @@ def create_discount(request, merchant_uuid):
         "combinesWith": {"orderDiscounts": True, "productDiscounts": True, "shippingDiscounts": True},
         "customerSelection": {"all": True},
         "customerGets": {
-            "value": {"percentage": float(percentage)},
+            "value": {"percentage": percentage_value},
             "items": {"all": True},
         },
     }
