@@ -316,8 +316,9 @@ class MerchantSettingsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.INDEPENDENT)
 
+    @patch("merchants.views.register_orders_create_webhook")
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
-    def test_start_shopify_billing(self, mock_create):
+    def test_start_shopify_billing(self, mock_create, mock_register_webhook):
         user = CustomUser.objects.create_user(
             username="shopify", password="pass", email="shopify@example.com", is_merchant=True
         )
@@ -329,6 +330,7 @@ class MerchantSettingsTests(TestCase):
         meta.save()
 
         mock_create.return_value = {"id": 1, "status": "pending", "capped_amount": "100.00"}
+        mock_register_webhook.return_value = True
 
         self.client.force_login(user)
         response = self.client.post(
@@ -349,8 +351,9 @@ class MerchantSettingsTests(TestCase):
         SHOPIFY_USAGE_CAPPED_AMOUNT=Decimal("500.00"),
         SHOPIFY_USAGE_TERMS="Usage-based charges",
     )
+    @patch("merchants.views.register_orders_create_webhook")
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
-    def test_start_shopify_billing_sets_usage_defaults(self, mock_create):
+    def test_start_shopify_billing_sets_usage_defaults(self, mock_create, mock_register_webhook):
         user = CustomUser.objects.create_user(
             username="shopify_usage",
             password="pass",
@@ -367,6 +370,7 @@ class MerchantSettingsTests(TestCase):
         meta.save()
 
         mock_create.return_value = {"id": 1, "status": "pending", "capped_amount": "500.00"}
+        mock_register_webhook.return_value = True
 
         self.client.force_login(user)
         response = self.client.post(
