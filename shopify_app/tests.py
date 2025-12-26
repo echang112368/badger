@@ -91,7 +91,7 @@ class CreateDiscountViewTests(TestCase):
         first_call = mock_client.graphql.call_args_list[0]
         variables = first_call.args[1]
         rule_payload = variables["basicCodeDiscount"]
-        self.assertEqual(rule_payload["customerGets"]["value"], {"percentage": 10})
+        self.assertEqual(rule_payload["customerGets"]["value"], {"percentage": 0.1})
         start = datetime.fromisoformat(rule_payload["startsAt"])
         end = datetime.fromisoformat(rule_payload["endsAt"])
         self.assertEqual(end - start, timedelta(days=1))
