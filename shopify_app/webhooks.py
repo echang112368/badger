@@ -29,13 +29,6 @@ def register_orders_create_webhook(
     """Register an orders/create webhook for the given shop."""
 
     client = ShopifyClient(access_token, shop_domain)
-    print(
-        "Registering Shopify orders/create webhook:",
-        {
-            "shop_domain": shop_domain,
-            "webhook_url": webhook_url,
-        },
-    )
     try:
         payload = client.graphql(
             WEBHOOK_CREATE_MUTATION,
@@ -48,37 +41,13 @@ def register_orders_create_webhook(
     result = payload.get("data", {}).get("webhookSubscriptionCreate") or {}
     user_errors = result.get("userErrors") or []
     if user_errors:
-        print(
-            "Shopify webhook user errors:",
-            {
-                "shop_domain": shop_domain,
-                "webhook_url": webhook_url,
-                "user_errors": user_errors,
-            },
-        )
         print(f"Error registering webhook: {user_errors}")
         return False
 
     subscription = result.get("webhookSubscription")
     if not subscription:
-        print(
-            "Shopify webhook creation failed to return subscription:",
-            {
-                "shop_domain": shop_domain,
-                "webhook_url": webhook_url,
-                "payload": payload,
-            },
-        )
         raise ShopifyGraphQLError(
             "Shopify webhook creation did not return a subscription.", payload
         )
 
-    print(
-        "Shopify webhook registered:",
-        {
-            "shop_domain": shop_domain,
-            "webhook_url": webhook_url,
-            "subscription": subscription,
-        },
-    )
     return True
