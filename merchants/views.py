@@ -133,6 +133,29 @@ def _build_product_link(product: dict, shopify_domain: str) -> str:
     return f"https://{shopify_domain}" if shopify_domain else "https://shopify.com"
 
 
+def _attempt_shopify_webhook_registration(
+    request,
+    merchant_meta: Optional[MerchantMeta],
+    shop_domain: str,
+) -> None:
+    if not merchant_meta or not merchant_meta.shopify_access_token or not shop_domain:
+        return
+    webhook_url = request.build_absolute_uri(
+        reverse("shopify_orders_create_webhook")
+    )
+    try:
+        register_orders_create_webhook(
+            shop_domain,
+            merchant_meta.shopify_access_token,
+            webhook_url=webhook_url,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to register Shopify orders/create webhook for %s.",
+            shop_domain,
+        )
+
+
 def _generate_team_email(merchant: CustomUser, username: str) -> str:
     merchant_identifier = slugify(merchant.username) or slugify(getattr(merchant, "email", ""))
     if not merchant_identifier:
@@ -1016,11 +1039,14 @@ def merchant_settings(request):
         merchant_meta.shopify_billing_status == "ACTIVE"
         and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
     )
+    shop_domain = ""
     shopify_cancel_url = ""
     if merchant_meta.shopify_store_domain:
-        normalised_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
-        if normalised_domain:
-            shopify_cancel_url = f"https://{normalised_domain}/admin/settings/billing"
+        shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
+        if shop_domain:
+            shopify_cancel_url = f"https://{shop_domain}/admin/settings/billing"
+    if shopify_plan_active and shop_domain:
+        _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
 
     return render(request, 'merchants/settings.html', {
         'merchant': merchant_user,
@@ -1122,21 +1148,7 @@ def start_shopify_billing(request):
         merchant_meta.shopify_billing_status == "ACTIVE"
         and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
     )
-    if merchant_meta.shopify_access_token and shop_domain:
-        webhook_url = request.build_absolute_uri(
-            reverse("shopify_orders_create_webhook")
-        )
-        try:
-            register_orders_create_webhook(
-                shop_domain,
-                merchant_meta.shopify_access_token,
-                webhook_url=webhook_url,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to register Shopify orders/create webhook for %s.",
-                shop_domain,
-            )
+    _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
     return JsonResponse(
         {
             **result,
@@ -1182,6 +1194,9 @@ def refresh_shopify_billing_status(request):
         merchant_meta.shopify_billing_status == "ACTIVE"
         and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
     )
+    shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain or "")
+    if plan_active and shop_domain:
+        _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
     return JsonResponse(
         {
             "status": merchant_meta.shopify_billing_status or "",
