@@ -43,7 +43,6 @@ from .oauth import (
     session_token_key,
     validate_shopify_hmac,
 )
-from .webhooks import register_orders_create_webhook
 from .shopify_client import ShopifyClient, ShopifyGraphQLError, ShopifyInvalidCredentialsError
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from accounts.forms import CustomLoginForm
@@ -642,22 +641,6 @@ def oauth_callback(request: HttpRequest):
         if user and not user.is_merchant:
             user.is_merchant = True
             user.save(update_fields=["is_merchant"])
-
-    if meta:
-        webhook_url = request.build_absolute_uri(
-            reverse("shopify_orders_create_webhook")
-        )
-        try:
-            register_orders_create_webhook(
-                normalised_shop,
-                meta.shopify_access_token,
-                webhook_url=webhook_url,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to register Shopify orders/create webhook during install for %s.",
-                normalised_shop,
-            )
 
     confirmation_url: Optional[str] = None
 
