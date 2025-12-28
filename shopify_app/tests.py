@@ -798,12 +798,9 @@ class OAuthCallbackTests(TestCase):
             self.client.session.get("shopify_pending_shop"), self.shop_domain
         )
 
-    @patch("shopify_app.views.register_orders_create_webhook")
     @patch("shopify_app.oauth.exchange_code_for_token")
     @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_stores_session_token(
-        self, mock_hmac, mock_exchange, mock_register_webhook
-    ):
+    def test_oauth_callback_stores_session_token(self, mock_hmac, mock_exchange):
         mock_exchange.return_value = AccessTokenResponse(
             access_token="shppa_token",
             scope="read_products",
@@ -811,7 +808,6 @@ class OAuthCallbackTests(TestCase):
             refresh_token="refresh_abc",
             raw={},
         )
-        mock_register_webhook.return_value = True
 
         session = self.client.session
         session[STATE_SESSION_KEY] = "abc"
@@ -836,12 +832,9 @@ class OAuthCallbackTests(TestCase):
             content,
         )
 
-    @patch("shopify_app.views.register_orders_create_webhook")
     @patch("shopify_app.oauth.exchange_code_for_token")
     @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_links_authenticated_user(
-        self, mock_hmac, mock_exchange, mock_register_webhook
-    ):
+    def test_oauth_callback_links_authenticated_user(self, mock_hmac, mock_exchange):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
@@ -862,7 +855,6 @@ class OAuthCallbackTests(TestCase):
             refresh_token="refresh_xyz",
             raw={},
         )
-        mock_register_webhook.return_value = True
 
         session = self.client.session
         session[STATE_SESSION_KEY] = "abc"
@@ -882,12 +874,9 @@ class OAuthCallbackTests(TestCase):
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
         self.assertIn("connected_at=", meta.shopify_oauth_authorization_line)
 
-    @patch("shopify_app.views.register_orders_create_webhook")
     @patch("shopify_app.oauth.exchange_code_for_token")
     @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
-    def test_oauth_callback_overwrites_existing_token(
-        self, mock_hmac, mock_exchange, mock_register_webhook
-    ):
+    def test_oauth_callback_overwrites_existing_token(self, mock_hmac, mock_exchange):
         user = CustomUser.objects.create_user(
             username="merchant",
             email="merchant@example.com",
@@ -910,7 +899,6 @@ class OAuthCallbackTests(TestCase):
             refresh_token="new_refresh_token",
             raw={},
         )
-        mock_register_webhook.return_value = True
 
         session = self.client.session
         session[STATE_SESSION_KEY] = "abc"
