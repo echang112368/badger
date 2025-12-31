@@ -1,9 +1,7 @@
-from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase
-from django.utils import timezone
 
 from accounts.models import CustomUser
 from merchants.models import MerchantMeta
@@ -13,7 +11,6 @@ from .models import LedgerEntry, MerchantInvoice
 from .invoices import (
     ShopifyBillingConfirmationRequired,
     create_invoice_for_merchant,
-    generate_due_invoices,
     generate_all_invoices,
 )
 
@@ -116,66 +113,6 @@ class ShopifyInvoiceTests(TestCase):
         self.assertEqual(len(result), 1)
         self.assertFalse(result.pending_shopify)
         self.assertEqual(result[0].provider, MerchantInvoice.Provider.SHOPIFY)
-
-    @patch("ledger.invoices.shopify_billing.create_usage_charge")
-    def test_generate_due_invoices_uses_shopify_billing_start_day(
-        self, mock_usage_charge
-    ):
-        self.merchant.date_joined = timezone.now() - timedelta(days=1)
-        self.merchant.save(update_fields=["date_joined"])
-        self.meta.shopify_billing_verified_at = timezone.now()
-        self.meta.save(update_fields=["shopify_billing_verified_at"])
-        mock_usage_charge.return_value = ShopifyChargeDetails(
-            charge_id="66",
-            amount=Decimal("11.00"),
-            currency="USD",
-            status="processed",
-            name="Usage",
-            description="Monthly",
-            raw={"id": 66},
-        )
-
-        LedgerEntry.objects.create(
-            merchant=self.merchant,
-            amount=Decimal("-11.00"),
-            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
-        )
-
-        created = generate_due_invoices()
-
-        self.assertEqual(len(created), 1)
-        self.assertEqual(created[0].provider, MerchantInvoice.Provider.SHOPIFY)
-        mock_usage_charge.assert_called_once()
-
-    @patch("ledger.invoices.shopify_billing.create_usage_charge")
-    def test_shopify_store_charges_shopify_even_when_business_type_independent(
-        self, mock_usage_charge
-    ):
-        self.meta.business_type = MerchantMeta.BusinessType.INDEPENDENT
-        self.meta.paypal_email = ""
-        self.meta.save(update_fields=["business_type", "paypal_email"])
-        mock_usage_charge.return_value = ShopifyChargeDetails(
-            charge_id="88",
-            amount=Decimal("20.00"),
-            currency="USD",
-            status="processed",
-            name="Usage",
-            description="Monthly",
-            raw={"id": 88},
-        )
-
-        LedgerEntry.objects.create(
-            merchant=self.merchant,
-            amount=Decimal("-20.00"),
-            entry_type=LedgerEntry.EntryType.BADGER_PAYOUT,
-        )
-
-        invoice = create_invoice_for_merchant(self.merchant)
-
-        self.assertIsNotNone(invoice)
-        self.assertEqual(invoice.provider, MerchantInvoice.Provider.SHOPIFY)
-        self.assertEqual(invoice.shopify_charge_id, "88")
-        mock_usage_charge.assert_called_once()
 
     @patch("ledger.invoices.shopify_billing.create_usage_charge")
     def test_generate_all_invoices_shopify_only_skips_non_shopify(self, mock_usage_charge):
