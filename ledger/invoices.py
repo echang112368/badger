@@ -516,7 +516,7 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
     """
     today = timezone.now().date()
     if not ignore_date and today.day != 1:
-        return []
+        return InvoiceGenerationResult([], [])
 
     outstanding_totals = (
         LedgerEntry.objects.filter(merchant__isnull=False, paid=False, invoice__isnull=True)
@@ -531,7 +531,7 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
     ]
 
     if not merchant_ids:
-        return []
+        return InvoiceGenerationResult([], [])
 
     User = get_user_model()
     merchants_qs = (
