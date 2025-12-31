@@ -9,6 +9,48 @@ from .payouts import send_mass_payouts
 from .invoices import generate_all_invoices
 
 
+def _summarize_shopify_charge_approvals(invoices):
+    approved = []
+    unapproved = []
+    for invoice in invoices:
+        if invoice.provider != MerchantInvoice.Provider.SHOPIFY:
+            continue
+        approved_flag = (invoice.shopify_payload or {}).get("charge_approved")
+        if approved_flag is True:
+            approved.append(invoice)
+        elif approved_flag is False:
+            unapproved.append(invoice)
+    return approved, unapproved
+
+
+def _notify_shopify_charge_approvals(request, invoices):
+    approved, unapproved = _summarize_shopify_charge_approvals(invoices)
+    if not approved and not unapproved:
+        return
+
+    messages.info(
+        request,
+        f"Shopify charge verification: {len(approved)} approved, {len(unapproved)} unverified.",
+    )
+    if unapproved:
+        merchant_names = ", ".join(
+            sorted(
+                {
+                    invoice.merchant.get_full_name()
+                    or invoice.merchant.username
+                    for invoice in unapproved
+                }
+            )
+        )
+        messages.warning(
+            request,
+            (
+                "Shopify charges could not be verified for: "
+                f"{merchant_names}. Check the billing logs or retry."
+            ),
+        )
+
+
 @admin.register(LedgerEntry)
 class LedgerEntryAdmin(admin.ModelAdmin):
     list_display = (
@@ -66,6 +108,7 @@ class LedgerEntryAdmin(admin.ModelAdmin):
                     )
 
                 messages.success(request, f"Generated {len(result)} invoice(s)")
+                _notify_shopify_charge_approvals(request, result)
         return redirect("../")
 
 @admin.register(MerchantInvoice)
@@ -145,6 +188,7 @@ class MerchantInvoiceAdmin(admin.ModelAdmin):
                         len(result)
                     ),
                 )
+                _notify_shopify_charge_approvals(request, result)
         return redirect("../")
 
 
@@ -241,4 +285,3 @@ class MerchantMonthlyFeeAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
