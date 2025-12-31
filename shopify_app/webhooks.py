@@ -28,7 +28,7 @@ def register_orders_create_webhook(
 ):
     """Register an orders/create webhook for the given shop."""
 
-    client = ShopifyClient(access_token, shop_domain)
+    client = ShopifyClient(access_token, shop_domain, token_type="offline")
     print(
         "Registering Shopify orders/create webhook:",
         {

@@ -105,6 +105,7 @@ def _get_shopify_client(merchant_meta: Optional[MerchantMeta]):
         merchant_meta.shopify_access_token,
         merchant_meta.shopify_store_domain,
         refresh_handler=lambda: refresh_shopify_token(merchant_meta),
+        token_type="offline",
     )
 
 

@@ -361,6 +361,12 @@ def create_invoice_for_merchant(merchant):
             description=description,
         )
 
+        shopify_payload = dict(charge.raw or {})
+        if charge.approved is not None:
+            shopify_payload["charge_approved"] = charge.approved
+        if charge.approval_payload:
+            shopify_payload["charge_verification"] = charge.approval_payload
+
         with transaction.atomic():
             invoice = MerchantInvoice.objects.create(
                 merchant=merchant,
@@ -370,7 +376,7 @@ def create_invoice_for_merchant(merchant):
                 total_amount=total.quantize(Decimal("0.01")),
                 shopify_charge_id=charge.charge_id,
                 shopify_status=charge.status,
-                shopify_payload=charge.raw or {},
+                shopify_payload=shopify_payload,
             )
             entries.update(invoice=invoice, paid=True)
 
