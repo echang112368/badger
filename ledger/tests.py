@@ -61,6 +61,7 @@ class ShopifyInvoiceTests(TestCase):
         self.meta.monthly_fee = Decimal("10.00")
         self.meta.shopify_recurring_charge_id = "123"
         self.meta.shopify_billing_status = "active"
+        self.meta.shopify_billing_plan = self.meta.billing_plan
         self.meta.save()
 
     @patch("ledger.invoices.shopify_billing.create_usage_charge")
@@ -73,6 +74,8 @@ class ShopifyInvoiceTests(TestCase):
             name="Usage",
             description="Monthly",
             raw={"id": 55},
+            approved=True,
+            approval_payload={"id": "gid://shopify/AppUsageRecord/55"},
         )
 
         LedgerEntry.objects.create(
@@ -87,6 +90,7 @@ class ShopifyInvoiceTests(TestCase):
         self.assertEqual(invoice.provider, MerchantInvoice.Provider.SHOPIFY)
         self.assertEqual(invoice.shopify_charge_id, "55")
         self.assertEqual(invoice.total_amount, Decimal("25.00"))
+        self.assertEqual(invoice.shopify_payload.get("charge_approved"), True)
         mock_usage_charge.assert_called_once()
         entries = LedgerEntry.objects.filter(merchant=self.merchant)
         self.assertTrue(entries.exists())
