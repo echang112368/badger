@@ -43,7 +43,8 @@ class OrdersWebhookTests(TestCase):
 
         merchant_meta = MerchantMeta.objects.get(user=merchant)
         merchant_meta.business_type = MerchantMeta.BusinessType.SHOPIFY
-        merchant_meta.shopify_billing_status = "active"
+        merchant_meta.shopify_billing_status = "ACTIVE"
+        merchant_meta.shopify_billing_plan = merchant_meta.billing_plan
         merchant_meta.save()
 
         return (
@@ -140,7 +141,7 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(creator_entry.amount, Decimal("0.80"))
         self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-0.80"))
-        self.assertEqual(points_entry.amount, Decimal("48"))
+        self.assertEqual(points_entry.amount, Decimal("1500"))
         self.assertIsNone(points_entry.merchant)
         self.assertFalse(
             LedgerEntry.objects.filter(merchant=merchant, entry_type="points").exists()
@@ -149,6 +150,10 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(conversion.merchant, merchant)
         self.assertEqual(conversion.order_amount, Decimal("25.00"))
         self.assertEqual(conversion.commission_amount, Decimal("0.80"))
+        self.assertEqual(
+            conversion.metadata.get("customer_uuid"),
+            str(customer_meta.uuid),
+        )
 
     def test_inactive_billing_blocks_ledger_updates(self):
         merchant, creator, customer, merchant_meta, creator_meta, customer_meta = (
@@ -221,9 +226,8 @@ class OrdersWebhookTests(TestCase):
                 ],
             ).exists()
         )
-        self.assertFalse(
-            LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
-        )
+        points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
+        self.assertEqual(points_entry.amount, Decimal("600"))
         self.assertEqual(ReferralConversion.objects.count(), 0)
 
     def test_special_uuid_triggers_fixed_commission(self):
@@ -284,7 +288,7 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(creator_entry.amount, Decimal("5.00"))
         self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-5.00"))
-        self.assertEqual(points_entry.amount, Decimal("300"))
+        self.assertEqual(points_entry.amount, Decimal("6000"))
         self.assertEqual(conversion.commission_amount, Decimal("5.00"))
 
     def test_missing_customer_skips_points(self):
@@ -355,7 +359,7 @@ class OrdersWebhookTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-        # No commissions or points should be recorded when item lacks a group
+        # No commissions should be recorded when item lacks a group
         self.assertFalse(
             LedgerEntry.objects.filter(
                 creator=creator, entry_type=LedgerEntry.EntryType.COMMISSION
@@ -370,9 +374,8 @@ class OrdersWebhookTests(TestCase):
                 ],
             ).exists()
         )
-        self.assertFalse(
-            LedgerEntry.objects.filter(creator=customer, entry_type="points").exists()
-        )
+        points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
+        self.assertEqual(points_entry.amount, Decimal("1200"))
         conversion = ReferralConversion.objects.get()
         self.assertEqual(conversion.order_amount, Decimal("20.00"))
         self.assertEqual(conversion.commission_amount, Decimal("0.00"))

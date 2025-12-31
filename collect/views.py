@@ -435,6 +435,10 @@ def orders_create_webhook(request):
     commission_total = commission_total.quantize(Decimal("0.01"))
     print(f"Order {order_id} total commission: {commission_total}")
 
+    conversion_metadata = {"source": "shopify_orders_create"}
+    if customer_uuid:
+        conversion_metadata["customer_uuid"] = str(customer_uuid)
+
     if merchant_meta and creator_meta and creator_active_for_merchant:
         ReferralConversion.objects.create(
             creator_uuid=creator_uuid or creator_meta.uuid,
@@ -444,7 +448,7 @@ def orders_create_webhook(request):
             order_id=str(order_id) if order_id else "",
             order_amount=order_total,
             commission_amount=commission_total,
-            metadata={"source": "shopify_orders_create"},
+            metadata=conversion_metadata,
         )
 
     if (
@@ -473,13 +477,13 @@ def orders_create_webhook(request):
             entry_type=merchant_entry_type,
         )
 
-        # Reward the customer with points (60 points = $1)
-        if customer_meta:
-            points = int(commission_total * 60)
-            LedgerEntry.objects.create(
-                creator=customer_meta.user,
-                amount=Decimal(points),
-                entry_type="points",
-            )
+    # Reward the customer with points (60 points = $1)
+    if customer_meta and order_total > 0:
+        points = int(order_total * 60)
+        LedgerEntry.objects.create(
+            creator=customer_meta.user,
+            amount=Decimal(points),
+            entry_type="points",
+        )
 
     return JsonResponse({"status": "received"}, status=200)
