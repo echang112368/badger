@@ -42,6 +42,8 @@ class ShopifyChargeDetails:
     raw: Optional[Dict[str, Any]] = None
     usage_terms: str = ""
     capped_amount: Optional[Decimal] = None
+    approved: Optional[bool] = None
+    approval_payload: Optional[Dict[str, Any]] = None
 
 
 def _strip_gid(value: str) -> str:
@@ -97,6 +99,7 @@ def _shopify_client(meta: MerchantMeta) -> ShopifyClient:
         meta.shopify_access_token,
         meta.shopify_store_domain,
         refresh_handler=lambda: _refresh_token_if_possible(meta),
+        token_type="offline",
     )
 
 
@@ -147,6 +150,25 @@ def _parse_usage_line_item(line_items: Iterable[Dict[str, Any]]) -> Tuple[str, s
         return fallback_line_id, "", None
 
     return "", "", None
+
+
+def _extract_subscription_node(payload: Dict[str, Any]) -> Dict[str, Any]:
+    data = payload.get("data", {}) or {}
+    node = data.get("node")
+    if not isinstance(node, dict) or node.get("__typename") != "AppSubscription":
+        raise ShopifyBillingError(
+            "Shopify billing schema is unavailable for this request. "
+            "Verify the Admin API endpoint and offline access token."
+        )
+    return node
+
+
+def _extract_usage_record_node(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    data = payload.get("data", {}) or {}
+    node = data.get("node")
+    if isinstance(node, dict) and node.get("__typename") == "AppUsageRecord":
+        return node
+    return None
 
 
 def create_or_update_recurring_charge(
@@ -206,10 +228,8 @@ def create_or_update_recurring_charge(
             refresh_payload = client.graphql(
                 _APP_SUBSCRIPTION_STATUS_QUERY, {"id": subscription.get("id")}
             )
-            line_items = (
-                refresh_payload.get("data", {}).get("appSubscription", {}).get("lineItems")
-                or []
-            )
+            refreshed_subscription = _extract_subscription_node(refresh_payload)
+            line_items = refreshed_subscription.get("lineItems") or []
         except ShopifyInvalidCredentialsError as exc:
             raise ShopifyReauthorizationRequired(str(exc))
 
@@ -224,7 +244,7 @@ def create_or_update_recurring_charge(
 
     subscription_status = subscription.get("status", "") or ""
     meta.shopify_recurring_charge_id = _strip_gid(subscription.get("id", ""))
-    meta.shopify_billing_status = ""
+    meta.shopify_billing_status = subscription_status
     meta.shopify_billing_plan = ""
     meta.shopify_billing_verified_at = None
     meta.shopify_billing_confirmation_url = result.get("confirmation_url", "") or ""
@@ -276,9 +296,7 @@ def refresh_recurring_charge(meta: MerchantMeta) -> Dict[str, Any]:
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(str(exc))
 
-    subscription = payload.get("data", {}).get("appSubscription") or {}
-    if not subscription:
-        raise ShopifyBillingError("Shopify did not return a subscription record.")
+    subscription = _extract_subscription_node(payload)
 
     _, terms, capped_amount = _parse_usage_line_item(subscription.get("lineItems") or [])
     meta.shopify_billing_status = subscription.get("status", "") or ""
@@ -405,7 +423,7 @@ def create_usage_charge(
         )
     except ShopifyInvalidCredentialsError as exc:
         raise ShopifyReauthorizationRequired(str(exc))
-    subscription = subscription_payload.get("data", {}).get("appSubscription") or {}
+    subscription = _extract_subscription_node(subscription_payload)
     line_items = subscription.get("lineItems") or []
     usage_line_id, terms, capped_amount = _parse_usage_line_item(line_items)
 
@@ -441,6 +459,16 @@ def create_usage_charge(
     except (InvalidOperation, TypeError, ValueError):
         parsed_amount = normalized_amount
 
+    approved: Optional[bool] = None
+    approval_payload: Optional[Dict[str, Any]] = None
+    if charge_id:
+        usage_gid = f"gid://shopify/AppUsageRecord/{charge_id}"
+        verification_payload = client.graphql(
+            _APP_USAGE_RECORD_STATUS_QUERY, {"id": usage_gid}
+        )
+        approval_payload = _extract_usage_record_node(verification_payload)
+        approved = approval_payload is not None
+
     return ShopifyChargeDetails(
         charge_id=charge_id,
         amount=parsed_amount,
@@ -451,27 +479,32 @@ def create_usage_charge(
         raw=usage_record,
         usage_terms=terms,
         capped_amount=capped_amount,
+        approved=approved,
+        approval_payload=approval_payload,
     )
 
 
 _APP_SUBSCRIPTION_STATUS_QUERY = """
 query GetSubscription($id: ID!) {
-  appSubscription(id: $id) {
-    id
-    status
-    name
-    lineItems {
+  node(id: $id) {
+    ... on AppSubscription {
+      __typename
       id
-      plan {
-        pricingDetails {
-          __typename
-          ... on AppRecurringPricing {
-            interval
-            price { amount currencyCode }
-          }
-          ... on AppUsagePricing {
-            terms
-            cappedAmount { amount currencyCode }
+      status
+      name
+      lineItems {
+        id
+        plan {
+          pricingDetails {
+            __typename
+            ... on AppRecurringPricing {
+              interval
+              price { amount currencyCode }
+            }
+            ... on AppUsagePricing {
+              terms
+              cappedAmount { amount currencyCode }
+            }
           }
         }
       }
@@ -503,6 +536,20 @@ mutation CreateUsageRecord($subscriptionLineItemId: ID!, $description: String!, 
     appUsageRecord {
       id
       description
+      price { amount currencyCode }
+    }
+  }
+}
+"""
+
+_APP_USAGE_RECORD_STATUS_QUERY = """
+query GetUsageRecord($id: ID!) {
+  node(id: $id) {
+    ... on AppUsageRecord {
+      __typename
+      id
+      description
+      createdAt
       price { amount currencyCode }
     }
   }
