@@ -29,6 +29,7 @@ class Command(BaseCommand):
                 access_token,
                 store_domain,
                 refresh_handler=lambda m=merchant: refresh_shopify_token(m),
+                token_type="offline",
             )
             try:
                 tags = _fetch_script_tags(client)
