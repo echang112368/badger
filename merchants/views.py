@@ -267,7 +267,11 @@ def merchant_dashboard(request):
             return redirect(authorize_url)
 
     balance = LedgerEntry.merchant_balance(merchant_user)
-    entries = LedgerEntry.objects.filter(merchant=merchant_user).order_by('-timestamp')
+    entries = (
+        LedgerEntry.objects.filter(merchant=merchant_user)
+        .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
+        .order_by('-timestamp')
+    )
     affiliate_total_raw = (
         LedgerEntry.objects.filter(
             merchant=merchant_user,
