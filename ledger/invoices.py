@@ -184,21 +184,32 @@ def _merchant_display_name(merchant) -> str:
     return full_name or merchant.username
 
 
+def _is_shopify_billed(meta: Optional[MerchantMeta]) -> bool:
+    if not meta:
+        return False
+    if meta.business_type == MerchantMeta.BusinessType.SHOPIFY:
+        return True
+    return bool(meta.shopify_store_domain and meta.shopify_access_token)
+
+
+def _billing_cycle_day(merchant, meta: Optional[MerchantMeta]) -> int:
+    if _is_shopify_billed(meta) and meta.shopify_billing_verified_at:
+        return meta.shopify_billing_verified_at.day
+    return merchant.date_joined.day
+
+
 def create_invoice_for_merchant(merchant):
     """Create and send a PayPal invoice for all unpaid ledger entries."""
 
     meta = MerchantMeta.objects.filter(user=merchant).first()
     paypal_email = (meta.paypal_email or "").strip() if meta else ""
-    business_type = (
-        meta.business_type if meta else MerchantMeta.BusinessType.INDEPENDENT
-    )
-    shopify_business = business_type == MerchantMeta.BusinessType.SHOPIFY
+    shopify_business = _is_shopify_billed(meta)
 
-    if business_type != MerchantMeta.BusinessType.SHOPIFY and not paypal_email:
+    if not shopify_business and not paypal_email:
         return None
 
     invoicer_email = None
-    if business_type != MerchantMeta.BusinessType.SHOPIFY:
+    if not shopify_business:
         invoicer_email = _get_paypal_invoicer_email()
         if not invoicer_email:
             raise RuntimeError("PAYPAL_INVOICER_EMAIL is not configured")
@@ -209,8 +220,11 @@ def create_invoice_for_merchant(merchant):
     def _pending_entries():
         return (
             LedgerEntry.objects.filter(
-                merchant=merchant, paid=False, invoice__isnull=True
+                merchant=merchant,
+                paid=False,
+                invoice__isnull=True,
             ).order_by("id")
+            .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
         )
 
     entries = _pending_entries()
@@ -328,7 +342,7 @@ def create_invoice_for_merchant(merchant):
     elif total <= 0:
         return None
 
-    if business_type == MerchantMeta.BusinessType.SHOPIFY:
+    if shopify_business:
         try:
             shopify_billing.ensure_active_charge(meta)
         except shopify_billing.ShopifyBillingError:
@@ -477,9 +491,12 @@ def generate_due_invoices():
     """Create invoices for merchants whose join day matches today."""
     today = timezone.now().date()
     User = get_user_model()
-    merchants = User.objects.filter(is_merchant=True, date_joined__day=today.day)
+    merchants = User.objects.filter(is_merchant=True).select_related("merchantmeta")
     created = []
     for merchant in merchants:
+        meta = getattr(merchant, "merchantmeta", None)
+        if _billing_cycle_day(merchant, meta) != today.day:
+            continue
         try:
             invoice = create_invoice_for_merchant(merchant)
         except ShopifyBillingConfirmationRequired:
@@ -502,10 +519,11 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
     """
     today = timezone.now().date()
     if not ignore_date and today.day != 1:
-        return []
+        return InvoiceGenerationResult([], [])
 
     outstanding_totals = (
         LedgerEntry.objects.filter(merchant__isnull=False, paid=False, invoice__isnull=True)
+        .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
         .values("merchant")
         .annotate(total=Sum("amount"))
     )
@@ -517,7 +535,7 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
     ]
 
     if not merchant_ids:
-        return []
+        return InvoiceGenerationResult([], [])
 
     User = get_user_model()
     merchants_qs = (
@@ -541,19 +559,17 @@ def generate_all_invoices(ignore_date: bool = False, shopify_only: bool = False)
             continue
 
         fee = getattr(meta, "monthly_fee", None)
-        business_type = getattr(
-            meta, "business_type", MerchantMeta.BusinessType.INDEPENDENT
-        )
+        shopify_business = _is_shopify_billed(meta)
 
-        if shopify_only and business_type != MerchantMeta.BusinessType.SHOPIFY:
+        if shopify_only and not shopify_business:
             continue
 
         if fee is None or fee <= 0:
-            if not shopify_only or business_type == MerchantMeta.BusinessType.SHOPIFY:
+            if not shopify_only or shopify_business:
                 missing_fees.append(_merchant_display_name(merchant))
             continue
 
-        if business_type == MerchantMeta.BusinessType.SHOPIFY:
+        if shopify_business:
             ready_merchants.append(merchant)
             continue
 
