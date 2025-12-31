@@ -118,7 +118,9 @@ class LedgerEntry(models.Model):
     @staticmethod
     def merchant_balance(user):
         result = (
-            LedgerEntry.objects.filter(merchant=user).aggregate(total=Sum("amount"))
+            LedgerEntry.objects.filter(merchant=user)
+            .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
+            .aggregate(total=Sum("amount"))
         )
         total = result["total"] if result["total"] is not None else Decimal("0")
         return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
