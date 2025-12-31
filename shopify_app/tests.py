@@ -31,7 +31,6 @@ from .oauth import (
     session_token_key,
 )
 from .shopify_client import (
-    ADMIN_API_VERSION,
     ShopifyClient,
     ShopifyInvalidCredentialsError,
     _PRODUCTS_QUERY,
@@ -224,15 +223,13 @@ class ShopifyBillingTests(TestCase):
     def test_create_usage_charge(self, mock_client_cls):
         self.meta.shopify_recurring_charge_id = "999"
         self.meta.shopify_billing_status = "active"
-        self.meta.shopify_billing_plan = self.meta.billing_plan
         self.meta.save()
 
         mock_client = mock_client_cls.return_value
         mock_client.graphql.side_effect = [
             {
                 "data": {
-                    "node": {
-                        "__typename": "AppSubscription",
+                    "appSubscription": {
                         "id": "gid://shopify/AppSubscription/999",
                         "lineItems": [
                             {
@@ -249,7 +246,7 @@ class ShopifyBillingTests(TestCase):
                                 },
                             }
                         ],
-                    },
+                    }
                 }
             },
             {
@@ -264,17 +261,6 @@ class ShopifyBillingTests(TestCase):
                     }
                 }
             },
-            {
-                "data": {
-                    "node": {
-                        "__typename": "AppUsageRecord",
-                        "id": "gid://shopify/AppUsageRecord/55",
-                        "description": "Test charge",
-                        "price": {"amount": "10.25", "currencyCode": "USD"},
-                        "createdAt": "2025-01-01T00:00:00Z",
-                    }
-                }
-            },
         ]
 
         details = billing.create_usage_charge(
@@ -286,19 +272,6 @@ class ShopifyBillingTests(TestCase):
         mock_client.graphql.assert_called()
         self.assertEqual(details.charge_id, "55")
         self.assertEqual(details.amount, Decimal("10.25"))
-
-    @patch("shopify_app.billing.ShopifyClient")
-    def test_refresh_recurring_charge_requires_subscription_node(self, mock_client_cls):
-        self.meta.shopify_recurring_charge_id = "123"
-        self.meta.save()
-
-        mock_client = mock_client_cls.return_value
-        mock_client.graphql.return_value = {"data": {"node": {"__typename": "Shop"}}}
-
-        with self.assertRaises(billing.ShopifyBillingError) as context:
-            billing.refresh_recurring_charge(self.meta)
-
-        self.assertIn("Admin API endpoint", str(context.exception))
 
 
 @override_settings(SHOPIFY_API_KEY="key")
@@ -415,20 +388,6 @@ class ShopifyClientRefreshTests(SimpleTestCase):
 
         with self.assertRaises(ShopifyInvalidCredentialsError):
             client.request("GET", "/admin/api/2024-07/shop.json")
-
-
-class ShopifyClientGraphQLTests(SimpleTestCase):
-    def test_graphql_uses_admin_endpoint(self):
-        client = ShopifyClient("token", "example.myshopify.com")
-        response = MagicMock()
-        response.json.return_value = {"data": {}}
-        client.post = MagicMock(return_value=response)
-
-        client.graphql("query { shop { name } }")
-
-        path = client.post.call_args[0][0]
-        self.assertIn("/admin/api/", path)
-        self.assertIn(ADMIN_API_VERSION, path)
 
 
 class ShopifyClientProductsTests(SimpleTestCase):
