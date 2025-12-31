@@ -500,7 +500,6 @@ def create_discount(request, merchant_uuid):
         meta.shopify_access_token,
         meta.shopify_store_domain,
         refresh_handler=lambda: refresh_shopify_token(meta),
-        token_type="offline",
     )
 
     coupon_code = f"BADGER-{uuid.uuid4().hex[:8].upper()}"
