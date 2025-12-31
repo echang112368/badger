@@ -6,6 +6,7 @@ import requests
 
 
 logger = logging.getLogger(__name__)
+ADMIN_API_VERSION = "2024-07"
 
 
 class ShopifyInvalidCredentialsError(RuntimeError):
@@ -28,10 +29,21 @@ class ShopifyInvalidCredentialsError(RuntimeError):
 class ShopifyClient:
     """Helper for making authenticated requests to a Shopify store."""
 
-    def __init__(self, access_token: str, store_domain: str, *, refresh_handler=None):
+    def __init__(
+        self,
+        access_token: str,
+        store_domain: str,
+        *,
+        refresh_handler=None,
+        token_type: str = "offline",
+    ):
         self.access_token = access_token
         self.store_domain = store_domain.rstrip('/')
         self._refresh_handler = refresh_handler
+        self.token_type = token_type or "offline"
+
+    def _admin_graphql_path(self) -> str:
+        return f"/admin/api/{ADMIN_API_VERSION}/graphql.json"
 
     def request(self, method: str, path: str, **kwargs):
         url = f"https://{self.store_domain}{path}"
@@ -77,8 +89,23 @@ class ShopifyClient:
     def graphql(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a GraphQL Admin API query and return the parsed JSON body."""
 
+        graphql_path = self._admin_graphql_path()
+        graphql_url = f"https://{self.store_domain}{graphql_path}"
+        assert "/admin/api/" in graphql_url, "Shopify GraphQL must use the Admin API endpoint."
+        if "/admin/api/" not in graphql_url:
+            raise ShopifyGraphQLError(
+                "Shopify GraphQL must use the Admin API endpoint.", graphql_url
+            )
+
+        logger.info(
+            "Shopify GraphQL request url=%s api_version=%s token_type=%s",
+            graphql_url,
+            ADMIN_API_VERSION,
+            self.token_type,
+        )
+
         response = self.post(
-            "/admin/api/2024-07/graphql.json",
+            graphql_path,
             json={"query": query, "variables": variables or {}},
         )
         payload = response.json()
@@ -90,6 +117,14 @@ class ShopifyClient:
 
         errors = payload.get("errors")
         if errors:
+            if _has_schema_error(errors):
+                logger.error(
+                    "Shopify GraphQL schema errors for %s: %s", graphql_url, errors
+                )
+                raise ShopifyGraphQLError(
+                    "Shopify GraphQL schema error (check Admin API endpoint and token).",
+                    errors,
+                )
             logger.error("Shopify GraphQL returned errors for %s: %s", query, errors)
             raise ShopifyGraphQLError("Shopify GraphQL request returned errors.", errors)
 
@@ -409,6 +444,23 @@ def _stringify_graphql_errors(value: Any) -> str:
         return "; ".join(part for part in parts if part)
 
     return str(value)
+
+
+def _has_schema_error(errors: Any) -> bool:
+    if not isinstance(errors, (list, tuple, set)):
+        return False
+
+    for error in errors:
+        if not isinstance(error, dict):
+            continue
+        extensions = error.get("extensions") or {}
+        code = (extensions.get("code") or "").lower()
+        if code in {"undefinedfield", "schema", "invalidfield"}:
+            return True
+        message = str(error.get("message", "") or "").lower()
+        if "doesn't exist on type" in message or "does not exist on type" in message:
+            return True
+    return False
 
 
 # Shopify Admin GraphQL appSubscriptionCreate mutation
