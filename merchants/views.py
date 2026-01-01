@@ -747,11 +747,23 @@ def request_creator(request):
         return HttpResponseForbidden()
 
     merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
     if request.method == "POST":
         uuid = request.POST.get("creator_uuid", "").strip()
         if uuid:
             try:
                 creator_meta = CreatorMeta.objects.get(uuid=uuid)
+                existing_link = MerchantCreatorLink.objects.filter(
+                    merchant=merchant_user,
+                    creator=creator_meta.user,
+                ).first()
+                creator_limit = merchant_meta.creator_limit if merchant_meta else None
+                if creator_limit is not None and existing_link is None:
+                    current_count = MerchantCreatorLink.objects.filter(
+                        merchant=merchant_user
+                    ).count()
+                    if current_count >= creator_limit:
+                        return redirect("merchant_creators")
                 link, created = MerchantCreatorLink.objects.get_or_create(
                     merchant=merchant_user,
                     creator=creator_meta.user,
