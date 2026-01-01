@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Optional
 
 from django.db import models
 from django.db.models.functions import Lower
@@ -115,6 +116,12 @@ class MerchantMeta(models.Model):
     @property
     def includes_badger_creator(self) -> bool:
         return self.billing_plan == self.BillingPlan.BADGER_CREATOR
+
+    @property
+    def creator_limit(self) -> "Optional[int]":
+        if self.billing_plan == self.BillingPlan.PLATFORM_ONLY:
+            return 50
+        return None
 
     @property
     def has_active_billing_plan(self) -> bool:
