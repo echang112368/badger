@@ -28,9 +28,12 @@ def _remember_verification_user(request, user: User) -> None:
 
 
 def _get_verification_user(request):
+    session_user = get_user_by_pk(request.session.get("verification_user_id"))
+    if session_user:
+        return session_user
     if request.user.is_authenticated:
         return request.user
-    return get_user_by_pk(request.session.get("verification_user_id"))
+    return None
 
 
 def _redirect_after_login(request, user):
