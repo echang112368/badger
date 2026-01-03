@@ -575,6 +575,10 @@ def merchant_items(request):
                 for pid in non_conflicting_items:
                     product = product_details.get(pid, {})
                     featured_image = ((product or {}).get("featuredImage") or {}).get("src")
+                    if not featured_image:
+                        images = (product or {}).get("images") or []
+                        if images:
+                            featured_image = images[0].get("src")
                     variants = (product or {}).get("variants") or []
                     variant_price = variants[0].get("price") if variants else None
                     item = existing_items.get(pid)
