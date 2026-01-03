@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -22,9 +23,11 @@ from links.models import (
 )
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from shopify_app.shopify_client import ShopifyClient
+from shopify_app.token_management import refresh_shopify_token
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def creator_earnings(request):
@@ -222,39 +225,78 @@ def _affiliate_company_metrics(user):
         "generated_at": timezone.now().isoformat(),
     }
 
+def _is_blank(value):
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
 def _refresh_shopify_assets(items):
     items_by_merchant = {}
     for item in items:
         items_by_merchant.setdefault(item.merchant_id, []).append(item)
 
     for merchant_id, merchant_items in items_by_merchant.items():
+        message = (
+            f"Refreshing Shopify assets for merchant_id={merchant_id} "
+            f"(items={len(merchant_items)})."
+        )
+        logger.info(message)
+        print(message)
         missing_items = [
             item
             for item in merchant_items
-            if item.shopify_product_id and not item.image_url
+            if item.shopify_product_id and _is_blank(item.image_url)
         ]
+        message = (
+            f"Detected {len(missing_items)} items without image URLs for "
+            f"merchant_id={merchant_id}; attempting refresh."
+        )
+        logger.info(message)
+        print(message)
         if not missing_items:
             continue
 
         meta = MerchantMeta.objects.filter(user_id=merchant_id).first()
         if not meta or not meta.shopify_access_token or not meta.shopify_store_domain:
+            logger.info(
+                "Skipping Shopify refresh for merchant_id=%s due to missing credentials.",
+                merchant_id,
+            )
+            print(
+                f"Skipping Shopify refresh for merchant_id={merchant_id} due to missing credentials."
+            )
             continue
 
         client = ShopifyClient(
             meta.shopify_access_token,
             meta.shopify_store_domain,
+            refresh_handler=lambda: refresh_shopify_token(meta),
+            token_type="offline",
         )
         try:
             products = client.get_products_by_ids(
                 [item.shopify_product_id for item in missing_items]
             )
         except Exception:
+            logger.exception(
+                "Failed to refresh Shopify images for merchant_id=%s.",
+                merchant_id,
+            )
             continue
+        message = (
+            f"Attempted to pull images again for merchant_id={merchant_id} "
+            f"(items={len(missing_items)})."
+        )
+        logger.info(message)
+        print(message)
 
         products_by_id = {str(product.get("id")): product for product in products}
         for item in missing_items:
             product = products_by_id.get(str(item.shopify_product_id), {})
             featured_image = ((product or {}).get("featuredImage") or {}).get("src")
+            if not featured_image:
+                images = (product or {}).get("images") or []
+                if images:
+                    featured_image = images[0].get("src")
             variants = (product or {}).get("variants") or []
             variant_price = variants[0].get("price") if variants else None
             update_fields = []
@@ -264,6 +306,16 @@ def _refresh_shopify_assets(items):
             if variant_price is not None and item.price != variant_price:
                 item.price = variant_price
                 update_fields.append("price")
+            if not featured_image:
+                logger.info(
+                    "Shopify image URL missing for item_id=%s shopify_product_id=%s.",
+                    item.id,
+                    item.shopify_product_id,
+                )
+                print(
+                    "Shopify image URL missing for "
+                    f"item_id={item.id} shopify_product_id={item.shopify_product_id}."
+                )
             if update_fields:
                 item.save(update_fields=update_fields)
 
