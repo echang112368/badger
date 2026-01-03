@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -19,6 +21,7 @@ from links.models import (
     STATUS_REQUESTED,
 )
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
+from shopify_app.shopify_client import ShopifyClient
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 
@@ -219,6 +222,51 @@ def _affiliate_company_metrics(user):
         "generated_at": timezone.now().isoformat(),
     }
 
+def _refresh_shopify_assets(items):
+    items_by_merchant = {}
+    for item in items:
+        items_by_merchant.setdefault(item.merchant_id, []).append(item)
+
+    for merchant_id, merchant_items in items_by_merchant.items():
+        missing_items = [
+            item
+            for item in merchant_items
+            if item.shopify_product_id and not item.image_url
+        ]
+        if not missing_items:
+            continue
+
+        meta = MerchantMeta.objects.filter(user_id=merchant_id).first()
+        if not meta or not meta.shopify_access_token or not meta.shopify_store_domain:
+            continue
+
+        client = ShopifyClient(
+            meta.shopify_access_token,
+            meta.shopify_store_domain,
+        )
+        try:
+            products = client.get_products_by_ids(
+                [item.shopify_product_id for item in missing_items]
+            )
+        except Exception:
+            continue
+
+        products_by_id = {str(product.get("id")): product for product in products}
+        for item in missing_items:
+            product = products_by_id.get(str(item.shopify_product_id), {})
+            featured_image = ((product or {}).get("featuredImage") or {}).get("src")
+            variants = (product or {}).get("variants") or []
+            variant_price = variants[0].get("price") if variants else None
+            update_fields = []
+            if featured_image and item.image_url != featured_image:
+                item.image_url = featured_image
+                update_fields.append("image_url")
+            if variant_price is not None and item.price != variant_price:
+                item.price = variant_price
+                update_fields.append("price")
+            if update_fields:
+                item.save(update_fields=update_fields)
+
 
 @login_required
 def creator_affiliate_companies(request):
@@ -254,19 +302,37 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     if merchant_id is None:
         if query:
             merchant_ids = links.values_list("merchant_id", flat=True)
-            item_queryset = MerchantItem.objects.filter(
-                groups__merchant_id__in=merchant_ids
-            ).distinct()
+            item_queryset = (
+                MerchantItem.objects.filter(groups__merchant_id__in=merchant_ids)
+                .distinct()
+                .prefetch_related("groups")
+            )
             item_queryset = item_queryset.filter(
                 Q(title__icontains=query)
                 | Q(shopify_product_id__icontains=query)
                 | Q(id__icontains=query)
             )
 
+            item_list = list(item_queryset)
+            _refresh_shopify_assets(item_list)
             merchant_ids_found = set()
             group_ids_found = set()
             items = []
-            for item in item_queryset:
+            for item in item_list:
+                commission_percent = None
+                commission_amount = None
+                first_group = item.groups.first()
+                if first_group:
+                    commission_percent = first_group.affiliate_percent
+                    if item.price is not None:
+                        try:
+                            commission_amount = (
+                                Decimal(str(item.price))
+                                * Decimal(str(commission_percent))
+                                / Decimal("100")
+                            )
+                        except (InvalidOperation, TypeError):
+                            commission_amount = None
                 merchant_ids_found.add(item.merchant_id)
                 group_ids_found.update(item.groups.values_list("id", flat=True))
                 base_link = item.link
@@ -274,7 +340,14 @@ def creator_my_links(request, merchant_id=None, group_id=None):
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
-                items.append({"item": item, "affiliate_link": affiliate_link})
+                items.append(
+                    {
+                        "item": item,
+                        "affiliate_link": affiliate_link,
+                        "commission_percent": commission_percent,
+                        "commission_amount": commission_amount,
+                    }
+                )
 
             # If search results are within a single merchant or group, redirect so
             # breadcrumbs show the full path.
@@ -322,22 +395,47 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     # Merchant level: show groups or search across merchant items
     if group_id is None:
         if query:
-            item_queryset = MerchantItem.objects.filter(
-                groups__merchant=merchant
-            ).distinct()
+            item_queryset = (
+                MerchantItem.objects.filter(groups__merchant=merchant)
+                .distinct()
+                .prefetch_related("groups")
+            )
             item_queryset = item_queryset.filter(
                 Q(title__icontains=query)
                 | Q(shopify_product_id__icontains=query)
                 | Q(id__icontains=query)
             )
+            item_list = list(item_queryset)
+            _refresh_shopify_assets(item_list)
             items = []
-            for item in item_queryset:
+            for item in item_list:
+                commission_percent = None
+                commission_amount = None
+                first_group = item.groups.first()
+                if first_group:
+                    commission_percent = first_group.affiliate_percent
+                    if item.price is not None:
+                        try:
+                            commission_amount = (
+                                Decimal(str(item.price))
+                                * Decimal(str(commission_percent))
+                                / Decimal("100")
+                            )
+                        except (InvalidOperation, TypeError):
+                            commission_amount = None
                 base_link = item.link
                 sep = "&" if "?" in base_link else "?"
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
-                items.append({"item": item, "affiliate_link": affiliate_link})
+                items.append(
+                    {
+                        "item": item,
+                        "affiliate_link": affiliate_link,
+                        "commission_percent": commission_percent,
+                        "commission_amount": commission_amount,
+                    }
+                )
             context.update(
                 {"merchant": merchant, "items": items, "search_query": query}
             )
@@ -354,7 +452,7 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     )
     breadcrumbs.append((group.name, None))
 
-    item_queryset = group.items.all()
+    item_queryset = group.items.all().prefetch_related("groups")
     if query:
         item_queryset = item_queryset.filter(
             Q(title__icontains=query)
@@ -362,14 +460,34 @@ def creator_my_links(request, merchant_id=None, group_id=None):
             | Q(id__icontains=query)
         )
 
+    item_list = list(item_queryset)
+    _refresh_shopify_assets(item_list)
     items = []
-    for item in item_queryset:
+    for item in item_list:
+        commission_percent = group.affiliate_percent
+        commission_amount = None
+        if item.price is not None:
+            try:
+                commission_amount = (
+                    Decimal(str(item.price))
+                    * Decimal(str(commission_percent))
+                    / Decimal("100")
+                )
+            except (InvalidOperation, TypeError):
+                commission_amount = None
         base_link = item.link
         sep = "&" if "?" in base_link else "?"
         affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
         if item.shopify_product_id:
             affiliate_link += f"&item_id={item.shopify_product_id}"
-        items.append({"item": item, "affiliate_link": affiliate_link})
+        items.append(
+            {
+                "item": item,
+                "affiliate_link": affiliate_link,
+                "commission_percent": commission_percent,
+                "commission_amount": commission_amount,
+            }
+        )
 
     context.update(
         {
