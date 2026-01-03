@@ -574,9 +574,6 @@ def merchant_items(request):
                 }
                 for pid in non_conflicting_items:
                     product = product_details.get(pid, {})
-                    featured_image = ((product or {}).get("featuredImage") or {}).get("src")
-                    variants = (product or {}).get("variants") or []
-                    variant_price = variants[0].get("price") if variants else None
                     item = existing_items.get(pid)
                     if not item:
                         item = MerchantItem.objects.create(
@@ -584,8 +581,6 @@ def merchant_items(request):
                             shopify_product_id=str(pid),
                             title=product.get("title") or f"Shopify product {pid}",
                             link=_build_product_link(product, shopify_domain),
-                            image_url=featured_image,
-                            price=variant_price,
                         )
                     else:
                         if product:
@@ -597,21 +592,8 @@ def merchant_items(request):
                             if product_link and item.link != product_link:
                                 item.link = product_link
                                 updated = True
-                            if featured_image and item.image_url != featured_image:
-                                item.image_url = featured_image
-                                updated = True
-                            if variant_price is not None and item.price != variant_price:
-                                item.price = variant_price
-                                updated = True
                             if updated:
-                                item.save(
-                                    update_fields=[
-                                        "title",
-                                        "link",
-                                        "image_url",
-                                        "price",
-                                    ]
-                                )
+                                item.save(update_fields=["title", "link"])
 
                     items_to_add.append(item)
                 group.save()

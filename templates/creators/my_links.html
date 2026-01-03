@@ -1,96 +1,11 @@
 {% extends 'creators/base.html' %}
 {% block title %}My Links{% endblock %}
 {% block content %}
-<section class="my-4 links-dashboard">
-    <style>
-        .links-dashboard .page-title { letter-spacing: -0.02em; }
-        .links-dashboard .search-input { min-width: 240px; }
-        .links-dashboard .link-card { border-radius: 16px; }
-        .links-dashboard .link-card__thumb {
-            width: 56px;
-            height: 56px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        .links-dashboard .link-card__thumb img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .links-dashboard .link-card__meta {
-            border-top: 1px solid rgba(0,0,0,0.08);
-        }
-        .links-dashboard .badge-status {
-            background: rgba(48,79,145,0.12);
-            color: #304f91;
-        }
-        .links-dashboard .view-toggle .btn {
-            min-width: 96px;
-            padding: 0.35rem 0.75rem;
-            font-size: 0.85rem;
-        }
-        .links-dashboard .view-toggle .btn + .btn {
-            margin-left: -1px;
-        }
-        .links-dashboard .table thead th {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #6c757d;
-        }
-        .links-dashboard .empty-state {
-            border: 1px dashed rgba(0,0,0,0.1);
-            border-radius: 16px;
-        }
-        .links-dashboard .link-pill {
-            background: rgba(48,79,145,0.08);
-            color: #263f74;
-            border-radius: 999px;
-            padding: 0.35rem 0.75rem;
-            font-size: 0.85rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .links-dashboard .link-pill .link-preview {
-            max-width: 220px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            display: inline-block;
-        }
-    </style>
-
-    <div class="d-flex flex-column align-items-start gap-2 mb-4">
-        <div>
-            <h1 class="fw-bold fs-3 mb-1 page-title">My Links</h1>
-            <p class="text-muted mb-0">Grab an affiliate link and share in seconds.</p>
-        </div>
-        <form method="get" class="d-flex flex-wrap gap-2 w-100">
-            <div class="input-group search-input flex-grow-1">
-                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search products">
-            </div>
-            <select class="form-select" name="status" aria-label="Filter by status">
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-            </select>
-            <button class="btn btn-outline-secondary" type="submit">Search</button>
-        </form>
-        {% if items %}
-        <div class="btn-group view-toggle" role="group" aria-label="View toggle">
-            <button type="button" class="btn btn-primary btn-sm" data-view="cards">Card View</button>
-            <button type="button" class="btn btn-outline-primary btn-sm" data-view="table">Table View</button>
-        </div>
-        {% endif %}
-    </div>
-
+<section class="my-4">
+    <h1 class="fw-bold fs-3 mb-4">My Links</h1>
     {% if breadcrumbs %}
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb mb-0">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
             {% for label, url in breadcrumbs %}
                 {% if url %}
                     <li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>
@@ -102,271 +17,63 @@
     </nav>
     {% endif %}
 
-    {% if items %}
-        <div id="links-card-view">
-            <div class="row g-3">
-                {% for entry in items %}
-                <div class="col-12 col-md-6 col-xl-4">
-                    <div class="card link-card h-100 border-0 shadow-sm">
-                        <div class="card-body d-flex flex-column gap-3">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="d-flex gap-3">
-                                    <div class="link-card__thumb bg-light">
-                                        {% if entry.item.image_url %}
-                                            <img src="{{ entry.item.image_url }}" alt="{{ entry.item.title }} thumbnail">
-                                        {% else %}
-                                            <i class="bi bi-image text-muted fs-4"></i>
-                                        {% endif %}
-                                    </div>
-                                    <div>
-                                        <div class="fw-semibold fs-6">{{ entry.item.title }}</div>
-                                        {% if entry.item.product_price or entry.item.price %}
-                                            <div class="text-muted small">{{ entry.item.product_price|default:entry.item.price }}</div>
-                                        {% else %}
-                                            <div class="text-muted small">Price unavailable</div>
-                                        {% endif %}
-                                        <div class="text-muted small">
-                                            {% if entry.commission_percent %}
-                                                Commission: {{ entry.commission_percent }}%
-                                            {% elif group %}
-                                                Commission: {{ group.affiliate_percent }}%
-                                            {% else %}
-                                                Commission: —%
-                                            {% endif %}
-                                            {% if entry.commission_amount %}
-                                                · ${{ entry.commission_amount|floatformat:2 }}
-                                            {% endif %}
-                                        </div>
-                                        <span class="badge badge-status rounded-pill mt-2">Active</span>
-                                    </div>
-                                </div>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="bi bi-three-dots"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        {% if entry.item.link %}
-                                        <li><a class="dropdown-item" href="{{ entry.item.link }}" target="_blank" rel="noopener">Preview product</a></li>
-                                        {% endif %}
-                                        <li><button class="dropdown-item copy-full-btn" data-full-link="{{ entry.affiliate_link }}">Copy full URL</button></li>
-                                        <li><button class="dropdown-item" type="button" disabled>Share (coming soon)</button></li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            <div class="link-pill w-100 justify-content-between">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="bi bi-link-45deg"></i>
-                                    <span class="link-preview">{{ entry.affiliate_link }}</span>
-                                </div>
-                                <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#full-link-{{ forloop.counter }}" aria-expanded="false" aria-controls="full-link-{{ forloop.counter }}">
-                                    <i class="bi bi-chevron-down"></i>
-                                </button>
-                            </div>
-                            <div class="collapse" id="full-link-{{ forloop.counter }}">
-                                <div class="text-muted small mt-1">{{ entry.affiliate_link }}</div>
-                            </div>
-
-                            <button class="btn btn-primary w-100 py-2 copy-link-btn" data-short-link="{{ entry.affiliate_link }}">
-                                <i class="bi bi-link-45deg me-2"></i>Copy Link
-                            </button>
-
-                            <div>
-                                <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#link-meta-{{ forloop.counter }}" aria-expanded="false" aria-controls="link-meta-{{ forloop.counter }}">
-                                    Details
-                                    <i class="bi bi-chevron-down ms-1"></i>
-                                </button>
-                                <div class="collapse" id="link-meta-{{ forloop.counter }}">
-                                    <div class="pt-2 text-muted small link-card__meta">
-                                        {% if entry.item.shopify_product_id %}
-                                            <div>Product ID: {{ entry.item.shopify_product_id }}</div>
-                                        {% else %}
-                                            <div>Product ID hidden</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+    <form method="get" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="q" value="{{ search_query }}" class="form-control" placeholder="Search by name or ID">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
         </div>
+    </form>
 
-        <div id="links-table-view" class="d-none">
-            <div class="card border-0 shadow-sm">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in items %}
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="link-card__thumb bg-light">
-                                        {% if entry.item.image_url %}
-                                            <img src="{{ entry.item.image_url }}" alt="{{ entry.item.title }} thumbnail">
-                                        {% else %}
-                                            <i class="bi bi-image text-muted"></i>
-                                        {% endif %}
-                                        </div>
-                                        <div>
-                                            <div class="fw-semibold">{{ entry.item.title }}</div>
-                                            <div class="text-muted small">ID: {{ entry.item.shopify_product_id|default:"Hidden" }}</div>
-                                            <div class="text-muted small">
-                                                {% if entry.commission_percent %}
-                                                    Commission: {{ entry.commission_percent }}%
-                                                {% elif group %}
-                                                    Commission: {{ group.affiliate_percent }}%
-                                                {% else %}
-                                                    Commission: —%
-                                                {% endif %}
-                                                {% if entry.commission_amount %}
-                                                    · ${{ entry.commission_amount|floatformat:2 }}
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if entry.item.product_price or entry.item.price %}
-                                        {{ entry.item.product_price|default:entry.item.price }}
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
-                                <td><span class="badge badge-status rounded-pill">Active</span></td>
-                                <td class="text-end">
-                                    <button class="btn btn-primary btn-sm copy-link-btn" data-short-link="{{ entry.affiliate_link }}">Copy Link</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    {% if search_query %}
+        {% if items %}
+        <ul class="list-group">
+            {% for entry in items %}
+            <li class="list-group-item">
+                <div class="fw-semibold">{{ entry.item.title }}{% if entry.item.shopify_product_id %} (ID: {{ entry.item.shopify_product_id }}){% endif %}</div>
+                {% if entry.item.link %}<div class="text-muted small">{{ entry.item.link }}</div>{% endif %}
+                <div class="mt-1"><a href="{{ entry.affiliate_link }}" target="_blank">{{ entry.affiliate_link }}</a></div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted">No items found.</p>
+        {% endif %}
     {% elif companies %}
-        <div class="row g-3">
+        <ul class="list-group">
             {% for company in companies %}
-            <div class="col-12 col-md-6 col-xl-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column gap-3">
-                        <div>
-                            <h3 class="fs-5 fw-semibold mb-1">{{ company.name }}</h3>
-                            <p class="text-muted small mb-0">Browse available products and copy links fast.</p>
-                        </div>
-                        <a class="btn btn-outline-primary w-100" href="{% url 'creator_my_links_merchant' company.id %}">View links</a>
-                    </div>
-                </div>
-            </div>
+            <li class="list-group-item">
+                <a href="{% url 'creator_my_links_merchant' company.id %}">{{ company.name }}</a>
+            </li>
             {% endfor %}
-        </div>
+        </ul>
     {% elif groups %}
-        <div class="row g-3">
+        <ul class="list-group">
             {% for group in groups %}
-            <div class="col-12 col-md-6 col-xl-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body d-flex flex-column gap-3">
-                        <div>
-                            <h3 class="fs-5 fw-semibold mb-1">{{ group.name }}</h3>
-                            <div class="text-muted small">Commission: {{ group.affiliate_percent }}%</div>
-                        </div>
-                        <div class="text-muted small">
-                            {% if group.items.all %}
-                                {{ group.items.all|length }} products
-                            {% else %}
-                                No products yet
-                            {% endif %}
-                        </div>
-                        <a class="btn btn-outline-primary w-100" href="{% url 'creator_my_links_group' merchant.id group.id %}">Open group</a>
-                    </div>
+            <li class="list-group-item">
+                <a href="{% url 'creator_my_links_group' merchant.id group.id %}">{{ group.name }}</a>
+                <div class="text-muted small">Commission: {{ group.affiliate_percent }}%</div>
+                {% if group.items.all %}
+                <div class="text-muted small">Items:
+                    {% for item in group.items.all %}
+                        {{ item.title }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
                 </div>
-            </div>
+                {% endif %}
+            </li>
             {% endfor %}
-        </div>
+        </ul>
+    {% elif items %}
+        <ul class="list-group">
+            {% for entry in items %}
+            <li class="list-group-item">
+                <div class="fw-semibold">{{ entry.item.title }}{% if entry.item.shopify_product_id %} (ID: {{ entry.item.shopify_product_id }}){% endif %}</div>
+                {% if entry.item.link %}<div class="text-muted small">{{ entry.item.link }}</div>{% endif %}
+                <div class="mt-1"><a href="{{ entry.affiliate_link }}" target="_blank">{{ entry.affiliate_link }}</a></div>
+            </li>
+            {% endfor %}
+        </ul>
     {% else %}
-        <div class="empty-state p-5 text-center">
-            <h2 class="fs-4 fw-semibold mb-2">No links yet</h2>
-            <p class="text-muted mb-0">Once merchants add products, you can copy and share links here.</p>
-        </div>
+        <p class="text-muted">You have no links yet.</p>
     {% endif %}
-
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="copyToast" class="toast align-items-center text-bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">Copied!</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    </div>
 </section>
-
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const toastEl = document.getElementById('copyToast');
-        const toast = window.bootstrap && toastEl ? new bootstrap.Toast(toastEl, { delay: 1600 }) : null;
-
-        const copyToClipboard = async (text) => {
-            if (!text) return;
-            try {
-                await navigator.clipboard.writeText(text);
-                if (toast) toast.show();
-            } catch (err) {
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.setAttribute('readonly', '');
-                textarea.style.position = 'absolute';
-                textarea.style.left = '-9999px';
-                document.body.appendChild(textarea);
-                textarea.select();
-                try {
-                    document.execCommand('copy');
-                    if (toast) toast.show();
-                } catch (fallbackErr) {
-                    console.warn('Clipboard copy failed', fallbackErr);
-                } finally {
-                    document.body.removeChild(textarea);
-                }
-            }
-        };
-
-        document.querySelectorAll('.copy-link-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                copyToClipboard(btn.getAttribute('data-short-link'));
-            });
-        });
-
-        document.querySelectorAll('.copy-full-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                copyToClipboard(btn.getAttribute('data-full-link'));
-            });
-        });
-
-        const viewButtons = document.querySelectorAll('.view-toggle [data-view]');
-        const cardView = document.getElementById('links-card-view');
-        const tableView = document.getElementById('links-table-view');
-
-        if (viewButtons.length && cardView && tableView) {
-            viewButtons.forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    const view = btn.getAttribute('data-view');
-                    viewButtons.forEach((button) => {
-                        button.classList.toggle('btn-primary', button === btn);
-                        button.classList.toggle('btn-outline-primary', button !== btn);
-                    });
-                    cardView.classList.toggle('d-none', view !== 'cards');
-                    tableView.classList.toggle('d-none', view !== 'table');
-                });
-            });
-        }
-    });
-</script>
 {% endblock %}
