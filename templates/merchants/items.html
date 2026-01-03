@@ -362,32 +362,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var row = document.createElement('tr');
 
             var titleCell = document.createElement('td');
-            var titleWrapper = document.createElement('div');
-            titleWrapper.className = 'd-flex align-items-center gap-2';
-            var thumb = document.createElement('div');
-            thumb.className = 'rounded bg-light flex-shrink-0';
-            thumb.style.width = '40px';
-            thumb.style.height = '40px';
-            thumb.style.backgroundSize = 'cover';
-            thumb.style.backgroundPosition = 'center';
-            if (product.image) {
-                thumb.style.backgroundImage = 'url(' + product.image + ')';
-            } else {
-                thumb.classList.add('d-flex', 'justify-content-center', 'align-items-center');
-                thumb.innerHTML = '<i class="bi bi-box"></i>';
-            }
-            var textWrapper = document.createElement('div');
             var titleText = document.createElement('div');
             titleText.className = 'fw-semibold';
             titleText.textContent = product.title || 'Untitled product';
             var handle = document.createElement('div');
             handle.className = 'text-muted small';
             handle.textContent = product.handle ? 'Handle: ' + product.handle : 'ID: ' + (product.id || 'N/A');
-            textWrapper.appendChild(titleText);
-            textWrapper.appendChild(handle);
-            titleWrapper.appendChild(thumb);
-            titleWrapper.appendChild(textWrapper);
-            titleCell.appendChild(titleWrapper);
+            titleCell.appendChild(titleText);
+            titleCell.appendChild(handle);
 
             var typeCell = document.createElement('td');
             typeCell.textContent = product.productType || 'Uncategorized';
@@ -634,3 +616,4 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endblock %}
+
