@@ -1,5 +1,3 @@
-from decimal import Decimal, InvalidOperation
-
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -256,11 +254,9 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     if merchant_id is None:
         if query:
             merchant_ids = links.values_list("merchant_id", flat=True)
-            item_queryset = (
-                MerchantItem.objects.filter(groups__merchant_id__in=merchant_ids)
-                .distinct()
-                .prefetch_related("groups")
-            )
+            item_queryset = MerchantItem.objects.filter(
+                groups__merchant_id__in=merchant_ids
+            ).distinct()
             item_queryset = item_queryset.filter(
                 Q(title__icontains=query)
                 | Q(shopify_product_id__icontains=query)
@@ -271,20 +267,6 @@ def creator_my_links(request, merchant_id=None, group_id=None):
             group_ids_found = set()
             items = []
             for item in item_queryset:
-                commission_percent = None
-                commission_amount = None
-                first_group = item.groups.first()
-                if first_group:
-                    commission_percent = first_group.affiliate_percent
-                    if item.price is not None:
-                        try:
-                            commission_amount = (
-                                Decimal(str(item.price))
-                                * Decimal(str(commission_percent))
-                                / Decimal("100")
-                            )
-                        except (InvalidOperation, TypeError):
-                            commission_amount = None
                 merchant_ids_found.add(item.merchant_id)
                 group_ids_found.update(item.groups.values_list("id", flat=True))
                 base_link = item.link
@@ -292,14 +274,7 @@ def creator_my_links(request, merchant_id=None, group_id=None):
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
-                items.append(
-                    {
-                        "item": item,
-                        "affiliate_link": affiliate_link,
-                        "commission_percent": commission_percent,
-                        "commission_amount": commission_amount,
-                    }
-                )
+                items.append({"item": item, "affiliate_link": affiliate_link})
 
             # If search results are within a single merchant or group, redirect so
             # breadcrumbs show the full path.
@@ -347,11 +322,9 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     # Merchant level: show groups or search across merchant items
     if group_id is None:
         if query:
-            item_queryset = (
-                MerchantItem.objects.filter(groups__merchant=merchant)
-                .distinct()
-                .prefetch_related("groups")
-            )
+            item_queryset = MerchantItem.objects.filter(
+                groups__merchant=merchant
+            ).distinct()
             item_queryset = item_queryset.filter(
                 Q(title__icontains=query)
                 | Q(shopify_product_id__icontains=query)
@@ -359,33 +332,12 @@ def creator_my_links(request, merchant_id=None, group_id=None):
             )
             items = []
             for item in item_queryset:
-                commission_percent = None
-                commission_amount = None
-                first_group = item.groups.first()
-                if first_group:
-                    commission_percent = first_group.affiliate_percent
-                    if item.price is not None:
-                        try:
-                            commission_amount = (
-                                Decimal(str(item.price))
-                                * Decimal(str(commission_percent))
-                                / Decimal("100")
-                            )
-                        except (InvalidOperation, TypeError):
-                            commission_amount = None
                 base_link = item.link
                 sep = "&" if "?" in base_link else "?"
                 affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
                 if item.shopify_product_id:
                     affiliate_link += f"&item_id={item.shopify_product_id}"
-                items.append(
-                    {
-                        "item": item,
-                        "affiliate_link": affiliate_link,
-                        "commission_percent": commission_percent,
-                        "commission_amount": commission_amount,
-                    }
-                )
+                items.append({"item": item, "affiliate_link": affiliate_link})
             context.update(
                 {"merchant": merchant, "items": items, "search_query": query}
             )
@@ -402,7 +354,7 @@ def creator_my_links(request, merchant_id=None, group_id=None):
     )
     breadcrumbs.append((group.name, None))
 
-    item_queryset = group.items.all().prefetch_related("groups")
+    item_queryset = group.items.all()
     if query:
         item_queryset = item_queryset.filter(
             Q(title__icontains=query)
@@ -412,30 +364,12 @@ def creator_my_links(request, merchant_id=None, group_id=None):
 
     items = []
     for item in item_queryset:
-        commission_percent = group.affiliate_percent
-        commission_amount = None
-        if item.price is not None:
-            try:
-                commission_amount = (
-                    Decimal(str(item.price))
-                    * Decimal(str(commission_percent))
-                    / Decimal("100")
-                )
-            except (InvalidOperation, TypeError):
-                commission_amount = None
         base_link = item.link
         sep = "&" if "?" in base_link else "?"
         affiliate_link = f"{base_link}{sep}ref=badger:{creator_meta.uuid}"
         if item.shopify_product_id:
             affiliate_link += f"&item_id={item.shopify_product_id}"
-        items.append(
-            {
-                "item": item,
-                "affiliate_link": affiliate_link,
-                "commission_percent": commission_percent,
-                "commission_amount": commission_amount,
-            }
-        )
+        items.append({"item": item, "affiliate_link": affiliate_link})
 
     context.update(
         {
