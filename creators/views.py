@@ -1,5 +1,4 @@
 from decimal import Decimal, InvalidOperation
-import logging
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -26,7 +25,6 @@ from shopify_app.shopify_client import ShopifyClient
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 
-logger = logging.getLogger(__name__)
 
 @login_required
 def creator_earnings(request):
@@ -224,10 +222,6 @@ def _affiliate_company_metrics(user):
         "generated_at": timezone.now().isoformat(),
     }
 
-def _is_blank(value):
-    return value is None or (isinstance(value, str) and not value.strip())
-
-
 def _refresh_shopify_assets(items):
     items_by_merchant = {}
     for item in items:
@@ -237,15 +231,10 @@ def _refresh_shopify_assets(items):
         missing_items = [
             item
             for item in merchant_items
-            if item.shopify_product_id and _is_blank(item.image_url)
+            if item.shopify_product_id and not item.image_url
         ]
         if not missing_items:
             continue
-        logger.info(
-            "Detected %s items without image URLs for merchant_id=%s; attempting refresh.",
-            len(missing_items),
-            merchant_id,
-        )
 
         meta = MerchantMeta.objects.filter(user_id=merchant_id).first()
         if not meta or not meta.shopify_access_token or not meta.shopify_store_domain:
@@ -260,25 +249,12 @@ def _refresh_shopify_assets(items):
                 [item.shopify_product_id for item in missing_items]
             )
         except Exception:
-            logger.exception(
-                "Failed to refresh Shopify images for merchant_id=%s.",
-                merchant_id,
-            )
             continue
-        logger.info(
-            "Attempted to pull images again for merchant_id=%s (items=%s).",
-            merchant_id,
-            len(missing_items),
-        )
 
         products_by_id = {str(product.get("id")): product for product in products}
         for item in missing_items:
             product = products_by_id.get(str(item.shopify_product_id), {})
             featured_image = ((product or {}).get("featuredImage") or {}).get("src")
-            if not featured_image:
-                images = (product or {}).get("images") or []
-                if images:
-                    featured_image = images[0].get("src")
             variants = (product or {}).get("variants") or []
             variant_price = variants[0].get("price") if variants else None
             update_fields = []
@@ -288,12 +264,6 @@ def _refresh_shopify_assets(items):
             if variant_price is not None and item.price != variant_price:
                 item.price = variant_price
                 update_fields.append("price")
-            if not featured_image:
-                logger.info(
-                    "Shopify image URL missing for item_id=%s shopify_product_id=%s.",
-                    item.id,
-                    item.shopify_product_id,
-                )
             if update_fields:
                 item.save(update_fields=update_fields)
 
