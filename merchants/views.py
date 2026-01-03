@@ -415,6 +415,10 @@ def search_shopify_products(request):
 
     def _serialize_product(product: dict) -> dict:
         image = (product.get("featuredImage") or {}).get("src")
+        if not image:
+            images = product.get("images") or []
+            if images:
+                image = images[0].get("src")
         return {
             "id": product.get("id"),
             "title": product.get("title"),
@@ -486,6 +490,10 @@ def list_shopify_products(request):
 
     def _serialize_product(product: dict) -> dict:
         image = (product.get("featuredImage") or {}).get("src")
+        if not image:
+            images = product.get("images") or []
+            if images:
+                image = images[0].get("src")
         return {
             "id": product.get("id"),
             "title": product.get("title"),
