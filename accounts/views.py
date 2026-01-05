@@ -57,7 +57,7 @@ def _redirect_after_login(request, user):
         return redirect('merchant_dashboard')
 
     if user.is_creator:
-        return redirect('creator_earnings')
+        return redirect('creator_dashboard')
 
     return redirect('user_dashboard')
 
