@@ -92,18 +92,9 @@ class BusinessSignUpForm(UserCreationForm):
         return cleaned
 
 class CreatorSignUpForm(UserCreationForm):
-    username = forms.CharField(
-        label="Display name",
-        widget=forms.TextInput(attrs={"placeholder": "Your creator name"}),
-    )
-    email = forms.EmailField(
-        label="Email",
-        widget=forms.EmailInput(attrs={"placeholder": "you@example.com"}),
-    )
-
     class Meta:
         model = User
-        fields = ("username", "email", "password1", "password2")
+        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
 
 
 class UserSignUpForm(UserCreationForm):
@@ -131,3 +122,4 @@ class EmailVerificationForm(forms.Form):
             }
         ),
     )
+
