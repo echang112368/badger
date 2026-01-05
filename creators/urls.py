@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    creator_dashboard,
     creator_earnings,
     creator_affiliate_companies,
     creator_affiliate_companies_data,
@@ -11,6 +12,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path('dashboard/', creator_dashboard, name='creator_dashboard'),
     path('earnings/', creator_earnings, name='creator_earnings'),
     path('affiliate-companies/', creator_affiliate_companies, name='creator_affiliate_companies'),
     path('affiliate-companies/delete/', delete_affiliate_merchants, name='creator_delete_affiliations'),
