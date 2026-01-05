@@ -30,10 +30,6 @@ from ledger.models import LedgerEntry
 logger = logging.getLogger(__name__)
 
 @login_required
-def creator_dashboard(request):
-    return render(request, "creators/dashboard.html")
-
-@login_required
 def creator_earnings(request):
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
@@ -562,14 +558,11 @@ def creator_settings(request):
     if request.method == "POST":
         user_form = UserNameForm(request.POST, instance=request.user)
         paypal_email = request.POST.get("paypal_email", "").strip()
-        creator_name = request.POST.get("creator_name", "").strip()
         if user_form.is_valid():
             user_form.save()
             if paypal_email:
                 creator_meta.paypal_email = paypal_email
-            if creator_name:
-                creator_meta.display_name = creator_name
-            creator_meta.save()
+                creator_meta.save()
             return redirect("creator_settings")
     else:
         user_form = UserNameForm(instance=request.user)
