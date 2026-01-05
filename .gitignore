@@ -20,7 +20,6 @@ migrations/
 !merchants/migrations/
 !shopify_app/migrations/
 !accounts/migrations/
-!creators/migrations/
 
 # Environment
 .env
