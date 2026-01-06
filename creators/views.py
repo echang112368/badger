@@ -30,10 +30,6 @@ from ledger.models import LedgerEntry
 logger = logging.getLogger(__name__)
 
 @login_required
-def creator_dashboard(request):
-    return creator_earnings(request)
-
-@login_required
 def creator_earnings(request):
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
