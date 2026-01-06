@@ -240,7 +240,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'creators.context_processors.creator_onboarding',
             ],
             'libraries': {
                 # Ensure custom admin dashboard tags are always discoverable.
