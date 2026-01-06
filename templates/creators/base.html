@@ -32,35 +32,6 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        .onboarding-card .list-group-item {
-            border: none;
-            padding: 0.65rem 0;
-        }
-        .onboarding-card .list-group-item + .list-group-item {
-            border-top: 1px solid rgba(0,0,0,0.05);
-        }
-        .onboarding-card .step-status {
-            font-size: 0.75rem;
-            letter-spacing: 0.02em;
-            text-transform: uppercase;
-            color: #6c757d;
-        }
-        .onboarding-step-panel {
-            background: #f8f9fb;
-            border-radius: 16px;
-            padding: 1.5rem;
-        }
-        .onboarding-step-panel .form-label {
-            font-weight: 600;
-        }
-        .onboarding-step-panel .why-copy {
-            font-size: 0.85rem;
-            color: #6c757d;
-        }
-        .onboarding-step-panel .badge-optional {
-            background: rgba(48, 79, 145, 0.1);
-            color: #304f91;
-        }
     </style>
 </head>
 <body>
@@ -72,7 +43,7 @@
         <hr>
         {% with request.resolver_match.url_name as current_url %}
         <ul class="nav nav-pills flex-column mb-auto">
-            <li><a href="{% url 'creator_earnings' %}" class="nav-link {% if current_url == 'creator_earnings' or current_url == 'creator_dashboard' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-cash-stack me-2"></i>Earnings</a></li>
+            <li><a href="{% url 'creator_earnings' %}" class="nav-link {% if current_url == 'creator_earnings' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-cash-stack me-2"></i>Earnings</a></li>
             <li><a href="{% url 'creator_affiliate_companies' %}" class="nav-link {% if current_url == 'creator_affiliate_companies' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-building me-2"></i>Affiliate Companies</a></li>
             <li><a href="{% url 'creator_my_links' %}" class="nav-link {% if current_url == 'creator_my_links' or current_url == 'creator_my_links_merchant' or current_url == 'creator_my_links_group' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-link-45deg me-2"></i>My Links</a></li>
             <li><a href="{% url 'creator_settings' %}" class="nav-link {% if current_url == 'creator_settings' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-gear me-2"></i>Settings</a></li>
@@ -87,190 +58,6 @@
             <i class="bi bi-list"></i>
         </button>
         <main id="content" class="container-fluid px-3 fade-in">
-            {% if creator_onboarding %}
-                {% if not creator_onboarding.onboarding_completed %}
-                    <section class="my-4" id="creator-onboarding">
-                        <div class="card shadow-sm border-0 onboarding-card">
-                            <div class="card-body">
-                                <div class="d-flex flex-wrap gap-3 align-items-start justify-content-between mb-3">
-                                    <div>
-                                        <h2 class="fw-bold fs-4 mb-1">Complete your profile (2–3 minutes)</h2>
-                                        <p class="text-muted mb-1">Brands use this to find creators like you.</p>
-                                        <p class="mb-0 text-muted">Finish onboarding to unlock payouts and auto-approval.</p>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="fw-semibold">Completion score</div>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="progress" style="width: 160px; height: 8px;">
-                                                <div class="progress-bar" role="progressbar" style="width: 0%;" id="onboarding-progress-bar"></div>
-                                            </div>
-                                            <span class="fw-semibold" id="onboarding-progress-label">0%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row g-4">
-                                    <div class="col-lg-4">
-                                        <ul class="list-group list-group-flush" id="onboarding-checklist">
-                                            <li class="list-group-item d-flex align-items-center justify-content-between" data-step="identity">
-                                                <button class="btn btn-link text-decoration-none p-0 fw-semibold">Identity & niche</button>
-                                                <span class="step-status" data-status></span>
-                                            </li>
-                                            <li class="list-group-item d-flex align-items-center justify-content-between" data-step="platforms">
-                                                <button class="btn btn-link text-decoration-none p-0 fw-semibold">Platforms</button>
-                                                <span class="step-status" data-status></span>
-                                            </li>
-                                            <li class="list-group-item d-flex align-items-center justify-content-between" data-step="content">
-                                                <button class="btn btn-link text-decoration-none p-0 fw-semibold">Content style</button>
-                                                <span class="step-status" data-status></span>
-                                            </li>
-                                            <li class="list-group-item d-flex align-items-center justify-content-between" data-step="performance">
-                                                <button class="btn btn-link text-decoration-none p-0 fw-semibold">Performance signals</button>
-                                                <span class="step-status" data-status></span>
-                                            </li>
-                                            <li class="list-group-item d-flex align-items-center justify-content-between" data-step="payouts">
-                                                <button class="btn btn-link text-decoration-none p-0 fw-semibold">Payouts (required to earn)</button>
-                                                <span class="step-status" data-status></span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="col-lg-8">
-                                        <div class="onboarding-step-panel">
-                                            <div class="onboarding-step" data-step-panel="identity">
-                                                <div class="d-flex align-items-center gap-2 mb-2">
-                                                    <h3 class="fw-bold fs-5 mb-0">Identity & niche</h3>
-                                                    <span class="badge bg-primary">Required</span>
-                                                </div>
-                                                <p class="why-copy mb-3">Brands use this to match with creators in your category.</p>
-                                                <div class="row g-3">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label">Display name</label>
-                                                        <input class="form-control" type="text" name="display_name" data-field="display_name">
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label class="form-label">Country</label>
-                                                        <input class="form-control" type="text" name="country" data-field="country">
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <label class="form-label">Primary niche(s)</label>
-                                                        <input class="form-control" type="text" name="primary_niches" placeholder="Beauty, fitness, tech" data-field="primary_niches">
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex justify-content-end mt-3">
-                                                    <button class="btn btn-primary" data-action="save" data-step="identity">Save & continue</button>
-                                                </div>
-                                            </div>
-                                            <div class="onboarding-step d-none" data-step-panel="platforms">
-                                                <div class="d-flex align-items-center gap-2 mb-2">
-                                                    <h3 class="fw-bold fs-5 mb-0">Platforms</h3>
-                                                    <span class="badge bg-primary">Required</span>
-                                                </div>
-                                                <p class="why-copy mb-3">Paste a profile link to auto-detect the platform.</p>
-                                                <div data-platform-list></div>
-                                                <button class="btn btn-outline-primary btn-sm mt-2" type="button" data-action="add-platform">
-                                                    <i class="bi bi-plus-lg"></i> Add platform
-                                                </button>
-                                                <div class="d-flex justify-content-end mt-3">
-                                                    <button class="btn btn-primary" data-action="save" data-step="platforms">Save & continue</button>
-                                                </div>
-                                            </div>
-                                            <div class="onboarding-step d-none" data-step-panel="content">
-                                                <div class="d-flex align-items-center gap-2 mb-2">
-                                                    <h3 class="fw-bold fs-5 mb-0">Content style & availability</h3>
-                                                    <span class="badge badge-optional">Optional</span>
-                                                </div>
-                                                <p class="why-copy mb-3">Let brands know how you create content and how often you post.</p>
-                                                <div class="row g-3">
-                                                    <div class="col-12">
-                                                        <label class="form-label">Content style tags</label>
-                                                        <input class="form-control" type="text" name="content_style_tags" placeholder="UGC, reviews, deals" data-field="content_style_tags">
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label class="form-label">Posting frequency</label>
-                                                        <select class="form-select" name="posting_frequency" data-field="posting_frequency">
-                                                            <option value="">Select frequency</option>
-                                                            <option value="Daily">Daily</option>
-                                                            <option value="Weekly">Weekly</option>
-                                                            <option value="Monthly">Monthly</option>
-                                                            <option value="Seasonal">Seasonal</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-6 d-flex align-items-end">
-                                                        <div class="form-check">
-                                                            <input class="form-check-input" type="checkbox" value="true" id="openToGifting" data-field="open_to_gifting">
-                                                            <label class="form-check-label" for="openToGifting">Open to gifting</label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex justify-content-between mt-3">
-                                                    <button class="btn btn-outline-secondary" data-action="skip" data-step="content">Skip for now</button>
-                                                    <button class="btn btn-primary" data-action="save" data-step="content">Save & continue</button>
-                                                </div>
-                                            </div>
-                                            <div class="onboarding-step d-none" data-step-panel="performance">
-                                                <div class="d-flex align-items-center gap-2 mb-2">
-                                                    <h3 class="fw-bold fs-5 mb-0">Performance signals</h3>
-                                                    <span class="badge badge-optional">Optional</span>
-                                                </div>
-                                                <div class="alert alert-light border mb-3" id="performance-message">
-                                                    We’ll add this automatically after your first sale.
-                                                </div>
-                                                <div class="d-flex justify-content-between">
-                                                    <button class="btn btn-outline-secondary" data-action="skip" data-step="performance">Skip for now</button>
-                                                    <button class="btn btn-primary" data-action="save" data-step="performance">Continue</button>
-                                                </div>
-                                            </div>
-                                            <div class="onboarding-step d-none" data-step-panel="payouts">
-                                                <div class="d-flex align-items-center gap-2 mb-2">
-                                                    <h3 class="fw-bold fs-5 mb-0">Payout setup</h3>
-                                                    <span class="badge bg-primary">Required</span>
-                                                </div>
-                                                <p class="why-copy mb-3">Payouts are locked until this step is complete.</p>
-                                                <div class="row g-3">
-                                                    <div class="col-md-6">
-                                                        <label class="form-label">Payout method</label>
-                                                        <select class="form-select" name="payout_method" data-field="payout_method">
-                                                            <option value="">Select method</option>
-                                                            <option value="paypal">PayPal</option>
-                                                            <option value="bank">Bank transfer</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-6">
-                                                        <label class="form-label">PayPal email</label>
-                                                        <input class="form-control" type="email" name="paypal_email" placeholder="you@paypal.com" data-field="paypal_email">
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <label class="form-label">Tax info</label>
-                                                        <textarea class="form-control" rows="3" name="tax_info" placeholder="Tax ID, VAT number, or notes" data-field="tax_info"></textarea>
-                                                    </div>
-                                                </div>
-                                                <div class="d-flex justify-content-end mt-3">
-                                                    <button class="btn btn-primary" data-action="save" data-step="payouts">Save & finish</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="alert alert-success mt-4 d-none" id="onboarding-success">
-                                    <strong>Your profile is live!</strong> Brands can now discover and invite you.
-                                    <div class="mt-2">
-                                        <a href="{% url 'creator_settings' %}" class="btn btn-sm btn-outline-success">Improve your profile</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                    {{ creator_onboarding|json_script:"creator-onboarding-data" }}
-                {% else %}
-                    <section class="my-4">
-                        <div class="alert alert-success d-flex align-items-center justify-content-between">
-                            <div>
-                                <strong>Your profile is live!</strong> Brands can now discover and invite you.
-                            </div>
-                            <a href="{% url 'creator_settings' %}" class="btn btn-sm btn-outline-success">Improve your profile</a>
-                        </div>
-                    </section>
-                {% endif %}
-            {% endif %}
             {% block content %}{% endblock %}
         </main>
     </div>
@@ -295,9 +82,6 @@
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-{% if creator_onboarding and not creator_onboarding.onboarding_completed %}
-<script src="{% static 'creators/js/onboarding.js' %}"></script>
-{% endif %}
 <script>
     document.querySelectorAll('time.local-time').forEach(function(el){
         var iso = el.getAttribute('datetime');
