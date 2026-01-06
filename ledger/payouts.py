@@ -78,8 +78,6 @@ def send_mass_payouts(ignore_date: bool = False) -> Dict[str, str]:
             meta = CreatorMeta.objects.get(user=creator)
         except (User.DoesNotExist, CreatorMeta.DoesNotExist):
             continue
-        if not meta.onboarding_completed:
-            continue
         if not meta.paypal_email:
             continue
 
