@@ -556,96 +556,20 @@ def creator_my_links(request, merchant_id=None, group_id=None):
 def creator_settings(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        paypal_email = request.POST.get("paypal_email", "").strip()
-        if paypal_email:
-            creator_meta.paypal_email = paypal_email
-            creator_meta.save()
-        return redirect("creator_settings")
-
-    return render(
-        request,
-        "creators/settings.html",
-        {"creator_meta": creator_meta, "creator": request.user},
-    )
-
-
-@login_required
-def creator_profile(request):
-    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
-
-    def parse_int(value):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        return int(cleaned)
-
-    def parse_decimal(value):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        return Decimal(cleaned)
-
-    if request.method == "POST":
         user_form = UserNameForm(request.POST, instance=request.user)
+        paypal_email = request.POST.get("paypal_email", "").strip()
         if user_form.is_valid():
             user_form.save()
-            creator_meta.display_name = request.POST.get("display_name", "").strip()
-            creator_meta.bio = request.POST.get("bio", "").strip()
-            creator_meta.primary_platform = request.POST.get("primary_platform", "").strip()
-            creator_meta.primary_niche = request.POST.get("primary_niche", "").strip()
-            creator_meta.content_formats = request.POST.get("content_formats", "").strip()
-            creator_meta.audience_locations = request.POST.get("audience_locations", "").strip()
-            creator_meta.audience_age_range = request.POST.get("audience_age_range", "").strip()
-            creator_meta.preferred_partnerships = request.POST.get("preferred_partnerships", "").strip()
-            creator_meta.media_kit_url = request.POST.get("media_kit_url", "").strip()
-            creator_meta.instagram_url = request.POST.get("instagram_url", "").strip()
-            creator_meta.tiktok_url = request.POST.get("tiktok_url", "").strip()
-            creator_meta.youtube_url = request.POST.get("youtube_url", "").strip()
-            creator_meta.twitch_url = request.POST.get("twitch_url", "").strip()
-
-            try:
-                creator_meta.instagram_followers = parse_int(
-                    request.POST.get("instagram_followers", "")
-                )
-            except ValueError:
-                creator_meta.instagram_followers = None
-
-            try:
-                creator_meta.tiktok_followers = parse_int(
-                    request.POST.get("tiktok_followers", "")
-                )
-            except ValueError:
-                creator_meta.tiktok_followers = None
-
-            try:
-                creator_meta.youtube_subscribers = parse_int(
-                    request.POST.get("youtube_subscribers", "")
-                )
-            except ValueError:
-                creator_meta.youtube_subscribers = None
-
-            try:
-                creator_meta.twitch_followers = parse_int(
-                    request.POST.get("twitch_followers", "")
-                )
-            except ValueError:
-                creator_meta.twitch_followers = None
-
-            try:
-                creator_meta.average_engagement_rate = parse_decimal(
-                    request.POST.get("average_engagement_rate", "")
-                )
-            except (InvalidOperation, ValueError):
-                creator_meta.average_engagement_rate = None
-
-            creator_meta.save()
-            return redirect("creator_profile")
+            if paypal_email:
+                creator_meta.paypal_email = paypal_email
+                creator_meta.save()
+            return redirect("creator_settings")
     else:
         user_form = UserNameForm(instance=request.user)
 
     return render(
         request,
-        "creators/profile.html",
+        "creators/settings.html",
         {"creator_meta": creator_meta, "creator": request.user, "user_form": user_form},
     )
 
