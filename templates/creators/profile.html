@@ -1,0 +1,141 @@
+{% extends 'creators/base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<script src="https://cdn.tailwindcss.com"></script>
+<div class="max-w-5xl mx-auto py-10 px-4">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900">Profile</h1>
+    <div>
+      <input type="text" placeholder="Search" class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
+    </div>
+  </div>
+  <form id="profileForm" method="post" action="{% url 'creator_profile' %}" class="space-y-8">
+    {% csrf_token %}
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h2 class="text-lg font-semibold text-gray-900">Creator details</h2>
+      <p class="text-sm text-gray-500 mb-6">Share the info merchants use to find the right partners.</p>
+      <div class="grid gap-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+          <input type="text" name="display_name" value="{{ creator_meta.display_name|default_if_none:'' }}" placeholder="Creator Studio" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Creator UUID</label>
+          <div class="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">{{ creator_meta.uuid }}</div>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <input type="text" name="first_name" value="{{ user_form.first_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <input type="text" name="last_name" value="{{ user_form.last_name.value|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" name="email" value="{{ creator.email }}" disabled class="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+          <textarea name="bio" rows="4" placeholder="Share your audience, content style, and experience." class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ creator_meta.bio|default_if_none:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h2 class="text-lg font-semibold text-gray-900">Social presence</h2>
+      <p class="text-sm text-gray-500 mb-6">Add the platforms and follower counts merchants can filter by.</p>
+      <div class="grid gap-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Primary Platform</label>
+          <input type="text" name="primary_platform" value="{{ creator_meta.primary_platform|default_if_none:'' }}" placeholder="TikTok, Instagram, YouTube" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Instagram URL</label>
+            <input type="url" name="instagram_url" value="{{ creator_meta.instagram_url|default_if_none:'' }}" placeholder="https://instagram.com/yourhandle" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Instagram Followers</label>
+            <input type="number" name="instagram_followers" min="0" value="{{ creator_meta.instagram_followers|default_if_none:'' }}" placeholder="125000" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">TikTok URL</label>
+            <input type="url" name="tiktok_url" value="{{ creator_meta.tiktok_url|default_if_none:'' }}" placeholder="https://tiktok.com/@yourhandle" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">TikTok Followers</label>
+            <input type="number" name="tiktok_followers" min="0" value="{{ creator_meta.tiktok_followers|default_if_none:'' }}" placeholder="98000" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+            <input type="url" name="youtube_url" value="{{ creator_meta.youtube_url|default_if_none:'' }}" placeholder="https://youtube.com/@yourchannel" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">YouTube Subscribers</label>
+            <input type="number" name="youtube_subscribers" min="0" value="{{ creator_meta.youtube_subscribers|default_if_none:'' }}" placeholder="54000" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Twitch URL</label>
+            <input type="url" name="twitch_url" value="{{ creator_meta.twitch_url|default_if_none:'' }}" placeholder="https://twitch.tv/yourhandle" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Twitch Followers</label>
+            <input type="number" name="twitch_followers" min="0" value="{{ creator_meta.twitch_followers|default_if_none:'' }}" placeholder="12000" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
+      <h2 class="text-lg font-semibold text-gray-900">Audience & content</h2>
+      <p class="text-sm text-gray-500 mb-6">Provide the details merchants use to match with your audience.</p>
+      <div class="grid gap-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Primary Niche</label>
+          <input type="text" name="primary_niche" value="{{ creator_meta.primary_niche|default_if_none:'' }}" placeholder="Beauty, Fitness, Tech reviews" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Content Formats</label>
+          <input type="text" name="content_formats" value="{{ creator_meta.content_formats|default_if_none:'' }}" placeholder="Short-form video, livestreams, product tutorials" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Audience Locations</label>
+            <input type="text" name="audience_locations" value="{{ creator_meta.audience_locations|default_if_none:'' }}" placeholder="US, Canada, UK" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Audience Age Range</label>
+            <input type="text" name="audience_age_range" value="{{ creator_meta.audience_age_range|default_if_none:'' }}" placeholder="18-24, 25-34" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Average Engagement Rate (%)</label>
+            <input type="number" step="0.01" name="average_engagement_rate" value="{{ creator_meta.average_engagement_rate|default_if_none:'' }}" placeholder="4.8" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Media Kit URL</label>
+            <input type="url" name="media_kit_url" value="{{ creator_meta.media_kit_url|default_if_none:'' }}" placeholder="https://drive.google.com/your-media-kit" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Preferred Partnerships</label>
+          <input type="text" name="preferred_partnerships" value="{{ creator_meta.preferred_partnerships|default_if_none:'' }}" placeholder="Affiliate links, product seeding, paid sponsorships" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+      </div>
+    </div>
+  </form>
+  <div class="fixed bottom-6 right-6">
+    <button type="submit" form="profileForm" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Save Profile</button>
+  </div>
+</div>
+{% endblock %}
