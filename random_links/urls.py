@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .views import landing_page
 from merchants import views as merchant_views
+from creators import views as creator_views
 
 urlpatterns = [
     path('', landing_page, name='landing'),
@@ -30,10 +31,12 @@ urlpatterns = [
     path('api/products/search/', merchant_views.search_shopify_products, name='shopify_product_search'),
     path('api/products/catalog/', merchant_views.list_shopify_products, name='shopify_product_catalog'),
     path('api/creators/', include('creators.api_urls')),
+    path('api/creator/', include('creators.api_urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
+    path('creator/dashboard/', creator_views.creator_dashboard, name='creator_dashboard'),
     path('shopify/', include('shopify_app.urls')),
     path('collect/', include('collect.urls')),
     path('verification/', include('verify_email.urls')),
