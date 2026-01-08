@@ -5,6 +5,8 @@ class CreatorMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
     paypal_email = models.EmailField(blank=True)
+    social_media_platform = models.CharField(max_length=100, blank=True)
+    follower_range = models.CharField(max_length=50, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
 
@@ -15,4 +17,3 @@ class CreatorMeta(models.Model):
     def balance(self):
         from ledger.models import LedgerEntry
         return LedgerEntry.creator_balance(self.user)
-
