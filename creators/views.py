@@ -556,21 +556,46 @@ def creator_my_links(request, merchant_id=None, group_id=None):
 def creator_settings(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        user_form = UserNameForm(request.POST, instance=request.user)
         paypal_email = request.POST.get("paypal_email", "").strip()
+        creator_meta.paypal_email = paypal_email
+        creator_meta.save()
+        return redirect("creator_settings")
+
+    return render(
+        request,
+        "creators/settings.html",
+        {"creator_meta": creator_meta, "creator": request.user},
+    )
+
+
+@login_required
+def creator_profile(request):
+    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        user_form = UserNameForm(request.POST, instance=request.user)
+        email = request.POST.get("email", "").strip()
+        social_media_platform = request.POST.get("social_media_platform", "").strip()
+        follower_range = request.POST.get("follower_range", "").strip()
         if user_form.is_valid():
-            user_form.save()
-            if paypal_email:
-                creator_meta.paypal_email = paypal_email
-                creator_meta.save()
-            return redirect("creator_settings")
+            user = user_form.save(commit=False)
+            if email:
+                user.email = email
+            user.save()
+            creator_meta.social_media_platform = social_media_platform
+            creator_meta.follower_range = follower_range
+            creator_meta.save()
+            return redirect("creator_profile")
     else:
         user_form = UserNameForm(instance=request.user)
 
     return render(
         request,
-        "creators/settings.html",
-        {"creator_meta": creator_meta, "creator": request.user, "user_form": user_form},
+        "creators/profile.html",
+        {
+            "creator_meta": creator_meta,
+            "creator": request.user,
+            "user_form": user_form,
+        },
     )
 
 
