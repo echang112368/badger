@@ -17,8 +17,8 @@ from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from rest_framework_simplejwt.tokens import RefreshToken
 
 
-class CreatorProfileTests(TestCase):
-    def test_profile_displays_uuid(self):
+class CreatorSettingsTests(TestCase):
+    def test_settings_displays_uuid(self):
         user = CustomUser.objects.create_user(
             username="creator_uuid",
             password="pass",
@@ -26,11 +26,11 @@ class CreatorProfileTests(TestCase):
             is_creator=True,
         )
         self.client.force_login(user)
-        response = self.client.get(reverse("creator_profile"))
+        response = self.client.get(reverse("creator_settings"))
         creator_meta = CreatorMeta.objects.get(user=user)
         self.assertContains(response, str(creator_meta.uuid))
 
-    def test_profile_displays_email(self):
+    def test_settings_displays_email(self):
         user = CustomUser.objects.create_user(
             username="creator",
             password="pass",
@@ -38,10 +38,21 @@ class CreatorProfileTests(TestCase):
             is_creator=True,
         )
         self.client.force_login(user)
-        response = self.client.get(reverse("creator_profile"))
+        response = self.client.get(reverse("creator_settings"))
         self.assertContains(response, user.email)
 
-    def test_profile_updates_name(self):
+    def test_settings_displays_password(self):
+        user = CustomUser.objects.create_user(
+            username="creator2",
+            password="pass123",
+            email="creator2@example.com",
+            is_creator=True,
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("creator_settings"))
+        self.assertContains(response, user.password)
+
+    def test_settings_updates_name(self):
         user = CustomUser.objects.create_user(
             username="creator3",
             password="pass123",
@@ -50,10 +61,10 @@ class CreatorProfileTests(TestCase):
         )
         self.client.force_login(user)
         response = self.client.post(
-            reverse("creator_profile"),
+            reverse("creator_settings"),
             {"first_name": "New", "last_name": "Name", "paypal_email": ""},
         )
-        self.assertRedirects(response, reverse("creator_profile"))
+        self.assertRedirects(response, reverse("creator_settings"))
         user.refresh_from_db()
         self.assertEqual(user.last_name, "Name")
 
@@ -304,3 +315,4 @@ class CreatorLinksTests(TestCase):
         response = self.client.get(url, {"q": other.shopify_product_id})
         self.assertContains(response, "Hat")
         self.assertNotContains(response, "Shoe")
+
