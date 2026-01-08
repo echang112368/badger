@@ -65,6 +65,10 @@
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="active" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
+                        <th class="text-left p-3">
+                            Short Pitch
+                            <span class="block text-xs text-gray-500 font-normal">Creator provided</span>
+                        </th>
                         <th class="text-right p-3">Total Earnings</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Visits</th>
@@ -79,6 +83,13 @@
                         <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
+                        <td class="p-3 text-left text-gray-700">
+                            {% if creator.short_pitch %}
+                                {{ creator.short_pitch|truncatewords:12 }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td class="p-3 text-right font-semibold">${{ creator.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ creator.visits }}</td>
@@ -88,7 +99,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="p-4 text-center text-gray-500">No active creators found.</td>
+                        <td colspan="10" class="p-4 text-center text-gray-500">No active creators found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -105,6 +116,10 @@
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="inactive" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
+                        <th class="text-left p-3">
+                            Short Pitch
+                            <span class="block text-xs text-gray-500 font-normal">Creator provided</span>
+                        </th>
                         <th class="text-right p-3">Total Earnings</th>
                         <th class="text-right p-3">Monthly Earnings</th>
                         <th class="text-right p-3">Visits</th>
@@ -117,6 +132,13 @@
                         <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
+                        <td class="p-3 text-left text-gray-700">
+                            {% if creator.short_pitch %}
+                                {{ creator.short_pitch|truncatewords:12 }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td class="p-3 text-right">${{ creator.total_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">${{ creator.monthly_earnings|floatformat:2 }}</td>
                         <td class="p-3 text-right">{{ creator.visits }}</td>
@@ -124,7 +146,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="p-4 text-center text-gray-500">No inactive creators found.</td>
+                        <td colspan="8" class="p-4 text-center text-gray-500">No inactive creators found.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -141,6 +163,10 @@
                         <th class="p-3"><input type="checkbox" class="h-4 w-4 select-all" data-target="pending" {% if not permissions.can_modify_content %}disabled{% endif %} /></th>
                         <th class="text-left p-3">Creator Username</th>
                         <th class="text-left p-3">Email</th>
+                        <th class="text-left p-3">
+                            Short Pitch
+                            <span class="block text-xs text-gray-500 font-normal">Creator provided</span>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -149,10 +175,17 @@
                         <td class="p-3"><input type="checkbox" name="selected_creators" value="{{ creator.creator_id }}" class="h-4 w-4" {% if not permissions.can_modify_content %}disabled{% endif %} /></td>
                         <td class="p-3 text-left">{{ creator.username }}</td>
                         <td class="p-3 text-left">{{ creator.email }}</td>
+                        <td class="p-3 text-left text-gray-700">
+                            {% if creator.short_pitch %}
+                                {{ creator.short_pitch|truncatewords:12 }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="p-4 text-center text-gray-500">No pending requests.</td>
+                        <td colspan="4" class="p-4 text-center text-gray-500">No pending requests.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
