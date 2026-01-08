@@ -556,63 +556,20 @@ def creator_my_links(request, merchant_id=None, group_id=None):
 def creator_settings(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        paypal_email = request.POST.get("paypal_email", "").strip()
-        creator_meta.paypal_email = paypal_email
-        creator_meta.save()
-        return redirect("creator_settings")
-
-    return render(
-        request,
-        "creators/settings.html",
-        {"creator_meta": creator_meta, "creator": request.user},
-    )
-
-
-@login_required
-def creator_profile(request):
-    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
-    if request.method == "POST":
         user_form = UserNameForm(request.POST, instance=request.user)
+        paypal_email = request.POST.get("paypal_email", "").strip()
         if user_form.is_valid():
             user_form.save()
-
-        creator_meta.display_name = request.POST.get("display_name", "").strip()
-        creator_meta.primary_platform = request.POST.get("primary_platform", "").strip()
-        creator_meta.social_platforms = request.POST.get("social_platforms", "").strip()
-        creator_meta.social_links = request.POST.get("social_links", "").strip()
-        creator_meta.audience_location = request.POST.get("audience_location", "").strip()
-        creator_meta.audience_age_range = request.POST.get("audience_age_range", "").strip()
-        creator_meta.content_categories = request.POST.get("content_categories", "").strip()
-        creator_meta.content_formats = request.POST.get("content_formats", "").strip()
-        creator_meta.posting_frequency = request.POST.get("posting_frequency", "").strip()
-        creator_meta.collaboration_types = request.POST.get("collaboration_types", "").strip()
-        creator_meta.preferred_commission_range = request.POST.get("preferred_commission_range", "").strip()
-        creator_meta.brand_affinities = request.POST.get("brand_affinities", "").strip()
-        creator_meta.bio = request.POST.get("bio", "").strip()
-
-        follower_count = request.POST.get("follower_count", "").strip()
-        creator_meta.follower_count = int(follower_count) if follower_count.isdigit() else None
-
-        engagement_rate = request.POST.get("engagement_rate", "").strip()
-        if engagement_rate:
-            try:
-                creator_meta.engagement_rate = Decimal(engagement_rate)
-            except (InvalidOperation, TypeError):
-                creator_meta.engagement_rate = None
-        else:
-            creator_meta.engagement_rate = None
-
-        average_views = request.POST.get("average_views_per_post", "").strip()
-        creator_meta.average_views_per_post = int(average_views) if average_views.isdigit() else None
-
-        creator_meta.save()
-        return redirect("creator_profile")
+            if paypal_email:
+                creator_meta.paypal_email = paypal_email
+                creator_meta.save()
+            return redirect("creator_settings")
     else:
         user_form = UserNameForm(instance=request.user)
 
     return render(
         request,
-        "creators/profile.html",
+        "creators/settings.html",
         {"creator_meta": creator_meta, "creator": request.user, "user_form": user_form},
     )
 
