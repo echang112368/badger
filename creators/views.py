@@ -1,6 +1,5 @@
 from decimal import Decimal, InvalidOperation
 import logging
-import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -228,130 +227,6 @@ def _affiliate_company_metrics(user):
 
 def _is_blank(value):
     return value is None or (isinstance(value, str) and not value.strip())
-
-
-SOCIAL_PLATFORM_OPTIONS = [
-    "YouTube",
-    "TikTok",
-    "Instagram",
-    "Snapchat",
-    "Twitter / X",
-    "Facebook",
-    "Twitch",
-    "Discord",
-    "Reddit",
-    "Pinterest",
-    "LinkedIn",
-    "Blog / Website",
-    "Newsletter (Substack, Beehiiv, etc.)",
-    "Podcast",
-    "Other",
-]
-
-FOLLOWER_RANGE_OPTIONS = [
-    "0–1k",
-    "1k–5k",
-    "5k–10k",
-    "10k–50k",
-    "50k–100k",
-    "100k–500k",
-    "500k–1M",
-    "1M+",
-]
-
-
-def _normalize_short_pitch(value, max_length=240):
-    if value is None:
-        return ""
-    pitch = " ".join(value.strip().split())
-    return pitch[:max_length]
-
-
-def _parse_content_skills(raw_value, max_skills=20):
-    if not raw_value:
-        return []
-    try:
-        payload = json.loads(raw_value)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(payload, list):
-        return []
-    skills = []
-    seen = set()
-    for item in payload:
-        if not isinstance(item, str):
-            continue
-        cleaned = " ".join(item.strip().split())
-        if not cleaned:
-            continue
-        if len(cleaned.split()) > 3:
-            continue
-        key = cleaned.lower()
-        if key in seen:
-            continue
-        skills.append(cleaned)
-        seen.add(key)
-        if len(skills) >= max_skills:
-            break
-    return skills
-
-
-def _parse_social_media_profiles(post_data):
-    platforms = post_data.getlist("platform")
-    follower_ranges = post_data.getlist("platform_follower_range")
-    profile_urls = post_data.getlist("platform_url")
-    custom_platforms = post_data.getlist("platform_custom")
-
-    total = max(
-        len(platforms),
-        len(follower_ranges),
-        len(profile_urls),
-        len(custom_platforms),
-    )
-    profiles = []
-    for idx in range(total):
-        platform = platforms[idx].strip() if idx < len(platforms) else ""
-        follower_range = (
-            follower_ranges[idx].strip() if idx < len(follower_ranges) else ""
-        )
-        profile_url = profile_urls[idx].strip() if idx < len(profile_urls) else ""
-        custom_platform = (
-            custom_platforms[idx].strip() if idx < len(custom_platforms) else ""
-        )
-        platform_name = custom_platform if platform == "Other" else platform
-        if not (platform_name or follower_range or profile_url):
-            continue
-        profiles.append(
-            {
-                "platform": platform_name,
-                "follower_range": follower_range,
-                "profile_url": profile_url,
-            }
-        )
-    return profiles
-
-
-def _prepare_social_media_profiles(profiles):
-    platform_set = set(SOCIAL_PLATFORM_OPTIONS)
-    prepared = []
-    for profile in profiles or []:
-        platform = (profile.get("platform") or "").strip()
-        follower_range = (profile.get("follower_range") or "").strip()
-        profile_url = (profile.get("profile_url") or "").strip()
-        if not (platform or follower_range or profile_url):
-            continue
-        platform_value = platform if platform in platform_set else "Other" if platform else ""
-        custom_platform = "" if platform in platform_set else platform
-        prepared.append(
-            {
-                "platform": platform,
-                "platform_value": platform_value,
-                "custom_platform": custom_platform,
-                "follower_range": follower_range,
-                "profile_url": profile_url,
-            }
-        )
-    return prepared
 
 
 def _refresh_shopify_assets(items):
@@ -699,17 +574,15 @@ def creator_profile(request):
     if request.method == "POST":
         user_form = UserNameForm(request.POST, instance=request.user)
         email = request.POST.get("email", "").strip()
-        short_pitch = _normalize_short_pitch(request.POST.get("short_pitch", ""))
-        social_media_profiles = _parse_social_media_profiles(request.POST)
-        content_skills = _parse_content_skills(request.POST.get("content_skills"))
+        social_media_platform = request.POST.get("social_media_platform", "").strip()
+        follower_range = request.POST.get("follower_range", "").strip()
         if user_form.is_valid():
             user = user_form.save(commit=False)
             if email:
                 user.email = email
             user.save()
-            creator_meta.short_pitch = short_pitch
-            creator_meta.social_media_profiles = social_media_profiles
-            creator_meta.content_skills = content_skills
+            creator_meta.social_media_platform = social_media_platform
+            creator_meta.follower_range = follower_range
             creator_meta.save()
             return redirect("creator_profile")
     else:
@@ -722,12 +595,6 @@ def creator_profile(request):
             "creator_meta": creator_meta,
             "creator": request.user,
             "user_form": user_form,
-            "social_media_profiles": _prepare_social_media_profiles(
-                creator_meta.social_media_profiles
-            ),
-            "content_skills": creator_meta.content_skills or [],
-            "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
-            "follower_range_options": FOLLOWER_RANGE_OPTIONS,
         },
     )
 

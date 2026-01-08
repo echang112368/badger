@@ -7,9 +7,6 @@ class CreatorMeta(models.Model):
     paypal_email = models.EmailField(blank=True)
     social_media_platform = models.CharField(max_length=100, blank=True)
     follower_range = models.CharField(max_length=50, blank=True)
-    short_pitch = models.CharField(max_length=240, blank=True)
-    social_media_profiles = models.JSONField(default=list, blank=True)
-    content_skills = models.JSONField(default=list, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
 
