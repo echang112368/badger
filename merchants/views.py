@@ -931,6 +931,7 @@ def merchant_creators(request):
             "creator_id": creator.id,
             "username": creator.username,
             "email": creator.email,
+            "short_pitch": creator_meta.short_pitch if creator_meta else "",
             "total_earnings": total_earnings,
             "monthly_earnings": monthly_earnings,
             "visits": visits,
@@ -938,6 +939,10 @@ def merchant_creators(request):
             "avg_earnings_per_visit": avg,
             "conversion_rate": conversion_rate,
         }
+
+    def get_short_pitch(creator):
+        creator_meta = getattr(creator, "creatormeta", None)
+        return creator_meta.short_pitch if creator_meta else ""
 
     active_creators = [build_creator_entry(link) for link in active_links]
     inactive_creators = [build_creator_entry(link) for link in inactive_links]
@@ -947,6 +952,7 @@ def merchant_creators(request):
             "creator_id": link.creator.id,
             "username": link.creator.username,
             "email": link.creator.email,
+            "short_pitch": get_short_pitch(link.creator),
         }
         for link in pending_links
     ]
