@@ -256,7 +256,16 @@ FOLLOWER_RANGE_OPTIONS = [
     "50k–100k",
     "100k–500k",
     "500k–1M",
-    "1M+",
+    "1M–2M",
+    "2M–3M",
+    "3M–4M",
+    "4M–5M",
+    "5M–6M",
+    "6M–7M",
+    "7M–8M",
+    "8M–9M",
+    "9M–10M",
+    "10M+",
 ]
 
 
@@ -700,6 +709,8 @@ def creator_profile(request):
         user_form = UserNameForm(request.POST, instance=request.user)
         email = request.POST.get("email", "").strip()
         short_pitch = _normalize_short_pitch(request.POST.get("short_pitch", ""))
+        country = request.POST.get("country", "").strip()
+        content_languages = request.POST.get("content_languages", "").strip()
         social_media_profiles = _parse_social_media_profiles(request.POST)
         content_skills = _parse_content_skills(request.POST.get("content_skills"))
         if user_form.is_valid():
@@ -708,6 +719,8 @@ def creator_profile(request):
                 user.email = email
             user.save()
             creator_meta.short_pitch = short_pitch
+            creator_meta.country = country
+            creator_meta.content_languages = content_languages
             creator_meta.social_media_profiles = social_media_profiles
             creator_meta.content_skills = content_skills
             creator_meta.save()
