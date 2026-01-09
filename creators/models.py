@@ -10,6 +10,8 @@ class CreatorMeta(models.Model):
     short_pitch = models.CharField(max_length=240, blank=True)
     social_media_profiles = models.JSONField(default=list, blank=True)
     content_skills = models.JSONField(default=list, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    content_languages = models.CharField(max_length=200, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
 
