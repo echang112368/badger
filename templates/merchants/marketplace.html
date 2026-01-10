@@ -5,7 +5,7 @@
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">Marketplace</h1>
-            <p class="text-muted mb-0">Find creators who are open to new partnerships.</p>
+            <p class="text-muted mb-0">Browse creators open to new partnerships. Profiles improve as creators share more details.</p>
         </div>
         <form method="post" class="d-flex align-items-center gap-3">
             {% csrf_token %}
@@ -25,7 +25,7 @@
                 <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search creators" />
             </div>
             <div class="col-md-6 col-lg-2">
-                <select name="platform" class="form-select">
+                <select name="platform" class="form-select" {% if not filter_availability.platform and not platform %}disabled{% endif %}>
                     <option value="">All platforms</option>
                     {% for platform_option in social_platform_options %}
                         <option value="{{ platform_option }}" {% if platform == platform_option %}selected{% endif %}>{{ platform_option }}</option>
@@ -33,7 +33,7 @@
                 </select>
             </div>
             <div class="col-md-6 col-lg-2">
-                <select name="follower_range" class="form-select">
+                <select name="follower_range" class="form-select" {% if not filter_availability.follower_range and not follower_range %}disabled{% endif %}>
                     <option value="">All follower ranges</option>
                     {% for range_option in follower_range_options %}
                         <option value="{{ range_option }}" {% if follower_range == range_option %}selected{% endif %}>{{ range_option }}</option>
@@ -41,13 +41,13 @@
                 </select>
             </div>
             <div class="col-md-6 col-lg-2">
-                <input type="text" name="country" value="{{ country }}" class="form-control" placeholder="Country" />
+                <input type="text" name="country" value="{{ country }}" class="form-control" placeholder="Country" {% if not filter_availability.country and not country %}disabled{% endif %} />
             </div>
             <div class="col-md-6 col-lg-2">
-                <input type="text" name="language" value="{{ language }}" class="form-control" placeholder="Language" />
+                <input type="text" name="language" value="{{ language }}" class="form-control" placeholder="Language" {% if not filter_availability.language and not language %}disabled{% endif %} />
             </div>
             <div class="col-md-6 col-lg-2">
-                <input type="text" name="skill" value="{{ skill }}" class="form-control" placeholder="Content skill" />
+                <input type="text" name="skill" value="{{ skill }}" class="form-control" placeholder="Content skill" {% if not filter_availability.skill and not skill %}disabled{% endif %} />
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-outline-primary">Search</button>
