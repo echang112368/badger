@@ -63,17 +63,23 @@ def _normalize_domain(domain: str) -> str:
 
 
 def _creator_card_payload(meta: CreatorMeta) -> dict:
-    profiles = meta.social_media_profiles or []
-    primary_platform = meta.social_media_platform or "Not shared"
-    follower_range = meta.follower_range or "Not shared"
-    if profiles and isinstance(profiles, list):
-        primary = profiles[0] if profiles else {}
-        if isinstance(primary, dict):
-            primary_platform = primary.get("platform") or primary_platform
-            follower_range = primary.get("follower_range") or follower_range
-    skills = (meta.content_skills or [])[:3]
+    primary_platform, follower_range, avatar_url = meta.primary_platform_data()
+    skills = [skill for skill in (meta.content_skills or []) if skill][:3]
+    languages = [
+        part.strip()
+        for part in (meta.content_languages or "").split(",")
+        if part.strip()
+    ]
     name = meta.user.get_full_name() or meta.user.username
     initials = "".join(part[0] for part in name.split() if part)[:2].upper()
+    optional_fields = {
+        "platform": bool(primary_platform),
+        "follower_range": bool(follower_range),
+        "country": bool(meta.country.strip()) if meta.country else False,
+        "languages": bool(languages),
+        "skills": bool(skills),
+    }
+    optional_fields_count = sum(optional_fields.values())
     return {
         "meta": meta,
         "name": name,
@@ -81,12 +87,16 @@ def _creator_card_payload(meta: CreatorMeta) -> dict:
         "platform": primary_platform,
         "follower_range": follower_range,
         "skills": skills,
-        "short_pitch": meta.short_pitch,
-        "availability_label": "Available" if meta.marketplace_enabled else "Unavailable",
+        "availability_label": "Available" if meta.marketplace_enabled else "Not accepting",
         "is_verified": meta.user.email_verified,
         "initials": initials or "CR",
-        "country": meta.country or "Not shared",
-        "languages": meta.content_languages or "Not shared",
+        "country": meta.country.strip() if meta.country else "",
+        "languages": languages,
+        "languages_display": ", ".join(languages),
+        "profile_completeness_score": meta.profile_completeness_score,
+        "profile_in_progress": optional_fields_count < 2,
+        "optional_fields": optional_fields,
+        "avatar_url": avatar_url or "",
     }
 
 
@@ -390,6 +400,13 @@ def merchant_marketplace(request):
     language = (request.GET.get("language") or "").strip()
     skill = (request.GET.get("skill") or "").strip()
     creator_cards = []
+    filter_availability = {
+        "platform": False,
+        "follower_range": False,
+        "country": False,
+        "language": False,
+        "skill": False,
+    }
     if merchant_meta.marketplace_enabled:
         creator_qs = (
             CreatorMeta.objects.select_related("user")
@@ -405,18 +422,72 @@ def merchant_marketplace(request):
                 | Q(country__icontains=query)
                 | Q(content_languages__icontains=query)
             )
-        if platform:
-            creator_qs = creator_qs.filter(social_media_platform__icontains=platform)
-        if follower_range:
-            creator_qs = creator_qs.filter(follower_range__iexact=follower_range)
-        if country:
-            creator_qs = creator_qs.filter(country__icontains=country)
-        if language:
-            creator_qs = creator_qs.filter(content_languages__icontains=language)
-        if skill:
-            creator_qs = creator_qs.filter(content_skills__contains=[skill])
-
         creator_cards = [_creator_card_payload(meta) for meta in creator_qs]
+        filter_availability = {
+            "platform": any(card["platform"] for card in creator_cards),
+            "follower_range": any(card["follower_range"] for card in creator_cards),
+            "country": any(card["country"] for card in creator_cards),
+            "language": any(card["languages"] for card in creator_cards),
+            "skill": any(card["skills"] for card in creator_cards),
+        }
+
+        def _matches_filter(value, filter_value, matcher):
+            if not filter_value:
+                return True
+            if not value:
+                return True
+            return matcher(value, filter_value)
+
+        def _contains_text(value, filter_value):
+            return filter_value.lower() in value.lower()
+
+        def _matches_list(values, filter_value):
+            filter_lower = filter_value.lower()
+            return any(filter_lower in value.lower() for value in values)
+
+        filtered_cards = []
+        for card in creator_cards:
+            if not _matches_filter(
+                card["platform"],
+                platform,
+                _contains_text,
+            ):
+                continue
+            if not _matches_filter(
+                card["follower_range"],
+                follower_range,
+                lambda value, filter_value: value.lower() == filter_value.lower(),
+            ):
+                continue
+            if not _matches_filter(
+                card["country"],
+                country,
+                _contains_text,
+            ):
+                continue
+            if not _matches_filter(
+                card["languages"],
+                language,
+                _matches_list,
+            ):
+                continue
+            if not _matches_filter(
+                card["skills"],
+                skill,
+                _matches_list,
+            ):
+                continue
+            filtered_cards.append(card)
+
+        creator_cards = filtered_cards
+        creator_cards.sort(
+            key=lambda card: (
+                -int(card["meta"].marketplace_enabled),
+                -card["profile_completeness_score"],
+                -int(card["is_verified"]),
+                card["name"].lower(),
+            )
+        )
 
     return render(
         request,
@@ -432,6 +503,7 @@ def merchant_marketplace(request):
             "country": country,
             "language": language,
             "skill": skill,
+            "filter_availability": filter_availability,
             "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
             "follower_range_options": FOLLOWER_RANGE_OPTIONS,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),

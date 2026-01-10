@@ -1,6 +1,6 @@
 <div class="d-flex align-items-start gap-3">
-    <div class="rounded-circle bg-primary-subtle text-primary fw-semibold d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
-        {{ creator.initials }}
+    <div>
+        {% include "shared/creator_avatar.html" with creator=creator size=48 %}
     </div>
     <div class="flex-grow-1">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
@@ -10,39 +10,56 @@
                 <span class="badge bg-success-subtle text-success">Verified</span>
             {% endif %}
         </div>
-        <div class="text-muted small">{{ creator.email }}</div>
-        {% if creator.short_pitch %}
-            <p class="mt-2 mb-2">{{ creator.short_pitch }}</p>
+        {% if creator.profile_in_progress %}
+            <div class="text-muted small">Profile in progress</div>
         {% endif %}
-        <div class="row gy-2 small text-muted">
-            <div class="col-12 col-md-6">
-                <div class="text-uppercase fw-semibold">Primary platform</div>
-                <div>{{ creator.platform }}</div>
+        {% if creator.platform or creator.follower_range %}
+            <div class="mt-3">
+                <div class="text-uppercase text-muted small">Reach &amp; Platform</div>
+                <div class="d-flex flex-wrap gap-3 small">
+                    {% if creator.platform %}
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-broadcast"></i>
+                            <span>{{ creator.platform }}</span>
+                        </div>
+                    {% endif %}
+                    {% if creator.follower_range %}
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-people"></i>
+                            <span>{{ creator.follower_range }}</span>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="text-uppercase fw-semibold">Follower range</div>
-                <div>{{ creator.follower_range }}</div>
+        {% endif %}
+        {% if creator.country or creator.languages %}
+            <div class="mt-3">
+                <div class="text-uppercase text-muted small">Audience Fit</div>
+                <div class="d-flex flex-wrap gap-3 small">
+                    {% if creator.country %}
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-geo-alt"></i>
+                            <span>{{ creator.country }}</span>
+                        </div>
+                    {% endif %}
+                    {% if creator.languages %}
+                        <div class="d-flex align-items-center gap-1">
+                            <i class="bi bi-translate"></i>
+                            <span>{{ creator.languages_display }}</span>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="text-uppercase fw-semibold">Location</div>
-                <div>{{ creator.country }}</div>
-            </div>
-            <div class="col-12 col-md-6">
-                <div class="text-uppercase fw-semibold">Languages</div>
-                <div>{{ creator.languages }}</div>
-            </div>
-        </div>
-        <div class="mt-2">
-            <div class="text-uppercase text-muted small">Top skills</div>
-            {% if creator.skills %}
+        {% endif %}
+        {% if creator.skills %}
+            <div class="mt-3">
+                <div class="text-uppercase text-muted small">Content Fit</div>
                 <div class="d-flex flex-wrap gap-2 mt-1">
                     {% for skill in creator.skills %}
                         <span class="badge bg-secondary-subtle text-secondary">{{ skill }}</span>
                     {% endfor %}
                 </div>
-            {% else %}
-                <div class="small text-muted">Not shared</div>
-            {% endif %}
-        </div>
+            </div>
+        {% endif %}
     </div>
 </div>
