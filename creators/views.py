@@ -1053,6 +1053,16 @@ def creator_profile(request):
             "creator_meta": creator_meta,
             "creator": request.user,
             "user_form": user_form,
+            "creator_avatar": {
+                "name": request.user.get_full_name() or request.user.username,
+                "initials": "".join(
+                    part[0]
+                    for part in (request.user.get_full_name() or request.user.username).split()
+                    if part
+                )[:2].upper()
+                or "CR",
+                "avatar_url": creator_meta.primary_platform_data()[2],
+            },
             "social_media_profiles": _prepare_social_media_profiles(
                 creator_meta.social_media_profiles
             ),
