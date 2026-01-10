@@ -28,6 +28,13 @@
                 </div>
             </div>
             <div class="col-md-6 col-lg-2">
+                <select name="search_scope" class="form-select">
+                    <option value="all" {% if search_scope == "all" %}selected{% endif %}>All searches</option>
+                    <option value="business" {% if search_scope == "business" %}selected{% endif %}>Business search</option>
+                    <option value="item" {% if search_scope == "item" %}selected{% endif %}>Item search</option>
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-2">
                 <select name="business_type" class="form-select">
                     <option value="">All business types</option>
                     {% for value, label in business_types.choices %}
@@ -46,124 +53,144 @@
             </div>
         </form>
 
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h2 class="h5 mb-0">Businesses ({{ merchant_cards|length }})</h2>
-        </div>
-        <div class="row g-4 mb-5">
-            {% for merchant in merchant_cards %}
-                <div class="col-md-6 col-xl-4">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-body d-flex flex-column">
-                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                <div>
-                                    <h5 class="card-title mb-1">{{ merchant.display_name }}</h5>
-                                    <p class="text-muted mb-0">Business type: {{ merchant.meta.get_business_type_display }}</p>
+        {% if search_scope != "item" %}
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="h5 mb-0">Businesses ({{ merchant_cards|length }})</h2>
+            </div>
+            <div class="row g-4 mb-4">
+                {% for merchant in merchant_cards_display %}
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                    <div>
+                                        <h5 class="card-title mb-1">{{ merchant.display_name }}</h5>
+                                        <p class="text-muted mb-0">Business type: {{ merchant.meta.get_business_type_display }}</p>
+                                    </div>
+                                    <span class="badge bg-light text-dark">{{ merchant.meta.get_business_type_display }}</span>
                                 </div>
-                                <span class="badge bg-light text-dark">{{ merchant.meta.get_business_type_display }}</span>
+                                <div class="text-muted small mb-3">
+                                    {% if merchant.meta.shopify_store_domain %}
+                                        <div><i class="bi bi-globe2 me-1"></i>{{ merchant.meta.shopify_store_domain }}</div>
+                                    {% endif %}
+                                    <div><i class="bi bi-tag me-1"></i>Avg commission range:
+                                        {% if merchant.commission_range %}
+                                            {{ merchant.commission_range.min }}%–{{ merchant.commission_range.max }}%
+                                        {% else %}
+                                            Not set
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="mt-auto d-flex flex-wrap gap-2">
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#requestModal"
+                                            data-merchant-id="{{ merchant.meta.user.id }}"
+                                            data-merchant-name="{{ merchant.display_name }}"
+                                            data-item-name=""
+                                            data-item-id=""
+                                            data-item-group-id=""
+                                            data-request-source="Business">
+                                        Request Partnership
+                                    </button>
+                                    {% if merchant.store_url %}
+                                        <a class="btn btn-outline-secondary" href="{{ merchant.store_url }}" target="_blank" rel="noopener">View Store</a>
+                                    {% else %}
+                                        <button class="btn btn-outline-secondary" type="button" disabled>View Store</button>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div class="text-muted small mb-3">
-                                {% if merchant.meta.shopify_store_domain %}
-                                    <div><i class="bi bi-globe2 me-1"></i>{{ merchant.meta.shopify_store_domain }}</div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-light border">No marketplace businesses found.</div>
+                    </div>
+                {% endfor %}
+            </div>
+            {% if search_scope == "all" and merchant_cards|length > 6 %}
+                <div class="mb-5">
+                    <a class="btn btn-outline-primary"
+                       href="?q={{ query|urlencode }}&business_type={{ business_type|urlencode }}&affiliate_min={{ affiliate_min|urlencode }}&affiliate_max={{ affiliate_max|urlencode }}&search_scope=business">
+                        More businesses
+                    </a>
+                </div>
+            {% endif %}
+        {% endif %}
+
+        {% if search_scope != "business" %}
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="h5 mb-0">Items ({{ item_cards|length }})</h2>
+            </div>
+            <div class="row g-4">
+                {% for item in item_cards_display %}
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body d-flex flex-column">
+                                {% if item.image_url %}
+                                    <img src="{{ item.image_url }}" alt="{{ item.name }}" class="rounded mb-3 w-100" style="height:160px; object-fit:cover;">
+                                {% else %}
+                                    <div class="rounded bg-light d-flex align-items-center justify-content-center mb-3" style="height:160px;">
+                                        <span class="text-muted">No image</span>
+                                    </div>
                                 {% endif %}
-                                <div><i class="bi bi-tag me-1"></i>Avg commission range:
-                                    {% if merchant.commission_range %}
-                                        {{ merchant.commission_range.min }}%–{{ merchant.commission_range.max }}%
+                                <div class="d-flex align-items-start justify-content-between mb-2">
+                                    <div>
+                                        <h5 class="card-title mb-1">{{ item.name }}</h5>
+                                        {% if item.merchant_url %}
+                                            <a href="{{ item.merchant_url }}" class="text-muted small text-decoration-none" target="_blank" rel="noopener">{{ item.merchant_name }}</a>
+                                        {% else %}
+                                            <span class="text-muted small">{{ item.merchant_name }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-light text-dark">{{ item.type }}</span>
+                                </div>
+                                <div class="text-muted small mb-3">
+                                    <span class="fw-semibold">Commission:</span>
+                                    {% if item.commission != None %}
+                                        {{ item.commission }}%
                                     {% else %}
                                         Not set
                                     {% endif %}
                                 </div>
-                            </div>
-                            <div class="mt-auto d-flex flex-wrap gap-2">
-                                <button type="button"
-                                        class="btn btn-primary"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#requestModal"
-                                        data-merchant-id="{{ merchant.meta.user.id }}"
-                                        data-merchant-name="{{ merchant.display_name }}"
-                                        data-item-name=""
-                                        data-item-id=""
-                                        data-item-group-id=""
-                                        data-request-source="Business">
-                                    Request Partnership
-                                </button>
-                                {% if merchant.store_url %}
-                                    <a class="btn btn-outline-secondary" href="{{ merchant.store_url }}" target="_blank" rel="noopener">View Store</a>
-                                {% else %}
-                                    <button class="btn btn-outline-secondary" type="button" disabled>View Store</button>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% empty %}
-                <div class="col-12">
-                    <div class="alert alert-light border">No marketplace businesses found.</div>
-                </div>
-            {% endfor %}
-        </div>
-
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <h2 class="h5 mb-0">Items ({{ item_cards|length }})</h2>
-        </div>
-        <div class="row g-4">
-            {% for item in item_cards %}
-                <div class="col-md-6 col-xl-4">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-body d-flex flex-column">
-                            {% if item.image_url %}
-                                <img src="{{ item.image_url }}" alt="{{ item.name }}" class="rounded mb-3 w-100" style="height:160px; object-fit:cover;">
-                            {% else %}
-                                <div class="rounded bg-light d-flex align-items-center justify-content-center mb-3" style="height:160px;">
-                                    <span class="text-muted">No image</span>
-                                </div>
-                            {% endif %}
-                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                <div>
-                                    <h5 class="card-title mb-1">{{ item.name }}</h5>
-                                    {% if item.merchant_url %}
-                                        <a href="{{ item.merchant_url }}" class="text-muted small text-decoration-none" target="_blank" rel="noopener">{{ item.merchant_name }}</a>
+                                <div class="mt-auto d-flex flex-wrap gap-2">
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#requestModal"
+                                            data-merchant-id="{{ item.merchant.user.id }}"
+                                            data-merchant-name="{{ item.merchant_name }}"
+                                            data-item-name="{{ item.name }}"
+                                            data-item-id="{{ item.item_id|default:'' }}"
+                                            data-item-group-id="{{ item.item_group_id|default:'' }}"
+                                            data-request-source="Item">
+                                        Request to Promote
+                                    </button>
+                                    {% if item.detail_url %}
+                                        <a class="btn btn-outline-secondary" href="{{ item.detail_url }}" target="_blank" rel="noopener">View Item</a>
                                     {% else %}
-                                        <span class="text-muted small">{{ item.merchant_name }}</span>
+                                        <button class="btn btn-outline-secondary" type="button" disabled>View Item</button>
                                     {% endif %}
                                 </div>
-                                <span class="badge bg-light text-dark">{{ item.type }}</span>
-                            </div>
-                            <div class="text-muted small mb-3">
-                                <span class="fw-semibold">Commission:</span>
-                                {% if item.commission != None %}
-                                    {{ item.commission }}%
-                                {% else %}
-                                    Not set
-                                {% endif %}
-                            </div>
-                            <div class="mt-auto d-flex flex-wrap gap-2">
-                                <button type="button"
-                                        class="btn btn-primary"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#requestModal"
-                                        data-merchant-id="{{ item.merchant.user.id }}"
-                                        data-merchant-name="{{ item.merchant_name }}"
-                                        data-item-name="{{ item.name }}"
-                                        data-item-id="{{ item.item_id|default:'' }}"
-                                        data-item-group-id="{{ item.item_group_id|default:'' }}"
-                                        data-request-source="Item">
-                                    Request to Promote
-                                </button>
-                                {% if item.detail_url %}
-                                    <a class="btn btn-outline-secondary" href="{{ item.detail_url }}" target="_blank" rel="noopener">View Item</a>
-                                {% else %}
-                                    <button class="btn btn-outline-secondary" type="button" disabled>View Item</button>
-                                {% endif %}
                             </div>
                         </div>
                     </div>
+                {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-light border">No marketplace items found.</div>
+                    </div>
+                {% endfor %}
+            </div>
+            {% if search_scope == "all" and item_cards|length > 6 %}
+                <div class="mt-4">
+                    <a class="btn btn-outline-primary"
+                       href="?q={{ query|urlencode }}&business_type={{ business_type|urlencode }}&affiliate_min={{ affiliate_min|urlencode }}&affiliate_max={{ affiliate_max|urlencode }}&search_scope=item">
+                        More items
+                    </a>
                 </div>
-            {% empty %}
-                <div class="col-12">
-                    <div class="alert alert-light border">No marketplace items found.</div>
-                </div>
-            {% endfor %}
-        </div>
+            {% endif %}
+        {% endif %}
 
         <div class="modal fade" id="requestModal" tabindex="-1" aria-labelledby="requestModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">

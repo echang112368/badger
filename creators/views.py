@@ -271,6 +271,9 @@ def creator_marketplace(request):
     affiliate_min_raw = (request.GET.get("affiliate_min") or "").strip()
     affiliate_max_raw = (request.GET.get("affiliate_max") or "").strip()
     business_type = (request.GET.get("business_type") or "").strip()
+    search_scope = (request.GET.get("search_scope") or "all").strip().lower()
+    if search_scope not in {"all", "business", "item"}:
+        search_scope = "all"
 
     def _parse_decimal(value):
         if not value:
@@ -434,18 +437,31 @@ def creator_marketplace(request):
     merchant_cards.sort(key=lambda card: (-card["score"], card["display_name"].lower()))
     item_cards.sort(key=lambda card: (-card["score"], card["name"].lower()))
 
+    if search_scope == "all":
+        merchant_cards_display = merchant_cards[:6]
+        item_cards_display = item_cards[:6]
+    elif search_scope == "business":
+        merchant_cards_display = merchant_cards
+        item_cards_display = []
+    else:
+        merchant_cards_display = []
+        item_cards_display = item_cards
+
     return render(
         request,
         "creators/marketplace.html",
         {
             "creator_meta": creator_meta,
             "merchant_cards": merchant_cards,
+            "merchant_cards_display": merchant_cards_display,
             "item_cards": item_cards,
+            "item_cards_display": item_cards_display,
             "query": query,
             "affiliate_min": affiliate_min_raw,
             "affiliate_max": affiliate_max_raw,
             "business_type": business_type,
             "business_types": MerchantMeta.BusinessType,
+            "search_scope": search_scope,
         },
     )
 
