@@ -238,6 +238,20 @@ def creator_marketplace(request):
         return redirect("creator_marketplace")
 
     query = (request.GET.get("q") or "").strip()
+    affiliate_min_raw = (request.GET.get("affiliate_min") or "").strip()
+    affiliate_max_raw = (request.GET.get("affiliate_max") or "").strip()
+    business_type = (request.GET.get("business_type") or "").strip()
+
+    def _parse_decimal(value):
+        if not value:
+            return None
+        try:
+            return Decimal(value)
+        except (InvalidOperation, ValueError):
+            return None
+
+    affiliate_min = _parse_decimal(affiliate_min_raw)
+    affiliate_max = _parse_decimal(affiliate_max_raw)
     merchant_cards = []
 
     if creator_meta.marketplace_enabled:
@@ -246,11 +260,24 @@ def creator_marketplace(request):
             .filter(marketplace_enabled=True)
             .order_by("company_name", "user__username")
         )
+        if business_type:
+            merchant_qs = merchant_qs.filter(business_type=business_type)
+        if affiliate_min is not None:
+            merchant_qs = merchant_qs.filter(
+                user__itemgroup__affiliate_percent__gte=affiliate_min
+            )
+        if affiliate_max is not None:
+            merchant_qs = merchant_qs.filter(
+                user__itemgroup__affiliate_percent__lte=affiliate_max
+            )
         if query:
             merchant_qs = merchant_qs.filter(
                 Q(company_name__icontains=query)
                 | Q(user__username__icontains=query)
+                | Q(user__merchantitem__title__icontains=query)
+                | Q(user__itemgroup__name__icontains=query)
             )
+        merchant_qs = merchant_qs.distinct()
         merchant_metas = list(merchant_qs)
         merchant_users = [meta.user for meta in merchant_metas]
         groups_by_merchant = {}
@@ -262,11 +289,39 @@ def creator_marketplace(request):
             groups_by_merchant.setdefault(group.merchant_id, []).append(group)
 
         for meta in merchant_metas:
+            groups = groups_by_merchant.get(meta.user_id, [])
+            if affiliate_min is not None:
+                groups = [
+                    group for group in groups if group.affiliate_percent >= affiliate_min
+                ]
+            if affiliate_max is not None:
+                groups = [
+                    group for group in groups if group.affiliate_percent <= affiliate_max
+                ]
+            if query:
+                query_lower = query.lower()
+                matches_merchant = (
+                    query_lower in (meta.company_name or "").lower()
+                    or query_lower in meta.user.username.lower()
+                    or query_lower in (meta.user.email or "").lower()
+                )
+                if not matches_merchant:
+                    filtered_groups = []
+                    for group in groups:
+                        if query_lower in group.name.lower():
+                            filtered_groups.append(group)
+                            continue
+                        if any(
+                            query_lower in (item.title or "").lower()
+                            for item in group.items.all()
+                        ):
+                            filtered_groups.append(group)
+                    groups = filtered_groups
             merchant_cards.append(
                 {
                     "meta": meta,
                     "display_name": _merchant_display_name(meta.user),
-                    "groups": groups_by_merchant.get(meta.user_id, []),
+                    "groups": groups,
                 }
             )
 
@@ -277,6 +332,10 @@ def creator_marketplace(request):
             "creator_meta": creator_meta,
             "merchant_cards": merchant_cards,
             "query": query,
+            "affiliate_min": affiliate_min_raw,
+            "affiliate_max": affiliate_max_raw,
+            "business_type": business_type,
+            "business_types": MerchantMeta.BusinessType,
         },
     )
 
