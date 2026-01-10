@@ -394,6 +394,7 @@ def merchant_marketplace(request):
         return redirect("merchant_marketplace")
 
     query = (request.GET.get("q") or "").strip()
+    request_count = PartnershipRequest.objects.filter(merchant=merchant_user).count()
     platform = (request.GET.get("platform") or "").strip()
     follower_range = (request.GET.get("follower_range") or "").strip()
     country = (request.GET.get("country") or "").strip()
@@ -507,6 +508,7 @@ def merchant_marketplace(request):
             "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
             "follower_range_options": FOLLOWER_RANGE_OPTIONS,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+            "request_count": request_count,
         },
     )
 
@@ -526,6 +528,7 @@ def merchant_requests(request):
         .select_related("creator", "creator__creatormeta", "item", "item_group")
         .order_by("-created_at")
     )
+    request_count = request_qs.count()
     request_cards = []
     for req in request_qs:
         creator_meta = getattr(req.creator, "creatormeta", None)
@@ -546,6 +549,7 @@ def merchant_requests(request):
             "permissions": permissions,
             "request_cards": request_cards,
             "show_invoices_tab": _should_show_invoices_tab(_get_merchant_meta(merchant_user)),
+            "request_count": request_count,
         },
     )
 
