@@ -12,6 +12,7 @@ urlpatterns = [
     path('invoices/', views.merchant_invoices, name='merchant_invoices'),
     path('items/', views.merchant_items, name='merchant_items'),
     path('creators/', views.merchant_creators, name='merchant_creators'),
+    path('marketplace/', views.merchant_marketplace, name='merchant_marketplace'),
     path('team/<int:member_id>/update/', views.update_team_member, name='update_team_member'),
     path('team/<int:member_id>/delete/', views.delete_team_member, name='delete_team_member'),
     path('settings/', views.merchant_settings, name='merchant_settings'),

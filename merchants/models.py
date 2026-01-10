@@ -82,6 +82,7 @@ class MerchantMeta(models.Model):
         null=True,
         blank=True,
     )
+    marketplace_enabled = models.BooleanField(default=False)
     monthly_fee = models.DecimalField(
         max_digits=10,
         decimal_places=2,
