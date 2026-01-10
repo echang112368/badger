@@ -59,52 +59,7 @@
                 <div class="col-md-6 col-xl-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body">
-                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                <div>
-                                    <h5 class="card-title mb-0">{{ creator.user.get_full_name|default:creator.user.username }}</h5>
-                                    <p class="text-muted mb-0">{{ creator.user.email }}</p>
-                                </div>
-                                <span class="badge bg-light text-dark">Creator</span>
-                            </div>
-                            {% if creator.short_pitch %}
-                                <p class="mb-3">{{ creator.short_pitch }}</p>
-                            {% endif %}
-                            <div class="mb-3">
-                                <span class="text-uppercase text-muted small">Location</span>
-                                <p class="mb-0">{{ creator.country|default:"Not shared" }}</p>
-                            </div>
-                            <div class="mb-3">
-                                <span class="text-uppercase text-muted small">Languages</span>
-                                <p class="mb-0">{{ creator.content_languages|default:"Not shared" }}</p>
-                            </div>
-                            <div class="mb-3">
-                                <span class="text-uppercase text-muted small">Content skills</span>
-                                {% if creator.content_skills %}
-                                    <div class="d-flex flex-wrap gap-2 mt-1">
-                                        {% for skill in creator.content_skills %}
-                                            <span class="badge bg-secondary-subtle text-secondary">{{ skill }}</span>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="mb-0">Not shared</p>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <span class="text-uppercase text-muted small">Social profiles</span>
-                                {% if creator.social_media_profiles %}
-                                    <ul class="mt-2 mb-0 ps-3 small">
-                                        {% for profile in creator.social_media_profiles %}
-                                            <li>
-                                                <span class="fw-semibold">{{ profile.platform|default:"Platform" }}</span>
-                                                {% if profile.follower_range %}<span class="text-muted"> · {{ profile.follower_range }}</span>{% endif %}
-                                                {% if profile.profile_url %}<div class="text-muted">{{ profile.profile_url }}</div>{% endif %}
-                                            </li>
-                                        {% endfor %}
-                                    </ul>
-                                {% else %}
-                                    <p class="mb-0">Not shared</p>
-                                {% endif %}
-                            </div>
+                            {% include "shared/creator_card.html" with creator=creator %}
                         </div>
                     </div>
                 </div>

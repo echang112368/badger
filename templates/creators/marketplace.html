@@ -21,8 +21,11 @@
         <div class="alert alert-info">Turn on Marketplace visibility to be discoverable by merchants and search for new companies.</div>
     {% else %}
         <form method="get" class="row g-2 align-items-center mb-4">
-            <div class="col-md-6 col-lg-4">
-                <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search companies or items" />
+            <div class="col-lg-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search companies or items" />
+                </div>
             </div>
             <div class="col-md-6 col-lg-2">
                 <select name="business_type" class="form-select">
@@ -43,52 +46,189 @@
             </div>
         </form>
 
-        <div class="row g-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 mb-0">Businesses ({{ merchant_cards|length }})</h2>
+        </div>
+        <div class="row g-4 mb-5">
             {% for merchant in merchant_cards %}
                 <div class="col-md-6 col-xl-4">
                     <div class="card h-100 shadow-sm">
-                        <div class="card-body">
+                        <div class="card-body d-flex flex-column">
                             <div class="d-flex align-items-start justify-content-between mb-2">
-                                <h5 class="card-title mb-0">{{ merchant.display_name }}</h5>
+                                <div>
+                                    <h5 class="card-title mb-1">{{ merchant.display_name }}</h5>
+                                    <p class="text-muted mb-0">Business type: {{ merchant.meta.get_business_type_display }}</p>
+                                </div>
                                 <span class="badge bg-light text-dark">{{ merchant.meta.get_business_type_display }}</span>
                             </div>
-                            <p class="mb-1 text-muted"><i class="bi bi-envelope me-1"></i>{{ merchant.meta.user.email }}</p>
-                            {% if merchant.meta.shopify_store_domain %}
-                                <p class="mb-1 text-muted"><i class="bi bi-globe2 me-1"></i>{{ merchant.meta.shopify_store_domain }}</p>
-                            {% endif %}
-                            <p class="text-muted small mb-3">Merchant ID: {{ merchant.meta.uuid }}</p>
-
-                            <h6 class="text-uppercase text-muted small">Items & earnings</h6>
-                            {% if merchant.groups %}
-                                {% for group in merchant.groups %}
-                                    <div class="border rounded p-2 mb-2">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span class="fw-semibold">{{ group.name }}</span>
-                                            <span class="badge bg-primary">{{ group.affiliate_percent }}%</span>
-                                        </div>
-                                        {% if group.items.all %}
-                                            <ul class="mt-2 mb-0 ps-3 small text-muted">
-                                                {% for item in group.items.all %}
-                                                    <li>{{ item.title }}</li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="mb-0 mt-2 small text-muted">No items in this group yet.</p>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-muted mb-0">No item groups shared yet.</p>
-                            {% endif %}
+                            <div class="text-muted small mb-3">
+                                {% if merchant.meta.shopify_store_domain %}
+                                    <div><i class="bi bi-globe2 me-1"></i>{{ merchant.meta.shopify_store_domain }}</div>
+                                {% endif %}
+                                <div><i class="bi bi-tag me-1"></i>Avg commission range:
+                                    {% if merchant.commission_range %}
+                                        {{ merchant.commission_range.min }}%–{{ merchant.commission_range.max }}%
+                                    {% else %}
+                                        Not set
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-auto d-flex flex-wrap gap-2">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#requestModal"
+                                        data-merchant-id="{{ merchant.meta.user.id }}"
+                                        data-merchant-name="{{ merchant.display_name }}"
+                                        data-item-name=""
+                                        data-item-id=""
+                                        data-item-group-id=""
+                                        data-request-source="Business">
+                                    Request Partnership
+                                </button>
+                                {% if merchant.store_url %}
+                                    <a class="btn btn-outline-secondary" href="{{ merchant.store_url }}" target="_blank" rel="noopener">View Store</a>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary" type="button" disabled>View Store</button>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
             {% empty %}
                 <div class="col-12">
-                    <div class="alert alert-light border">No marketplace companies found.</div>
+                    <div class="alert alert-light border">No marketplace businesses found.</div>
                 </div>
             {% endfor %}
         </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 mb-0">Items ({{ item_cards|length }})</h2>
+        </div>
+        <div class="row g-4">
+            {% for item in item_cards %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body d-flex flex-column">
+                            {% if item.image_url %}
+                                <img src="{{ item.image_url }}" alt="{{ item.name }}" class="rounded mb-3 w-100" style="height:160px; object-fit:cover;">
+                            {% else %}
+                                <div class="rounded bg-light d-flex align-items-center justify-content-center mb-3" style="height:160px;">
+                                    <span class="text-muted">No image</span>
+                                </div>
+                            {% endif %}
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <div>
+                                    <h5 class="card-title mb-1">{{ item.name }}</h5>
+                                    {% if item.merchant_url %}
+                                        <a href="{{ item.merchant_url }}" class="text-muted small text-decoration-none" target="_blank" rel="noopener">{{ item.merchant_name }}</a>
+                                    {% else %}
+                                        <span class="text-muted small">{{ item.merchant_name }}</span>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-light text-dark">{{ item.type }}</span>
+                            </div>
+                            <div class="text-muted small mb-3">
+                                <span class="fw-semibold">Commission:</span>
+                                {% if item.commission != None %}
+                                    {{ item.commission }}%
+                                {% else %}
+                                    Not set
+                                {% endif %}
+                            </div>
+                            <div class="mt-auto d-flex flex-wrap gap-2">
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#requestModal"
+                                        data-merchant-id="{{ item.merchant.user.id }}"
+                                        data-merchant-name="{{ item.merchant_name }}"
+                                        data-item-name="{{ item.name }}"
+                                        data-item-id="{{ item.item_id|default:'' }}"
+                                        data-item-group-id="{{ item.item_group_id|default:'' }}"
+                                        data-request-source="Item">
+                                    Request to Promote
+                                </button>
+                                {% if item.detail_url %}
+                                    <a class="btn btn-outline-secondary" href="{{ item.detail_url }}" target="_blank" rel="noopener">View Item</a>
+                                {% else %}
+                                    <button class="btn btn-outline-secondary" type="button" disabled>View Item</button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-light border">No marketplace items found.</div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="modal fade" id="requestModal" tabindex="-1" aria-labelledby="requestModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'creator_send_request' %}">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="requestModalLabel">Send Partnership Request</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" name="merchant_id" id="requestMerchantId">
+                            <input type="hidden" name="item_id" id="requestItemId">
+                            <input type="hidden" name="item_group_id" id="requestItemGroupId">
+                            <div class="mb-3">
+                                <label class="form-label">Target merchant</label>
+                                <input type="text" class="form-control" id="requestMerchantName" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Item context</label>
+                                <input type="text" class="form-control" id="requestItemName" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Message</label>
+                                <textarea class="form-control" name="message" id="requestMessage" rows="4"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const modal = document.getElementById('requestModal');
+                if (!modal) {
+                    return;
+                }
+                modal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const merchantId = button.getAttribute('data-merchant-id') || '';
+                    const merchantName = button.getAttribute('data-merchant-name') || '';
+                    const itemName = button.getAttribute('data-item-name') || 'None';
+                    const itemId = button.getAttribute('data-item-id') || '';
+                    const itemGroupId = button.getAttribute('data-item-group-id') || '';
+                    const source = button.getAttribute('data-request-source') || 'Business';
+
+                    document.getElementById('requestMerchantId').value = merchantId;
+                    document.getElementById('requestItemId').value = itemId;
+                    document.getElementById('requestItemGroupId').value = itemGroupId;
+                    document.getElementById('requestMerchantName').value = merchantName;
+                    document.getElementById('requestItemName').value = source === 'Item' ? itemName : 'Business partnership';
+
+                    const messageField = document.getElementById('requestMessage');
+                    const baseMessage = source === 'Item'
+                        ? `Hi ${merchantName} team, I'd like to request access to promote \"${itemName}\" through Badger.`
+                        : `Hi ${merchantName} team, I'd love to request a partnership and share your products with my audience.`;
+                    messageField.value = baseMessage;
+                });
+            });
+        </script>
     {% endif %}
 </div>
 {% endblock %}
