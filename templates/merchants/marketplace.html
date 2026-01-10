@@ -1,0 +1,94 @@
+{% extends 'merchants/base.html' %}
+{% block title %}Marketplace{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Marketplace</h1>
+            <p class="text-muted mb-0">Find creators who are open to new partnerships.</p>
+        </div>
+        <form method="post" class="d-flex align-items-center gap-3">
+            {% csrf_token %}
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="marketplaceToggle" name="marketplace_enabled" {% if merchant_meta.marketplace_enabled %}checked{% endif %} {% if not permissions.can_modify_content %}disabled{% endif %}>
+                <label class="form-check-label" for="marketplaceToggle">Marketplace visibility</label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" {% if not permissions.can_modify_content %}disabled{% endif %}>Save</button>
+        </form>
+    </div>
+
+    {% if not merchant_meta.marketplace_enabled %}
+        <div class="alert alert-info">Turn on Marketplace visibility to be discoverable by creators and search for new partners.</div>
+    {% else %}
+        <form method="get" class="row g-2 align-items-center mb-4">
+            <div class="col-md-6 col-lg-4">
+                <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search creators" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">Search</button>
+            </div>
+        </form>
+
+        <div class="row g-4">
+            {% for creator in creator_cards %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <div>
+                                    <h5 class="card-title mb-0">{{ creator.user.get_full_name|default:creator.user.username }}</h5>
+                                    <p class="text-muted mb-0">{{ creator.user.email }}</p>
+                                </div>
+                                <span class="badge bg-light text-dark">Creator</span>
+                            </div>
+                            {% if creator.short_pitch %}
+                                <p class="mb-3">{{ creator.short_pitch }}</p>
+                            {% endif %}
+                            <div class="mb-3">
+                                <span class="text-uppercase text-muted small">Location</span>
+                                <p class="mb-0">{{ creator.country|default:"Not shared" }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <span class="text-uppercase text-muted small">Languages</span>
+                                <p class="mb-0">{{ creator.content_languages|default:"Not shared" }}</p>
+                            </div>
+                            <div class="mb-3">
+                                <span class="text-uppercase text-muted small">Content skills</span>
+                                {% if creator.content_skills %}
+                                    <div class="d-flex flex-wrap gap-2 mt-1">
+                                        {% for skill in creator.content_skills %}
+                                            <span class="badge bg-secondary-subtle text-secondary">{{ skill }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="mb-0">Not shared</p>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <span class="text-uppercase text-muted small">Social profiles</span>
+                                {% if creator.social_media_profiles %}
+                                    <ul class="mt-2 mb-0 ps-3 small">
+                                        {% for profile in creator.social_media_profiles %}
+                                            <li>
+                                                <span class="fw-semibold">{{ profile.platform|default:"Platform" }}</span>
+                                                {% if profile.follower_range %}<span class="text-muted"> · {{ profile.follower_range }}</span>{% endif %}
+                                                {% if profile.profile_url %}<div class="text-muted">{{ profile.profile_url }}</div>{% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="mb-0">Not shared</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-light border">No creators found.</div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -46,6 +46,7 @@
             <li><a href="{% url 'merchant_dashboard' %}" class="nav-link {% if current_url == 'merchant_dashboard' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
             <li><a href="{% url 'merchant_creators' %}" class="nav-link {% if current_url == 'merchant_creators' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-people me-2"></i>Creators</a></li>
             <li><a href="{% url 'merchant_items' %}" class="nav-link {% if current_url == 'merchant_items' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-plus-square me-2"></i>Items</a></li>
+            <li><a href="{% url 'merchant_marketplace' %}" class="nav-link {% if current_url == 'merchant_marketplace' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-shop me-2"></i>Marketplace</a></li>
             {% if show_invoices_tab %}
             <li data-nav-invoices><a href="{% url 'merchant_invoices' %}" class="nav-link {% if current_url == 'merchant_invoices' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-receipt me-2"></i>Invoices</a></li>
             {% endif %}
