@@ -1,6 +1,7 @@
 from decimal import Decimal, InvalidOperation
 import logging
 import json
+import re
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -18,6 +19,10 @@ from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 
 from links.models import (
     MerchantCreatorLink,
+    PartnershipRequest,
+    REQUEST_STATUS_ACCEPTED,
+    REQUEST_STATUS_DECLINED,
+    REQUEST_STATUS_PENDING,
     STATUS_ACTIVE,
     STATUS_INACTIVE,
     STATUS_REQUESTED,
@@ -72,6 +77,31 @@ def _merchant_display_name(merchant):
     if meta and meta.company_name:
         return meta.company_name
     return merchant.username
+
+
+def _tokenize_query(query):
+    tokens = [token for token in re.split(r"[\\s,]+", query.lower()) if token]
+    expanded = set(tokens)
+    for token in tokens:
+        if token.endswith("s") and len(token) > 3:
+            expanded.add(token.rstrip("s"))
+    return list(expanded)
+
+
+def _score_text(value, tokens, weight):
+    if not value:
+        return 0
+    lowered = value.lower()
+    return sum(weight for token in tokens if token in lowered)
+
+
+def _merchant_store_url(meta):
+    domain = (meta.shopify_store_domain or "").strip()
+    if not domain:
+        return ""
+    if domain.startswith("http://") or domain.startswith("https://"):
+        return domain
+    return f"https://{domain}"
 
 
 def _quantize_amount(value):
@@ -253,6 +283,7 @@ def creator_marketplace(request):
     affiliate_min = _parse_decimal(affiliate_min_raw)
     affiliate_max = _parse_decimal(affiliate_max_raw)
     merchant_cards = []
+    item_cards = []
 
     if creator_meta.marketplace_enabled:
         merchant_qs = (
@@ -270,26 +301,29 @@ def creator_marketplace(request):
             merchant_qs = merchant_qs.filter(
                 user__itemgroup__affiliate_percent__lte=affiliate_max
             )
-        if query:
-            merchant_qs = merchant_qs.filter(
-                Q(company_name__icontains=query)
-                | Q(user__username__icontains=query)
-                | Q(user__merchantitem__title__icontains=query)
-                | Q(user__itemgroup__name__icontains=query)
-            )
         merchant_qs = merchant_qs.distinct()
         merchant_metas = list(merchant_qs)
         merchant_users = [meta.user for meta in merchant_metas]
         groups_by_merchant = {}
+        items_by_merchant = {}
         for group in (
             ItemGroup.objects.filter(merchant__in=merchant_users)
             .prefetch_related("items")
             .order_by("name")
         ):
             groups_by_merchant.setdefault(group.merchant_id, []).append(group)
+        for item in (
+            MerchantItem.objects.filter(merchant__in=merchant_users)
+            .prefetch_related("groups")
+            .order_by("title")
+        ):
+            items_by_merchant.setdefault(item.merchant_id, []).append(item)
+
+        tokens = _tokenize_query(query) if query else []
 
         for meta in merchant_metas:
             groups = groups_by_merchant.get(meta.user_id, [])
+            items = items_by_merchant.get(meta.user_id, [])
             if affiliate_min is not None:
                 groups = [
                     group for group in groups if group.affiliate_percent >= affiliate_min
@@ -298,32 +332,107 @@ def creator_marketplace(request):
                 groups = [
                     group for group in groups if group.affiliate_percent <= affiliate_max
                 ]
-            if query:
-                query_lower = query.lower()
-                matches_merchant = (
-                    query_lower in (meta.company_name or "").lower()
-                    or query_lower in meta.user.username.lower()
-                    or query_lower in (meta.user.email or "").lower()
-                )
-                if not matches_merchant:
-                    filtered_groups = []
-                    for group in groups:
-                        if query_lower in group.name.lower():
-                            filtered_groups.append(group)
-                            continue
-                        if any(
-                            query_lower in (item.title or "").lower()
-                            for item in group.items.all()
-                        ):
-                            filtered_groups.append(group)
-                    groups = filtered_groups
+            commissions = [group.affiliate_percent for group in groups]
+            commission_range = None
+            if commissions:
+                commission_range = {
+                    "min": min(commissions),
+                    "max": max(commissions),
+                }
+
+            score = 0
+            if tokens:
+                score += _score_text(meta.company_name or "", tokens, 4)
+                score += _score_text(meta.shopify_store_domain or "", tokens, 3)
+                score += _score_text(meta.user.username or "", tokens, 2)
+                for group in groups:
+                    score += _score_text(group.name or "", tokens, 2)
+                for item in items:
+                    score += _score_text(item.title or "", tokens, 1)
+
+            if tokens and score == 0:
+                continue
+
             merchant_cards.append(
                 {
                     "meta": meta,
                     "display_name": _merchant_display_name(meta.user),
                     "groups": groups,
+                    "commission_range": commission_range,
+                    "store_url": _merchant_store_url(meta),
+                    "score": score,
                 }
             )
+
+        for meta in merchant_metas:
+            store_url = _merchant_store_url(meta)
+            for group in groups_by_merchant.get(meta.user_id, []):
+                if affiliate_min is not None and group.affiliate_percent < affiliate_min:
+                    continue
+                if affiliate_max is not None and group.affiliate_percent > affiliate_max:
+                    continue
+                score = 0
+                if tokens:
+                    score += _score_text(group.name or "", tokens, 4)
+                    score += _score_text(meta.company_name or "", tokens, 2)
+                    score += _score_text(meta.shopify_store_domain or "", tokens, 2)
+                if tokens and score == 0:
+                    continue
+                image_url = None
+                for item in group.items.all():
+                    if item.image_url:
+                        image_url = item.image_url
+                        break
+                item_cards.append(
+                    {
+                        "type": "Collection",
+                        "name": group.name,
+                        "merchant": meta,
+                        "merchant_name": _merchant_display_name(meta.user),
+                        "merchant_url": store_url,
+                        "image_url": image_url,
+                        "commission": group.affiliate_percent,
+                        "item_group_id": group.id,
+                        "item_id": None,
+                        "detail_url": store_url,
+                        "score": score,
+                    }
+                )
+
+            for item in items_by_merchant.get(meta.user_id, []):
+                group_commissions = [group.affiliate_percent for group in item.groups.all()]
+                commission = max(group_commissions) if group_commissions else None
+                if affiliate_min is not None and commission is not None and commission < affiliate_min:
+                    continue
+                if affiliate_max is not None and commission is not None and commission > affiliate_max:
+                    continue
+                score = 0
+                if tokens:
+                    score += _score_text(item.title or "", tokens, 5)
+                    score += _score_text(meta.company_name or "", tokens, 2)
+                    score += _score_text(meta.shopify_store_domain or "", tokens, 2)
+                    for group in item.groups.all():
+                        score += _score_text(group.name or "", tokens, 1)
+                if tokens and score == 0:
+                    continue
+                item_cards.append(
+                    {
+                        "type": "Product",
+                        "name": item.title,
+                        "merchant": meta,
+                        "merchant_name": _merchant_display_name(meta.user),
+                        "merchant_url": store_url,
+                        "image_url": item.image_url,
+                        "commission": commission,
+                        "item_id": item.id,
+                        "item_group_id": None,
+                        "detail_url": item.link,
+                        "score": score,
+                    }
+                )
+
+    merchant_cards.sort(key=lambda card: (-card["score"], card["display_name"].lower()))
+    item_cards.sort(key=lambda card: (-card["score"], card["name"].lower()))
 
     return render(
         request,
@@ -331,6 +440,7 @@ def creator_marketplace(request):
         {
             "creator_meta": creator_meta,
             "merchant_cards": merchant_cards,
+            "item_cards": item_cards,
             "query": query,
             "affiliate_min": affiliate_min_raw,
             "affiliate_max": affiliate_max_raw,
@@ -341,6 +451,85 @@ def creator_marketplace(request):
 
 def _is_blank(value):
     return value is None or (isinstance(value, str) and not value.strip())
+
+
+@login_required
+def creator_send_request(request):
+    if request.method != "POST" or not request.user.is_creator:
+        return redirect("creator_marketplace")
+
+    merchant_id = request.POST.get("merchant_id")
+    item_id = request.POST.get("item_id") or None
+    item_group_id = request.POST.get("item_group_id") or None
+    message = (request.POST.get("message") or "").strip()
+
+    merchant = get_object_or_404(CustomUser, id=merchant_id, is_merchant=True)
+    merchant_meta = getattr(merchant, "merchantmeta", None)
+    if not merchant_meta or not merchant_meta.marketplace_enabled:
+        return redirect("creator_marketplace")
+    item = None
+    item_group = None
+    if item_id:
+        item = get_object_or_404(MerchantItem, id=item_id, merchant=merchant)
+    if item_group_id:
+        item_group = get_object_or_404(ItemGroup, id=item_group_id, merchant=merchant)
+
+    if MerchantCreatorLink.objects.filter(
+        merchant=merchant, creator=request.user, status=STATUS_ACTIVE
+    ).exists():
+        return redirect("creator_requests")
+
+    PartnershipRequest.objects.get_or_create(
+        creator=request.user,
+        merchant=merchant,
+        item=item,
+        item_group=item_group,
+        defaults={
+            "message": message,
+            "status": REQUEST_STATUS_PENDING,
+        },
+    )
+
+    return redirect("creator_requests")
+
+
+@login_required
+def creator_requests(request):
+    if not request.user.is_creator:
+        return redirect("creator_marketplace")
+
+    requests = (
+        PartnershipRequest.objects.filter(creator=request.user)
+        .select_related("merchant", "merchant__merchantmeta", "item", "item_group")
+        .order_by("-created_at")
+    )
+    grouped = {
+        REQUEST_STATUS_PENDING: [],
+        REQUEST_STATUS_ACCEPTED: [],
+        REQUEST_STATUS_DECLINED: [],
+    }
+
+    for req in requests:
+        meta = getattr(req.merchant, "merchantmeta", None)
+        grouped[req.status].append(
+            {
+                "id": req.id,
+                "merchant_name": _merchant_display_name(req.merchant),
+                "business_type": meta.get_business_type_display() if meta else "Merchant",
+                "item_name": req.item.title if req.item else (req.item_group.name if req.item_group else None),
+                "status": req.status,
+                "created_at": req.created_at,
+                "message": req.message,
+            }
+        )
+
+    return render(
+        request,
+        "creators/requests.html",
+        {
+            "requests_grouped": grouped,
+        },
+    )
 
 
 SOCIAL_PLATFORM_OPTIONS = [
