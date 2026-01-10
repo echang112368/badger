@@ -22,7 +22,21 @@
     {% else %}
         <form method="get" class="row g-2 align-items-center mb-4">
             <div class="col-md-6 col-lg-4">
-                <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search companies" />
+                <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search companies or items" />
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <select name="business_type" class="form-select">
+                    <option value="">All business types</option>
+                    {% for value, label in business_types.choices %}
+                        <option value="{{ value }}" {% if business_type == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-6 col-lg-2">
+                <input type="number" step="0.01" min="0" max="100" name="affiliate_min" value="{{ affiliate_min }}" class="form-control" placeholder="Min %" />
+            </div>
+            <div class="col-6 col-lg-2">
+                <input type="number" step="0.01" min="0" max="100" name="affiliate_max" value="{{ affiliate_max }}" class="form-control" placeholder="Max %" />
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-outline-primary">Search</button>

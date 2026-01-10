@@ -24,6 +24,31 @@
             <div class="col-md-6 col-lg-4">
                 <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search creators" />
             </div>
+            <div class="col-md-6 col-lg-2">
+                <select name="platform" class="form-select">
+                    <option value="">All platforms</option>
+                    {% for platform_option in social_platform_options %}
+                        <option value="{{ platform_option }}" {% if platform == platform_option %}selected{% endif %}>{{ platform_option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <select name="follower_range" class="form-select">
+                    <option value="">All follower ranges</option>
+                    {% for range_option in follower_range_options %}
+                        <option value="{{ range_option }}" {% if follower_range == range_option %}selected{% endif %}>{{ range_option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <input type="text" name="country" value="{{ country }}" class="form-control" placeholder="Country" />
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <input type="text" name="language" value="{{ language }}" class="form-control" placeholder="Language" />
+            </div>
+            <div class="col-md-6 col-lg-2">
+                <input type="text" name="skill" value="{{ skill }}" class="form-control" placeholder="Content skill" />
+            </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-outline-primary">Search</button>
             </div>
