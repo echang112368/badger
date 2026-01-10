@@ -268,6 +268,7 @@ def creator_marketplace(request):
         return redirect("creator_marketplace")
 
     query = (request.GET.get("q") or "").strip()
+    request_count = PartnershipRequest.objects.filter(creator=request.user).count()
     affiliate_min_raw = (request.GET.get("affiliate_min") or "").strip()
     affiliate_max_raw = (request.GET.get("affiliate_max") or "").strip()
     business_type = (request.GET.get("business_type") or "").strip()
@@ -462,6 +463,7 @@ def creator_marketplace(request):
             "business_type": business_type,
             "business_types": MerchantMeta.BusinessType,
             "search_scope": search_scope,
+            "request_count": request_count,
         },
     )
 
@@ -519,6 +521,7 @@ def creator_requests(request):
         .select_related("merchant", "merchant__merchantmeta", "item", "item_group")
         .order_by("-created_at")
     )
+    request_count = requests.count()
     grouped = {
         REQUEST_STATUS_PENDING: [],
         REQUEST_STATUS_ACCEPTED: [],
@@ -544,6 +547,7 @@ def creator_requests(request):
         "creators/requests.html",
         {
             "requests_grouped": grouped,
+            "request_count": request_count,
         },
     )
 
