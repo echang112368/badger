@@ -63,6 +63,44 @@ def _normalize_domain(domain: str) -> str:
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
 SHOPIFY_BILLING_STATUS_TTL = timedelta(minutes=5)
 
+SOCIAL_PLATFORM_OPTIONS = [
+    "YouTube",
+    "TikTok",
+    "Instagram",
+    "Snapchat",
+    "Twitter / X",
+    "Facebook",
+    "Twitch",
+    "Discord",
+    "Reddit",
+    "Pinterest",
+    "LinkedIn",
+    "Blog / Website",
+    "Newsletter (Substack, Beehiiv, etc.)",
+    "Podcast",
+    "Other",
+]
+
+FOLLOWER_RANGE_OPTIONS = [
+    "0–1k",
+    "1k–5k",
+    "5k–10k",
+    "10k–50k",
+    "50k–100k",
+    "100k–500k",
+    "500k–1M",
+    "1M–2M",
+    "2M–3M",
+    "3M–4M",
+    "4M–5M",
+    "5M–6M",
+    "6M–7M",
+    "7M–8M",
+    "8M–9M",
+    "9M–10M",
+    "10M+",
+]
+
 
 def _get_merchant_meta(merchant_user: Optional[CustomUser]) -> Optional[MerchantMeta]:
     """Safely return the merchant's ``MerchantMeta`` instance if it exists."""
@@ -316,6 +354,11 @@ def merchant_marketplace(request):
         return redirect("merchant_marketplace")
 
     query = (request.GET.get("q") or "").strip()
+    platform = (request.GET.get("platform") or "").strip()
+    follower_range = (request.GET.get("follower_range") or "").strip()
+    country = (request.GET.get("country") or "").strip()
+    language = (request.GET.get("language") or "").strip()
+    skill = (request.GET.get("skill") or "").strip()
     creator_cards = []
     if merchant_meta.marketplace_enabled:
         creator_qs = (
@@ -332,6 +375,16 @@ def merchant_marketplace(request):
                 | Q(country__icontains=query)
                 | Q(content_languages__icontains=query)
             )
+        if platform:
+            creator_qs = creator_qs.filter(social_media_platform__icontains=platform)
+        if follower_range:
+            creator_qs = creator_qs.filter(follower_range__iexact=follower_range)
+        if country:
+            creator_qs = creator_qs.filter(country__icontains=country)
+        if language:
+            creator_qs = creator_qs.filter(content_languages__icontains=language)
+        if skill:
+            creator_qs = creator_qs.filter(content_skills__contains=[skill])
 
         creator_cards = list(creator_qs)
 
@@ -344,6 +397,13 @@ def merchant_marketplace(request):
             "permissions": permissions,
             "creator_cards": creator_cards,
             "query": query,
+            "platform": platform,
+            "follower_range": follower_range,
+            "country": country,
+            "language": language,
+            "skill": skill,
+            "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
+            "follower_range_options": FOLLOWER_RANGE_OPTIONS,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
         },
     )
