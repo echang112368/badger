@@ -8,6 +8,8 @@ from .views import (
     creator_settings,
     creator_support,
     creator_marketplace,
+    creator_requests,
+    creator_send_request,
     delete_affiliate_merchants,
     respond_request,
 )
@@ -24,5 +26,7 @@ urlpatterns = [
     path('settings/', creator_settings, name='creator_settings'),
     path('support/', creator_support, name='creator_support'),
     path('marketplace/', creator_marketplace, name='creator_marketplace'),
+    path('requests/', creator_requests, name='creator_requests'),
+    path('requests/send/', creator_send_request, name='creator_send_request'),
     path('respond-request/<int:link_id>/', respond_request, name='respond_request'),
 ]

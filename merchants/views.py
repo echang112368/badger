@@ -1,7 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
 import json
-import json
 import logging
 import secrets
 
@@ -12,6 +11,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from links.models import (
     MerchantCreatorLink,
+    PartnershipRequest,
+    REQUEST_STATUS_ACCEPTED,
+    REQUEST_STATUS_DECLINED,
     STATUS_REQUESTED,
     STATUS_ACTIVE,
     STATUS_INACTIVE,
@@ -58,6 +60,34 @@ def _normalize_domain(domain: str) -> str:
     if host.startswith("www."):
         host = host[4:]
     return host
+
+
+def _creator_card_payload(meta: CreatorMeta) -> dict:
+    profiles = meta.social_media_profiles or []
+    primary_platform = meta.social_media_platform or "Not shared"
+    follower_range = meta.follower_range or "Not shared"
+    if profiles and isinstance(profiles, list):
+        primary = profiles[0] if profiles else {}
+        if isinstance(primary, dict):
+            primary_platform = primary.get("platform") or primary_platform
+            follower_range = primary.get("follower_range") or follower_range
+    skills = (meta.content_skills or [])[:3]
+    name = meta.user.get_full_name() or meta.user.username
+    initials = "".join(part[0] for part in name.split() if part)[:2].upper()
+    return {
+        "meta": meta,
+        "name": name,
+        "email": meta.user.email,
+        "platform": primary_platform,
+        "follower_range": follower_range,
+        "skills": skills,
+        "short_pitch": meta.short_pitch,
+        "availability_label": "Available" if meta.marketplace_enabled else "Unavailable",
+        "is_verified": meta.user.email_verified,
+        "initials": initials or "CR",
+        "country": meta.country or "Not shared",
+        "languages": meta.content_languages or "Not shared",
+    }
 
 
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
@@ -386,7 +416,7 @@ def merchant_marketplace(request):
         if skill:
             creator_qs = creator_qs.filter(content_skills__contains=[skill])
 
-        creator_cards = list(creator_qs)
+        creator_cards = [_creator_card_payload(meta) for meta in creator_qs]
 
     return render(
         request,
@@ -407,6 +437,75 @@ def merchant_marketplace(request):
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
         },
     )
+
+
+@login_required
+def merchant_requests(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return redirect("login")
+
+    merchant_user = permissions.merchant
+    if not merchant_user:
+        return redirect("merchant_dashboard")
+
+    request_qs = (
+        PartnershipRequest.objects.filter(merchant=merchant_user)
+        .select_related("creator", "creator__creatormeta", "item", "item_group")
+        .order_by("-created_at")
+    )
+    request_cards = []
+    for req in request_qs:
+        creator_meta = getattr(req.creator, "creatormeta", None)
+        if not creator_meta:
+            creator_meta, _ = CreatorMeta.objects.get_or_create(user=req.creator)
+        request_cards.append(
+            {
+                "request": req,
+                "creator_card": _creator_card_payload(creator_meta),
+                "item_name": req.item.title if req.item else (req.item_group.name if req.item_group else None),
+            }
+        )
+
+    return render(
+        request,
+        "merchants/requests.html",
+        {
+            "permissions": permissions,
+            "request_cards": request_cards,
+            "show_invoices_tab": _should_show_invoices_tab(_get_merchant_meta(merchant_user)),
+        },
+    )
+
+
+@login_required
+def merchant_update_request(request, request_id: int):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_modify_content:
+        return redirect("merchant_requests")
+
+    merchant_user = permissions.merchant
+    if request.method != "POST" or not merchant_user:
+        return redirect("merchant_requests")
+
+    partnership_request = get_object_or_404(
+        PartnershipRequest, id=request_id, merchant=merchant_user
+    )
+    action = request.POST.get("action")
+    if action not in {"accept", "decline"}:
+        return redirect("merchant_requests")
+    if action == "accept":
+        partnership_request.status = REQUEST_STATUS_ACCEPTED
+        MerchantCreatorLink.objects.get_or_create(
+            merchant=merchant_user,
+            creator=partnership_request.creator,
+            defaults={"status": STATUS_ACTIVE},
+        )
+    elif action == "decline":
+        partnership_request.status = REQUEST_STATUS_DECLINED
+    partnership_request.save(update_fields=["status", "updated_at"])
+
+    return redirect("merchant_requests")
 
 
 @login_required
