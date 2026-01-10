@@ -7,7 +7,7 @@ import secrets
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from links.models import (
@@ -292,6 +292,61 @@ def merchant_dashboard(request):
         'affiliate_total': affiliate_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
     })
+
+
+@login_required
+def merchant_marketplace(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return redirect('login')
+
+    merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
+
+    if not merchant_meta:
+        return redirect('merchant_dashboard')
+
+    if request.method == "POST":
+        if not permissions.can_modify_content:
+            return redirect("merchant_marketplace")
+        merchant_meta.marketplace_enabled = bool(
+            request.POST.get("marketplace_enabled")
+        )
+        merchant_meta.save(update_fields=["marketplace_enabled"])
+        return redirect("merchant_marketplace")
+
+    query = (request.GET.get("q") or "").strip()
+    creator_cards = []
+    if merchant_meta.marketplace_enabled:
+        creator_qs = (
+            CreatorMeta.objects.select_related("user")
+            .filter(marketplace_enabled=True)
+            .order_by("user__first_name", "user__last_name", "user__username")
+        )
+        if query:
+            creator_qs = creator_qs.filter(
+                Q(user__first_name__icontains=query)
+                | Q(user__last_name__icontains=query)
+                | Q(user__username__icontains=query)
+                | Q(user__email__icontains=query)
+                | Q(country__icontains=query)
+                | Q(content_languages__icontains=query)
+            )
+
+        creator_cards = list(creator_qs)
+
+    return render(
+        request,
+        "merchants/marketplace.html",
+        {
+            "merchant": merchant_user,
+            "merchant_meta": merchant_meta,
+            "permissions": permissions,
+            "creator_cards": creator_cards,
+            "query": query,
+            "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+        },
+    )
 
 
 @login_required

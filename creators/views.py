@@ -226,6 +226,60 @@ def _affiliate_company_metrics(user):
         "generated_at": timezone.now().isoformat(),
     }
 
+
+@login_required
+def creator_marketplace(request):
+    creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        creator_meta.marketplace_enabled = bool(
+            request.POST.get("marketplace_enabled")
+        )
+        creator_meta.save(update_fields=["marketplace_enabled"])
+        return redirect("creator_marketplace")
+
+    query = (request.GET.get("q") or "").strip()
+    merchant_cards = []
+
+    if creator_meta.marketplace_enabled:
+        merchant_qs = (
+            MerchantMeta.objects.select_related("user")
+            .filter(marketplace_enabled=True)
+            .order_by("company_name", "user__username")
+        )
+        if query:
+            merchant_qs = merchant_qs.filter(
+                Q(company_name__icontains=query)
+                | Q(user__username__icontains=query)
+            )
+        merchant_metas = list(merchant_qs)
+        merchant_users = [meta.user for meta in merchant_metas]
+        groups_by_merchant = {}
+        for group in (
+            ItemGroup.objects.filter(merchant__in=merchant_users)
+            .prefetch_related("items")
+            .order_by("name")
+        ):
+            groups_by_merchant.setdefault(group.merchant_id, []).append(group)
+
+        for meta in merchant_metas:
+            merchant_cards.append(
+                {
+                    "meta": meta,
+                    "display_name": _merchant_display_name(meta.user),
+                    "groups": groups_by_merchant.get(meta.user_id, []),
+                }
+            )
+
+    return render(
+        request,
+        "creators/marketplace.html",
+        {
+            "creator_meta": creator_meta,
+            "merchant_cards": merchant_cards,
+            "query": query,
+        },
+    )
+
 def _is_blank(value):
     return value is None or (isinstance(value, str) and not value.strip())
 
