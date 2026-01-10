@@ -13,6 +13,7 @@ class CreatorMeta(models.Model):
     country = models.CharField(max_length=100, blank=True)
     content_languages = models.CharField(max_length=200, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    marketplace_enabled = models.BooleanField(default=False)
 
 
     def __str__(self):
