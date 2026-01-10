@@ -3,8 +3,14 @@
 {% block content %}
 <script src="https://cdn.tailwindcss.com"></script>
 <div class="max-w-3xl mx-auto py-10 px-4">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-semibold text-gray-900">Profile</h1>
+  <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-3">
+      {% include "shared/creator_avatar.html" with creator=creator_avatar size=56 %}
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Profile</h1>
+        <p class="text-sm text-gray-500">{{ creator_avatar.name }}</p>
+      </div>
+    </div>
     <div>
       <input type="text" placeholder="Search" class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
     </div>

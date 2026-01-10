@@ -1,0 +1,9 @@
+{% with avatar_size=size|default:48 %}
+<div style="width:{{ avatar_size }}px;height:{{ avatar_size }}px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background-color:#e9ecef;color:#495057;font-weight:600;">
+    {% if creator.avatar_url %}
+        <img src="{{ creator.avatar_url }}" alt="{{ creator.name }}" style="width:100%;height:100%;object-fit:cover;object-position:center;">
+    {% else %}
+        <span style="font-size:calc({{ avatar_size }}px / 2.4);line-height:1;">{{ creator.initials }}</span>
+    {% endif %}
+</div>
+{% endwith %}
