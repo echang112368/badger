@@ -167,6 +167,7 @@
                             Short Pitch
                             <span class="block text-xs text-gray-500 font-normal">Creator provided</span>
                         </th>
+                        <th class="text-right p-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -182,15 +183,89 @@
                                 —
                             {% endif %}
                         </td>
+                        <td class="p-3 text-right">
+                            <div class="flex flex-wrap justify-end gap-2">
+                                <button type="button" class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-50" data-bs-toggle="modal" data-bs-target="#creatorViewModal-{{ creator.creator_id }}">View</button>
+                                <form method="post" action="{% url 'update_creator_status' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="activate">
+                                    <input type="hidden" name="selected_creators" value="{{ creator.creator_id }}">
+                                    <button type="submit" class="{% if permissions.can_modify_content %}bg-green-600 hover:bg-green-700{% else %}bg-gray-300 cursor-not-allowed{% endif %} text-white px-3 py-1.5 rounded-md text-sm" {% if not permissions.can_modify_content %}disabled{% endif %}>Accept</button>
+                                </form>
+                                <form method="post" action="{% url 'delete_creators' %}" onsubmit="return confirm('Reject this creator request?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="selected_creators" value="{{ creator.creator_id }}">
+                                    <button type="submit" class="{% if permissions.can_modify_content %}bg-red-600 hover:bg-red-700{% else %}bg-gray-300 cursor-not-allowed{% endif %} text-white px-3 py-1.5 rounded-md text-sm" {% if not permissions.can_modify_content %}disabled{% endif %}>Reject</button>
+                                </form>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="p-4 text-center text-gray-500">No pending requests.</td>
+                        <td colspan="5" class="p-4 text-center text-gray-500">No pending requests.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+        {% for creator in pending_creators %}
+        <div class="modal fade" id="creatorViewModal-{{ creator.creator_id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Creator Profile</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="flex items-start justify-between gap-4 mb-4">
+                                <div>
+                                    <p class="text-lg font-semibold text-gray-900">{{ creator.username }}</p>
+                                    <p class="text-sm text-gray-600">{{ creator.email }}</p>
+                                </div>
+                            </div>
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Bio</p>
+                                    <p class="text-sm text-gray-800">{{ creator.bio|default:"No bio provided." }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Short Pitch</p>
+                                    <p class="text-sm text-gray-800">{{ creator.short_pitch|default:"—" }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Primary Platform</p>
+                                    <p class="text-sm text-gray-800">{{ creator.social_media_platform|default:"—" }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Follower Range</p>
+                                    <p class="text-sm text-gray-800">{{ creator.follower_range|default:"—" }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Country</p>
+                                    <p class="text-sm text-gray-800">{{ creator.country|default:"—" }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Content Languages</p>
+                                    <p class="text-sm text-gray-800">{{ creator.content_languages|default:"—" }}</p>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <p class="text-xs uppercase tracking-wide text-gray-500">Content Skills</p>
+                                    <p class="text-sm text-gray-800">
+                                        {% if creator.content_skills %}
+                                            {{ creator.content_skills|join:", " }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 
     <script>
