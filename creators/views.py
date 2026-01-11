@@ -495,8 +495,19 @@ def creator_send_request(request):
         return redirect("creator_marketplace")
 
     merchant_id = request.POST.get("merchant_id")
+    logger.info(
+        "creator_request_submit_start creator_id=%s merchant_id=%s item_id=%s item_group_id=%s",
+        request.user.id,
+        merchant_id,
+        request.POST.get("item_id"),
+        request.POST.get("item_group_id"),
+    )
     if not merchant_id:
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            logger.warning(
+                "creator_request_submit_failed_missing_merchant creator_id=%s",
+                request.user.id,
+            )
             return JsonResponse({"status": "error", "message": "Missing merchant."}, status=400)
         return redirect("creator_marketplace")
     item_id = request.POST.get("item_id") or None
@@ -506,6 +517,11 @@ def creator_send_request(request):
     merchant = get_object_or_404(CustomUser, id=merchant_id, is_merchant=True)
     merchant_meta = getattr(merchant, "merchantmeta", None)
     if not merchant_meta or not merchant_meta.marketplace_enabled:
+        logger.warning(
+            "creator_request_submit_failed_marketplace_disabled creator_id=%s merchant_id=%s",
+            request.user.id,
+            merchant_id,
+        )
         return redirect("creator_marketplace")
     item = None
     item_group = None
@@ -517,6 +533,11 @@ def creator_send_request(request):
     if MerchantCreatorLink.objects.filter(
         merchant=merchant, creator=request.user, status=STATUS_ACTIVE
     ).exists():
+        logger.info(
+            "creator_request_submit_skipped_active_link creator_id=%s merchant_id=%s",
+            request.user.id,
+            merchant_id,
+        )
         return redirect("creator_requests")
 
     partnership_request, created = PartnershipRequest.objects.get_or_create(
@@ -550,6 +571,12 @@ def creator_send_request(request):
         f"creator_uuid={creator_meta.uuid} "
         f"merchant={_merchant_display_name(merchant)} "
         f"merchant_uuid={merchant_meta.uuid}"
+    )
+    logger.info(
+        "creator_request_submit_success creator_id=%s merchant_id=%s request_id=%s",
+        request.user.id,
+        merchant_id,
+        partnership_request.id,
     )
 
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
