@@ -447,20 +447,6 @@ def creator_marketplace(request):
         merchant_cards_display = []
         item_cards_display = item_cards
 
-    pending_requests = PartnershipRequest.objects.filter(
-        creator=request.user,
-        status=REQUEST_STATUS_PENDING,
-    )
-    requested_merchants = set()
-    requested_items = set()
-    requested_item_groups = set()
-    for pending in pending_requests:
-        requested_merchants.add(pending.merchant_id)
-        if pending.item_id:
-            requested_items.add(pending.item_id)
-        if pending.item_group_id:
-            requested_item_groups.add(pending.item_group_id)
-
     return render(
         request,
         "creators/marketplace.html",
@@ -476,9 +462,6 @@ def creator_marketplace(request):
             "business_type": business_type,
             "business_types": MerchantMeta.BusinessType,
             "search_scope": search_scope,
-            "requested_merchants": list(requested_merchants),
-            "requested_items": list(requested_items),
-            "requested_item_groups": list(requested_item_groups),
         },
     )
 
@@ -523,16 +506,7 @@ def creator_send_request(request):
         },
     )
 
-    link, created = MerchantCreatorLink.objects.get_or_create(
-        merchant=merchant,
-        creator=request.user,
-        defaults={"status": STATUS_REQUESTED},
-    )
-    if not created and link.status != STATUS_ACTIVE:
-        link.status = STATUS_REQUESTED
-        link.save(update_fields=["status"])
-
-    return redirect("creator_marketplace")
+    return redirect("creator_requests")
 
 
 @login_required
