@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.db.models import Sum, Q, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
@@ -42,12 +42,8 @@ def disp(message: str) -> None:
 def creator_earnings(request):
     balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
-    commission_entries = LedgerEntry.objects.filter(
-        creator=request.user,
-        entry_type="commission",
-    )
     monthly_data = (
-        commission_entries
+        LedgerEntry.objects.filter(creator=request.user, entry_type="commission")
         .annotate(month=TruncMonth("timestamp"))
         .values("month")
         .annotate(total=Sum("amount"))
@@ -67,13 +63,6 @@ def creator_earnings(request):
     months.reverse()
     earnings_labels = [m.strftime("%b %Y") for m in months]
     earnings_totals = [monthly_totals.get(m, 0.0) for m in months]
-    last_30_days_start = timezone.now() - timedelta(days=30)
-    total_earnings = commission_entries.aggregate(total=Sum("amount"))["total"] or 0
-    last_30_days_earnings = (
-        commission_entries.filter(timestamp__gte=last_30_days_start)
-        .aggregate(total=Sum("amount"))["total"]
-        or 0
-    )
     return render(
         request,
         "creators/earnings.html",
@@ -82,8 +71,6 @@ def creator_earnings(request):
             "ledger_entries": entries,
             "earnings_labels": earnings_labels,
             "earnings_totals": earnings_totals,
-            "total_earnings": float(total_earnings),
-            "last_30_days_earnings": float(last_30_days_earnings),
         },
     )
 
