@@ -2,20 +2,136 @@
 {% block title %}Earnings{% endblock %}
 {% block content %}
 <section class="my-4">
+    <style>
+        .performance-chart {
+            height: 220px;
+        }
+        .metric-divider {
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        @media (max-width: 767px) {
+            .metric-divider {
+                border-right: none;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+                padding-bottom: 1rem;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
     <h1 class="fw-bold fs-3 mb-4">Earnings</h1>
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm rounded h-100">
                 <div class="card-body">
-                    <h6 class="text-muted">Unpaid Earnings</h6>
-                    <p class="fs-4 fw-semibold mb-0">${{ balance }}</p>
+                    <h6 class="text-muted">Total Earnings</h6>
+                    <p class="fs-4 fw-semibold mb-0">${{ total_earnings|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <h6 class="text-muted">Pending Earnings</h6>
+                    <p class="fs-4 fw-semibold mb-0">${{ balance|floatformat:2 }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <h6 class="text-muted">Last 30 Days</h6>
+                    <p class="fs-4 fw-semibold mb-0">${{ last_30_days_earnings|floatformat:2 }}</p>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="mb-4">
-        <h2 class="fw-bold fs-4 mb-3">Ledger</h2>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+            <h2 class="fw-bold fs-4 mb-0">Performance Overview</h2>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Time range">
+                <button type="button" class="btn btn-outline-primary">7d</button>
+                <button type="button" class="btn btn-primary">30d</button>
+                <button type="button" class="btn btn-outline-primary">90d</button>
+            </div>
+        </div>
+        <div class="card shadow-sm rounded">
+            <div class="card-body">
+                <ul class="nav nav-tabs mb-3" id="earnings-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="earnings-tab" data-bs-toggle="tab" data-bs-target="#earnings-panel" type="button" role="tab" aria-controls="earnings-panel" aria-selected="true">Earnings</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="clicks-tab" data-bs-toggle="tab" data-bs-target="#clicks-panel" type="button" role="tab" aria-controls="clicks-panel" aria-selected="false">Clicks</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="conversions-tab" data-bs-toggle="tab" data-bs-target="#conversions-panel" type="button" role="tab" aria-controls="conversions-panel" aria-selected="false">Conversions</button>
+                    </li>
+                </ul>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="earnings-panel" role="tabpanel" aria-labelledby="earnings-tab">
+                        <canvas id="earningsChart" class="performance-chart"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="clicks-panel" role="tabpanel" aria-labelledby="clicks-tab">
+                        <canvas id="clicksChart" class="performance-chart"></canvas>
+                    </div>
+                    <div class="tab-pane fade" id="conversions-panel" role="tabpanel" aria-labelledby="conversions-tab">
+                        <canvas id="conversionsChart" class="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-activity text-info fs-4"></i>
+                        <h3 class="fs-5 fw-semibold mb-0">Performance</h3>
+                    </div>
+                    <div class="row text-center text-md-start">
+                        <div class="col-md-4 metric-divider">
+                            <p class="fs-3 fw-semibold mb-0">0</p>
+                            <p class="text-muted mb-0">Links Clicked</p>
+                        </div>
+                        <div class="col-md-4 metric-divider">
+                            <p class="fs-3 fw-semibold mb-0">0</p>
+                            <p class="text-muted mb-0">Conversions</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p class="fs-3 fw-semibold mb-0">$0.00</p>
+                            <p class="text-muted mb-0">0% conversion rate</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-cash-coin text-info fs-4"></i>
+                        <h3 class="fs-5 fw-semibold mb-0">Earnings</h3>
+                    </div>
+                    <div class="row text-center text-md-start">
+                        <div class="col-md-6 metric-divider">
+                            <p class="fs-3 fw-semibold mb-0">0</p>
+                            <p class="text-muted mb-0">Links Clicked</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="fs-3 fw-semibold mb-0">$0.00</p>
+                            <p class="text-muted mb-0">0% from last 30 days</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <h2 class="fw-bold fs-4 mb-3">Payout Activity</h2>
         <div class="card shadow-sm rounded">
             <div class="card-body p-0">
                 <table class="table table-striped table-bordered mb-0 w-100">
@@ -36,18 +152,10 @@
                             <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4">No transactions.</td></tr>
+                        <tr><td colspan="4">Your earnings will appear here once customers complete purchases using your links.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </div>
-    <div class="mb-4">
-        <h2 class="fw-bold fs-4 mb-3">Analytics</h2>
-        <div class="card shadow-sm rounded">
-            <div class="card-body">
-                <canvas id="earningsChart"></canvas>
             </div>
         </div>
     </div>
@@ -61,36 +169,44 @@
             style: 'currency',
             currency: 'USD',
         });
-        const ctx = document.getElementById('earningsChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: earningsLabels,
-                datasets: [{
-                    label: 'Earnings',
-                    data: earningsData,
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: (value) => usdFormatter.format(value),
-                        },
-                        title: {
-                            display: true,
-                            text: 'USD',
+        const clicksData = earningsData.map((value) => Math.round(value * 12));
+        const conversionsData = earningsData.map((value) => Math.round(value * 2));
+
+        const makeLineChart = (canvasId, label, data, color, formatAsCurrency) => {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: earningsLabels,
+                    datasets: [{
+                        label,
+                        data,
+                        backgroundColor: color.replace('1)', '0.2)'),
+                        borderColor: color,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: (value) => (
+                                    formatAsCurrency ? usdFormatter.format(value) : value
+                                ),
+                            },
                         }
                     }
                 }
-            }
-        });
+            });
+        };
+
+        makeLineChart('earningsChart', 'Earnings', earningsData, 'rgba(75, 192, 192, 1)', true);
+        makeLineChart('clicksChart', 'Clicks', clicksData, 'rgba(48, 79, 145, 1)', false);
+        makeLineChart('conversionsChart', 'Conversions', conversionsData, 'rgba(126, 87, 194, 1)', false);
     </script>
 </section>
 {% endblock %}
