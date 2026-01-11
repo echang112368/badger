@@ -292,9 +292,16 @@ def creator_marketplace(request):
     item_cards = []
 
     if creator_meta.marketplace_enabled:
+        connected_merchant_ids = list(
+            MerchantCreatorLink.objects.filter(
+                creator=request.user,
+                status=STATUS_ACTIVE,
+            ).values_list("merchant_id", flat=True)
+        )
         merchant_qs = (
             MerchantMeta.objects.select_related("user")
             .filter(marketplace_enabled=True)
+            .exclude(user_id__in=connected_merchant_ids)
             .order_by("company_name", "user__username")
         )
         if business_type:
