@@ -92,18 +92,22 @@
                                     </div>
                                 </div>
                                 <div class="mt-auto d-flex marketplace-actions">
-                                    <button type="button"
-                                            class="btn btn-primary"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#requestModal"
-                                            data-merchant-id="{{ merchant.meta.user.id }}"
-                                            data-merchant-name="{{ merchant.display_name }}"
-                                            data-item-name=""
-                                            data-item-id=""
-                                            data-item-group-id=""
-                                            data-request-source="Business">
-                                        Request
-                                    </button>
+                                    {% if merchant.meta.user.id in requested_merchants %}
+                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
+                                    {% else %}
+                                        <button type="button"
+                                                class="btn btn-primary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#requestModal"
+                                                data-merchant-id="{{ merchant.meta.user.id }}"
+                                                data-merchant-name="{{ merchant.display_name }}"
+                                                data-item-name=""
+                                                data-item-id=""
+                                                data-item-group-id=""
+                                                data-request-source="Business">
+                                            Request
+                                        </button>
+                                    {% endif %}
                                     {% if merchant.store_url %}
                                         <a class="btn btn-outline-secondary" href="{{ merchant.store_url }}" target="_blank" rel="noopener">View</a>
                                     {% else %}
@@ -165,18 +169,26 @@
                                     {% endif %}
                                 </div>
                                 <div class="mt-auto d-flex marketplace-actions">
-                                    <button type="button"
-                                            class="btn btn-primary"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#requestModal"
-                                            data-merchant-id="{{ item.merchant.user.id }}"
-                                            data-merchant-name="{{ item.merchant_name }}"
-                                            data-item-name="{{ item.name }}"
-                                            data-item-id="{{ item.item_id|default:'' }}"
-                                            data-item-group-id="{{ item.item_group_id|default:'' }}"
-                                            data-request-source="Item">
-                                        Request
-                                    </button>
+                                    {% if item.item_id and item.item_id in requested_items %}
+                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
+                                    {% elif item.item_group_id and item.item_group_id in requested_item_groups %}
+                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
+                                    {% elif item.merchant.user.id in requested_merchants %}
+                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
+                                    {% else %}
+                                        <button type="button"
+                                                class="btn btn-primary"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#requestModal"
+                                                data-merchant-id="{{ item.merchant.user.id }}"
+                                                data-merchant-name="{{ item.merchant_name }}"
+                                                data-item-name="{{ item.name }}"
+                                                data-item-id="{{ item.item_id|default:'' }}"
+                                                data-item-group-id="{{ item.item_group_id|default:'' }}"
+                                                data-request-source="Item">
+                                            Request
+                                        </button>
+                                    {% endif %}
                                     {% if item.detail_url %}
                                         <a class="btn btn-outline-secondary" href="{{ item.detail_url }}" target="_blank" rel="noopener">View</a>
                                     {% else %}
@@ -205,13 +217,14 @@
         <div class="modal fade" id="requestModal" tabindex="-1" aria-labelledby="requestModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                    <form method="post" action="{% url 'creator_send_request' %}">
+                    <form method="post" action="{% url 'creator_send_request' %}" id="creator-request-form">
                         {% csrf_token %}
                         <div class="modal-header">
                             <h5 class="modal-title" id="requestModalLabel">Send Partnership Request</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
+                            <div id="requestError" class="alert alert-danger d-none" role="alert"></div>
                             <input type="hidden" name="merchant_id" id="requestMerchantId">
                             <input type="hidden" name="item_id" id="requestItemId">
                             <input type="hidden" name="item_group_id" id="requestItemGroupId">
@@ -230,7 +243,7 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                            <button type="submit" class="btn btn-primary" data-request-submit>Submit Request</button>
                         </div>
                     </form>
                 </div>
@@ -243,7 +256,43 @@
                 if (!modal) {
                     return;
                 }
+                const form = document.getElementById('creator-request-form');
+                const errorMessage = document.getElementById('requestError');
+                const submitButton = form ? form.querySelector('[data-request-submit]') : null;
+                let activeTrigger = null;
+
+                const getCookie = (name) => {
+                    const value = `; ${document.cookie}`;
+                    const parts = value.split(`; ${name}=`);
+                    if (parts.length === 2) {
+                        return parts.pop().split(';').shift();
+                    }
+                    return '';
+                };
+
+                const showError = (message) => {
+                    if (!errorMessage) {
+                        return;
+                    }
+                    errorMessage.textContent = message;
+                    errorMessage.classList.remove('d-none');
+                };
+
+                const clearError = () => {
+                    if (!errorMessage) {
+                        return;
+                    }
+                    errorMessage.textContent = '';
+                    errorMessage.classList.add('d-none');
+                };
+
                 modal.addEventListener('show.bs.modal', function(event) {
+                    activeTrigger = event.relatedTarget;
+                    clearError();
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Submit Request';
+                    }
                     const button = event.relatedTarget;
                     const merchantId = button.getAttribute('data-merchant-id') || '';
                     const merchantName = button.getAttribute('data-merchant-name') || '';
@@ -264,6 +313,54 @@
                         : `Hi ${merchantName} team, I'd love to request a partnership and share your products with my audience.`;
                     messageField.value = baseMessage;
                 });
+
+                if (form) {
+                    form.addEventListener('submit', function(event) {
+                        if (!window.fetch) {
+                            return;
+                        }
+                        event.preventDefault();
+                        clearError();
+
+                        if (submitButton) {
+                            submitButton.disabled = true;
+                            submitButton.textContent = 'Submitting...';
+                        }
+
+                        fetch(form.action, {
+                            method: 'POST',
+                            body: new FormData(form),
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': getCookie('csrftoken'),
+                            },
+                        })
+                            .then((response) => {
+                                if (!response.ok) {
+                                    throw new Error('Unable to submit request. Please try again.');
+                                }
+                                if (activeTrigger) {
+                                    activeTrigger.classList.remove('btn-primary');
+                                    activeTrigger.classList.add('btn-secondary');
+                                    activeTrigger.textContent = 'Requested';
+                                    activeTrigger.disabled = true;
+                                    activeTrigger.removeAttribute('data-bs-toggle');
+                                    activeTrigger.removeAttribute('data-bs-target');
+                                }
+                                const instance = bootstrap.Modal.getInstance(modal);
+                                if (instance) {
+                                    instance.hide();
+                                }
+                            })
+                            .catch((error) => {
+                                showError(error.message || 'Unable to submit request.');
+                                if (submitButton) {
+                                    submitButton.disabled = false;
+                                    submitButton.textContent = 'Submit Request';
+                                }
+                            });
+                    });
+                }
             });
         </script>
     {% endif %}
