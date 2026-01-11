@@ -17,22 +17,6 @@
         </form>
     </div>
 
-    <div class="d-flex align-items-center justify-content-between mb-4">
-        <ul class="nav nav-tabs mb-0">
-            <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="{% url 'merchant_marketplace' %}">Marketplace</a>
-            </li>
-        </ul>
-        {% if request_count %}
-            <a class="btn btn-dark btn-sm position-relative" href="{% url 'merchant_requests' %}" aria-label="View requests">
-                <i class="bi bi-people-fill"></i>
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                    {{ request_count }}
-                </span>
-            </a>
-        {% endif %}
-    </div>
-
     {% if not merchant_meta.marketplace_enabled %}
         <div class="alert alert-info">Turn on Marketplace visibility to be discoverable by creators and search for new partners.</div>
     {% else %}
