@@ -1232,16 +1232,28 @@ def merchant_creators(request):
 
     active_creators = [build_creator_entry(link) for link in active_links]
     inactive_creators = [build_creator_entry(link) for link in inactive_links]
-    pending_creators = [
-        {
-            "link_id": link.id,
-            "creator_id": link.creator.id,
-            "username": link.creator.username,
-            "email": link.creator.email,
-            "short_pitch": get_short_pitch(link.creator),
-        }
-        for link in pending_links
-    ]
+    pending_creators = []
+    for link in pending_links:
+        creator_meta = getattr(link.creator, "creatormeta", None)
+        pending_creators.append(
+            {
+                "link_id": link.id,
+                "creator_id": link.creator.id,
+                "username": link.creator.username,
+                "email": link.creator.email,
+                "short_pitch": get_short_pitch(link.creator),
+                "bio": creator_meta.bio if creator_meta else "",
+                "social_media_platform": (
+                    creator_meta.social_media_platform if creator_meta else ""
+                ),
+                "follower_range": creator_meta.follower_range if creator_meta else "",
+                "country": creator_meta.country if creator_meta else "",
+                "content_languages": (
+                    creator_meta.content_languages if creator_meta else ""
+                ),
+                "content_skills": creator_meta.content_skills if creator_meta else [],
+            }
+        )
 
     return render(
         request,
