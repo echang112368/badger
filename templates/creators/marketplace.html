@@ -92,22 +92,18 @@
                                     </div>
                                 </div>
                                 <div class="mt-auto d-flex marketplace-actions">
-                                    {% if merchant.meta.user.id in requested_merchants %}
-                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
-                                    {% else %}
-                                        <button type="button"
-                                                class="btn btn-primary"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#requestModal"
-                                                data-merchant-id="{{ merchant.meta.user.id }}"
-                                                data-merchant-name="{{ merchant.display_name }}"
-                                                data-item-name=""
-                                                data-item-id=""
-                                                data-item-group-id=""
-                                                data-request-source="Business">
-                                            Request
-                                        </button>
-                                    {% endif %}
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#requestModal"
+                                            data-merchant-id="{{ merchant.meta.user.id }}"
+                                            data-merchant-name="{{ merchant.display_name }}"
+                                            data-item-name=""
+                                            data-item-id=""
+                                            data-item-group-id=""
+                                            data-request-source="Business">
+                                        Request
+                                    </button>
                                     {% if merchant.store_url %}
                                         <a class="btn btn-outline-secondary" href="{{ merchant.store_url }}" target="_blank" rel="noopener">View</a>
                                     {% else %}
@@ -169,26 +165,18 @@
                                     {% endif %}
                                 </div>
                                 <div class="mt-auto d-flex marketplace-actions">
-                                    {% if item.item_id and item.item_id in requested_items %}
-                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
-                                    {% elif item.item_group_id and item.item_group_id in requested_item_groups %}
-                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
-                                    {% elif item.merchant.user.id in requested_merchants %}
-                                        <button type="button" class="btn btn-secondary" disabled>Requested</button>
-                                    {% else %}
-                                        <button type="button"
-                                                class="btn btn-primary"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#requestModal"
-                                                data-merchant-id="{{ item.merchant.user.id }}"
-                                                data-merchant-name="{{ item.merchant_name }}"
-                                                data-item-name="{{ item.name }}"
-                                                data-item-id="{{ item.item_id|default:'' }}"
-                                                data-item-group-id="{{ item.item_group_id|default:'' }}"
-                                                data-request-source="Item">
-                                            Request
-                                        </button>
-                                    {% endif %}
+                                    <button type="button"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#requestModal"
+                                            data-merchant-id="{{ item.merchant.user.id }}"
+                                            data-merchant-name="{{ item.merchant_name }}"
+                                            data-item-name="{{ item.name }}"
+                                            data-item-id="{{ item.item_id|default:'' }}"
+                                            data-item-group-id="{{ item.item_group_id|default:'' }}"
+                                            data-request-source="Item">
+                                        Request
+                                    </button>
                                     {% if item.detail_url %}
                                         <a class="btn btn-outline-secondary" href="{{ item.detail_url }}" target="_blank" rel="noopener">View</a>
                                     {% else %}
