@@ -1116,12 +1116,12 @@ def merchant_creators(request):
         .select_related("creator__creatormeta")
         .order_by("creator__username")
     )
-    pending_links = (
-        MerchantCreatorLink.objects.filter(
-            merchant=merchant_user, status=STATUS_REQUESTED
+    pending_requests = (
+        PartnershipRequest.objects.filter(
+            merchant=merchant_user, status=REQUEST_STATUS_PENDING
         )
         .select_related("creator__creatormeta")
-        .order_by("creator__username")
+        .order_by("-created_at")
     )
 
     def quantize_amount(value):
@@ -1232,16 +1232,21 @@ def merchant_creators(request):
 
     active_creators = [build_creator_entry(link) for link in active_links]
     inactive_creators = [build_creator_entry(link) for link in inactive_links]
-    pending_creators = [
-        {
-            "link_id": link.id,
-            "creator_id": link.creator.id,
-            "username": link.creator.username,
-            "email": link.creator.email,
-            "short_pitch": get_short_pitch(link.creator),
-        }
-        for link in pending_links
-    ]
+    pending_creators = []
+    seen_creators = set()
+    for request_entry in pending_requests:
+        creator = request_entry.creator
+        if creator.id in seen_creators:
+            continue
+        seen_creators.add(creator.id)
+        pending_creators.append(
+            {
+                "creator_id": creator.id,
+                "username": creator.username,
+                "email": creator.email,
+                "short_pitch": get_short_pitch(creator),
+            }
+        )
 
     return render(
         request,
