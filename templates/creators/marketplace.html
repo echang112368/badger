@@ -321,11 +321,6 @@
                         }
                         event.preventDefault();
                         clearError();
-                        console.info('[creator-request] submit start', {
-                            merchantId: document.getElementById('requestMerchantId').value,
-                            itemId: document.getElementById('requestItemId').value,
-                            itemGroupId: document.getElementById('requestItemGroupId').value,
-                        });
 
                         if (submitButton) {
                             submitButton.disabled = true;
@@ -344,7 +339,6 @@
                                 if (!response.ok) {
                                     throw new Error('Unable to submit request. Please try again.');
                                 }
-                                console.info('[creator-request] submit success');
                                 if (activeTrigger) {
                                     activeTrigger.classList.remove('btn-primary');
                                     activeTrigger.classList.add('btn-secondary');
@@ -359,7 +353,6 @@
                                 }
                             })
                             .catch((error) => {
-                                console.error('[creator-request] submit failed', error);
                                 showError(error.message || 'Unable to submit request.');
                                 if (submitButton) {
                                     submitButton.disabled = false;
