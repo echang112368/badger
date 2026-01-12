@@ -5,17 +5,24 @@
     <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card shadow-sm rounded h-100">
                 <div class="card-body">
                     <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card shadow-sm rounded h-100">
                 <div class="card-body">
                     <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <p class="mb-0 fw-bold">Total Earnings (30 days): ${{ earnings_total }}</p>
                 </div>
             </div>
         </div>
