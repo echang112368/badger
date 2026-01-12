@@ -1,22 +1,102 @@
 {% extends 'merchants/base.html' %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<section class="my-4">
+<style>
+    .dashboard-hero h1 { letter-spacing: -0.02em; }
+    .metric-card { border-radius: 12px; border: 1px solid #e7e7ef; box-shadow: 0 10px 24px rgba(26, 26, 26, 0.08); }
+    .metric-card .label { color: #5f6470; font-size: 0.9rem; }
+    .metric-card .value { font-size: 1.4rem; font-weight: 600; }
+    .chart-card { border-radius: 16px; border: 1px solid #e7e7ef; box-shadow: 0 12px 32px rgba(26, 26, 26, 0.08); }
+    .chart-tabs .nav-link { color: #5f6470; padding: 0.35rem 0.75rem; }
+    .chart-tabs .nav-link.active { color: #1f2a44; border-bottom: 2px solid #304f91; }
+    .chart-area { background: linear-gradient(180deg, rgba(230, 242, 246, 0.6), rgba(255, 255, 255, 0)); border-radius: 12px; border: 1px solid #eef0f6; }
+    .chart-legend { font-size: 0.85rem; color: #5f6470; }
+    .subsection-title { font-size: 1.1rem; font-weight: 600; }
+    .overview-controls .form-select,
+    .overview-controls .btn { border-radius: 999px; }
+</style>
+
+<section class="my-4 dashboard-hero">
     <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card shadow-sm rounded h-100">
+        <div class="col-lg-4 col-md-6">
+            <div class="card metric-card h-100">
                 <div class="card-body">
-                    <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
+                    <div class="label mb-1">Total Expenses</div>
+                    <div class="value">${{ balance|floatformat:2 }}</div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card shadow-sm rounded h-100">
+        <div class="col-lg-4 col-md-6">
+            <div class="card metric-card h-100">
                 <div class="card-body">
-                    <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
+                    <div class="label mb-1">Affiliate Payouts Owed</div>
+                    <div class="value">${{ affiliate_total|floatformat:2 }}</div>
                 </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-12">
+            <div class="card metric-card h-100">
+                <div class="card-body">
+                    <div class="label mb-1">Total Revenue</div>
+                    <div class="value">${{ total_revenue|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="subsection-title">Revenue Overview</div>
+            <div class="chart-legend d-flex align-items-center gap-2">
+                <span class="d-inline-block rounded" style="width:28px;height:10px;background:#d6ecf1;border:1px solid #7fb7c8;"></span>
+                Earnings
+            </div>
+        </div>
+        <div class="card chart-card">
+            <div class="card-body">
+                <ul class="nav chart-tabs gap-2 mb-3">
+                    <li class="nav-item"><span class="nav-link active">Overview</span></li>
+                    <li class="nav-item"><span class="nav-link">Clicks</span></li>
+                    <li class="nav-item"><span class="nav-link">Conversions</span></li>
+                    <li class="nav-item"><span class="nav-link">Creators</span></li>
+                </ul>
+                <div class="chart-area p-3">
+                    <svg viewBox="0 0 560 180" class="w-100" role="img" aria-label="Revenue trend">
+                        <defs>
+                            <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#b9dfe8" stop-opacity="0.8"></stop>
+                                <stop offset="100%" stop-color="#b9dfe8" stop-opacity="0.05"></stop>
+                            </linearGradient>
+                        </defs>
+                        <polyline fill="none" stroke="#7fb7c8" stroke-width="3"
+                            points="10,140 90,110 170,90 250,105 330,80 410,120 490,140 550,132" />
+                        <polygon fill="url(#chartFill)"
+                            points="10,140 90,110 170,90 250,105 330,80 410,120 490,140 550,132 550,170 10,170" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="subsection-title">Revenue Overview</div>
+            <div class="overview-controls d-flex gap-2">
+                <button class="btn btn-light btn-sm">Overview</button>
+                <button class="btn btn-light btn-sm">Clicks</button>
+                <select class="form-select form-select-sm" aria-label="Creators">
+                    <option selected>ATL - Creators</option>
+                </select>
+                <select class="form-select form-select-sm" aria-label="Timeframe">
+                    <option selected>20d, 900</option>
+                </select>
+            </div>
+        </div>
+        <div class="card chart-card">
+            <div class="card-body">
+                <p class="text-muted mb-0">More analytics views are coming soon.</p>
             </div>
         </div>
     </div>
