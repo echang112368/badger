@@ -436,20 +436,6 @@ def orders_create_webhook(request):
     print(f"Order {order_id} total commission: {commission_total}")
 
     conversion_metadata = {"source": "shopify_orders_create"}
-    line_items_payload = []
-    for item in payload.get("line_items", []):
-        product_id = item.get("product_id")
-        if not product_id:
-            continue
-        line_items_payload.append(
-            {
-                "product_id": str(product_id),
-                "quantity": item.get("quantity", 1),
-                "price": item.get("price"),
-            }
-        )
-    if line_items_payload:
-        conversion_metadata["line_items"] = line_items_payload
     if customer_uuid:
         conversion_metadata["customer_uuid"] = str(customer_uuid)
 
