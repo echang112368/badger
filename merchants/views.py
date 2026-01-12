@@ -43,7 +43,7 @@ from django.urls import reverse
 from typing import Iterable, Optional
 from django.utils.text import slugify
 
-from collect.models import AffiliateClick, ReferralVisit
+from collect.models import AffiliateClick, ReferralConversion, ReferralVisit
 
 from .access import resolve_merchant_permissions
 
@@ -362,12 +362,20 @@ def merchant_dashboard(request):
         -affiliate_total_raw if affiliate_total_raw < 0 else affiliate_total_raw
     )
     affiliate_total = affiliate_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    earnings_window_start = timezone.now() - timedelta(days=30)
+    earnings_total = (
+        ReferralConversion.objects.filter(
+            merchant=merchant_user, created_at__gte=earnings_window_start
+        ).aggregate(total=Sum("order_amount"))
+    ).get("total") or Decimal("0")
+    earnings_total = earnings_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
         'balance': balance,
         'ledger_entries': entries,
         'permissions': permissions,
         'affiliate_total': affiliate_total,
+        'earnings_total': earnings_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
     })
 
