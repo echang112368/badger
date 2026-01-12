@@ -2,287 +2,58 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <section class="my-4">
-    {% if request.GET.view == "analytics" %}
-        <h1 class="fw-bold fs-3 mb-2">Campaign Analytics</h1>
-        <p class="text-muted mb-4">
-            Active campaign items are listed below with their earnings and sales activity.
-        </p>
+    <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
 
-        <div class="card shadow-sm rounded mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <h2 class="fw-bold fs-5 mb-1">Active Campaign Items</h2>
-                        <small class="text-muted">Only items included in active campaigns appear here.</small>
-                    </div>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Product</th>
-                                <th>Campaigns</th>
-                                <th>Total Earnings</th>
-                                <th>Units Sold</th>
-                                <th class="text-center">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in analytics_items %}
-                            <tr>
-                                <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        {% if entry.item.image_url %}
-                                            <img src="{{ entry.item.image_url }}" alt="{{ entry.item.title }}" class="rounded border" width="44" height="44">
-                                        {% else %}
-                                            <div class="rounded bg-light border d-flex align-items-center justify-content-center" style="width:44px; height:44px;">
-                                                <i class="bi bi-bag"></i>
-                                            </div>
-                                        {% endif %}
-                                        <div>
-                                            <div class="fw-semibold">{{ entry.item.title }}</div>
-                                            {% if entry.item.shopify_product_id %}
-                                                <small class="text-muted">ID: {{ entry.item.shopify_product_id }}</small>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if entry.campaigns %}
-                                        <div class="d-flex flex-wrap gap-1">
-                                            {% for campaign in entry.campaigns %}
-                                                <span class="badge bg-light text-dark border">{{ campaign }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    {% else %}
-                                        <span class="text-muted">No active campaign</span>
-                                    {% endif %}
-                                </td>
-                                <td>${{ entry.earnings }}</td>
-                                <td>{{ entry.quantity }}</td>
-                                <td class="text-center">
-                                    <button
-                                        class="btn btn-sm btn-outline-primary analytics-details-btn"
-                                        type="button"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#analyticsDetailModal"
-                                        data-details="{{ entry.details_json|escapejs }}"
-                                    >
-                                        View more
-                                    </button>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">No active campaign items yet.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
                 </div>
             </div>
         </div>
-
-        <div class="modal fade" id="analyticsDetailModal" tabindex="-1" aria-labelledby="analyticsDetailModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <div>
-                            <h5 class="modal-title" id="analyticsDetailModalLabel">Item details</h5>
-                            <small class="text-muted" id="analyticsDetailCampaigns"></small>
-                        </div>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row g-4 mb-4">
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Total earnings</div>
-                                        <div class="fs-4 fw-bold" id="analyticsDetailEarnings">$0.00</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Items purchased</div>
-                                        <div class="fs-4 fw-bold" id="analyticsDetailUnits">0</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Creators credited</div>
-                                        <div class="fs-4 fw-bold" id="analyticsDetailCreatorsCount">0</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-4">
-                            <div class="col-lg-5">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <h6 class="fw-semibold">Creator attribution</h6>
-                                        <ul class="list-group list-group-flush" id="analyticsDetailCreators">
-                                            <li class="list-group-item text-muted">No creator sales recorded.</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-lg-7">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <h6 class="fw-semibold mb-3">Monthly sales (past 12 months)</h6>
-                                        <canvas id="analyticsDetailChart" height="120"></canvas>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
                 </div>
             </div>
         </div>
-    {% else %}
-        <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
-
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card shadow-sm rounded h-100">
-                    <div class="card-body">
-                        <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card shadow-sm rounded h-100">
-                    <div class="card-body">
-                        <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card shadow-sm rounded h-100">
-                    <div class="card-body">
-                        <p class="mb-0 fw-bold">Total Earnings (30 days): ${{ earnings_total }}</p>
-                    </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm rounded h-100">
+                <div class="card-body">
+                    <p class="mb-0 fw-bold">Total Earnings (30 days): ${{ earnings_total }}</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <h2 class="fw-bold fs-4 mb-3">Transaction History</h2>
-        <div class="card shadow-sm rounded mb-4">
-            <div class="card-body p-0">
-                <table class="table table-striped table-bordered mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Amount</th>
-                            <th>Paid</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in ledger_entries %}
-                        <tr>
-                            <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
-                            <td>{{ entry.get_entry_type_display }}</td>
-                            <td>{{ entry.amount }}</td>
-                            <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="4">No transactions.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <h2 class="fw-bold fs-4 mb-3">Transaction History</h2>
+    <div class="card shadow-sm rounded mb-4">
+        <div class="card-body p-0">
+            <table class="table table-striped table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Paid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in ledger_entries %}
+                    <tr>
+                        <td><time class="local-time" datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp }}</time></td>
+                        <td>{{ entry.get_entry_type_display }}</td>
+                        <td>{{ entry.amount }}</td>
+                        <td>{{ entry.paid|yesno:"Paid,Unpaid" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">No transactions.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    {% endif %}
+    </div>
 </section>
-
-{% if request.GET.view == "analytics" %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var detailsButtons = document.querySelectorAll('.analytics-details-btn');
-        var modalTitle = document.getElementById('analyticsDetailModalLabel');
-        var campaignsEl = document.getElementById('analyticsDetailCampaigns');
-        var earningsEl = document.getElementById('analyticsDetailEarnings');
-        var unitsEl = document.getElementById('analyticsDetailUnits');
-        var creatorsCountEl = document.getElementById('analyticsDetailCreatorsCount');
-        var creatorsListEl = document.getElementById('analyticsDetailCreators');
-        var chartCanvas = document.getElementById('analyticsDetailChart');
-        var activeChart = null;
-
-        function renderChart(labels, data) {
-            if (!chartCanvas) {
-                return;
-            }
-            if (activeChart) {
-                activeChart.destroy();
-            }
-            activeChart = new Chart(chartCanvas, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Units sold',
-                        data: data,
-                        backgroundColor: 'rgba(48, 79, 145, 0.6)',
-                        borderColor: 'rgba(48, 79, 145, 1)',
-                        borderWidth: 1,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                    },
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
-                }
-            });
-        }
-
-        detailsButtons.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var detailsRaw = btn.getAttribute('data-details');
-                if (!detailsRaw) {
-                    return;
-                }
-                var details = JSON.parse(detailsRaw);
-                modalTitle.textContent = details.title || 'Item details';
-                campaignsEl.textContent = (details.campaigns || []).join(', ') || 'No campaign assigned';
-                earningsEl.textContent = '$' + (details.earnings || '0.00');
-                unitsEl.textContent = details.total_quantity || 0;
-
-                var creators = details.creator_breakdown || [];
-                creatorsCountEl.textContent = creators.length;
-                creatorsListEl.innerHTML = '';
-                if (!creators.length) {
-                    var emptyItem = document.createElement('li');
-                    emptyItem.className = 'list-group-item text-muted';
-                    emptyItem.textContent = 'No creator sales recorded.';
-                    creatorsListEl.appendChild(emptyItem);
-                } else {
-                    creators.forEach(function (creator) {
-                        var li = document.createElement('li');
-                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                        li.innerHTML = '<span>' + creator.name + '</span><span class="badge bg-primary rounded-pill">' + creator.quantity + '</span>';
-                        creatorsListEl.appendChild(li);
-                    });
-                }
-
-                renderChart(details.monthly_labels || [], details.monthly_sales || []);
-            });
-        });
-    });
-</script>
-{% endif %}
 {% endblock %}
