@@ -1,5 +1,6 @@
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from datetime import datetime, timedelta
+from collections import defaultdict
 import json
 import logging
 import secrets
@@ -369,6 +370,147 @@ def merchant_dashboard(request):
         ).aggregate(total=Sum("order_amount"))
     ).get("total") or Decimal("0")
     earnings_total = earnings_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    analytics_items = []
+    if request.GET.get("view") == "analytics":
+        groups = (
+            ItemGroup.objects.filter(merchant=merchant_user)
+            .prefetch_related("items")
+            .order_by("name")
+        )
+        campaign_items = {}
+        item_by_product_id = {}
+        for group in groups:
+            for item in group.items.all():
+                entry = campaign_items.setdefault(
+                    item.id,
+                    {
+                        "item": item,
+                        "campaigns": set(),
+                    },
+                )
+                entry["campaigns"].add(group.name)
+                if item.shopify_product_id:
+                    item_by_product_id[str(item.shopify_product_id)] = item.id
+
+        now = timezone.now()
+        month_labels = []
+        month_keys = []
+        for offset in range(11, -1, -1):
+            month = now.month - offset
+            year = now.year
+            while month <= 0:
+                month += 12
+                year -= 1
+            label = datetime(year, month, 1).strftime("%b %Y")
+            month_labels.append(label)
+            month_keys.append(f"{year:04d}-{month:02d}")
+        month_index = {key: idx for idx, key in enumerate(month_keys)}
+
+        analytics_data = {}
+        for item_id, entry in campaign_items.items():
+            analytics_data[item_id] = {
+                "earnings": Decimal("0"),
+                "quantity": 0,
+                "creator_breakdown": defaultdict(int),
+                "monthly_sales": [0 for _ in month_labels],
+            }
+
+        conversions = (
+            ReferralConversion.objects.filter(merchant=merchant_user)
+            .select_related("creator")
+            .order_by("-created_at")
+        )
+        missing_creator_uuids = {
+            str(conversion.creator_uuid)
+            for conversion in conversions
+            if not conversion.creator and conversion.creator_uuid
+        }
+        creator_lookup = {}
+        if missing_creator_uuids:
+            creator_lookup = {
+                str(meta.uuid): meta
+                for meta in CreatorMeta.objects.select_related("user").filter(
+                    uuid__in=missing_creator_uuids
+                )
+            }
+        for conversion in conversions:
+            metadata = conversion.metadata or {}
+            line_items = metadata.get("line_items") if isinstance(metadata, dict) else []
+            if not line_items:
+                continue
+            created_key = conversion.created_at.strftime("%Y-%m")
+            for line in line_items:
+                product_id = line.get("product_id")
+                if not product_id:
+                    continue
+                item_id = item_by_product_id.get(str(product_id))
+                if not item_id:
+                    continue
+                quantity = line.get("quantity") or 0
+                price = line.get("price") or "0"
+                try:
+                    quantity_int = int(quantity)
+                except (TypeError, ValueError):
+                    quantity_int = 0
+                try:
+                    line_amount = (Decimal(str(price)) * Decimal(quantity_int)).quantize(
+                        Decimal("0.01")
+                    )
+                except (TypeError, ValueError, InvalidOperation):
+                    line_amount = Decimal("0")
+
+                analytics_data[item_id]["earnings"] += line_amount
+                analytics_data[item_id]["quantity"] += quantity_int
+                creator_name = "Unknown creator"
+                if conversion.creator:
+                    creator_name = (
+                        conversion.creator.get_full_name()
+                        or conversion.creator.username
+                    )
+                elif conversion.creator_uuid:
+                    creator_meta = creator_lookup.get(str(conversion.creator_uuid))
+                    if creator_meta and creator_meta.user:
+                        creator_name = (
+                            creator_meta.user.get_full_name()
+                            or creator_meta.user.username
+                        )
+                analytics_data[item_id]["creator_breakdown"][creator_name] += quantity_int
+                if created_key in month_index:
+                    analytics_data[item_id]["monthly_sales"][
+                        month_index[created_key]
+                    ] += quantity_int
+
+        for item_id, entry in campaign_items.items():
+            item = entry["item"]
+            data = analytics_data.get(item_id, {})
+            earnings = data.get("earnings", Decimal("0")).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            creator_breakdown = [
+                {"name": name, "quantity": qty}
+                for name, qty in sorted(
+                    data.get("creator_breakdown", {}).items(),
+                    key=lambda kv: (-kv[1], kv[0].lower()),
+                )
+            ]
+            details = {
+                "title": item.title,
+                "campaigns": sorted(entry["campaigns"]),
+                "earnings": f"{earnings:.2f}",
+                "total_quantity": data.get("quantity", 0),
+                "creator_breakdown": creator_breakdown,
+                "monthly_labels": month_labels,
+                "monthly_sales": data.get("monthly_sales", [0 for _ in month_labels]),
+            }
+            analytics_items.append(
+                {
+                    "item": item,
+                    "campaigns": sorted(entry["campaigns"]),
+                    "earnings": earnings,
+                    "quantity": data.get("quantity", 0),
+                    "details_json": json.dumps(details),
+                }
+            )
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
         'balance': balance,
@@ -377,6 +519,7 @@ def merchant_dashboard(request):
         'affiliate_total': affiliate_total,
         'earnings_total': earnings_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
+        'analytics_items': analytics_items,
     })
 
 
