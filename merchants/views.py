@@ -435,7 +435,13 @@ def merchant_dashboard(request):
             analytics_data[item_id] = {
                 "earnings": Decimal("0"),
                 "quantity": 0,
-                "creator_breakdown": defaultdict(int),
+                "creator_breakdown": defaultdict(
+                    lambda: {
+                        "quantity": 0,
+                        "revenue": Decimal("0"),
+                        "commission": Decimal("0"),
+                    }
+                ),
                 "monthly_sales": [0 for _ in month_labels],
             }
 
@@ -498,7 +504,16 @@ def merchant_dashboard(request):
                             creator_meta.user.get_full_name()
                             or creator_meta.user.username
                         )
-                analytics_data[item_id]["creator_breakdown"][creator_name] += quantity_int
+                creator_entry = analytics_data[item_id]["creator_breakdown"][creator_name]
+                creator_entry["quantity"] += quantity_int
+                creator_entry["revenue"] += line_amount
+                affiliate_percent = campaign_items.get(item_id, {}).get(
+                    "affiliate_percent"
+                )
+                if affiliate_percent is not None:
+                    creator_entry["commission"] += (
+                        line_amount * Decimal(affiliate_percent) / Decimal("100")
+                    )
                 if created_key in month_index:
                     analytics_data[item_id]["monthly_sales"][
                         month_index[created_key]
@@ -516,10 +531,15 @@ def merchant_dashboard(request):
                     Decimal("0.01"), rounding=ROUND_HALF_UP
                 )
             creator_breakdown = [
-                {"name": name, "quantity": qty}
-                for name, qty in sorted(
+                {
+                    "name": name,
+                    "quantity": data["quantity"],
+                    "revenue": f"{data['revenue']:.2f}",
+                    "commission": f"{data['commission']:.2f}",
+                }
+                for name, data in sorted(
                     data.get("creator_breakdown", {}).items(),
-                    key=lambda kv: (-kv[1], kv[0].lower()),
+                    key=lambda kv: (-kv[1]["quantity"], kv[0].lower()),
                 )
             ]
             details = {
