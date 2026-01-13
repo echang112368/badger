@@ -397,9 +397,16 @@ def merchant_dashboard(request):
                     {
                         "item": item,
                         "campaigns": set(),
+                        "affiliate_percent": group.affiliate_percent,
                     },
                 )
                 entry["campaigns"].add(group.name)
+                if entry.get("affiliate_percent") is None:
+                    entry["affiliate_percent"] = group.affiliate_percent
+                else:
+                    entry["affiliate_percent"] = max(
+                        entry["affiliate_percent"], group.affiliate_percent
+                    )
                 if item.shopify_product_id:
                     raw_product_id = str(item.shopify_product_id)
                     normalised_product_id = _normalise_shopify_product_id(
@@ -503,6 +510,11 @@ def merchant_dashboard(request):
             earnings = data.get("earnings", Decimal("0")).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             )
+            affiliate_percent = entry.get("affiliate_percent")
+            if affiliate_percent is not None:
+                affiliate_percent = affiliate_percent.quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                )
             creator_breakdown = [
                 {"name": name, "quantity": qty}
                 for name, qty in sorted(
@@ -513,6 +525,11 @@ def merchant_dashboard(request):
             details = {
                 "title": item.title,
                 "campaigns": sorted(entry["campaigns"]),
+                "image_url": item.image_url,
+                "item_id": item.id,
+                "affiliate_percent": (
+                    f"{affiliate_percent:.2f}" if affiliate_percent is not None else None
+                ),
                 "earnings": f"{earnings:.2f}",
                 "total_quantity": data.get("quantity", 0),
                 "creator_breakdown": creator_breakdown,
@@ -538,6 +555,46 @@ def merchant_dashboard(request):
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         'analytics_items': analytics_items,
     })
+
+
+@login_required
+def merchant_increase_commission(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_modify_content:
+        return HttpResponseForbidden()
+
+    if request.method != "POST":
+        return redirect(f"{reverse('merchant_dashboard')}?view=analytics")
+
+    merchant_user = permissions.merchant
+    item_id = request.POST.get("item_id")
+    affiliate_percent_raw = request.POST.get("affiliate_percent")
+
+    try:
+        affiliate_percent = Decimal(str(affiliate_percent_raw))
+    except (TypeError, ValueError, InvalidOperation):
+        return redirect(f"{reverse('merchant_dashboard')}?view=analytics")
+
+    affiliate_percent = max(Decimal("0"), min(Decimal("100"), affiliate_percent))
+
+    item = MerchantItem.objects.filter(id=item_id, merchant=merchant_user).first()
+    if not item:
+        return redirect(f"{reverse('merchant_dashboard')}?view=analytics")
+
+    groups = ItemGroup.objects.filter(merchant=merchant_user, items=item)
+    for group in groups:
+        group.items.remove(item)
+        if not group.items.exists():
+            group.delete()
+
+    new_group = ItemGroup.objects.create(
+        merchant=merchant_user,
+        name=item.title,
+        affiliate_percent=affiliate_percent,
+    )
+    new_group.items.add(item)
+
+    return redirect(f"{reverse('merchant_dashboard')}?view=analytics")
 
 
 @login_required
