@@ -52,6 +52,17 @@ from .access import resolve_merchant_permissions
 logger = logging.getLogger(__name__)
 
 
+def _normalise_shopify_product_id(product_id):
+    if product_id is None:
+        return None
+    product_id_str = str(product_id).strip()
+    if product_id_str.startswith("gid://"):
+        parts = product_id_str.rsplit("/", 1)
+        if len(parts) == 2 and parts[1]:
+            return parts[1]
+    return product_id_str
+
+
 def _normalize_domain(domain: str) -> str:
     if not domain:
         return ""
@@ -390,7 +401,13 @@ def merchant_dashboard(request):
                 )
                 entry["campaigns"].add(group.name)
                 if item.shopify_product_id:
-                    item_by_product_id[str(item.shopify_product_id)] = item.id
+                    raw_product_id = str(item.shopify_product_id)
+                    normalised_product_id = _normalise_shopify_product_id(
+                        item.shopify_product_id
+                    )
+                    item_by_product_id[raw_product_id] = item.id
+                    if normalised_product_id:
+                        item_by_product_id[normalised_product_id] = item.id
 
         now = timezone.now()
         month_labels = []
@@ -440,7 +457,7 @@ def merchant_dashboard(request):
                 continue
             created_key = conversion.created_at.strftime("%Y-%m")
             for line in line_items:
-                product_id = line.get("product_id")
+                product_id = _normalise_shopify_product_id(line.get("product_id"))
                 if not product_id:
                     continue
                 item_id = item_by_product_id.get(str(product_id))
