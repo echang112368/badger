@@ -11,6 +11,7 @@ urlpatterns = [
     path('dashboard/', merchant_dashboard, name='merchant_dashboard'),
     path('invoices/', views.merchant_invoices, name='merchant_invoices'),
     path('items/', views.merchant_items, name='merchant_items'),
+    path('items/increase-commission/', views.merchant_increase_commission, name='merchant_increase_commission'),
     path('creators/', views.merchant_creators, name='merchant_creators'),
     path('requests/', views.merchant_requests, name='merchant_requests'),
     path('requests/<int:request_id>/update/', views.merchant_update_request, name='merchant_update_request'),
