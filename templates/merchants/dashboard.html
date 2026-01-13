@@ -66,7 +66,7 @@
                                         type="button"
                                         data-bs-toggle="modal"
                                         data-bs-target="#analyticsDetailModal"
-                                        data-details="{{ entry.details_json|escapejs }}"
+                                        data-details="{{ entry.details_json|escape }}"
                                     >
                                         View more
                                     </button>
@@ -256,7 +256,13 @@
                 if (!detailsRaw) {
                     return;
                 }
-                var details = JSON.parse(detailsRaw);
+                var details = null;
+                try {
+                    details = JSON.parse(detailsRaw);
+                } catch (error) {
+                    console.warn('Unable to parse analytics details payload.', error);
+                    return;
+                }
                 modalTitle.textContent = details.title || 'Item details';
                 campaignsEl.textContent = (details.campaigns || []).join(', ') || 'No campaign assigned';
                 earningsEl.textContent = '$' + (details.earnings || '0.00');
