@@ -513,6 +513,7 @@ def merchant_dashboard(request):
             details = {
                 "title": item.title,
                 "campaigns": sorted(entry["campaigns"]),
+                "image_url": item.image_url,
                 "earnings": f"{earnings:.2f}",
                 "total_quantity": data.get("quantity", 0),
                 "creator_breakdown": creator_breakdown,

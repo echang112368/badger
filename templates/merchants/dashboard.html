@@ -83,67 +83,155 @@
             </div>
         </div>
 
+        <style>
+            .analytics-detail-image {
+                width: 72px;
+                height: 72px;
+            }
+
+            .analytics-detail-metrics .border-end {
+                border-color: #e9ecef !important;
+            }
+
+            @media (max-width: 767.98px) {
+                .analytics-detail-metrics .border-end {
+                    border-right: 0 !important;
+                    border-bottom: 1px solid #e9ecef !important;
+                }
+            }
+        </style>
+
         <div class="modal fade" id="analyticsDetailModal" tabindex="-1" aria-labelledby="analyticsDetailModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <div>
-                            <h5 class="modal-title" id="analyticsDetailModalLabel">Item details</h5>
-                            <small class="text-muted" id="analyticsDetailCampaigns"></small>
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header border-0 pb-0">
+                        <div class="d-flex align-items-start gap-3 flex-grow-1">
+                            <div class="analytics-detail-image rounded-3 border bg-light d-flex align-items-center justify-content-center overflow-hidden">
+                                <img src="" alt="" class="w-100 h-100 object-fit-cover d-none" id="analyticsDetailImage">
+                                <i class="bi bi-image text-muted fs-3" id="analyticsDetailImagePlaceholder"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h5 class="modal-title fw-semibold mb-1" id="analyticsDetailModalLabel">Item details</h5>
+                                <div class="text-muted small mb-2" id="analyticsDetailCampaigns"></div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1">
+                                        <span class="rounded-circle bg-success d-inline-block" style="width:8px;height:8px;"></span>
+                                        Active
+                                    </span>
+                                    <span class="badge rounded-pill text-bg-light border text-dark">
+                                        <span class="fw-semibold">12%</span> commission
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div class="row g-4 mb-4">
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Total earnings</div>
+                    <div class="modal-body pt-3">
+                        <div class="analytics-detail-metrics border rounded-4 overflow-hidden mb-4">
+                            <div class="row g-0 text-center text-md-start">
+                                <div class="col-md">
+                                    <div class="p-3 h-100 border-end">
+                                        <div class="text-muted small">Total Revenue</div>
                                         <div class="fs-4 fw-bold" id="analyticsDetailEarnings">$0.00</div>
+                                        <div class="text-muted small">Last 12 months</div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Items purchased</div>
+                                <div class="col-md">
+                                    <div class="p-3 h-100 border-end">
+                                        <div class="text-muted small">Units Sold</div>
                                         <div class="fs-4 fw-bold" id="analyticsDetailUnits">0</div>
+                                        <div class="text-muted small">Avg price: $--</div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <div class="text-muted small">Creators credited</div>
+                                <div class="col-md">
+                                    <div class="p-3 h-100 border-end">
+                                        <div class="text-muted small">Creators</div>
                                         <div class="fs-4 fw-bold" id="analyticsDetailCreatorsCount">0</div>
+                                        <div class="text-muted small">Active affiliate</div>
+                                    </div>
+                                </div>
+                                <div class="col-md">
+                                    <div class="p-3 h-100 border-end">
+                                        <div class="text-muted small">Conversion Rate</div>
+                                        <div class="fs-4 fw-bold" id="analyticsDetailConversionRate">--</div>
+                                        <div class="text-muted small">From -- clicks</div>
+                                    </div>
+                                </div>
+                                <div class="col-md">
+                                    <div class="p-3 h-100">
+                                        <div class="text-muted small">Avg Commission Paid</div>
+                                        <div class="fs-4 fw-bold" id="analyticsDetailCommissionPaid">$--</div>
+                                        <div class="text-muted small">per sale</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="row g-4">
-                            <div class="col-lg-5">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <h6 class="fw-semibold">Creator attribution</h6>
-                                        <ul class="list-group list-group-flush" id="analyticsDetailCreators">
-                                            <li class="list-group-item text-muted">No creator sales recorded.</li>
-                                        </ul>
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                                        <h6 class="fw-semibold mb-0">Performance</h6>
+                                        <div class="text-muted small d-flex align-items-center gap-3">
+                                            <span class="border-start ps-3">Clicks</span>
+                                            <span>Conversions</span>
+                                            <span>Commission Paid</span>
+                                        </div>
+                                    </div>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
+                                        <button type="button" class="btn btn-outline-secondary">6M</button>
+                                        <button type="button" class="btn btn-outline-secondary">1Y</button>
+                                        <button type="button" class="btn btn-outline-secondary">2Y</button>
                                     </div>
                                 </div>
+                                <div class="position-relative">
+                                    <canvas id="analyticsDetailChart" height="120"></canvas>
+                                </div>
                             </div>
-                            <div class="col-lg-7">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-body">
-                                        <h6 class="fw-semibold mb-3">Monthly sales (past 12 months)</h6>
-                                        <canvas id="analyticsDetailChart" height="120"></canvas>
+                        </div>
+
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="fw-semibold mb-0">Creator Attribution</h6>
+                                        <span class="badge text-bg-light border text-success">Verified</span>
                                     </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>
+                                        View creator profile
+                                    </button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Creator</th>
+                                                <th>Sales</th>
+                                                <th>Revenue</th>
+                                                <th>Commission</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="analyticsDetailCreators">
+                                            <tr>
+                                                <td colspan="4" class="text-muted">No creator sales recorded.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary">
+                            <i class="bi bi-cash-coin me-1"></i>
+                            Increase commission
+                        </button>
+                        <button type="button" class="btn btn-primary">
+                            <i class="bi bi-megaphone me-1"></i>
+                            Promote to creators
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -216,6 +304,10 @@
         var unitsEl = document.getElementById('analyticsDetailUnits');
         var creatorsCountEl = document.getElementById('analyticsDetailCreatorsCount');
         var creatorsListEl = document.getElementById('analyticsDetailCreators');
+        var imageEl = document.getElementById('analyticsDetailImage');
+        var imagePlaceholderEl = document.getElementById('analyticsDetailImagePlaceholder');
+        var conversionRateEl = document.getElementById('analyticsDetailConversionRate');
+        var commissionPaidEl = document.getElementById('analyticsDetailCommissionPaid');
         var chartCanvas = document.getElementById('analyticsDetailChart');
         var activeChart = null;
 
@@ -227,15 +319,20 @@
                 activeChart.destroy();
             }
             activeChart = new Chart(chartCanvas, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
                         label: 'Units sold',
                         data: data,
-                        backgroundColor: 'rgba(48, 79, 145, 0.6)',
-                        borderColor: 'rgba(48, 79, 145, 1)',
-                        borderWidth: 1,
+                        tension: 0.35,
+                        fill: true,
+                        backgroundColor: 'rgba(91, 155, 213, 0.15)',
+                        borderColor: 'rgba(91, 155, 213, 0.8)',
+                        pointBackgroundColor: 'rgba(91, 155, 213, 1)',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 2,
                     }]
                 },
                 options: {
@@ -244,7 +341,10 @@
                         legend: { display: false },
                     },
                     scales: {
-                        y: { beginAtZero: true }
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
                     }
                 }
             });
@@ -264,24 +364,40 @@
                     return;
                 }
                 modalTitle.textContent = details.title || 'Item details';
-                campaignsEl.textContent = (details.campaigns || []).join(', ') || 'No campaign assigned';
+                campaignsEl.textContent = (details.campaigns || []).join(' / ') || 'No campaign assigned';
                 earningsEl.textContent = '$' + (details.earnings || '0.00');
                 unitsEl.textContent = details.total_quantity || 0;
+                conversionRateEl.textContent = details.conversion_rate || '--';
+                commissionPaidEl.textContent = details.average_commission || '$--';
+
+                if (imageEl && imagePlaceholderEl) {
+                    if (details.image_url) {
+                        imageEl.src = details.image_url;
+                        imageEl.alt = details.title || 'Product image';
+                        imageEl.classList.remove('d-none');
+                        imagePlaceholderEl.classList.add('d-none');
+                    } else {
+                        imageEl.classList.add('d-none');
+                        imagePlaceholderEl.classList.remove('d-none');
+                    }
+                }
 
                 var creators = details.creator_breakdown || [];
                 creatorsCountEl.textContent = creators.length;
                 creatorsListEl.innerHTML = '';
                 if (!creators.length) {
-                    var emptyItem = document.createElement('li');
-                    emptyItem.className = 'list-group-item text-muted';
-                    emptyItem.textContent = 'No creator sales recorded.';
-                    creatorsListEl.appendChild(emptyItem);
+                    var emptyRow = document.createElement('tr');
+                    emptyRow.innerHTML = '<td colspan="4" class="text-muted">No creator sales recorded.</td>';
+                    creatorsListEl.appendChild(emptyRow);
                 } else {
                     creators.forEach(function (creator) {
-                        var li = document.createElement('li');
-                        li.className = 'list-group-item d-flex justify-content-between align-items-center';
-                        li.innerHTML = '<span>' + creator.name + '</span><span class="badge bg-primary rounded-pill">' + creator.quantity + '</span>';
-                        creatorsListEl.appendChild(li);
+                        var row = document.createElement('tr');
+                        row.innerHTML =
+                            '<td class="fw-semibold">' + creator.name + '</td>' +
+                            '<td>' + creator.quantity + '</td>' +
+                            '<td>$--</td>' +
+                            '<td>$--</td>';
+                        creatorsListEl.appendChild(row);
                     });
                 }
 
