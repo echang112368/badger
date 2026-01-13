@@ -23,6 +23,17 @@ from decimal import Decimal, InvalidOperation
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
 
 
+def _normalise_shopify_product_id(product_id):
+    if product_id is None:
+        return None
+    product_id_str = str(product_id).strip()
+    if product_id_str.startswith("gid://"):
+        parts = product_id_str.rsplit("/", 1)
+        if len(parts) == 2 and parts[1]:
+            return parts[1]
+    return product_id_str
+
+
 def _normalize_domain(domain: str) -> str:
     if not domain:
         return ""
@@ -403,7 +414,7 @@ def orders_create_webhook(request):
     elif merchant_meta and creator_meta and creator_active_for_merchant:
         # Calculate commission per line item based on its group percentage
         for item in payload.get("line_items", []):
-            product_id = str(item.get("product_id"))
+            product_id = _normalise_shopify_product_id(item.get("product_id"))
             quantity = item.get("quantity", 1)
             price = item.get("price")
             try:
@@ -438,7 +449,7 @@ def orders_create_webhook(request):
     conversion_metadata = {"source": "shopify_orders_create"}
     line_items_payload = []
     for item in payload.get("line_items", []):
-        product_id = item.get("product_id")
+        product_id = _normalise_shopify_product_id(item.get("product_id"))
         if not product_id:
             continue
         line_items_payload.append(
