@@ -5,8 +5,8 @@ from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
 from shopify_app.token_management import refresh_shopify_token
 
 SCRIPT_SRCS = [
-    "https://4173244c6495.ngrok-free.app/static/js/referral_tracker.js",
-    "https://4173244c6495.ngrok-free.app/static/js/cart_attributes.js",
+    "https://6457c6b55211.ngrok-free.app/static/js/referral_tracker.js",
+    "https://6457c6b55211.ngrok-free.app/static/js/cart_attributes.js",
     
 ]
 

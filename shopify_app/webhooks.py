@@ -24,7 +24,7 @@ mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
 def register_orders_create_webhook(
     shop_domain: str,
     access_token: str,
-    webhook_url: str = "https://4173244c6495.ngrok-free.app/shopify/webhooks/orders-create/",
+    webhook_url: str = "https://6457c6b55211.ngrok-free.app/shopify/webhooks/orders-create/",
 ):
     """Register an orders/create webhook for the given shop."""
 
