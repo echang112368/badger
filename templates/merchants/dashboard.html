@@ -150,20 +150,6 @@
                                         <div class="text-muted small">Active affiliate</div>
                                     </div>
                                 </div>
-                                <div class="col-md">
-                                    <div class="p-3 h-100 border-end">
-                                        <div class="text-muted small">Conversion Rate</div>
-                                        <div class="fs-4 fw-bold" id="analyticsDetailConversionRate">--</div>
-                                        <div class="text-muted small">From -- clicks</div>
-                                    </div>
-                                </div>
-                                <div class="col-md">
-                                    <div class="p-3 h-100">
-                                        <div class="text-muted small">Avg Commission Paid</div>
-                                        <div class="fs-4 fw-bold" id="analyticsDetailCommissionPaid">$--</div>
-                                        <div class="text-muted small">per sale</div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -172,11 +158,6 @@
                                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
                                     <div class="d-flex align-items-center gap-3 flex-wrap">
                                         <h6 class="fw-semibold mb-0">Performance</h6>
-                                        <div class="text-muted small d-flex align-items-center gap-3">
-                                            <span class="border-start ps-3">Clicks</span>
-                                            <span>Conversions</span>
-                                            <span>Commission Paid</span>
-                                        </div>
                                     </div>
                                     <div class="btn-group btn-group-sm" role="group" aria-label="Date range">
                                         <button type="button" class="btn btn-outline-secondary">6M</button>
@@ -320,8 +301,6 @@
         var creatorsListEl = document.getElementById('analyticsDetailCreators');
         var imageEl = document.getElementById('analyticsDetailImage');
         var imagePlaceholderEl = document.getElementById('analyticsDetailImagePlaceholder');
-        var conversionRateEl = document.getElementById('analyticsDetailConversionRate');
-        var commissionPaidEl = document.getElementById('analyticsDetailCommissionPaid');
         var commissionPercentEl = document.getElementById('analyticsDetailCommissionPercent');
         var itemIdInput = document.getElementById('analyticsDetailItemId');
         var affiliateInput = document.getElementById('analyticsDetailAffiliateInput');
@@ -384,8 +363,6 @@
                 campaignsEl.textContent = (details.campaigns || []).join(' / ') || 'No campaign assigned';
                 earningsEl.textContent = '$' + (details.earnings || '0.00');
                 unitsEl.textContent = details.total_quantity || 0;
-                conversionRateEl.textContent = details.conversion_rate || '--';
-                commissionPaidEl.textContent = details.average_commission || '$--';
                 commissionPercentEl.textContent = (details.affiliate_percent || '--') + '%';
 
                 if (itemIdInput) {
@@ -420,8 +397,8 @@
                         row.innerHTML =
                             '<td class="fw-semibold">' + creator.name + '</td>' +
                             '<td>' + creator.quantity + '</td>' +
-                            '<td>$--</td>' +
-                            '<td>$--</td>';
+                            '<td>$' + creator.revenue + '</td>' +
+                            '<td>$' + creator.commission + '</td>';
                         creatorsListEl.appendChild(row);
                     });
                 }
