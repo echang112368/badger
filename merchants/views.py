@@ -374,6 +374,36 @@ def merchant_dashboard(request):
         -affiliate_total_raw if affiliate_total_raw < 0 else affiliate_total_raw
     )
     affiliate_total = affiliate_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    affiliate_entries = (
+        LedgerEntry.objects.filter(
+            merchant=merchant_user,
+            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+        )
+        .select_related("invoice")
+        .only("amount", "paid", "invoice__status")
+    )
+    canceled_statuses = {"CANCELLED", "CANCELED", "VOIDED"}
+    holding_period_total = Decimal("0")
+    scheduled_total = Decimal("0")
+    paid_total = Decimal("0")
+    canceled_total = Decimal("0")
+    for entry in affiliate_entries:
+        amount = -entry.amount if entry.amount < 0 else entry.amount
+        status = entry.invoice.status.upper() if entry.invoice else ""
+        if entry.paid:
+            paid_total += amount
+        elif status in canceled_statuses:
+            canceled_total += amount
+        elif entry.invoice:
+            scheduled_total += amount
+        else:
+            holding_period_total += amount
+    holding_period_total = holding_period_total.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+    scheduled_total = scheduled_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    paid_total = paid_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    canceled_total = canceled_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     earnings_window_start = timezone.now() - timedelta(days=30)
     earnings_total = (
         ReferralConversion.objects.filter(
@@ -721,6 +751,10 @@ def merchant_dashboard(request):
         'ledger_entries': entries,
         'permissions': permissions,
         'affiliate_total': affiliate_total,
+        'holding_period_total': holding_period_total,
+        'scheduled_total': scheduled_total,
+        'paid_total': paid_total,
+        'canceled_total': canceled_total,
         'earnings_total': earnings_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         'analytics_items': analytics_items,
