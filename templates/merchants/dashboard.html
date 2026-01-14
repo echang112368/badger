@@ -235,30 +235,122 @@
         <h1 class="fw-bold fs-3 mb-4">Welcome {{ merchant.username }}</h1>
 
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-lg-6">
                 <div class="card shadow-sm rounded h-100">
                     <div class="card-body">
-                        <p class="mb-0 fw-bold">Total Expenses: ${{ balance }}</p>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <p class="text-muted mb-1">Total Expenses (30d)</p>
+                                <h2 class="fw-bold mb-1">${{ expenses_total_30 }}</h2>
+                                <small class="text-muted">Affiliate + platform payouts</small>
+                            </div>
+                        </div>
+                        <div class="position-relative">
+                            <canvas id="expensesChart" height="120"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-lg-6">
                 <div class="card shadow-sm rounded h-100">
                     <div class="card-body">
-                        <p class="mb-0 fw-bold">Affiliate Payouts Owed: ${{ affiliate_total }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card shadow-sm rounded h-100">
-                    <div class="card-body">
-                        <p class="mb-0 fw-bold">Total Earnings (30 days): ${{ earnings_total }}</p>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <p class="text-muted mb-1">Total Earnings (30d)</p>
+                                <h2 class="fw-bold mb-1">${{ earnings_total }}</h2>
+                                <small class="text-muted">Creator-driven revenue</small>
+                            </div>
+                        </div>
+                        <div class="position-relative">
+                            <canvas id="earningsChart" height="120"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <h2 class="fw-bold fs-4 mb-3">Transaction History</h2>
+        <div class="row g-3 mb-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm rounded h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h2 class="fw-bold fs-5 mb-1">Top Creators</h2>
+                                <small class="text-muted">Highest earnings in the last 30 days.</small>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'merchant_creators' %}">
+                                View more
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Creator</th>
+                                        <th class="text-end">Orders</th>
+                                        <th class="text-end">Earnings</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for creator in top_creators %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ creator.name }}</td>
+                                        <td class="text-end">{{ creator.orders }}</td>
+                                        <td class="text-end">${{ creator.earnings|floatformat:2 }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">No creator earnings yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card shadow-sm rounded h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h2 class="fw-bold fs-5 mb-1">Top Product Earnings</h2>
+                                <small class="text-muted">Products driving the most affiliate revenue.</small>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'merchant_items' %}">
+                                View more
+                            </a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th class="text-end">Revenue</th>
+                                        <th class="text-end">Creators</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for product in top_products %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ product.name }}</td>
+                                        <td class="text-end">${{ product.revenue|floatformat:2 }}</td>
+                                        <td class="text-end">{{ product.creators_count }}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">No product earnings yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="fw-bold fs-4 mb-3">Current Ledger</h2>
         <div class="card shadow-sm rounded mb-4">
             <div class="card-body p-0">
                 <table class="table table-striped table-bordered mb-0">
@@ -406,6 +498,63 @@
                 renderChart(details.monthly_labels || [], details.monthly_sales || []);
             });
         });
+    });
+</script>
+{% else %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{{ earnings_chart_labels|json_script:"earnings-chart-labels" }}
+{{ earnings_chart_values|json_script:"earnings-chart-values" }}
+{{ expenses_chart_values|json_script:"expenses-chart-values" }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var earningsCanvas = document.getElementById('earningsChart');
+        var expensesCanvas = document.getElementById('expensesChart');
+        var labels = JSON.parse(document.getElementById('earnings-chart-labels').textContent);
+        var earningsValues = JSON.parse(document.getElementById('earnings-chart-values').textContent);
+        var expensesValues = JSON.parse(document.getElementById('expenses-chart-values').textContent);
+
+        function buildChart(canvas, label, data, color) {
+            if (!canvas) {
+                return;
+            }
+            var ctx = canvas.getContext('2d');
+            var gradient = ctx.createLinearGradient(0, 0, 0, 140);
+            gradient.addColorStop(0, color.replace('1)', '0.35)'));
+            gradient.addColorStop(1, color.replace('1)', '0.05)'));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        tension: 0.35,
+                        fill: true,
+                        backgroundColor: gradient,
+                        borderColor: color,
+                        pointRadius: 3,
+                        pointBackgroundColor: color,
+                        pointHoverRadius: 4,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: function (context) { return '$' + context.parsed.y.toFixed(2); } } }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, ticks: { callback: function (value) { return '$' + value; } } }
+                    }
+                }
+            });
+        }
+
+        buildChart(earningsCanvas, 'Total Earnings', earningsValues, 'rgba(88, 101, 242, 1)');
+        buildChart(expensesCanvas, 'Total Expenses', expensesValues, 'rgba(45, 184, 176, 1)');
     });
 </script>
 {% endif %}
