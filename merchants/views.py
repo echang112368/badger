@@ -381,6 +381,148 @@ def merchant_dashboard(request):
         ).aggregate(total=Sum("order_amount"))
     ).get("total") or Decimal("0")
     earnings_total = earnings_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    chart_window_start = timezone.now() - timedelta(days=29)
+    chart_dates = [
+        timezone.localdate(timezone.now() - timedelta(days=offset))
+        for offset in range(29, -1, -1)
+    ]
+    earnings_by_day = {date: Decimal("0") for date in chart_dates}
+    expenses_by_day = {date: Decimal("0") for date in chart_dates}
+
+    dashboard_conversions = (
+        ReferralConversion.objects.filter(
+            merchant=merchant_user, created_at__gte=chart_window_start
+        )
+        .select_related("creator")
+        .order_by("created_at")
+    )
+    missing_creator_uuids = {
+        str(conversion.creator_uuid)
+        for conversion in dashboard_conversions
+        if not conversion.creator and conversion.creator_uuid
+    }
+    creator_lookup = {}
+    if missing_creator_uuids:
+        creator_lookup = {
+            str(meta.uuid): meta
+            for meta in CreatorMeta.objects.select_related("user").filter(
+                uuid__in=missing_creator_uuids
+            )
+        }
+    for conversion in dashboard_conversions:
+        conversion_date = timezone.localdate(conversion.created_at)
+        if conversion_date in earnings_by_day:
+            earnings_by_day[conversion_date] += conversion.order_amount
+
+    expense_entries = LedgerEntry.objects.filter(
+        merchant=merchant_user,
+        entry_type__in=[
+            LedgerEntry.EntryType.AFFILIATE_PAYOUT,
+            LedgerEntry.EntryType.BADGER_PAYOUT,
+            LedgerEntry.EntryType.PAYOUT,
+        ],
+        timestamp__gte=chart_window_start,
+    ).order_by("timestamp")
+    for entry in expense_entries:
+        entry_date = timezone.localdate(entry.timestamp)
+        if entry_date in expenses_by_day:
+            expenses_by_day[entry_date] += abs(entry.amount)
+
+    earnings_chart_labels = [date.strftime("%b %d") for date in chart_dates]
+    earnings_chart_values = [float(earnings_by_day[date]) for date in chart_dates]
+    expenses_chart_values = [float(expenses_by_day[date]) for date in chart_dates]
+    expenses_total_30 = sum(expenses_by_day.values())
+    expenses_total_30 = expenses_total_30.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
+
+    top_creators_map = {}
+    top_products_map = {}
+    for conversion in dashboard_conversions:
+        creator_key = str(conversion.creator_id or conversion.creator_uuid or "unknown")
+        if creator_key not in top_creators_map:
+            creator_name = "Unknown creator"
+            if conversion.creator:
+                creator_name = conversion.creator.username
+            elif conversion.creator_uuid:
+                creator_meta = creator_lookup.get(str(conversion.creator_uuid))
+                if creator_meta and creator_meta.user:
+                    creator_name = creator_meta.user.username
+            top_creators_map[creator_key] = {
+                "name": creator_name,
+                "earnings": Decimal("0"),
+                "orders": 0,
+            }
+        top_creators_map[creator_key]["earnings"] += conversion.order_amount
+        top_creators_map[creator_key]["orders"] += 1
+
+        metadata = conversion.metadata if isinstance(conversion.metadata, dict) else {}
+        line_items = metadata.get("line_items") if isinstance(metadata, dict) else []
+        line_items = line_items or []
+        creator_reference = conversion.creator_id or conversion.creator_uuid
+        if line_items:
+            per_item_fallback = (
+                conversion.order_amount / max(len(line_items), 1)
+                if conversion.order_amount
+                else Decimal("0")
+            )
+            for item in line_items:
+                title = item.get("title") or item.get("name") or "Product"
+                quantity = item.get("quantity") or 1
+                price_raw = item.get("price") or item.get("price_amount") or item.get(
+                    "amount"
+                )
+                revenue = None
+                if price_raw is not None:
+                    try:
+                        revenue = Decimal(str(price_raw)) * Decimal(str(quantity))
+                    except (InvalidOperation, TypeError):
+                        revenue = None
+                if revenue is None:
+                    revenue = per_item_fallback
+                product_entry = top_products_map.setdefault(
+                    title,
+                    {
+                        "name": title,
+                        "revenue": Decimal("0"),
+                        "orders": 0,
+                        "creators": set(),
+                    },
+                )
+                product_entry["revenue"] += revenue
+                product_entry["orders"] += 1
+                if creator_reference:
+                    product_entry["creators"].add(str(creator_reference))
+        else:
+            title = (
+                f"Order {conversion.order_id}" if conversion.order_id else "Misc sales"
+            )
+            product_entry = top_products_map.setdefault(
+                title,
+                {
+                    "name": title,
+                    "revenue": Decimal("0"),
+                    "orders": 0,
+                    "creators": set(),
+                },
+            )
+            product_entry["revenue"] += conversion.order_amount
+            product_entry["orders"] += 1
+            if creator_reference:
+                product_entry["creators"].add(str(creator_reference))
+
+    top_creators = sorted(
+        top_creators_map.values(),
+        key=lambda entry: entry["earnings"],
+        reverse=True,
+    )[:5]
+    top_products = sorted(
+        top_products_map.values(),
+        key=lambda entry: entry["revenue"],
+        reverse=True,
+    )[:5]
+    for entry in top_products:
+        entry["creators_count"] = len(entry.get("creators", []))
     analytics_items = []
     if request.GET.get("view") == "analytics":
         groups = (
@@ -572,8 +714,14 @@ def merchant_dashboard(request):
         'permissions': permissions,
         'affiliate_total': affiliate_total,
         'earnings_total': earnings_total,
+        'expenses_total_30': expenses_total_30,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         'analytics_items': analytics_items,
+        'earnings_chart_labels': earnings_chart_labels,
+        'earnings_chart_values': earnings_chart_values,
+        'expenses_chart_values': expenses_chart_values,
+        'top_creators': top_creators,
+        'top_products': top_products,
     })
 
 
