@@ -387,7 +387,6 @@ def merchant_dashboard(request):
         for offset in range(29, -1, -1)
     ]
     earnings_by_day = {date: Decimal("0") for date in chart_dates}
-    expenses_by_day = {date: Decimal("0") for date in chart_dates}
 
     dashboard_conversions = (
         ReferralConversion.objects.filter(
@@ -414,27 +413,8 @@ def merchant_dashboard(request):
         if conversion_date in earnings_by_day:
             earnings_by_day[conversion_date] += conversion.order_amount
 
-    expense_entries = LedgerEntry.objects.filter(
-        merchant=merchant_user,
-        entry_type__in=[
-            LedgerEntry.EntryType.AFFILIATE_PAYOUT,
-            LedgerEntry.EntryType.BADGER_PAYOUT,
-            LedgerEntry.EntryType.PAYOUT,
-        ],
-        timestamp__gte=chart_window_start,
-    ).order_by("timestamp")
-    for entry in expense_entries:
-        entry_date = timezone.localdate(entry.timestamp)
-        if entry_date in expenses_by_day:
-            expenses_by_day[entry_date] += abs(entry.amount)
-
     earnings_chart_labels = [date.strftime("%b %d") for date in chart_dates]
     earnings_chart_values = [float(earnings_by_day[date]) for date in chart_dates]
-    expenses_chart_values = [float(expenses_by_day[date]) for date in chart_dates]
-    expenses_total_30 = sum(expenses_by_day.values())
-    expenses_total_30 = expenses_total_30.quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
 
     top_creators_map = {}
     top_products_map = {}
@@ -714,12 +694,10 @@ def merchant_dashboard(request):
         'permissions': permissions,
         'affiliate_total': affiliate_total,
         'earnings_total': earnings_total,
-        'expenses_total_30': expenses_total_30,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         'analytics_items': analytics_items,
         'earnings_chart_labels': earnings_chart_labels,
         'earnings_chart_values': earnings_chart_values,
-        'expenses_chart_values': expenses_chart_values,
         'top_creators': top_creators,
         'top_products': top_products,
     })
