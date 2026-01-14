@@ -408,6 +408,19 @@ def merchant_dashboard(request):
                 uuid__in=missing_creator_uuids
             )
         }
+    product_name_lookup = {}
+    merchant_items = (
+        MerchantItem.objects.filter(merchant=merchant_user)
+        .exclude(shopify_product_id__isnull=True)
+        .exclude(shopify_product_id="")
+        .only("title", "shopify_product_id")
+    )
+    for item in merchant_items:
+        raw_product_id = str(item.shopify_product_id)
+        product_name_lookup[raw_product_id] = item.title
+        normalised_product_id = _normalise_shopify_product_id(raw_product_id)
+        if normalised_product_id:
+            product_name_lookup[normalised_product_id] = item.title
     for conversion in dashboard_conversions:
         conversion_date = timezone.localdate(conversion.created_at)
         if conversion_date in earnings_by_day:
@@ -447,7 +460,22 @@ def merchant_dashboard(request):
                 else Decimal("0")
             )
             for item in line_items:
-                title = item.get("title") or item.get("name") or "Product"
+                product_id = item.get("product_id")
+                normalised_product_id = _normalise_shopify_product_id(product_id)
+                title = (
+                    product_name_lookup.get(str(product_id)) if product_id else None
+                ) or (
+                    product_name_lookup.get(normalised_product_id)
+                    if normalised_product_id
+                    else None
+                )
+                title = (
+                    title
+                    or item.get("title")
+                    or item.get("name")
+                    or item.get("product_title")
+                    or "Product"
+                )
                 quantity = item.get("quantity") or 1
                 price_raw = item.get("price") or item.get("price_amount") or item.get(
                     "amount"
