@@ -240,13 +240,12 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <p class="text-muted mb-1">Total Expenses (30d)</p>
-                                <h2 class="fw-bold mb-1">${{ expenses_total_30 }}</h2>
-                                <small class="text-muted">Affiliate + platform payouts</small>
+                                <div class="d-flex align-items-center gap-2 text-success mb-2">
+                                    <i class="bi bi-cash-coin fs-5"></i>
+                                    <span class="fw-semibold">Payouts due</span>
+                                </div>
+                                <h2 class="fw-bold mb-1">${{ affiliate_total|floatformat:2 }}</h2>
                             </div>
-                        </div>
-                        <div class="position-relative">
-                            <canvas id="expensesChart" height="120"></canvas>
                         </div>
                     </div>
                 </div>
@@ -350,7 +349,7 @@
             </div>
         </div>
 
-        <h2 class="fw-bold fs-4 mb-3">Current Ledger</h2>
+        <h2 class="fw-bold fs-4 mb-3">Ledger</h2>
         <div class="card shadow-sm rounded mb-4">
             <div class="card-body p-0">
                 <table class="table table-striped table-bordered mb-0">
@@ -504,14 +503,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 {{ earnings_chart_labels|json_script:"earnings-chart-labels" }}
 {{ earnings_chart_values|json_script:"earnings-chart-values" }}
-{{ expenses_chart_values|json_script:"expenses-chart-values" }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         var earningsCanvas = document.getElementById('earningsChart');
-        var expensesCanvas = document.getElementById('expensesChart');
         var labels = JSON.parse(document.getElementById('earnings-chart-labels').textContent);
         var earningsValues = JSON.parse(document.getElementById('earnings-chart-values').textContent);
-        var expensesValues = JSON.parse(document.getElementById('expenses-chart-values').textContent);
 
         function buildChart(canvas, label, data, color) {
             if (!canvas) {
@@ -554,7 +550,6 @@
         }
 
         buildChart(earningsCanvas, 'Total Earnings', earningsValues, 'rgba(88, 101, 242, 1)');
-        buildChart(expensesCanvas, 'Total Expenses', expensesValues, 'rgba(45, 184, 176, 1)');
     });
 </script>
 {% endif %}
