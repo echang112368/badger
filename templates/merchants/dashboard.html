@@ -1,6 +1,24 @@
 {% extends 'merchants/base.html' %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
+<style>
+    .payout-status-grid .payout-status-item {
+        align-items: center;
+        column-gap: 0.5rem;
+        padding: 0.45rem 0.75rem;
+    }
+
+    .payout-status-grid .payout-status-label {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .payout-status-grid .payout-status-amount {
+        flex-shrink: 0;
+        margin-left: auto;
+        white-space: nowrap;
+    }
+</style>
 <section class="my-4">
     {% if request.GET.view == "analytics" %}
         <h1 class="fw-bold fs-3 mb-2">Campaign Analytics</h1>
@@ -249,17 +267,17 @@
                                     <p class="text-uppercase text-muted small fw-semibold mb-2">
                                         Payout status breakdown
                                     </p>
-                                        <div class="row g-2 small">
-                                            <div class="col-6">
-                                                <div class="d-flex justify-content-between bg-light border rounded px-2 py-1">
-                                                    <span>Holding period</span>
-                                                    <span class="fw-semibold text-dark">${{ holding_period_total|floatformat:2 }}</span>
-                                                </div>
+                                    <div class="row g-2 small payout-status-grid">
+                                        <div class="col-12 col-md-6">
+                                            <div class="d-flex payout-status-item bg-light border rounded">
+                                                <span class="payout-status-label">Holding period</span>
+                                                <span class="fw-semibold text-dark payout-status-amount">${{ holding_period_total|floatformat:2 }}</span>
                                             </div>
-                                        <div class="col-6">
-                                            <div class="d-flex justify-content-between bg-light border rounded px-2 py-1">
-                                                <span>Canceled</span>
-                                                <span class="fw-semibold text-dark">${{ canceled_total|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <div class="d-flex payout-status-item bg-light border rounded">
+                                                <span class="payout-status-label">Canceled</span>
+                                                <span class="fw-semibold text-dark payout-status-amount">${{ canceled_total|floatformat:2 }}</span>
                                             </div>
                                         </div>
                                     </div>
