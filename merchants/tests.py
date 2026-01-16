@@ -529,3 +529,4 @@ class ItemGroupFormTests(TestCase):
         form = ItemGroupForm(data={"name": "Group"}, merchant=merchant)
         self.assertFalse(form.is_valid())
         self.assertIn("affiliate_percent", form.errors)
+        self.assertIn("return_policy_days", form.errors)

@@ -15,6 +15,7 @@
                     <div class="me-2">
                         <div class="fw-bold">{{ group.name }}</div>
                         <small>Affiliate: {{ group.affiliate_percent }}%</small>
+                        <small class="d-block">Return policy: {{ group.return_policy_days }} days</small>
                         <div><small>
                             {% for gitem in group.items.all %}
                                 {{ gitem.title }}{% if gitem.shopify_product_id %} (ID: {{ gitem.shopify_product_id }}){% endif %}{% if not forloop.last %}, {% endif %}
@@ -22,7 +23,7 @@
                         </small></div>
                     </div>
                     <div class="btn-group">
-                        <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.shopify_product_id }}{% if not forloop.last %},{% endif %}{% endfor %}" data-group-products='[{% for gitem in group.items.all %}{"id":"{{ gitem.shopify_product_id }}","title":"{{ gitem.title|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]' {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Edit</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm edit-group-btn" data-bs-toggle="modal" data-bs-target="#groupModal" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-percent="{{ group.affiliate_percent }}" data-group-return-days="{{ group.return_policy_days }}" data-group-items="{% for gitem in group.items.all %}{{ gitem.shopify_product_id }}{% if not forloop.last %},{% endif %}{% endfor %}" data-group-products='[{% for gitem in group.items.all %}{"id":"{{ gitem.shopify_product_id }}","title":"{{ gitem.title|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]' {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Edit</button>
                         <button type="button" class="btn btn-outline-danger btn-sm delete-group-btn" data-bs-toggle="modal" data-bs-target="#deleteGroupModal" data-group-id="{{ group.id }}" {% if not permissions.can_modify_content %}disabled data-bs-target=""{% endif %}>Delete</button>
                     </div>
                 </li>
@@ -98,6 +99,13 @@
             {{ group_form.affiliate_percent }}
             {% if group_form.affiliate_percent.errors %}
             <div class="text-danger">{{ group_form.affiliate_percent.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="mb-3">
+            <label for="id_group-return_policy_days" class="form-label">Return policy (days)</label>
+            {{ group_form.return_policy_days }}
+            {% if group_form.return_policy_days.errors %}
+            <div class="text-danger">{{ group_form.return_policy_days.errors.0 }}</div>
             {% endif %}
           </div>
           {% if group_form.non_field_errors %}
@@ -566,6 +574,7 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#group-id').value = groupId;
             groupModalElement.querySelector('#id_group-name').value = this.getAttribute('data-group-name');
             groupModalElement.querySelector('#id_group-affiliate_percent').value = this.getAttribute('data-group-percent');
+            groupModalElement.querySelector('#id_group-return_policy_days').value = this.getAttribute('data-group-return-days');
             groupModalElement.querySelector('#group-error').innerHTML = '';
 
             var productsData = this.getAttribute('data-group-products') || '[]';
@@ -589,6 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
             groupModalElement.querySelector('#group-id').value = '';
             groupModalElement.querySelector('#id_group-name').value = '';
             groupModalElement.querySelector('#id_group-affiliate_percent').value = '';
+            groupModalElement.querySelector('#id_group-return_policy_days').value = '0';
             groupModalElement.querySelector('#group-error').innerHTML = '';
             selectedProducts = [];
             renderSelectedProducts();
