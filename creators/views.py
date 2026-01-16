@@ -8,7 +8,6 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.db.models import Sum, Q, Count
-from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
@@ -16,6 +15,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from .models import CreatorMeta
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
+from collect.utils import compute_commission_schedule
 
 from links.models import (
     MerchantCreatorLink,
@@ -40,19 +40,35 @@ def disp(message: str) -> None:
 
 @login_required
 def creator_earnings(request):
-    balance = LedgerEntry.creator_balance(request.user)
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
-    commission_entries = LedgerEntry.objects.filter(
-        creator=request.user,
-        entry_type="commission",
+    conversions = ReferralConversion.objects.filter(creator=request.user).select_related(
+        "merchant"
     )
-    monthly_data = (
-        commission_entries
-        .annotate(month=TruncMonth("timestamp"))
-        .values("month")
-        .annotate(total=Sum("amount"))
-    )
-    monthly_totals = {d["month"].date(): float(d["total"]) for d in monthly_data}
+    now = timezone.now()
+    pending_earnings = Decimal("0")
+    available_earnings = Decimal("0")
+    last_30_days_start = now - timedelta(days=30)
+    last_30_days_earnings = Decimal("0")
+    monthly_totals = {}
+
+    for conversion in conversions:
+        breakdown = compute_commission_schedule(conversion, conversion.merchant)
+        for commission, return_days in breakdown:
+            if commission <= 0:
+                continue
+            release_date = conversion.created_at + timedelta(days=return_days)
+            if now >= release_date:
+                available_earnings += commission
+                month_bucket = conversion.created_at.date().replace(day=1)
+                monthly_totals[month_bucket] = (
+                    monthly_totals.get(month_bucket, Decimal("0")) + commission
+                )
+                if conversion.created_at >= last_30_days_start:
+                    last_30_days_earnings += commission
+            else:
+                pending_earnings += commission
+
+    balance = pending_earnings.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     now = timezone.now()
     year = now.year
     month = now.month
@@ -66,13 +82,10 @@ def creator_earnings(request):
             month -= 1
     months.reverse()
     earnings_labels = [m.strftime("%b %Y") for m in months]
-    earnings_totals = [monthly_totals.get(m, 0.0) for m in months]
-    last_30_days_start = timezone.now() - timedelta(days=30)
-    total_earnings = commission_entries.aggregate(total=Sum("amount"))["total"] or 0
-    last_30_days_earnings = (
-        commission_entries.filter(timestamp__gte=last_30_days_start)
-        .aggregate(total=Sum("amount"))["total"]
-        or 0
+    earnings_totals = [float(monthly_totals.get(m, Decimal("0"))) for m in months]
+    total_earnings = available_earnings.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    last_30_days_earnings = last_30_days_earnings.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
     )
     return render(
         request,

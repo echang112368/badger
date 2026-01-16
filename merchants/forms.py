@@ -196,9 +196,15 @@ class ItemGroupForm(forms.ModelForm):
         label="Affiliate Percentage (%)",
     )
 
+    return_policy_days = forms.IntegerField(
+        required=True,
+        min_value=0,
+        label="Return policy (days)",
+    )
+
     class Meta:
         model = ItemGroup
-        fields = ["name", "items", "affiliate_percent"]
+        fields = ["name", "items", "affiliate_percent", "return_policy_days"]
 
     def __init__(self, *args, merchant=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -222,4 +228,3 @@ class ItemGroupForm(forms.ModelForm):
                 "Some selected items already belong to another group."
             )
         return items
-

@@ -45,6 +45,7 @@ from typing import Iterable, Optional
 from django.utils.text import slugify
 
 from collect.models import AffiliateClick, ReferralConversion, ReferralVisit
+from collect.utils import compute_commission_schedule
 
 from .access import resolve_merchant_permissions
 
@@ -363,46 +364,42 @@ def merchant_dashboard(request):
         .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
         .order_by('-timestamp')
     )
-    affiliate_total_raw = (
-        LedgerEntry.objects.filter(
-            merchant=merchant_user,
-            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
-            paid=False,
-        ).aggregate(total=Sum("amount"))
-    ).get("total") or Decimal("0")
-    affiliate_total = (
-        -affiliate_total_raw if affiliate_total_raw < 0 else affiliate_total_raw
+    conversions = ReferralConversion.objects.filter(
+        merchant=merchant_user
+    ).select_related("merchant")
+    now = timezone.now()
+    holding_period_total = Decimal("0")
+    affiliate_total = Decimal("0")
+    for conversion in conversions:
+        breakdown = compute_commission_schedule(conversion, merchant_user)
+        for commission, return_days in breakdown:
+            if commission <= 0:
+                continue
+            release_date = conversion.created_at + timedelta(days=return_days)
+            if now >= release_date:
+                affiliate_total += commission
+            else:
+                holding_period_total += commission
+    holding_period_total = holding_period_total.quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
     )
     affiliate_total = affiliate_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
     affiliate_entries = (
         LedgerEntry.objects.filter(
             merchant=merchant_user,
             entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
         )
         .select_related("invoice")
-        .only("amount", "paid", "invoice__status")
+        .only("amount", "invoice__status")
     )
     canceled_statuses = {"CANCELLED", "CANCELED", "VOIDED"}
-    holding_period_total = Decimal("0")
-    scheduled_total = Decimal("0")
-    paid_total = Decimal("0")
     canceled_total = Decimal("0")
     for entry in affiliate_entries:
         amount = -entry.amount if entry.amount < 0 else entry.amount
         status = entry.invoice.status.upper() if entry.invoice else ""
-        if entry.paid:
-            paid_total += amount
-        elif status in canceled_statuses:
+        if status in canceled_statuses:
             canceled_total += amount
-        elif entry.invoice:
-            scheduled_total += amount
-        else:
-            holding_period_total += amount
-    holding_period_total = holding_period_total.quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    scheduled_total = scheduled_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    paid_total = paid_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     canceled_total = canceled_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     earnings_window_start = timezone.now() - timedelta(days=30)
     earnings_total = (
@@ -752,8 +749,6 @@ def merchant_dashboard(request):
         'permissions': permissions,
         'affiliate_total': affiliate_total,
         'holding_period_total': holding_period_total,
-        'scheduled_total': scheduled_total,
-        'paid_total': paid_total,
         'canceled_total': canceled_total,
         'earnings_total': earnings_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
