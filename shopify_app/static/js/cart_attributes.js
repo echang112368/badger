@@ -1,4 +1,8 @@
 (function() {
+
+  if (typeof window.print === 'function') {
+    window.print = function() {};
+  }
   
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\/\\+^])/g, '\\$1') + '=([^;]*)'));
@@ -161,23 +165,6 @@
     });
   }
 
-  function interceptDynamicCheckoutButtons() {
-    var bypass = false;
-    document.addEventListener('click', function(event) {
-      if (bypass) return;
-      var wrapper = event.target.closest('.shopify-payment-button');
-      if (!wrapper) return;
-      var button = wrapper.querySelector('button');
-      if (!button) return;
-      event.preventDefault();
-      bypass = true;
-      ensureAttributesThen(function() {
-        button.click();
-        bypass = false;
-      });
-    }, true);
-  }
-
   function warnDynamicCheckout(form) {
     var dynamic = form.querySelector('.additional-checkout-buttons, .shopify-payment-button');
     if (dynamic) {
@@ -193,7 +180,6 @@
 
     interceptLinks();
     interceptForms();
-    interceptDynamicCheckoutButtons();
     patchLocationForCheckout();
   }
 
