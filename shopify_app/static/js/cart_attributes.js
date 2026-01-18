@@ -1,4 +1,8 @@
 (function() {
+
+  if (typeof window.print === 'function') {
+    window.print = function() {};
+  }
   
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\/\\+^])/g, '\\$1') + '=([^;]*)'));
