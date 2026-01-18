@@ -6,8 +6,9 @@ from shopify_app.token_management import refresh_shopify_token
 
 SCRIPT_SRCS = [
     "https://6457c6b55211.ngrok-free.app/static/js/referral_tracker.js",
+]
+LEGACY_SCRIPT_SRCS = [
     "https://6457c6b55211.ngrok-free.app/static/js/cart_attributes.js",
-    
 ]
 
 
@@ -33,6 +34,7 @@ class Command(BaseCommand):
             )
             try:
                 tags = _fetch_script_tags(client)
+                _remove_legacy_scripts(client, tags)
                 for src in SCRIPT_SRCS:
                     if any(tag.get("src") == src for tag in tags):
                         self.stdout.write(
@@ -79,6 +81,18 @@ mutation CreateScriptTag($src: URL!) {
 }
 """
 
+SCRIPT_TAG_DELETE_MUTATION = """
+mutation DeleteScriptTag($id: ID!) {
+  scriptTagDelete(id: $id) {
+    deletedScriptTagId
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
 
 def _fetch_script_tags(client: ShopifyClient):
     payload = client.graphql(SCRIPT_TAGS_QUERY)
@@ -92,3 +106,15 @@ def _create_script_tag(client: ShopifyClient, src: str) -> None:
     errors = result.get("userErrors") or []
     if errors:
         raise ShopifyGraphQLError("Failed to create script tag.", errors)
+
+
+def _remove_legacy_scripts(client: ShopifyClient, tags: list[dict]) -> None:
+    legacy_tags = [
+        tag for tag in tags if tag.get("src") in LEGACY_SCRIPT_SRCS and tag.get("id")
+    ]
+    for tag in legacy_tags:
+        payload = client.graphql(SCRIPT_TAG_DELETE_MUTATION, {"id": tag["id"]})
+        result = payload.get("data", {}).get("scriptTagDelete") or {}
+        errors = result.get("userErrors") or []
+        if errors:
+            raise ShopifyGraphQLError("Failed to delete script tag.", errors)
