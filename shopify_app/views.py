@@ -44,6 +44,7 @@ from .oauth import (
     validate_shopify_hmac,
 )
 from .shopify_client import ShopifyClient, ShopifyGraphQLError, ShopifyInvalidCredentialsError
+from .script_tags import SCRIPT_SRCS, inject_scripts_for_merchant
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from .webhooks import register_orders_create_webhook
 from accounts.forms import CustomLoginForm
@@ -239,6 +240,33 @@ def _attempt_shopify_webhook_registration(
             "Failed to register Shopify orders/create webhook for %s during OAuth.",
             shop_domain,
         )
+
+
+def _attempt_script_tag_injection(meta: MerchantMeta) -> None:
+    """Attempt to inject script tags after a successful OAuth connection."""
+
+    try:
+        injected, existing = inject_scripts_for_merchant(meta)
+    except Exception:
+        logger.exception(
+            "Failed to inject Shopify script tags for %s during OAuth.",
+            meta.shopify_store_domain,
+        )
+        return
+
+    for src in SCRIPT_SRCS:
+        if src in injected:
+            logger.info(
+                "Injected script tag %s for %s during OAuth.",
+                src,
+                meta.shopify_store_domain,
+            )
+        elif src in existing:
+            logger.info(
+                "Script tag %s already present for %s during OAuth.",
+                src,
+                meta.shopify_store_domain,
+            )
 
 
 def _session_retry_key(shop_domain: str) -> str:
@@ -671,6 +699,8 @@ def oauth_callback(request: HttpRequest):
         normalised_shop,
         access_token,
     )
+    if meta:
+        _attempt_script_tag_injection(meta)
 
     confirmation_url: Optional[str] = None
 
