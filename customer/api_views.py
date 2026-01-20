@@ -32,33 +32,21 @@ class LoginView(APIView):
         print("LoginView received JSON package:", json_package)
 
         email = json_package.get("email") or json_package.get("username")
-        first_name = json_package.get("first_name")
         password = json_package.get("password")
 
-        if not (email or first_name) or not password:
+        if not email or not password:
             return Response(
-                {"detail": "Email or first name and password required."},
+                {"detail": "Email and password required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         User = get_user_model()
-        if email:
-            try:
-                user = User.objects.get(
-                    email=email, is_merchant=False, is_creator=False
-                )
-            except User.DoesNotExist:
-                user = None
-        else:
-            user = (
-                User.objects.filter(
-                    first_name__iexact=first_name,
-                    is_merchant=False,
-                    is_creator=False,
-                )
-                .order_by("id")
-                .first()
+        try:
+            user = User.objects.get(
+                email=email, is_merchant=False, is_creator=False
             )
+        except User.DoesNotExist:
+            user = None
 
         if user is None or not user.check_password(password):
             return Response(
@@ -69,14 +57,15 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         customer, _ = CustomerMeta.objects.get_or_create(user=user)
 
+        full_name = user.get_full_name().strip() or user.first_name
+
         return Response(
             {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "uuid": str(customer.uuid),
-                "name": f"{user.first_name} {user.last_name}".strip(),
+                "name": full_name,
                 "points": get_points_balance(user),
-                "json_package": json_package,
             }
         )
 
