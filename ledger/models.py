@@ -72,6 +72,7 @@ class LedgerEntry(models.Model):
         POINTS = "points", "Points"
         AFFILIATE_PAYOUT = "affiliate_payout", "Affiliate Payout"
         BADGER_PAYOUT = "badger_payout", "Badger Payout"
+        SAVINGS = "savings", "Savings"
 
     creator = models.ForeignKey(
         User,
