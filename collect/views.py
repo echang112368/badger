@@ -337,6 +337,7 @@ def orders_create_webhook(request):
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
     amount_str = payload.get("total_price")
+    discount_str = payload.get("total_discounts") or payload.get("total_discount")
 
     #testing and getting the entire note attribute
     print(payload.get("note_attributes", []))
@@ -385,6 +386,7 @@ def orders_create_webhook(request):
 
     commission_total = Decimal("0")
     order_total = Decimal("0")
+    discount_total = Decimal("0")
 
     creator_uuid_str = str(creator_uuid) if creator_uuid else None
     creator_active_for_merchant = _creator_is_active_for_merchant(
@@ -396,6 +398,12 @@ def orders_create_webhook(request):
             order_total = Decimal(str(amount_str)).quantize(Decimal("0.01"))
         except (TypeError, InvalidOperation):
             order_total = Decimal("0")
+
+    if discount_str:
+        try:
+            discount_total = Decimal(str(discount_str)).quantize(Decimal("0.01"))
+        except (TypeError, InvalidOperation):
+            discount_total = Decimal("0")
 
     if (
         creator_active_for_merchant
@@ -509,6 +517,13 @@ def orders_create_webhook(request):
             creator=customer_meta.user,
             amount=Decimal(points),
             entry_type="points",
+        )
+
+    if customer_meta and discount_total > 0:
+        LedgerEntry.objects.create(
+            creator=customer_meta.user,
+            amount=discount_total,
+            entry_type=LedgerEntry.EntryType.SAVINGS,
         )
 
     return JsonResponse({"status": "received"}, status=200)

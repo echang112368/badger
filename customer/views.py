@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
+from django.db import models
 from decimal import Decimal
 from ledger.models import LedgerEntry
 from .models import CustomerMeta
@@ -13,7 +14,13 @@ def user_dashboard(request):
     points_balance = get_points_balance(user)
     redemption_value = points_balance / 60
     lifetime_points = points_balance
-    lifetime_savings = 0
+    lifetime_savings = (
+        LedgerEntry.objects.filter(
+            creator=user,
+            entry_type=LedgerEntry.EntryType.SAVINGS,
+        ).aggregate(total=models.Sum("amount"))["total"]
+        or Decimal("0")
+    )
     since_year = user.date_joined.year
 
     ledger_entries = (
