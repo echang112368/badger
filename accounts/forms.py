@@ -108,9 +108,34 @@ class CreatorSignUpForm(UserCreationForm):
 
 
 class UserSignUpForm(UserCreationForm):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(
+            attrs={
+                "autocomplete": "email",
+                "placeholder": "you@example.com",
+            }
+        ),
+    )
+
     class Meta:
         model = User
-        fields = ("username", "first_name", "last_name", "email", "password1", "password2")
+        fields = ("email", "first_name", "last_name", "password1", "password2")
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        email = self.cleaned_data.get("email", "").strip()
+        user.email = email
+        user.username = email
+        if commit:
+            user.save()
+        return user
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email", "").strip()
+        if "@" not in email:
+            raise forms.ValidationError("Enter a valid email address.")
+        return email
 
 
 class UserNameForm(forms.ModelForm):
