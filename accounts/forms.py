@@ -131,6 +131,12 @@ class UserSignUpForm(UserCreationForm):
             user.save()
         return user
 
+    def clean_email(self):
+        email = self.cleaned_data.get("email", "").strip()
+        if "@" not in email:
+            raise forms.ValidationError("Enter a valid email address.")
+        return email
+
 
 class UserNameForm(forms.ModelForm):
     class Meta:
