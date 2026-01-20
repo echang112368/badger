@@ -32,21 +32,33 @@ class LoginView(APIView):
         print("LoginView received JSON package:", json_package)
 
         email = json_package.get("email") or json_package.get("username")
+        first_name = json_package.get("first_name")
         password = json_package.get("password")
 
-        if not email or not password:
+        if not (email or first_name) or not password:
             return Response(
-                {"detail": "Username and password required."},
+                {"detail": "Email or first name and password required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         User = get_user_model()
-        try:
-            user = User.objects.get(
-                email=email, is_merchant=False, is_creator=False
+        if email:
+            try:
+                user = User.objects.get(
+                    email=email, is_merchant=False, is_creator=False
+                )
+            except User.DoesNotExist:
+                user = None
+        else:
+            user = (
+                User.objects.filter(
+                    first_name__iexact=first_name,
+                    is_merchant=False,
+                    is_creator=False,
+                )
+                .order_by("id")
+                .first()
             )
-        except User.DoesNotExist:
-            user = None
 
         if user is None or not user.check_password(password):
             return Response(
@@ -150,4 +162,3 @@ class CustomerPointsView(APIView):
                 "refresh": str(new_refresh),
             }
         )
-
