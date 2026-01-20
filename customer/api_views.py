@@ -36,7 +36,7 @@ class LoginView(APIView):
 
         if not email or not password:
             return Response(
-                {"detail": "Username and password required."},
+                {"detail": "Email and password required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -57,14 +57,15 @@ class LoginView(APIView):
         refresh = RefreshToken.for_user(user)
         customer, _ = CustomerMeta.objects.get_or_create(user=user)
 
+        full_name = user.get_full_name().strip() or user.first_name
+
         return Response(
             {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
                 "uuid": str(customer.uuid),
-                "name": f"{user.first_name} {user.last_name}".strip(),
+                "name": full_name,
                 "points": get_points_balance(user),
-                "json_package": json_package,
             }
         )
 
@@ -150,4 +151,3 @@ class CustomerPointsView(APIView):
                 "refresh": str(new_refresh),
             }
         )
-

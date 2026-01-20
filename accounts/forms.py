@@ -71,6 +71,11 @@ class BusinessSignUpForm(UserCreationForm):
             "password2",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "username" in self.fields:
+            self.fields["username"].label = "Business name"
+
     def clean(self):
         cleaned = super().clean()
         business_type = cleaned.get("business_type")
@@ -95,6 +100,11 @@ class CreatorSignUpForm(UserCreationForm):
     class Meta:
         model = User
         fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "username" in self.fields:
+            self.fields["username"].label = "Creator name"
 
 
 class UserSignUpForm(UserCreationForm):
@@ -122,4 +132,3 @@ class EmailVerificationForm(forms.Form):
             }
         ),
     )
-
