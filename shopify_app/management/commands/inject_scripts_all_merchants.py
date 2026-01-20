@@ -1,15 +1,9 @@
 from django.core.management.base import BaseCommand
 
 from merchants.models import MerchantMeta
-from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
+from shopify_app.script_tags import SCRIPT_SRCS, ensure_script_tags
+from shopify_app.shopify_client import ShopifyClient
 from shopify_app.token_management import refresh_shopify_token
-
-SCRIPT_SRCS = [
-    "https://6457c6b55211.ngrok-free.app/static/js/referral_tracker.js",
-]
-LEGACY_SCRIPT_SRCS = [
-    "https://6457c6b55211.ngrok-free.app/static/js/cart_attributes.js",
-]
 
 
 class Command(BaseCommand):
@@ -33,88 +27,16 @@ class Command(BaseCommand):
                 token_type="offline",
             )
             try:
-                tags = _fetch_script_tags(client)
-                _remove_legacy_scripts(client, tags)
+                injected, existing = ensure_script_tags(client)
                 for src in SCRIPT_SRCS:
-                    if any(tag.get("src") == src for tag in tags):
+                    if src in existing:
                         self.stdout.write(
                             f"Script {src} already present for {store_domain}, skipping"
                         )
                         continue
-
-                    _create_script_tag(client, src)
-                    self.stdout.write(f"Injected script {src} for {store_domain}")
+                    if src in injected:
+                        self.stdout.write(f"Injected script {src} for {store_domain}")
             except Exception as exc:
                 self.stderr.write(
                     f"Failed to inject script for {store_domain}: {exc}"
                 )
-
-
-SCRIPT_TAGS_QUERY = """
-query ScriptTags {
-  scriptTags(first: 100) {
-    edges {
-      node {
-        id
-        src
-        displayScope
-      }
-    }
-  }
-}
-"""
-
-
-SCRIPT_TAG_CREATE_MUTATION = """
-mutation CreateScriptTag($src: URL!) {
-  scriptTagCreate(input: {src: $src, displayScope: ONLINE_STORE}) {
-    scriptTag {
-      id
-      src
-      displayScope
-    }
-    userErrors {
-      field
-      message
-    }
-  }
-}
-"""
-
-SCRIPT_TAG_DELETE_MUTATION = """
-mutation DeleteScriptTag($id: ID!) {
-  scriptTagDelete(id: $id) {
-    deletedScriptTagId
-    userErrors {
-      field
-      message
-    }
-  }
-}
-"""
-
-
-def _fetch_script_tags(client: ShopifyClient):
-    payload = client.graphql(SCRIPT_TAGS_QUERY)
-    edges = (payload.get("data", {}).get("scriptTags", {}).get("edges") or [])
-    return [edge.get("node") or {} for edge in edges]
-
-
-def _create_script_tag(client: ShopifyClient, src: str) -> None:
-    payload = client.graphql(SCRIPT_TAG_CREATE_MUTATION, {"src": src})
-    result = payload.get("data", {}).get("scriptTagCreate") or {}
-    errors = result.get("userErrors") or []
-    if errors:
-        raise ShopifyGraphQLError("Failed to create script tag.", errors)
-
-
-def _remove_legacy_scripts(client: ShopifyClient, tags: list[dict]) -> None:
-    legacy_tags = [
-        tag for tag in tags if tag.get("src") in LEGACY_SCRIPT_SRCS and tag.get("id")
-    ]
-    for tag in legacy_tags:
-        payload = client.graphql(SCRIPT_TAG_DELETE_MUTATION, {"id": tag["id"]})
-        result = payload.get("data", {}).get("scriptTagDelete") or {}
-        errors = result.get("userErrors") or []
-        if errors:
-            raise ShopifyGraphQLError("Failed to delete script tag.", errors)
