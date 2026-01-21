@@ -190,6 +190,30 @@ class MerchantMeta(models.Model):
             self.shopify_billing_status = "CANCELLED"
             update_fields.append("shopify_billing_status")
 
+        if self.shopify_billing_plan:
+            self.shopify_billing_plan = ""
+            update_fields.append("shopify_billing_plan")
+
+        if self.shopify_billing_verified_at:
+            self.shopify_billing_verified_at = None
+            update_fields.append("shopify_billing_verified_at")
+
+        if self.shopify_recurring_charge_id:
+            self.shopify_recurring_charge_id = ""
+            update_fields.append("shopify_recurring_charge_id")
+
+        if self.shopify_billing_confirmation_url:
+            self.shopify_billing_confirmation_url = ""
+            update_fields.append("shopify_billing_confirmation_url")
+
+        if self.shopify_usage_terms:
+            self.shopify_usage_terms = ""
+            update_fields.append("shopify_usage_terms")
+
+        if self.shopify_usage_capped_amount is not None:
+            self.shopify_usage_capped_amount = None
+            update_fields.append("shopify_usage_capped_amount")
+
         if update_fields:
             self.save(update_fields=update_fields)
 
