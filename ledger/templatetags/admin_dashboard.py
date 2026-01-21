@@ -123,6 +123,18 @@ def render_admin_dashboard():
         .order_by("-revenue")[:5]
     )
 
+    canceled_merchants = list(
+        MerchantMeta.objects.filter(shopify_uninstalled_at__isnull=False)
+        .values(
+            "company_name",
+            "shopify_store_domain",
+            "shopify_uninstalled_at",
+            "user__email",
+            "user__username",
+        )
+        .order_by("-shopify_uninstalled_at")[:10]
+    )
+
     alerts: list[dict[str, str]] = []
     previous_count = conversions_prev_week.count()
     if previous_count and conversion_volume_week < previous_count * 0.5:
@@ -160,4 +172,5 @@ def render_admin_dashboard():
         "default_creator": default_creator,
         "default_creator_total": default_creator_total,
         "default_creator_merchants": default_creator_merchants,
+        "canceled_merchants": canceled_merchants,
     }

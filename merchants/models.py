@@ -3,6 +3,7 @@ from typing import Optional
 
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
 from accounts.models import CustomUser
 import uuid
 
@@ -82,6 +83,7 @@ class MerchantMeta(models.Model):
         null=True,
         blank=True,
     )
+    shopify_uninstalled_at = models.DateTimeField(null=True, blank=True)
     marketplace_enabled = models.BooleanField(default=False)
     monthly_fee = models.DecimalField(
         max_digits=10,
@@ -173,6 +175,52 @@ class MerchantMeta(models.Model):
             self.monthly_fee = self.plan_price
         super().save(*args, **kwargs)
         self.ensure_badger_creator_link()
+
+    def cancel_shopify_account(self, *, canceled_at=None) -> None:
+        """Mark the Shopify merchant account as cancelled/uninstalled."""
+
+        canceled_at = canceled_at or timezone.now()
+        update_fields = []
+
+        if self.shopify_uninstalled_at != canceled_at:
+            self.shopify_uninstalled_at = canceled_at
+            update_fields.append("shopify_uninstalled_at")
+
+        if self.shopify_billing_status != "CANCELLED":
+            self.shopify_billing_status = "CANCELLED"
+            update_fields.append("shopify_billing_status")
+
+        if self.shopify_billing_plan:
+            self.shopify_billing_plan = ""
+            update_fields.append("shopify_billing_plan")
+
+        if self.shopify_billing_verified_at:
+            self.shopify_billing_verified_at = None
+            update_fields.append("shopify_billing_verified_at")
+
+        if self.shopify_recurring_charge_id:
+            self.shopify_recurring_charge_id = ""
+            update_fields.append("shopify_recurring_charge_id")
+
+        if self.shopify_billing_confirmation_url:
+            self.shopify_billing_confirmation_url = ""
+            update_fields.append("shopify_billing_confirmation_url")
+
+        if self.shopify_usage_terms:
+            self.shopify_usage_terms = ""
+            update_fields.append("shopify_usage_terms")
+
+        if self.shopify_usage_capped_amount is not None:
+            self.shopify_usage_capped_amount = None
+            update_fields.append("shopify_usage_capped_amount")
+
+        if update_fields:
+            self.save(update_fields=update_fields)
+
+        if self.user.is_active or self.user.is_merchant:
+            self.user.is_active = False
+            self.user.is_merchant = False
+            self.user.save(update_fields=["is_active", "is_merchant"])
 
     def requires_shopify_oauth(self) -> bool:
         """Return ``True`` if the merchant still needs to complete Shopify OAuth."""

@@ -20,26 +20,26 @@ mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
 }
 """
 
-
-def register_orders_create_webhook(
+def _register_webhook(
+    *,
     shop_domain: str,
     access_token: str,
-    webhook_url: str = "https://6457c6b55211.ngrok-free.app/shopify/webhooks/orders-create/",
-):
-    """Register an orders/create webhook for the given shop."""
-
+    topic: str,
+    webhook_url: str,
+) -> bool:
     client = ShopifyClient(access_token, shop_domain, token_type="offline")
     print(
-        "Registering Shopify orders/create webhook:",
+        "Registering Shopify webhook:",
         {
             "shop_domain": shop_domain,
             "webhook_url": webhook_url,
+            "topic": topic,
         },
     )
     try:
         payload = client.graphql(
             WEBHOOK_CREATE_MUTATION,
-            {"topic": "ORDERS_CREATE", "callbackUrl": webhook_url},
+            {"topic": topic, "callbackUrl": webhook_url},
         )
     except Exception as exc:  # pragma: no cover - network errors
         print(f"Error registering webhook: {exc}")
@@ -82,3 +82,33 @@ def register_orders_create_webhook(
         },
     )
     return True
+
+
+def register_orders_create_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str = "https://6457c6b55211.ngrok-free.app/shopify/webhooks/orders-create/",
+):
+    """Register an orders/create webhook for the given shop."""
+
+    return _register_webhook(
+        shop_domain=shop_domain,
+        access_token=access_token,
+        topic="ORDERS_CREATE",
+        webhook_url=webhook_url,
+    )
+
+
+def register_app_uninstalled_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str,
+) -> bool:
+    """Register an app/uninstalled webhook for the given shop."""
+
+    return _register_webhook(
+        shop_domain=shop_domain,
+        access_token=access_token,
+        topic="APP_UNINSTALLED",
+        webhook_url=webhook_url,
+    )
