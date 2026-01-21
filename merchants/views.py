@@ -34,7 +34,7 @@ from shopify_app.shopify_client import ShopifyClient, ShopifyInvalidCredentialsE
 from shopify_app.token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
 from shopify_app.views import build_shopify_authorize_url
-from shopify_app.webhooks import register_app_uninstalled_webhook, register_orders_create_webhook
+from shopify_app.webhooks import register_orders_create_webhook
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
@@ -235,23 +235,15 @@ def _attempt_shopify_webhook_registration(
     webhook_url = request.build_absolute_uri(
         reverse("shopify_orders_create_webhook")
     )
-    uninstall_url = request.build_absolute_uri(
-        reverse("shopify_app_uninstall_webhook")
-    )
     try:
         register_orders_create_webhook(
             shop_domain,
             merchant_meta.shopify_access_token,
             webhook_url=webhook_url,
         )
-        register_app_uninstalled_webhook(
-            shop_domain,
-            merchant_meta.shopify_access_token,
-            webhook_url=uninstall_url,
-        )
     except Exception:
         logger.exception(
-            "Failed to register Shopify webhooks for %s.",
+            "Failed to register Shopify orders/create webhook for %s.",
             shop_domain,
         )
 
