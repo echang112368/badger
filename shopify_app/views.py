@@ -46,7 +46,7 @@ from .oauth import (
 from .shopify_client import ShopifyClient, ShopifyGraphQLError, ShopifyInvalidCredentialsError
 from .script_tags import SCRIPT_SRCS, inject_scripts_for_merchant
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
-from .webhooks import register_orders_create_webhook
+from .webhooks import register_app_uninstalled_webhook, register_orders_create_webhook
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
@@ -229,15 +229,28 @@ def _attempt_shopify_webhook_registration(
         return
 
     webhook_url = request.build_absolute_uri(reverse("shopify_orders_create_webhook"))
+    uninstall_url = request.build_absolute_uri(
+        reverse("shopify_app_uninstall_webhook")
+    )
     try:
-        register_orders_create_webhook(
+        orders_registered = register_orders_create_webhook(
             shop_domain,
             access_token,
             webhook_url=webhook_url,
         )
+        uninstall_registered = register_app_uninstalled_webhook(
+            shop_domain,
+            access_token,
+            webhook_url=uninstall_url,
+        )
+        if orders_registered and uninstall_registered:
+            logger.info(
+                "Registered Shopify webhooks during OAuth for %s.",
+                shop_domain,
+            )
     except Exception:
         logger.exception(
-            "Failed to register Shopify orders/create webhook for %s during OAuth.",
+            "Failed to register Shopify webhooks for %s during OAuth.",
             shop_domain,
         )
 

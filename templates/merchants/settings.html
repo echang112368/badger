@@ -175,6 +175,14 @@
               <p class="font-medium">Shopify billing enabled</p>
               <p class="mt-1 text-indigo-700/80">Recurring platform fees and usage charges will be billed through Shopify.</p>
             </div>
+            {% if merchant_meta.shopify_uninstalled_at %}
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p class="font-medium">Shopify app uninstalled</p>
+              <p class="mt-1 text-amber-700/80">
+                The Shopify app was uninstalled on {{ merchant_meta.shopify_uninstalled_at|date:"M d, Y" }}. Billing is inactive until you reinstall the app.
+              </p>
+            </div>
+            {% endif %}
             <div
               data-shopify-plan-card
               data-billing-plan-section="shopify"
