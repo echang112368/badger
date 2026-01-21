@@ -144,30 +144,5 @@
         </div>
       </div>
     </section>
-
-    <section class="panel">
-      <header>
-        <h2>Recent app cancellations</h2>
-        <p class="panel-sub">Merchants that uninstalled the Shopify app.</p>
-      </header>
-      {% if canceled_merchants %}
-        <ul class="earnings-list">
-          {% for merchant in canceled_merchants %}
-            <li>
-              <div class="row">
-                <span class="label">
-                  {{ merchant.company_name|default:merchant.user__username|default:merchant.user__email|default:"Unknown merchant" }}
-                </span>
-                <span class="value">
-                  {{ merchant.shopify_store_domain|default:"Unknown store" }} • {{ merchant.shopify_uninstalled_at|date:"M d, Y" }}
-                </span>
-              </div>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="empty">No Shopify cancellations have been recorded yet.</p>
-      {% endif %}
-    </section>
   </div>
 </div>
