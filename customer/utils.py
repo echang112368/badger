@@ -19,3 +19,20 @@ def get_points_balance(user: get_user_model()) -> int:
     )
     return int(total)
 
+
+def get_savings_total(user: get_user_model()) -> int:
+    """Return the total savings amount for ``user``.
+
+    Savings are stored as ledger entries with ``entry_type="savings"``.
+    """
+
+    total = (
+        LedgerEntry.objects.filter(
+            creator=user,
+            entry_type=LedgerEntry.EntryType.SAVINGS,
+        )
+        .aggregate(total=Sum("amount"))
+        .get("total")
+        or Decimal("0")
+    )
+    return int(total)

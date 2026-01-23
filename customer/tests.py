@@ -65,6 +65,11 @@ class LoginAPITests(TestCase):
             amount=Decimal("73"),
             entry_type="points",
         )
+        LedgerEntry.objects.create(
+            creator=self.user,
+            amount=Decimal("9"),
+            entry_type=LedgerEntry.EntryType.SAVINGS,
+        )
         url = reverse("api_login")
         response = self.client.post(url, {
             "username": "tester@example.com",
@@ -79,6 +84,8 @@ class LoginAPITests(TestCase):
         self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
         self.assertEqual(data["points"], 73)
+        self.assertIn("savings", data)
+        self.assertEqual(data["savings"], 9)
 
     def test_invalid_login_returns_400(self):
         url = reverse("api_login")
@@ -172,6 +179,11 @@ class CustomerPointsAPITests(TestCase):
             amount=Decimal("42"),
             entry_type="points",
         )
+        LedgerEntry.objects.create(
+            creator=self.user,
+            amount=Decimal("15"),
+            entry_type=LedgerEntry.EntryType.SAVINGS,
+        )
         login_response = self.client.post(
             reverse("api_login"),
             {"username": "customer@example.com", "password": "secret"},
@@ -193,6 +205,7 @@ class CustomerPointsAPITests(TestCase):
         data = response.json()
         self.assertEqual(data["uuid"], str(self.meta.uuid))
         self.assertEqual(data["points"], 42)
+        self.assertEqual(data["savings"], 15)
         self.assertIn("access", data)
         self.assertIn("refresh", data)
         self.assertNotEqual(data["access"], self.login_tokens["access"])
