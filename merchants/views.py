@@ -115,6 +115,7 @@ def _creator_card_payload(meta: CreatorMeta) -> dict:
 
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
 SHOPIFY_BILLING_STATUS_TTL = timedelta(minutes=5)
+SHOPIFY_PENDING_STATUS_REFRESH_WINDOW = timedelta(minutes=10)
 
 SOCIAL_PLATFORM_OPTIONS = [
     "YouTube",
@@ -178,6 +179,18 @@ def _should_refresh_shopify_billing(request, meta: Optional[MerchantMeta]) -> bo
     if not verified_at:
         return True
     return timezone.now() - verified_at > SHOPIFY_BILLING_STATUS_TTL
+
+
+def _should_refresh_pending_shopify_billing(meta: Optional[MerchantMeta]) -> bool:
+    if not meta or meta.business_type != MerchantMeta.BusinessType.SHOPIFY:
+        return False
+    status = (meta.shopify_billing_status or "").lower()
+    if status != "pending":
+        return False
+    verified_at = getattr(meta, "shopify_billing_verified_at", None)
+    if not verified_at:
+        return True
+    return timezone.now() - verified_at > SHOPIFY_PENDING_STATUS_REFRESH_WINDOW
 
 
 def _should_show_invoices_tab(merchant_meta: Optional[MerchantMeta]) -> bool:
@@ -1031,6 +1044,20 @@ def merchant_invoices(request):
 
     if not show_invoices_tab:
         return redirect('merchant_dashboard')
+
+    if _should_refresh_pending_shopify_billing(merchant_meta):
+        try:
+            shopify_billing.refresh_active_subscriptions(
+                merchant_meta,
+                expected_plan_name=shopify_billing.expected_shopify_plan_name(merchant_meta),
+            )
+        except shopify_billing.ShopifyReauthorizationRequired:
+            logger.warning(
+                "Shopify billing refresh requires reauthorization for %s.",
+                merchant_meta.shopify_store_domain,
+            )
+        except shopify_billing.ShopifyBillingError:
+            logger.exception("Failed to refresh Shopify billing status for invoices view.")
 
     invoices_qs = (
         MerchantInvoice.objects.filter(merchant=merchant_user)
