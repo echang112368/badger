@@ -6,5 +6,9 @@
     {% csrf_token %}
     <input type="submit" class="button" value="{% trans 'Generate Merchant Invoices' %}">
 </form>
+<form action="{% url 'admin:merchants_refresh_shopify_subscriptions' %}{{ cl.get_query_string }}" method="post" style="display:inline;margin-right:1em;">
+    {% csrf_token %}
+    <input type="submit" class="button" value="{% trans 'Refresh Shopify Subscriptions' %}">
+</form>
 {{ block.super }}
 {% endblock %}

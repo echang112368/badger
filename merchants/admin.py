@@ -31,6 +31,11 @@ class MerchantMetaAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.generate_invoices),
                 name="merchants_generate_invoices",
             ),
+            path(
+                "refresh-shopify-subscriptions/",
+                self.admin_site.admin_view(self.refresh_shopify_subscriptions),
+                name="merchants_refresh_shopify_subscriptions",
+            ),
         ]
         return custom_urls + urls
 
@@ -102,3 +107,52 @@ class MerchantMetaAdmin(admin.ModelAdmin):
 
                 messages.success(request, f"Generated {len(result)} invoice(s)")
         return redirect("../")
+
+    def refresh_shopify_subscriptions(self, request):
+        from shopify_app import billing as shopify_billing
+
+        changelist = self.get_changelist_instance(request)
+        queryset = changelist.get_queryset(request)
+        shopify_merchants = (
+            queryset.filter(business_type=MerchantMeta.BusinessType.SHOPIFY)
+            .select_related("user")
+        )
+        refreshed = 0
+        reauth_required = []
+        failures = []
+        for meta in shopify_merchants:
+            try:
+                shopify_billing.refresh_active_subscriptions(
+                    meta,
+                    expected_plan_name=shopify_billing.expected_shopify_plan_name(meta),
+                )
+            except shopify_billing.ShopifyReauthorizationRequired:
+                name = meta.company_name or meta.user.get_full_name() or meta.user.username
+                reauth_required.append(name)
+            except shopify_billing.ShopifyBillingError:
+                name = meta.company_name or meta.user.get_full_name() or meta.user.username
+                failures.append(name)
+            else:
+                refreshed += 1
+
+        if refreshed:
+            messages.success(
+                request,
+                f"Refreshed Shopify subscriptions for {refreshed} merchant(s).",
+            )
+        if reauth_required:
+            names = ", ".join(sorted(set(reauth_required)))
+            messages.warning(
+                request,
+                f"Shopify reauthorization required for: {names}.",
+            )
+        if failures:
+            names = ", ".join(sorted(set(failures)))
+            messages.error(
+                request,
+                f"Failed to refresh Shopify subscriptions for: {names}.",
+            )
+        if not refreshed and not reauth_required and not failures:
+            messages.info(request, "No Shopify merchants found to refresh.")
+
+        return redirect(request.META.get("HTTP_REFERER", "../"))
