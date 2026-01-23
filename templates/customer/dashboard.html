@@ -61,6 +61,16 @@
     .status-pill {
         font-size: 12px;
     }
+    .level-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #f1f4fb;
+        font-weight: 600;
+        color: #1f2f54;
+        font-size: 14px;
+    }
 </style>
 
 <div class="rewards-grid mb-4">
@@ -96,6 +106,30 @@
                 <span class="stat-value">${{ lifetime_savings|floatformat:2 }} from coupons</span>
             </li>
         </ul>
+    </div>
+
+    <div class="card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h2 class="h6 mb-1">Rewards level</h2>
+                <small class="text-muted">Every 1,000 points unlocks a new level</small>
+            </div>
+            <span class="level-pill">Level {{ level_progress.level }}</span>
+        </div>
+        <div class="progress mb-3" style="height: 12px;">
+            <div
+                class="progress-bar bg-warning"
+                role="progressbar"
+                style="width: {{ level_progress.level_progress_percent }}%;"
+                aria-valuenow="{{ level_progress.level_progress_percent }}"
+                aria-valuemin="0"
+                aria-valuemax="100"
+            ></div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center text-muted small">
+            <span>{{ level_progress.level_points }} / {{ level_progress.level_points_max }} pts</span>
+            <span>{{ level_progress.points_to_next_level }} pts to level {{ level_progress.level|add:"1" }}</span>
+        </div>
     </div>
 </div>
 
