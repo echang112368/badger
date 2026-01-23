@@ -12,7 +12,7 @@ from accounts.forms import UserNameForm
 def user_dashboard(request):
     user = request.user
     points_balance = get_points_balance(user)
-    redemption_value = points_balance / 60
+    redemption_value = points_balance / Decimal("600")
     lifetime_points = points_balance
     lifetime_savings = (
         LedgerEntry.objects.filter(
@@ -40,7 +40,7 @@ def user_dashboard(request):
                 "transaction_date": entry.timestamp.date(),
                 "company": company,
                 "points": int(entry.amount),
-                "amount_usd": (entry.amount / Decimal("60")).quantize(
+                "amount_usd": (entry.amount / Decimal("600")).quantize(
                     Decimal("0.01")
                 ),
             }
