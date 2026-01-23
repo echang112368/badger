@@ -510,7 +510,7 @@ def orders_create_webhook(request):
             entry_type=merchant_entry_type,
         )
 
-    # Reward the customer with points (60 points = $1)
+    # Reward the customer with points ($1 spent = 60 points; 60 points redeem for $0.10)
     if customer_meta and order_total > 0:
         points = int(order_total * 60)
         LedgerEntry.objects.create(
