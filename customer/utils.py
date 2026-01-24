@@ -5,7 +5,7 @@ from decimal import Decimal
 from ledger.models import LedgerEntry
 
 
-def get_points_balance(user: get_user_model()) -> Decimal:
+def get_points_balance(user: get_user_model()) -> int:
     """Return the current rewards points for ``user``.
 
     Points are stored as ledger entries with ``entry_type="points"``.
@@ -17,7 +17,7 @@ def get_points_balance(user: get_user_model()) -> Decimal:
         .get("total")
         or Decimal("0")
     )
-    return total.quantize(Decimal("0.1"))
+    return int(total)
 
 
 def get_savings_total(user: get_user_model()) -> int:
