@@ -20,7 +20,7 @@ from .models import (
 )
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
+from creators.constants import BADGER_CREATOR_UUID
 
 
 def _normalise_shopify_product_id(product_id):
@@ -272,7 +272,7 @@ def webhook_view(request):
                         )
                         merchant_entry_type = (
                             LedgerEntry.EntryType.BADGER_PAYOUT
-                            if str(creator_meta.uuid) == SPECIAL_CREATOR_UUID
+                            if str(creator_meta.uuid) == BADGER_CREATOR_UUID
                             else LedgerEntry.EntryType.AFFILIATE_PAYOUT
                         )
                         LedgerEntry.objects.create(
@@ -420,7 +420,7 @@ def orders_create_webhook(request):
 
     if (
         creator_active_for_merchant
-        and creator_uuid_str == SPECIAL_CREATOR_UUID
+        and creator_uuid_str == BADGER_CREATOR_UUID
         and amount_str
     ):
         try:
@@ -514,7 +514,7 @@ def orders_create_webhook(request):
         # Charge the merchant for the commission
         merchant_entry_type = (
             LedgerEntry.EntryType.BADGER_PAYOUT
-            if creator_uuid_str == SPECIAL_CREATOR_UUID
+            if creator_uuid_str == BADGER_CREATOR_UUID
             else LedgerEntry.EntryType.AFFILIATE_PAYOUT
         )
         LedgerEntry.objects.create(
