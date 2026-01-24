@@ -26,52 +26,6 @@ class CustomUser(AbstractUser):
             is_default_badger_creator=True, is_creator=True
         ).first()
 
-    @classmethod
-    def ensure_badger_creator(cls):
-        """Ensure the default Badger creator account exists."""
-
-        from creators.constants import (
-            BADGER_CREATOR_EMAIL,
-            BADGER_CREATOR_USERNAME,
-            BADGER_CREATOR_UUID,
-        )
-        from creators.models import CreatorMeta
-
-        badger_meta = CreatorMeta.objects.filter(uuid=BADGER_CREATOR_UUID).first()
-        if badger_meta:
-            badger_user = badger_meta.user
-        else:
-            badger_user = cls.objects.filter(
-                username=BADGER_CREATOR_USERNAME
-            ).first()
-            if not badger_user:
-                badger_user = cls.objects.filter(
-                    email=BADGER_CREATOR_EMAIL
-                ).first()
-            if not badger_user:
-                badger_user = cls.objects.create_user(
-                    username=BADGER_CREATOR_USERNAME,
-                    email=BADGER_CREATOR_EMAIL,
-                    password=None,
-                    first_name="Badger",
-                    last_name="",
-                    is_creator=True,
-                    is_default_badger_creator=True,
-                )
-                badger_user.set_unusable_password()
-                badger_user.save(update_fields=["password"])
-
-        if not badger_user.is_creator or not badger_user.is_default_badger_creator:
-            badger_user.is_creator = True
-            badger_user.is_default_badger_creator = True
-            badger_user.save(update_fields=["is_creator", "is_default_badger_creator"])
-
-        CreatorMeta.objects.update_or_create(
-            user=badger_user, defaults={"uuid": BADGER_CREATOR_UUID}
-        )
-
-        return badger_user
-
     def save(self, *args, **kwargs):
         # Ensure only one default Badger creator exists at a time and that the
         # user has creator capabilities enabled.
