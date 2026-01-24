@@ -65,7 +65,7 @@ class LoginView(APIView):
                 "refresh": str(refresh),
                 "uuid": str(customer.uuid),
                 "name": full_name,
-                "points": get_points_balance(user),
+                "points": float(get_points_balance(user)),
                 "savings": get_savings_total(user),
             }
         )
@@ -147,7 +147,7 @@ class CustomerPointsView(APIView):
         return Response(
             {
                 "uuid": str(customer.uuid),
-                "points": get_points_balance(user),
+                "points": float(get_points_balance(user)),
                 "savings": get_savings_total(user),
                 "access": str(new_access),
                 "refresh": str(new_refresh),
