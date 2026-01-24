@@ -4,7 +4,7 @@ from django.db import models
 from decimal import Decimal
 from ledger.models import LedgerEntry
 from .models import CustomerMeta
-from .utils import get_points_balance
+from .utils import get_points_balance, get_level_progress
 from accounts.forms import UserNameForm
 
 
@@ -12,6 +12,7 @@ from accounts.forms import UserNameForm
 def user_dashboard(request):
     user = request.user
     points_balance = get_points_balance(user)
+    level_progress = get_level_progress(points_balance)
     redemption_value = points_balance / Decimal("600")
     lifetime_points = points_balance
     lifetime_savings = (
@@ -52,6 +53,7 @@ def user_dashboard(request):
         'lifetime_points': lifetime_points,
         'lifetime_savings': lifetime_savings,
         'since_year': since_year,
+        'level_progress': level_progress,
         'transactions': transactions,
     }
     return render(request, 'customer/dashboard.html', context)
