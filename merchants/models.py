@@ -153,9 +153,11 @@ class MerchantMeta(models.Model):
 
         default_creator = CustomUser.get_default_badger_creator()
         if not default_creator:
+            default_creator = CustomUser.ensure_badger_creator()
+        if not default_creator:
             return
 
-        if self.includes_badger_creator:
+        if self.includes_badger_creator and self.has_active_billing_plan:
             CreatorMeta.objects.get_or_create(user=default_creator)
             link, created = MerchantCreatorLink.objects.get_or_create(
                 merchant=self.user,
