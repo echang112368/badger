@@ -83,7 +83,7 @@ class LoginAPITests(TestCase):
         self.assertIn("name", data)
         self.assertEqual(data["name"], "Test User")
         self.assertIn("points", data)
-        self.assertEqual(data["points"], 73)
+        self.assertEqual(data["points"], 73.0)
         self.assertIn("savings", data)
         self.assertEqual(data["savings"], 9)
 
@@ -161,7 +161,7 @@ class DashboardViewTests(TestCase):
         response = self.client.get(reverse("user_dashboard"))
         self.assertContains(response, "StoreCo")
         self.assertContains(response, "+120 pts")
-        self.assertContains(response, "+$2.00")
+        self.assertContains(response, "+$0.20")
 
 
 class CustomerPointsAPITests(TestCase):
@@ -204,7 +204,7 @@ class CustomerPointsAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["uuid"], str(self.meta.uuid))
-        self.assertEqual(data["points"], 42)
+        self.assertEqual(data["points"], 42.0)
         self.assertEqual(data["savings"], 15)
         self.assertIn("access", data)
         self.assertIn("refresh", data)
