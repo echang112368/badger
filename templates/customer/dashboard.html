@@ -110,7 +110,6 @@
                     <th scope="col">Date</th>
                     <th scope="col">Company</th>
                     <th scope="col" class="text-end">Points</th>
-                    <th scope="col" class="text-end">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -120,12 +119,11 @@
                             <td>{{ t.transaction_date }}</td>
                             <td>{{ t.company }}</td>
                             <td class="text-end amount-positive">+{{ t.points|floatformat:"-1" }} pts</td>
-                            <td class="text-end amount-positive">+${{ t.amount_usd|floatformat:2 }}</td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="4" class="text-center py-4">No rewards yet</td>
+                        <td colspan="3" class="text-center py-4">No rewards yet</td>
                     </tr>
                 {% endif %}
             </tbody>
