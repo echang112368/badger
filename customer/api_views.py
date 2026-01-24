@@ -12,7 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import CustomerMeta
-from .utils import get_points_balance, get_savings_total
+from .utils import get_points_balance, get_savings_total, get_level_progress
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -67,6 +67,7 @@ class LoginView(APIView):
                 "name": full_name,
                 "points": get_points_balance(user),
                 "savings": get_savings_total(user),
+                "level_progress": get_level_progress(get_points_balance(user)),
             }
         )
 
@@ -149,6 +150,7 @@ class CustomerPointsView(APIView):
                 "uuid": str(customer.uuid),
                 "points": get_points_balance(user),
                 "savings": get_savings_total(user),
+                "level_progress": get_level_progress(get_points_balance(user)),
                 "access": str(new_access),
                 "refresh": str(new_refresh),
             }
