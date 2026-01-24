@@ -1490,14 +1490,8 @@ def delete_creators(request):
         qs = MerchantCreatorLink.objects.filter(
             merchant=merchant_user, creator__id__in=creator_ids
         )
-        merchant_meta = _get_merchant_meta(merchant_user)
         default_creator = CustomUser.get_default_badger_creator()
-        if (
-            default_creator
-            and merchant_meta
-            and merchant_meta.includes_badger_creator
-            and merchant_meta.has_active_billing_plan
-        ):
+        if default_creator:
             qs = qs.exclude(creator=default_creator)
         qs.delete()
 
@@ -1518,14 +1512,8 @@ def update_creator_status(request):
             qs = MerchantCreatorLink.objects.filter(
                 merchant=merchant_user, creator__id__in=creator_ids
             )
-            merchant_meta = _get_merchant_meta(merchant_user)
             default_creator = CustomUser.get_default_badger_creator()
-            if (
-                default_creator
-                and merchant_meta
-                and merchant_meta.includes_badger_creator
-                and merchant_meta.has_active_billing_plan
-            ):
+            if default_creator:
                 qs = qs.exclude(creator=default_creator)
             qs.update(
                 status=STATUS_ACTIVE if action == "activate" else STATUS_INACTIVE
@@ -2025,7 +2013,6 @@ def refresh_shopify_billing_status(request):
     shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain or "")
     if plan_active and shop_domain:
         _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
-        merchant_meta.ensure_badger_creator_link()
     return JsonResponse(
         {
             "status": merchant_meta.shopify_billing_status or "",
