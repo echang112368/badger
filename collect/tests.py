@@ -141,7 +141,7 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(creator_entry.amount, Decimal("0.80"))
         self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-0.80"))
-        self.assertEqual(points_entry.amount, Decimal("1500.0"))
+        self.assertEqual(points_entry.amount, Decimal("1500"))
         self.assertIsNone(points_entry.merchant)
         self.assertFalse(
             LedgerEntry.objects.filter(merchant=merchant, entry_type="points").exists()
@@ -227,7 +227,7 @@ class OrdersWebhookTests(TestCase):
             ).exists()
         )
         points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
-        self.assertEqual(points_entry.amount, Decimal("600.0"))
+        self.assertEqual(points_entry.amount, Decimal("600"))
         self.assertEqual(ReferralConversion.objects.count(), 0)
 
     def test_special_uuid_triggers_fixed_commission(self):
@@ -288,7 +288,7 @@ class OrdersWebhookTests(TestCase):
         self.assertEqual(creator_entry.amount, Decimal("5.00"))
         self.assertIsNone(merchant_entry.creator)
         self.assertEqual(merchant_entry.amount, Decimal("-5.00"))
-        self.assertEqual(points_entry.amount, Decimal("6000.0"))
+        self.assertEqual(points_entry.amount, Decimal("6000"))
         self.assertEqual(conversion.commission_amount, Decimal("5.00"))
 
     def test_missing_customer_skips_points(self):
@@ -375,7 +375,7 @@ class OrdersWebhookTests(TestCase):
             ).exists()
         )
         points_entry = LedgerEntry.objects.get(creator=customer, entry_type="points")
-        self.assertEqual(points_entry.amount, Decimal("1200.0"))
+        self.assertEqual(points_entry.amount, Decimal("1200"))
         conversion = ReferralConversion.objects.get()
         self.assertEqual(conversion.order_amount, Decimal("20.00"))
         self.assertEqual(conversion.commission_amount, Decimal("0.00"))
