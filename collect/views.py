@@ -18,7 +18,7 @@ from .models import (
     ReferralConversion,
     CreatorMerchantStatus,
 )
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
 
@@ -512,10 +512,12 @@ def orders_create_webhook(request):
 
     # Reward the customer with points ($1 spent = 60 points; 60 points redeem for $0.10)
     if customer_meta and order_total > 0:
-        points = int(order_total * 60)
+        points = (order_total * Decimal("60")).quantize(
+            Decimal("1"), rounding=ROUND_HALF_UP
+        )
         LedgerEntry.objects.create(
             creator=customer_meta.user,
-            amount=Decimal(points),
+            amount=points,
             entry_type="points",
         )
 
