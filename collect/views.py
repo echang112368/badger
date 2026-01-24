@@ -18,7 +18,7 @@ from .models import (
     ReferralConversion,
     CreatorMerchantStatus,
 )
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 SPECIAL_CREATOR_UUID = "733d0d67-6a30-4c48-a92e-b8e211b490f5"
 
@@ -399,6 +399,19 @@ def orders_create_webhook(request):
         except (TypeError, InvalidOperation):
             order_total = Decimal("0")
 
+    line_items = payload.get("line_items", [])
+    line_items_total = Decimal("0")
+    for item in line_items:
+        quantity = item.get("quantity", 1)
+        price = item.get("price")
+        try:
+            line_amount = (Decimal(price) * Decimal(quantity)).quantize(
+                Decimal("0.01")
+            )
+        except (TypeError, InvalidOperation):
+            continue
+        line_items_total += line_amount
+
     if discount_str:
         try:
             discount_total = Decimal(str(discount_str)).quantize(Decimal("0.01"))
@@ -421,7 +434,7 @@ def orders_create_webhook(request):
             commission_total = Decimal("0")
     elif merchant_meta and creator_meta and creator_active_for_merchant:
         # Calculate commission per line item based on its group percentage
-        for item in payload.get("line_items", []):
+        for item in line_items:
             product_id = _normalise_shopify_product_id(item.get("product_id"))
             quantity = item.get("quantity", 1)
             price = item.get("price")
@@ -456,7 +469,7 @@ def orders_create_webhook(request):
 
     conversion_metadata = {"source": "shopify_orders_create"}
     line_items_payload = []
-    for item in payload.get("line_items", []):
+    for item in line_items:
         product_id = _normalise_shopify_product_id(item.get("product_id"))
         if not product_id:
             continue
@@ -511,11 +524,14 @@ def orders_create_webhook(request):
         )
 
     # Reward the customer with points ($1 spent = 60 points; 60 points redeem for $0.10)
-    if customer_meta and order_total > 0:
-        points = int(order_total * 60)
+    points_base = line_items_total if line_items_total > 0 else order_total
+    if customer_meta and points_base > 0:
+        points = (points_base * Decimal("60")).quantize(
+            Decimal("0.1"), rounding=ROUND_HALF_UP
+        )
         LedgerEntry.objects.create(
             creator=customer_meta.user,
-            amount=Decimal(points),
+            amount=points,
             entry_type="points",
         )
 
