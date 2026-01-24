@@ -39,7 +39,7 @@ def user_dashboard(request):
             {
                 "transaction_date": entry.timestamp.date(),
                 "company": company,
-                "points": entry.amount,
+                "points": int(entry.amount),
                 "amount_usd": (entry.amount / Decimal("600")).quantize(
                     Decimal("0.01")
                 ),
