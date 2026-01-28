@@ -12,18 +12,21 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #fafafa; }
         :root {
-            --bs-primary: #304f91;
-            --bs-primary-rgb: 48,79,145;
-            --bs-link-color: #304f91;
-            --bs-link-hover-color: #263f74;
+            --bs-primary: #fcd965;
+            --bs-primary-rgb: 252,217,101;
+            --bs-link-color: #c38b00;
+            --bs-link-hover-color: #a97500;
         }
         .btn-primary {
-            --bs-btn-bg: #304f91;
-            --bs-btn-border-color: #304f91;
-            --bs-btn-hover-bg: #263f74;
-            --bs-btn-hover-border-color: #263f74;
-            --bs-btn-active-bg: #263f74;
-            --bs-btn-active-border-color: #263f74;
+            --bs-btn-bg: #fcd965;
+            --bs-btn-border-color: #fcd965;
+            --bs-btn-hover-bg: #f8c93e;
+            --bs-btn-hover-border-color: #f8c93e;
+            --bs-btn-active-bg: #f1ba25;
+            --bs-btn-active-border-color: #f1ba25;
+            --bs-btn-color: #2d2d2d;
+            --bs-btn-hover-color: #1f1f1f;
+            --bs-btn-active-color: #1f1f1f;
         }
         a { color: var(--bs-link-color); }
         a:hover { color: var(--bs-link-hover-color); }
@@ -43,8 +46,8 @@
         <hr>
         {% with request.resolver_match.url_name as current_url %}
         <ul class="nav nav-pills flex-column mb-auto">
-            <li><a href="{% url 'user_dashboard' %}" class="nav-link {% if current_url == 'user_dashboard' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
-            <li><a href="{% url 'user_settings' %}" class="nav-link {% if current_url == 'user_settings' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-gear me-2"></i>Settings</a></li>
+            <li><a href="{% url 'user_dashboard' %}" class="nav-link {% if current_url == 'user_dashboard' %}bg-primary text-dark{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+            <li><a href="{% url 'user_settings' %}" class="nav-link {% if current_url == 'user_settings' %}bg-primary text-dark{% else %}text-dark{% endif %}"><i class="bi bi-gear me-2"></i>Settings</a></li>
             <li><a href="#" class="nav-link text-dark" data-bs-toggle="modal" data-bs-target="#logoutModal"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
         </ul>
         {% endwith %}
