@@ -6,7 +6,7 @@ import requests
 
 
 logger = logging.getLogger(__name__)
-ADMIN_API_VERSION = "2024-07"
+ADMIN_API_VERSION = "2024-10"
 
 
 class ShopifyInvalidCredentialsError(RuntimeError):
