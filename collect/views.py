@@ -10,7 +10,6 @@ from creators.models import CreatorMeta
 from customer.models import CustomerMeta
 from ledger.models import LedgerEntry
 from merchants.models import MerchantItem, MerchantMeta
-from shopify_app.webhook_verification import is_valid_shopify_webhook
 
 from .models import (
     AffiliateClick,
@@ -329,8 +328,6 @@ def orders_create_webhook(request):
     print('orders_create_webhook called' )
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
-    if not is_valid_shopify_webhook(request):
-        return JsonResponse({"error": "Invalid Shopify webhook signature."}, status=401)
 
     try:
         payload = json.loads(request.body)
