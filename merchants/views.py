@@ -34,13 +34,7 @@ from shopify_app.shopify_client import ShopifyClient, ShopifyInvalidCredentialsE
 from shopify_app.token_management import clear_shopify_token_for_shop, refresh_shopify_token
 from shopify_app.oauth import normalise_shop_domain, session_refresh_key, session_token_key
 from shopify_app.views import build_shopify_authorize_url
-from shopify_app.webhooks import (
-    register_app_uninstalled_webhook,
-    register_customers_data_request_webhook,
-    register_customers_redact_webhook,
-    register_orders_create_webhook,
-    register_shop_redact_webhook,
-)
+from shopify_app.webhooks import register_app_uninstalled_webhook, register_orders_create_webhook
 from ledger.models import LedgerEntry, MerchantInvoice
 from django.http import HttpResponseForbidden, JsonResponse, QueryDict
 from django.views.decorators.csrf import csrf_exempt
@@ -257,15 +251,6 @@ def _attempt_shopify_webhook_registration(
     uninstall_url = request.build_absolute_uri(
         reverse("shopify_app_uninstall_webhook")
     )
-    customers_data_request_url = request.build_absolute_uri(
-        reverse("shopify_customers_data_request_webhook")
-    )
-    customers_redact_url = request.build_absolute_uri(
-        reverse("shopify_customers_redact_webhook")
-    )
-    shop_redact_url = request.build_absolute_uri(
-        reverse("shopify_shop_redact_webhook")
-    )
     try:
         orders_registered = register_orders_create_webhook(
             shop_domain,
@@ -277,28 +262,7 @@ def _attempt_shopify_webhook_registration(
             merchant_meta.shopify_access_token,
             webhook_url=uninstall_url,
         )
-        data_request_registered = register_customers_data_request_webhook(
-            shop_domain,
-            merchant_meta.shopify_access_token,
-            webhook_url=customers_data_request_url,
-        )
-        customers_redact_registered = register_customers_redact_webhook(
-            shop_domain,
-            merchant_meta.shopify_access_token,
-            webhook_url=customers_redact_url,
-        )
-        shop_redact_registered = register_shop_redact_webhook(
-            shop_domain,
-            merchant_meta.shopify_access_token,
-            webhook_url=shop_redact_url,
-        )
-        if (
-            orders_registered
-            and uninstall_registered
-            and data_request_registered
-            and customers_redact_registered
-            and shop_redact_registered
-        ):
+        if orders_registered and uninstall_registered:
             logger.info("Registered Shopify webhooks for %s.", shop_domain)
     except Exception:
         logger.exception(
