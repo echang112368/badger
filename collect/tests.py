@@ -1,4 +1,8 @@
-from django.test import TestCase, RequestFactory
+import base64
+import hashlib
+import hmac
+
+from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from decimal import Decimal
 import json
@@ -18,9 +22,15 @@ from collect.models import (
 from .views import orders_create_webhook
 
 
+@override_settings(SHOPIFY_API_SECRET="test-shopify-secret")
 class OrdersWebhookTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
+
+    def _shopify_hmac(self, body: bytes) -> str:
+        secret = "test-shopify-secret"
+        digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).digest()
+        return base64.b64encode(digest).decode("utf-8")
 
     def _setup_users(self):
         merchant = CustomUser.objects.create_user(
@@ -71,10 +81,12 @@ class OrdersWebhookTests(TestCase):
                 {"name": "cusID", "value": str(customer_meta.uuid)}
             )
         body = json.dumps(payload)
+        hmac_header = self._shopify_hmac(body.encode("utf-8"))
         request = self.factory.post(
             "/shopify/webhooks/orders-create/",
             data=body,
             content_type="application/json",
+            HTTP_X_SHOPIFY_HMAC_SHA256=hmac_header,
         )
         return orders_create_webhook(request)
 
