@@ -96,7 +96,7 @@ def _register_webhook(
 def register_orders_create_webhook(
     shop_domain: str,
     access_token: str,
-    webhook_url: str = "https://6457c6b55211.ngrok-free.app/shopify/webhooks/orders-create/",
+    webhook_url: str = "https://f48b-2607-b400-26-0-e02d-88ef-be02-490e.ngrok-free.app/shopify/webhooks/orders-create/",
 ):
     """Register an orders/create webhook for the given shop."""
 
