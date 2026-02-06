@@ -1,14 +1,6 @@
 from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
 
 
-def ensure_https(url: str) -> str:
-    if not url:
-        return url
-    if url.startswith("http://"):
-        return "https://" + url.split("://", 1)[1]
-    return url
-
-
 WEBHOOK_CREATE_MUTATION = """
 mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $callbackUrl: URL!) {
   webhookSubscriptionCreate(
@@ -36,7 +28,6 @@ def _register_webhook(
     webhook_url: str,
 ) -> bool:
     client = ShopifyClient(access_token, shop_domain, token_type="offline")
-    webhook_url = ensure_https(webhook_url)
     print(
         "Registering Shopify webhook:",
         {
@@ -119,50 +110,5 @@ def register_app_uninstalled_webhook(
         shop_domain=shop_domain,
         access_token=access_token,
         topic="APP_UNINSTALLED",
-        webhook_url=webhook_url,
-    )
-
-
-def register_customers_data_request_webhook(
-    shop_domain: str,
-    access_token: str,
-    webhook_url: str,
-) -> bool:
-    """Register a customers/data_request GDPR webhook for the given shop."""
-
-    return _register_webhook(
-        shop_domain=shop_domain,
-        access_token=access_token,
-        topic="CUSTOMERS_DATA_REQUEST",
-        webhook_url=webhook_url,
-    )
-
-
-def register_customers_redact_webhook(
-    shop_domain: str,
-    access_token: str,
-    webhook_url: str,
-) -> bool:
-    """Register a customers/redact GDPR webhook for the given shop."""
-
-    return _register_webhook(
-        shop_domain=shop_domain,
-        access_token=access_token,
-        topic="CUSTOMERS_REDACT",
-        webhook_url=webhook_url,
-    )
-
-
-def register_shop_redact_webhook(
-    shop_domain: str,
-    access_token: str,
-    webhook_url: str,
-) -> bool:
-    """Register a shop/redact GDPR webhook for the given shop."""
-
-    return _register_webhook(
-        shop_domain=shop_domain,
-        access_token=access_token,
-        topic="SHOP_REDACT",
         webhook_url=webhook_url,
     )
