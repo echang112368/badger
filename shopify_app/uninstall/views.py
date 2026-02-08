@@ -1,10 +1,6 @@
-import base64
-import hashlib
-import hmac
 import json
 import logging
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -14,28 +10,16 @@ from merchants.models import MerchantMeta
 
 from shopify_app.oauth import normalise_shop_domain
 from shopify_app.token_management import clear_shopify_token_for_shop
+from shopify_app.webhook_verification import is_valid_shopify_webhook
 
 
 logger = logging.getLogger(__name__)
 
 
-def _is_valid_shopify_webhook(request) -> bool:
-    secret = getattr(settings, "SHOPIFY_API_SECRET", "")
-    provided_hmac = request.headers.get("X-Shopify-Hmac-Sha256") or request.META.get(
-        "HTTP_X_SHOPIFY_HMAC_SHA256", ""
-    )
-    if not secret or not provided_hmac:
-        return False
-
-    digest = hmac.new(secret.encode("utf-8"), request.body, hashlib.sha256).digest()
-    computed = base64.b64encode(digest).decode("utf-8")
-    return hmac.compare_digest(computed, provided_hmac)
-
-
 @csrf_exempt
 @require_POST
 def app_uninstall_webhook(request):
-    if not _is_valid_shopify_webhook(request):
+    if not is_valid_shopify_webhook(request):
         return JsonResponse({"error": "Invalid Shopify webhook signature."}, status=401)
 
     try:
