@@ -46,13 +46,7 @@ from .oauth import (
 from .shopify_client import ShopifyClient, ShopifyGraphQLError, ShopifyInvalidCredentialsError
 from .script_tags import SCRIPT_SRCS, inject_scripts_for_merchant
 from .token_management import clear_shopify_token_for_shop, refresh_shopify_token
-from .webhooks import (
-    register_app_uninstalled_webhook,
-    register_customers_data_request_webhook,
-    register_customers_redact_webhook,
-    register_orders_create_webhook,
-    register_shop_redact_webhook,
-)
+from .webhooks import register_app_uninstalled_webhook, register_orders_create_webhook
 from accounts.forms import CustomLoginForm
 from accounts.models import CustomUser
 
@@ -238,15 +232,6 @@ def _attempt_shopify_webhook_registration(
     uninstall_url = request.build_absolute_uri(
         reverse("shopify_app_uninstall_webhook")
     )
-    customers_data_request_url = request.build_absolute_uri(
-        reverse("shopify_customers_data_request_webhook")
-    )
-    customers_redact_url = request.build_absolute_uri(
-        reverse("shopify_customers_redact_webhook")
-    )
-    shop_redact_url = request.build_absolute_uri(
-        reverse("shopify_shop_redact_webhook")
-    )
     try:
         orders_registered = register_orders_create_webhook(
             shop_domain,
@@ -258,28 +243,7 @@ def _attempt_shopify_webhook_registration(
             access_token,
             webhook_url=uninstall_url,
         )
-        data_request_registered = register_customers_data_request_webhook(
-            shop_domain,
-            access_token,
-            webhook_url=customers_data_request_url,
-        )
-        redact_registered = register_customers_redact_webhook(
-            shop_domain,
-            access_token,
-            webhook_url=customers_redact_url,
-        )
-        shop_redact_registered = register_shop_redact_webhook(
-            shop_domain,
-            access_token,
-            webhook_url=shop_redact_url,
-        )
-        if (
-            orders_registered
-            and uninstall_registered
-            and data_request_registered
-            and redact_registered
-            and shop_redact_registered
-        ):
+        if orders_registered and uninstall_registered:
             logger.info(
                 "Registered Shopify webhooks during OAuth for %s.",
                 shop_domain,
