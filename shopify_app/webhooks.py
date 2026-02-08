@@ -112,3 +112,42 @@ def register_app_uninstalled_webhook(
         topic="APP_UNINSTALLED",
         webhook_url=webhook_url,
     )
+
+
+def register_customers_data_request_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str,
+) -> bool:
+    return _register_webhook(
+        shop_domain=shop_domain,
+        access_token=access_token,
+        topic="CUSTOMERS_DATA_REQUEST",
+        webhook_url=webhook_url,
+    )
+
+
+def register_customers_redact_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str,
+) -> bool:
+    return _register_webhook(
+        shop_domain=shop_domain,
+        access_token=access_token,
+        topic="CUSTOMERS_REDACT",
+        webhook_url=webhook_url,
+    )
+
+
+def register_shop_redact_webhook(
+    shop_domain: str,
+    access_token: str,
+    webhook_url: str,
+) -> bool:
+    return _register_webhook(
+        shop_domain=shop_domain,
+        access_token=access_token,
+        topic="SHOP_REDACT",
+        webhook_url=webhook_url,
+    )
