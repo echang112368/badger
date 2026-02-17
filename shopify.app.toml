@@ -1,0 +1,28 @@
+client_id = "<SHOPIFY_API_KEY>"
+name = "Badger"
+application_url = "https://your-domain.com/shopify/"
+embedded = true
+
+[auth]
+redirect_urls = [
+  "https://your-domain.com/shopify/oauth/callback/"
+]
+
+[webhooks]
+api_version = "2024-07"
+
+  [[webhooks.subscriptions]]
+  topics = ["app/uninstalled"]
+  uri = "https://your-domain.com/shopify/webhooks/app/uninstalled/"
+
+  [[webhooks.subscriptions]]
+  topics = ["customers/data_request"]
+  uri = "https://your-domain.com/shopify/webhooks/customers/data_request/"
+
+  [[webhooks.subscriptions]]
+  topics = ["customers/redact"]
+  uri = "https://your-domain.com/shopify/webhooks/customers/redact/"
+
+  [[webhooks.subscriptions]]
+  topics = ["shop/redact"]
+  uri = "https://your-domain.com/shopify/webhooks/shop/redact/"
