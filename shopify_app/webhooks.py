@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from shopify_app.shopify_client import ShopifyClient, ShopifyGraphQLError
 
 
@@ -87,15 +89,27 @@ def _register_webhook(
 def register_orders_create_webhook(
     shop_domain: str,
     access_token: str,
-    webhook_url: str = "https://f48b-2607-b400-26-0-e02d-88ef-be02-490e.ngrok-free.app/shopify/webhooks/orders-create/",
+    webhook_url: str = "",
 ):
     """Register an orders/create webhook for the given shop."""
+
+    resolved_webhook_url = webhook_url.strip()
+    if not resolved_webhook_url:
+        app_origin = str(getattr(settings, "SHOPIFY_APP_ORIGIN", "") or "").rstrip("/")
+        if app_origin:
+            resolved_webhook_url = f"{app_origin}/shopify/webhooks/orders-create/"
+
+    if not resolved_webhook_url:
+        print(
+            "Unable to register ORDERS_CREATE webhook: missing webhook URL and SHOPIFY_APP_ORIGIN."
+        )
+        return False
 
     return _register_webhook(
         shop_domain=shop_domain,
         access_token=access_token,
         topic="ORDERS_CREATE",
-        webhook_url=webhook_url,
+        webhook_url=resolved_webhook_url,
     )
 
 
