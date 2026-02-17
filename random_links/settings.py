@@ -149,7 +149,6 @@ SHOPIFY_ORIGIN_CANDIDATES = [
     os.environ.get("NGROK_HOST"),
     os.environ.get("SHOPIFY_APP_HOST"),
     os.environ.get("SHOPIFY_APP_DOMAIN"),
-    "https://f48b-2607-b400-26-0-e02d-88ef-be02-490e.ngrok-free.app",
 ]
 
 SHOPIFY_APP_HOST = None
@@ -346,7 +345,8 @@ if _extra_csrf_origins:
         if normalised_origin and normalised_origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(normalised_origin)
 
-#change url in shoplify_app/management/commands/inject_scripts_all_merchants.py if you change the ngrok URL
+# Shopify app origin should be configured via environment variables
+# (for example, SHOPIFY_APP_ORIGIN in a `.env` file).
 
 CORS_ALLOW_ALL_ORIGINS = True  # For development only, change for production
 
