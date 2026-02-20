@@ -1,11 +1,11 @@
-client_id = "<SHOPIFY_API_KEY>"
+client_id = "cc2c9329b4e81341e4b080d8950b4ed9"
 name = "Badger"
-application_url = "https://your-domain.com/shopify/"
+application_url = "https://38a6-216-106-142-66.ngrok-free.app/shopify/"
 embedded = true
 
 [auth]
 redirect_urls = [
-  "https://your-domain.com/shopify/oauth/callback/"
+  "https://38a6-216-106-142-66.ngrok-free.app/shopify/oauth/callback/"
 ]
 
 [webhooks]
@@ -13,16 +13,16 @@ api_version = "2024-07"
 
   [[webhooks.subscriptions]]
   topics = ["app/uninstalled"]
-  uri = "https://your-domain.com/shopify/webhooks/app/uninstalled/"
+  uri = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/app/uninstalled/"
 
   [[webhooks.subscriptions]]
   topics = ["customers/data_request"]
-  uri = "https://your-domain.com/shopify/webhooks/customers/data_request/"
+  uri = "https://38a6-216-106-142-66.ngrok-free.app/webhooks/customers/data_request/"
 
   [[webhooks.subscriptions]]
   topics = ["customers/redact"]
-  uri = "https://your-domain.com/shopify/webhooks/customers/redact/"
+  uri = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/customers/redact/"
 
   [[webhooks.subscriptions]]
   topics = ["shop/redact"]
-  uri = "https://your-domain.com/shopify/webhooks/shop/redact/"
+  uri = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/shop/redact/"
