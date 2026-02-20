@@ -21,19 +21,23 @@ urlpatterns = [
         app_uninstall_webhook,
         name='shopify_webhooks_app_uninstalled',
     ),
+    path('webhooks/app/uninstalled', app_uninstall_webhook),
     path(
         'webhooks/customers/data_request/',
         customers_data_request_webhook,
         name='shopify_customers_data_request_webhook',
     ),
+    path('webhooks/customers/data_request', customers_data_request_webhook),
     path(
         'webhooks/customers/redact/',
         customers_redact_webhook,
         name='shopify_customers_redact_webhook',
     ),
+    path('webhooks/customers/redact', customers_redact_webhook),
     path(
         'webhooks/shop/redact/',
         shop_redact_webhook,
         name='shopify_shop_redact_webhook',
     ),
+    path('webhooks/shop/redact', shop_redact_webhook),
 ]
