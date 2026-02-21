@@ -8,25 +8,23 @@ redirect_urls = [
   "https://38a6-216-106-142-66.ngrok-free.app/shopify/oauth/callback/"
 ]
 
-# App lifecycle webhooks
 [webhooks]
-api_version = "2024-07"
+api_version = "2025-07"
 
+# App lifecycle webhooks
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
-uri = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/app/uninstalled/"
+uri = "/webhooks/app/uninstalled/"
 
-# GDPR / Privacy compliance webhooks
-[privacy_compliance]
+# Mandatory privacy compliance webhooks
+[[webhooks.subscriptions]]
+uri = "/webhooks/customers/data_request/"
+compliance_topics = ["customers/data_request"]
 
-[[privacy_compliance.webhooks]]
-topic = "customers/data_request"
-address = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/customers/data_request/"
+[[webhooks.subscriptions]]
+uri = "/webhooks/customers/redact/"
+compliance_topics = ["customers/redact"]
 
-[[privacy_compliance.webhooks]]
-topic = "customers/redact"
-address = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/customers/redact/"
-
-[[privacy_compliance.webhooks]]
-topic = "shop/redact"
-address = "https://38a6-216-106-142-66.ngrok-free.app/shopify/webhooks/shop/redact/"
+[[webhooks.subscriptions]]
+uri = "/webhooks/shop/redact/"
+compliance_topics = ["shop/redact"]
