@@ -8,7 +8,7 @@ import uuid
 import html
 
 import jwt
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from django.contrib.messages import get_messages
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -755,6 +755,33 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(meta.shopify_access_token, self.access_token)
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
         self.assertNotIn(session_scope_key(self.shop_domain), self.client.session)
+
+    def test_post_login_recovers_shopify_context_from_signed_query(self):
+        user = CustomUser.objects.create_user(
+            username="merchant2",
+            email="merchant2@example.com",
+            password="pass12345",
+        )
+
+        MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain=self.shop_domain,
+            shopify_access_token=self.access_token,
+        )
+
+        url = reverse("shopify_embedded_home")
+        response = self.client.post(
+            f"{url}?{urlencode(self._signed_params())}",
+            {
+                "action": "login",
+                "username": "merchant2@example.com",
+                "password": "pass12345",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("merchant_dashboard"))
+        self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
 
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
