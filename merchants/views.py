@@ -120,6 +120,7 @@ def _creator_card_payload(meta: CreatorMeta) -> dict:
 
 
 _SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
+_SHOPIFY_EAGER_SETTINGS_TABS = {"billing"}
 SHOPIFY_BILLING_STATUS_TTL = timedelta(minutes=5)
 SHOPIFY_PENDING_STATUS_REFRESH_WINDOW = timedelta(minutes=10)
 
@@ -1873,7 +1874,8 @@ def merchant_settings(request):
     shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
     if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
         shopify_plan_price = Decimal("30.00")
-    if _should_refresh_shopify_billing(request, merchant_meta):
+    should_eager_load_shopify_state = active_tab in _SHOPIFY_EAGER_SETTINGS_TABS
+    if should_eager_load_shopify_state and _should_refresh_shopify_billing(request, merchant_meta):
         try:
             shopify_billing.refresh_active_subscriptions(
                 merchant_meta,
@@ -1897,7 +1899,7 @@ def merchant_settings(request):
         shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
         if shop_domain:
             shopify_cancel_url = f"https://{shop_domain}/admin/settings/billing"
-    if shopify_plan_active and shop_domain:
+    if should_eager_load_shopify_state and shopify_plan_active and shop_domain:
         _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
 
     return render(request, 'merchants/settings.html', {
