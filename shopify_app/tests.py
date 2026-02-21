@@ -688,6 +688,8 @@ class EmbeddedAppHomeTests(TestCase):
         self._store_session_token()
         response = self.client.get(url, self._signed_params())
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("password_reset"))
+        self.assertContains(response, "Forgot your password?")
 
     def test_signup_links_shopify_store(self):
         url = reverse("shopify_embedded_home")
