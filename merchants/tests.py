@@ -109,6 +109,63 @@ class MerchantSettingsFormTests(TestCase):
 
 
 class MerchantSettingsTests(TestCase):
+    @patch("merchants.views._attempt_shopify_webhook_registration")
+    @patch("merchants.views.shopify_billing.refresh_active_subscriptions")
+    def test_profile_tab_skips_eager_shopify_network_calls(
+        self,
+        mock_refresh_active_subscriptions,
+        mock_attempt_shopify_webhook_registration,
+    ):
+        user = CustomUser.objects.create_user(
+            username="merchant_profile_tab",
+            password="pass",
+            email="merchant_profile_tab@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "example.myshopify.com"
+        meta.shopify_billing_status = "ACTIVE"
+        meta.shopify_billing_plan = meta.billing_plan
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+
+        self.assertEqual(response.status_code, 200)
+        mock_refresh_active_subscriptions.assert_not_called()
+        mock_attempt_shopify_webhook_registration.assert_not_called()
+
+    @patch("merchants.views._attempt_shopify_webhook_registration")
+    @patch("merchants.views.shopify_billing.refresh_active_subscriptions")
+    def test_billing_tab_eager_loads_shopify_network_calls(
+        self,
+        mock_refresh_active_subscriptions,
+        mock_attempt_shopify_webhook_registration,
+    ):
+        user = CustomUser.objects.create_user(
+            username="merchant_billing_tab",
+            password="pass",
+            email="merchant_billing_tab@example.com",
+            is_merchant=True,
+        )
+        meta = MerchantMeta.objects.get(user=user)
+        meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        meta.shopify_access_token = "token"
+        meta.shopify_store_domain = "example.myshopify.com"
+        meta.shopify_billing_status = "ACTIVE"
+        meta.shopify_billing_plan = meta.billing_plan
+        meta.shopify_billing_verified_at = None
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"), {"tab": "billing"})
+
+        self.assertEqual(response.status_code, 200)
+        mock_refresh_active_subscriptions.assert_called_once()
+        mock_attempt_shopify_webhook_registration.assert_called_once()
+
     def test_updates_shopify_store_domain(self):
         user = CustomUser.objects.create_user(
             username="merchant", password="pass", email="merchant1@example.com", is_merchant=True
