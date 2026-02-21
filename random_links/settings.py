@@ -92,6 +92,8 @@ MIDDLEWARE = [
     #'django.middleware.common.CommonMiddleware',
 ]
 
+APPEND_SLASH = True
+
 ROOT_URLCONF = 'random_links.urls'
 
 
