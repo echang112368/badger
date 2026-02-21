@@ -471,10 +471,26 @@ def embedded_app_home(request: HttpRequest):
         }
         return render(request, "shopify_app/oauth_connect.html", context)
 
-    # POST handling requires a previously validated GET request so that we
-    # trust the HMAC and store domain stored in the session.
+    # POST handling usually follows a validated GET request, but embedded
+    # browser contexts can occasionally drop the app session before form
+    # submission. In that case, recover context from signed query parameters
+    # or a valid session token.
     if not request.session.get(EMBEDDED_AUTHORIZED_SESSION_KEY):
-        return HttpResponseBadRequest("Shopify session not initialised.")
+        signed_shop = normalise_shop_domain(request.GET.get("shop", ""))
+        if signed_shop and validate_shopify_hmac(request.GET):
+            request.session[EMBEDDED_SHOP_SESSION_KEY] = signed_shop
+            request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
+        else:
+            id_token = (request.GET.get("id_token") or "").strip()
+            if id_token:
+                try:
+                    token_shop, _payload = _verify_shopify_session_token(id_token)
+                except ShopifySessionTokenError:
+                    return HttpResponseBadRequest("Shopify session not initialised.")
+                request.session[EMBEDDED_SHOP_SESSION_KEY] = token_shop
+                request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
+            else:
+                return HttpResponseBadRequest("Shopify session not initialised.")
 
     shop_domain = request.session.get(EMBEDDED_SHOP_SESSION_KEY, "")
     if not shop_domain:
