@@ -691,6 +691,18 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertContains(response, reverse("password_reset"))
         self.assertContains(response, "Forgot your password?")
 
+    def test_get_without_stored_token_restarts_oauth(self):
+        url = reverse("shopify_embedded_home")
+
+        response = self.client.get(url, self._signed_params())
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(f"https://{self.shop_domain}/admin/oauth/authorize", response["Location"])
+        self.assertIn("client_id=key", response["Location"])
+        self.assertEqual(
+            self.client.session.get(views.PENDING_ONBOARD_SESSION_KEY), self.shop_domain
+        )
+
     def test_signup_links_shopify_store(self):
         url = reverse("shopify_embedded_home")
         self._store_session_token()
