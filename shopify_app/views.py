@@ -566,7 +566,10 @@ def embedded_app_home(request: HttpRequest):
         "login_form": login_form,
         "shop_domain": normalised_shop,
     }
-    return render(request, "shopify_app/oauth_connect.html", context, status=400)
+    # Invalid signup/login submissions should re-render the form as a normal
+    # response (HTTP 200). Returning 400 causes noisy "Bad Request" logs even
+    # when the only issue is incorrect credentials.
+    return render(request, "shopify_app/oauth_connect.html", context)
 
 
 @api_view(["POST"])

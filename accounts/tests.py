@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -277,3 +277,28 @@ class EmailVerificationFlowTests(TestCase):
 
         user.refresh_from_db()
         self.assertTrue(user.email_verified)
+
+
+class PasswordResetFlowTests(TestCase):
+    @override_settings(DEBUG=True)
+    def test_password_reset_logs_clickable_link_in_debug(self):
+        CustomUser.objects.create_user(
+            username="reset_user",
+            email="reset_user@example.com",
+            password="pass12345",
+        )
+
+        with self.assertLogs("accounts.forms", level="WARNING") as log_output:
+            response = self.client.post(
+                reverse("password_reset"),
+                {"email": "reset_user@example.com"},
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("password_reset_done"),
+            fetch_redirect_response=False,
+        )
+        joined = "\n".join(log_output.output)
+        self.assertIn("DEV password reset link for reset_user@example.com", joined)
+        self.assertIn("/accounts/reset/", joined)
