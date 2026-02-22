@@ -795,6 +795,34 @@ class EmbeddedAppHomeTests(TestCase):
         self.assertEqual(response["Location"], reverse("merchant_dashboard"))
         self.assertEqual(int(self.client.session.get("_auth_user_id")), user.pk)
 
+    def test_login_with_invalid_credentials_rerenders_with_success_status(self):
+        user = CustomUser.objects.create_user(
+            username="merchant3",
+            email="merchant3@example.com",
+            password="pass12345",
+        )
+
+        MerchantMeta.objects.create(
+            user=user,
+            shopify_store_domain=self.shop_domain,
+            shopify_access_token=self.access_token,
+        )
+
+        url = reverse("shopify_embedded_home")
+        self.client.get(url, self._signed_params())
+
+        response = self.client.post(
+            url,
+            {
+                "action": "login",
+                "username": "merchant3@example.com",
+                "password": "wrong-password",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Please enter a correct username and password")
+
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class OAuthCallbackTests(TestCase):
