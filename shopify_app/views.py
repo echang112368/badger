@@ -450,11 +450,10 @@ def embedded_app_home(request: HttpRequest):
         normalised_shop = normalise_shop_domain(shop)
         access_token = _resolve_shopify_access_token(request, normalised_shop)
         if not access_token:
-            return _render_shopify_error(
-                request,
-                "We couldn't find an authorized Shopify installation for this store. "
-                "Please reinstall the app from Shopify to continue.",
-            )
+            _clear_shopify_session_state(request, normalised_shop)
+            request.session[PENDING_ONBOARD_SESSION_KEY] = normalised_shop
+            authorize_url = build_shopify_authorize_url(request, normalised_shop)
+            return redirect(authorize_url)
 
         request.session[EMBEDDED_SHOP_SESSION_KEY] = normalised_shop
         request.session[EMBEDDED_AUTHORIZED_SESSION_KEY] = True
