@@ -1,12 +1,18 @@
+import logging
+
 from django import forms
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.forms import UserCreationForm
 from merchants.models import MerchantMeta
 from merchants.forms import normalize_shopify_store_domain
 
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
 
 class CustomLoginForm(AuthenticationForm):
     username = forms.EmailField(
@@ -157,3 +163,36 @@ class EmailVerificationForm(forms.Form):
             }
         ),
     )
+
+
+class DevFriendlyPasswordResetForm(PasswordResetForm):
+    """Log reset links in development so local testing is easier."""
+
+    def send_mail(
+        self,
+        subject_template_name,
+        email_template_name,
+        context,
+        from_email,
+        to_email,
+        html_email_template_name=None,
+    ):
+        super().send_mail(
+            subject_template_name,
+            email_template_name,
+            context,
+            from_email,
+            to_email,
+            html_email_template_name=html_email_template_name,
+        )
+
+        if settings.DEBUG:
+            reset_url = (
+                f"{context.get('protocol', 'http')}://{context.get('domain', '')}"
+                f"/accounts/reset/{context.get('uid', '')}/{context.get('token', '')}/"
+            )
+            logger.warning(
+                "DEV password reset link for %s: %s",
+                to_email,
+                reset_url,
+            )
