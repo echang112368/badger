@@ -302,3 +302,28 @@ class PasswordResetFlowTests(TestCase):
         joined = "\n".join(log_output.output)
         self.assertIn("DEV password reset link for reset_user@example.com", joined)
         self.assertIn("/accounts/reset/", joined)
+
+    @override_settings(DEBUG=True)
+    def test_password_reset_logs_skip_reason_for_inactive_matching_email(self):
+        user = CustomUser.objects.create_user(
+            username="inactive_reset",
+            email="inactive_reset@example.com",
+            password="pass12345",
+        )
+        user.is_active = False
+        user.save(update_fields=["is_active"])
+
+        with self.assertLogs("accounts.forms", level="WARNING") as log_output:
+            response = self.client.post(
+                reverse("password_reset"),
+                {"email": "inactive_reset@example.com"},
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("password_reset_done"),
+            fetch_redirect_response=False,
+        )
+        joined = "\n".join(log_output.output)
+        self.assertIn("DEV password reset skipped for inactive_reset@example.com", joined)
+        self.assertIn("is_active=False", joined)
