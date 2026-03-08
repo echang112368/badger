@@ -168,6 +168,27 @@ class EmailVerificationForm(forms.Form):
 class DevFriendlyPasswordResetForm(PasswordResetForm):
     """Log reset links in development so local testing is easier."""
 
+    def get_users(self, email):
+        """Log why a reset is skipped when an account matches but is ineligible."""
+
+        normalized_email = email or ""
+        active_and_usable = []
+        matched_users = User._default_manager.filter(email__iexact=normalized_email)
+
+        for user in matched_users:
+            if user.is_active and user.has_usable_password():
+                active_and_usable.append(user)
+            elif settings.DEBUG:
+                logger.warning(
+                    "DEV password reset skipped for %s (user_id=%s, is_active=%s, usable_password=%s)",
+                    normalized_email,
+                    user.pk,
+                    user.is_active,
+                    user.has_usable_password(),
+                )
+
+        return active_and_usable
+
     def send_mail(
         self,
         subject_template_name,
