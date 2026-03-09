@@ -172,6 +172,12 @@ def _ensure_shopify_link(
         .first()
     )
     if existing:
+        existing.process_shopify_uninstall_grace_expiration()
+        existing.refresh_from_db()
+        if not existing.shopify_store_domain:
+            existing = None
+
+    if existing:
         raise ValueError("This Shopify store is already connected to a different account.")
 
     meta, _ = MerchantMeta.objects.get_or_create(
