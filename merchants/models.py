@@ -3,7 +3,6 @@ from typing import Optional
 
 from django.db import models
 from django.db.models.functions import Lower
-from django.conf import settings
 from django.utils import timezone
 from accounts.models import CustomUser
 import uuid
@@ -218,76 +217,10 @@ class MerchantMeta(models.Model):
         if update_fields:
             self.save(update_fields=update_fields)
 
-    @staticmethod
-    def shopify_uninstall_grace_days() -> int:
-        """Return the grace period before an uninstalled shop is fully released."""
-
-        configured = getattr(settings, "SHOPIFY_UNINSTALL_GRACE_DAYS", 30)
-        try:
-            return max(int(configured), 0)
-        except (TypeError, ValueError):
-            return 30
-
-    def shopify_uninstall_grace_expires_at(self):
-        """Return when the uninstall grace period expires for this merchant."""
-
-        if not self.shopify_uninstalled_at:
-            return None
-        return self.shopify_uninstalled_at + timezone.timedelta(
-            days=self.shopify_uninstall_grace_days()
-        )
-
-    def is_shopify_uninstall_grace_expired(self, *, now=None) -> bool:
-        """Return ``True`` if the uninstall grace period has elapsed."""
-
-        expires_at = self.shopify_uninstall_grace_expires_at()
-        if not expires_at:
-            return False
-        return (now or timezone.now()) >= expires_at
-
-    def release_shopify_association(self) -> bool:
-        """Detach Shopify store association and deactivate merchant access."""
-
-        update_fields = []
-        if self.shopify_store_domain:
-            self.shopify_store_domain = ""
-            update_fields.append("shopify_store_domain")
-
-        if self.shopify_access_token:
-            self.shopify_access_token = ""
-            update_fields.append("shopify_access_token")
-
-        if self.shopify_refresh_token:
-            self.shopify_refresh_token = ""
-            update_fields.append("shopify_refresh_token")
-
-        if self.shopify_oauth_authorization_line:
-            self.shopify_oauth_authorization_line = ""
-            update_fields.append("shopify_oauth_authorization_line")
-
-        if update_fields:
-            self.save(update_fields=update_fields)
-
-        user_fields = []
-        if self.user.is_active:
+        if self.user.is_active or self.user.is_merchant:
             self.user.is_active = False
-            user_fields.append("is_active")
-        if self.user.is_merchant:
             self.user.is_merchant = False
-            user_fields.append("is_merchant")
-        if user_fields:
-            self.user.save(update_fields=user_fields)
-
-        return bool(update_fields or user_fields)
-
-    def process_shopify_uninstall_grace_expiration(self, *, now=None) -> bool:
-        """Release Shopify association once the uninstall grace period has passed."""
-
-        if not self.shopify_uninstalled_at:
-            return False
-        if not self.is_shopify_uninstall_grace_expired(now=now):
-            return False
-        return self.release_shopify_association()
+            self.user.save(update_fields=["is_active", "is_merchant"])
 
     def requires_shopify_oauth(self) -> bool:
         """Return ``True`` if the merchant still needs to complete Shopify OAuth."""
