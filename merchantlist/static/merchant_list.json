@@ -1,8 +1,9 @@
 {
-  "version": 3,
-  "updated": "2026-01-10T07:13:46.124577Z",
+  "version": 5,
+  "updated": "2026-02-22T21:18:07.836468Z",
   "merchants": [
-    "badgeraffiliateshop.myshopify.com"
+    "badgeraffiliateshop.myshopify.com",
+    "storenumber2-1.myshopify.com"
   ],
   "new_merchants": []
 }
