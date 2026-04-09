@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+
 from merchants.models import MerchantMeta
 
 from .shopify_client import ShopifyClient, ShopifyGraphQLError
@@ -11,11 +13,12 @@ from .token_management import refresh_shopify_token
 
 logger = logging.getLogger(__name__)
 
+_APP_ORIGIN = getattr(settings, "SHOPIFY_APP_ORIGIN", "").rstrip("/") or "https://f501-76-169-124-226.ngrok-free.app"
 SCRIPT_SRCS = [
-    "https://6457c6b55211.ngrok-free.app/static/js/referral_tracker.js",
+    f"{_APP_ORIGIN}/static/js/referral_tracker.js",
 ]
 LEGACY_SCRIPT_SRCS = [
-    "https://6457c6b55211.ngrok-free.app/static/js/cart_attributes.js",
+    f"{_APP_ORIGIN}/static/js/cart_attributes.js",
 ]
 
 
