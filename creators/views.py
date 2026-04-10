@@ -32,6 +32,7 @@ from shopify_app.shopify_client import ShopifyClient
 from shopify_app.token_management import refresh_shopify_token
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
+from creatorMatch.integrations.models import IntegrationProvider, SocialAccount
 
 logger = logging.getLogger(__name__)
 
@@ -1146,10 +1147,19 @@ def creator_settings(request):
         creator_meta.save()
         return redirect("creator_settings")
 
+    instagram_account = SocialAccount.objects.filter(
+        user=request.user,
+        provider=IntegrationProvider.INSTAGRAM,
+    ).first()
+
     return render(
         request,
         "creators/settings.html",
-        {"creator_meta": creator_meta, "creator": request.user},
+        {
+            "creator_meta": creator_meta,
+            "creator": request.user,
+            "instagram_account": instagram_account,
+        },
     )
 
 
