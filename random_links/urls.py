@@ -32,6 +32,7 @@ urlpatterns = [
     path('api/products/catalog/', merchant_views.list_shopify_products, name='shopify_product_catalog'),
     path('api/creators/', include('creators.api_urls')),
     path('api/search/', SearchAPIView.as_view(), name='smart_search'),
+    path('api/integrations/', include('creatorMatch.integrations.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('admin/', admin.site.urls),
