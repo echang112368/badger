@@ -1,3 +1,1 @@
-from django.shortcuts import render
-
-# Create your views here.
+"""Shared integration views can live here as non-provider-specific endpoints are added."""
