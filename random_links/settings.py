@@ -75,7 +75,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
-    'creatorMatch.integrations',
 
 ]
 
@@ -195,38 +194,6 @@ SHOPIFY_SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
     "read_products,write_discounts",
 )
-
-INSTAGRAM_APP_ID = os.environ.get("INSTAGRAM_APP_ID", "")
-INSTAGRAM_APP_SECRET = os.environ.get("INSTAGRAM_APP_SECRET", "")
-INSTAGRAM_REDIRECT_URI = os.environ.get(
-    "INSTAGRAM_REDIRECT_URI",
-    "http://localhost:8000/api/integrations/instagram/callback/",
-)
-INSTAGRAM_SCOPES = os.environ.get(
-    "INSTAGRAM_SCOPES",
-    "user_profile,user_media",
-)
-INSTAGRAM_AUTH_BASE_URL = os.environ.get(
-    "INSTAGRAM_AUTH_BASE_URL",
-    "https://api.instagram.com",
-)
-INSTAGRAM_GRAPH_BASE_URL = os.environ.get(
-    "INSTAGRAM_GRAPH_BASE_URL",
-    "https://graph.instagram.com",
-)
-INSTAGRAM_USE_LONG_LIVED_TOKEN = os.environ.get(
-    "INSTAGRAM_USE_LONG_LIVED_TOKEN",
-    "true",
-).lower() in {"1", "true", "yes", "on"}
-INTEGRATIONS_TOKEN_MAX_AGE_SECONDS = os.environ.get(
-    "INTEGRATIONS_TOKEN_MAX_AGE_SECONDS",
-    None,
-)
-if INTEGRATIONS_TOKEN_MAX_AGE_SECONDS is not None:
-    try:
-        INTEGRATIONS_TOKEN_MAX_AGE_SECONDS = int(INTEGRATIONS_TOKEN_MAX_AGE_SECONDS)
-    except (TypeError, ValueError):
-        INTEGRATIONS_TOKEN_MAX_AGE_SECONDS = None
 
 
 def _parse_decimal_setting(value: str | None, default: Decimal) -> Decimal:
