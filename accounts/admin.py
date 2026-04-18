@@ -9,11 +9,13 @@ class CustomUserAdmin(UserAdmin):
     list_display = [
         "username",
         "email",
+        "is_active",
         "is_creator",
         "is_merchant",
         "is_default_badger_creator",
         "is_staff",
     ]
+    list_editable = ["is_active"]
     list_filter = UserAdmin.list_filter + ("is_default_badger_creator",)
 
     fieldsets = UserAdmin.fieldsets + (
