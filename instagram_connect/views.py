@@ -1,0 +1,253 @@
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_GET
+from django.shortcuts import redirect
+
+from .models import InstagramConnection
+from .services import (
+    MetaAPIError,
+    build_oauth_url,
+    choose_page_with_instagram,
+    exchange_code_for_access_token,
+    generate_oauth_state,
+    get_instagram_user,
+    get_user_pages,
+    get_user_profile,
+    token_expiry_from_response,
+)
+
+
+@login_required
+@require_GET
+def connect_instagram(request):
+    """Start Meta OAuth for the logged-in user."""
+
+    state = generate_oauth_state()
+    request.session["meta_oauth_state"] = state
+    return redirect(build_oauth_url(state))
+
+
+@login_required
+@require_GET
+def instagram_callback(request):
+    """Complete OAuth callback, persist the connected Instagram account, and return JSON."""
+
+    if request.GET.get("error"):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "oauth_denied",
+                "message": request.GET.get(
+                    "error_description",
+                    "Authorization was denied by Meta.",
+                ),
+            },
+            status=400,
+        )
+
+    code = request.GET.get("code")
+    if not code:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "missing_code",
+                "message": "Missing authorization code from Meta callback.",
+            },
+            status=400,
+        )
+
+    expected_state = request.session.get("meta_oauth_state")
+    received_state = request.GET.get("state")
+    if not expected_state or expected_state != received_state:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "invalid_state",
+                "message": "OAuth state validation failed.",
+            },
+            status=400,
+        )
+
+    try:
+        token_data = exchange_code_for_access_token(code)
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "missing_access_token",
+                    "message": "Meta did not return an access token.",
+                },
+                status=400,
+            )
+
+        profile = get_user_profile(access_token)
+        pages_payload = get_user_pages(access_token)
+
+        pages = pages_payload.get("data")
+        if not isinstance(pages, list) or not pages:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "no_pages",
+                    "message": "No Facebook Pages were returned for this account.",
+                },
+                status=400,
+            )
+
+        page = choose_page_with_instagram(pages_payload)
+        if not page:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "no_instagram_business_account",
+                    "message": (
+                        "A linked Instagram professional account was not found "
+                        "on your Facebook Pages."
+                    ),
+                },
+                status=400,
+            )
+
+        ig_account = page.get("instagram_business_account") or {}
+        ig_user_id = ig_account.get("id")
+        if not ig_user_id:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "missing_instagram_id",
+                    "message": "Linked Instagram account ID was missing.",
+                },
+                status=400,
+            )
+
+        ig_user = get_instagram_user(ig_user_id, access_token)
+        now = timezone.now()
+
+        connection, created = InstagramConnection.objects.update_or_create(
+            user=request.user,
+            defaults={
+                "facebook_user_id": str(profile.get("id") or ""),
+                "page_id": str(page.get("id") or ""),
+                "page_name": page.get("name") or "",
+                "instagram_user_id": str(ig_user.get("id") or ig_user_id),
+                "instagram_username": ig_user.get("username") or "",
+                "followers_count": int(ig_user.get("followers_count") or 0),
+                "media_count": int(ig_user.get("media_count") or 0),
+                "access_token": access_token,
+                "token_expires_at": token_expiry_from_response(token_data),
+                "last_synced_at": now,
+            },
+        )
+
+        if created:
+            connection.connected_at = now
+            connection.save(update_fields=["connected_at"])
+
+    except MetaAPIError as exc:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "meta_api_error",
+                "message": str(exc),
+            },
+            status=400,
+        )
+    finally:
+        request.session.pop("meta_oauth_state", None)
+
+    return JsonResponse(
+        {
+            "success": True,
+            "connected": True,
+            "instagram_user_id": connection.instagram_user_id,
+            "instagram_username": connection.instagram_username,
+            "followers_count": connection.followers_count,
+            "media_count": connection.media_count,
+            "last_synced_at": connection.last_synced_at.isoformat()
+            if connection.last_synced_at
+            else None,
+        }
+    )
+
+
+@login_required
+@require_GET
+def instagram_status(request):
+    """Return the current Instagram connection status for the logged-in user."""
+
+    try:
+        connection = request.user.instagram_connection
+    except InstagramConnection.DoesNotExist:
+        return JsonResponse({"connected": False})
+
+    return JsonResponse(
+        {
+            "connected": True,
+            "instagram_username": connection.instagram_username,
+            "instagram_user_id": connection.instagram_user_id,
+            "followers_count": connection.followers_count,
+            "media_count": connection.media_count,
+            "last_synced_at": connection.last_synced_at.isoformat()
+            if connection.last_synced_at
+            else None,
+            "connected_at": connection.connected_at.isoformat()
+            if connection.connected_at
+            else None,
+        }
+    )
+
+
+@login_required
+@require_GET
+def instagram_sync(request):
+    """Refresh and persist Instagram metrics for an existing connection."""
+
+    try:
+        connection = request.user.instagram_connection
+    except InstagramConnection.DoesNotExist:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "not_connected",
+                "message": "No Instagram connection found for this account.",
+            },
+            status=404,
+        )
+
+    try:
+        ig_user = get_instagram_user(connection.instagram_user_id, connection.access_token)
+    except MetaAPIError as exc:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "meta_api_error",
+                "message": str(exc),
+            },
+            status=400,
+        )
+
+    connection.instagram_username = ig_user.get("username") or connection.instagram_username
+    connection.followers_count = int(ig_user.get("followers_count") or 0)
+    connection.media_count = int(ig_user.get("media_count") or 0)
+    connection.last_synced_at = timezone.now()
+    connection.save(
+        update_fields=[
+            "instagram_username",
+            "followers_count",
+            "media_count",
+            "last_synced_at",
+        ]
+    )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "connected": True,
+            "instagram_username": connection.instagram_username,
+            "followers_count": connection.followers_count,
+            "media_count": connection.media_count,
+            "last_synced_at": connection.last_synced_at.isoformat(),
+        }
+    )

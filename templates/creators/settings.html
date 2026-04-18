@@ -17,7 +17,7 @@
   </div>
   <form id="settingsForm" method="post" action="{% url 'creator_settings' %}" class="space-y-8">
     {% csrf_token %}
-    <div id="tab-billing">
+    <div id="tab-billing" class="space-y-6">
       <div class="bg-white shadow-sm rounded-lg p-6">
         <h2 class="text-lg font-semibold text-gray-900">Billing</h2>
         <p class="text-sm text-gray-500 mb-6">Manage your invoices and connected accounts.</p>
@@ -27,6 +27,52 @@
             <input type="email" name="paypal_email" value="{{ creator_meta.paypal_email|default_if_none:'' }}" class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
+      </div>
+
+      <div class="bg-white shadow-sm rounded-lg p-6" id="instagramConnectionCard">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Instagram Connection</h2>
+            <p class="text-sm text-gray-500">Connect your Instagram professional account to sync audience metrics.</p>
+          </div>
+          {% if instagram_connection %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Connected</span>
+          {% else %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">Not connected</span>
+          {% endif %}
+        </div>
+
+        <div id="instagramMessage" class="mt-4 hidden rounded-md border px-3 py-2 text-sm"></div>
+
+        {% if instagram_connection %}
+          <dl class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Instagram Username</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="igUsername">@{{ instagram_connection.instagram_username|default:'-' }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Followers</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="igFollowers">{{ instagram_connection.followers_count }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Media Count</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="igMediaCount">{{ instagram_connection.media_count }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Last Synced</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="igLastSync">{{ instagram_connection.last_synced_at|date:"M d, Y H:i"|default:"Never" }}</dd>
+            </div>
+          </dl>
+
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button type="button" id="instagramSyncBtn" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Sync now</button>
+            <a href="/instagram/connect/" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-sm hover:bg-gray-50">Reconnect Instagram</a>
+          </div>
+        {% else %}
+          <div class="mt-5">
+            <a href="/instagram/connect/" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Connect Instagram</a>
+          </div>
+        {% endif %}
       </div>
     </div>
     <div id="tab-notifications" class="hidden">
@@ -41,18 +87,85 @@
   </div>
 </div>
 <script>
-  const tabs=document.querySelectorAll('#settingsTabs button');
-  const sections={};
-  tabs.forEach(btn=>{
-    const id='tab-'+btn.dataset.tab;
-    sections[id]=document.getElementById(id);
-    btn.addEventListener('click',()=>{
-      tabs.forEach(t=>{t.classList.remove('border-indigo-500','text-indigo-600');t.classList.add('border-transparent','text-gray-500');});
-      btn.classList.add('border-indigo-500','text-indigo-600');
-      btn.classList.remove('text-gray-500','border-transparent');
-      Object.values(sections).forEach(sec=>sec.classList.add('hidden'));
+  const tabs = document.querySelectorAll('#settingsTabs button');
+  const sections = {};
+  tabs.forEach((btn) => {
+    const id = 'tab-' + btn.dataset.tab;
+    sections[id] = document.getElementById(id);
+    btn.addEventListener('click', () => {
+      tabs.forEach((t) => {
+        t.classList.remove('border-indigo-500', 'text-indigo-600');
+        t.classList.add('border-transparent', 'text-gray-500');
+      });
+      btn.classList.add('border-indigo-500', 'text-indigo-600');
+      btn.classList.remove('text-gray-500', 'border-transparent');
+      Object.values(sections).forEach((sec) => sec.classList.add('hidden'));
       sections[id].classList.remove('hidden');
     });
   });
+
+  const syncBtn = document.getElementById('instagramSyncBtn');
+  const messageBox = document.getElementById('instagramMessage');
+
+  function showInstagramMessage(message, ok) {
+    if (!messageBox) return;
+    messageBox.textContent = message;
+    messageBox.classList.remove('hidden', 'border-green-200', 'bg-green-50', 'text-green-700', 'border-red-200', 'bg-red-50', 'text-red-700');
+    if (ok) {
+      messageBox.classList.add('border-green-200', 'bg-green-50', 'text-green-700');
+    } else {
+      messageBox.classList.add('border-red-200', 'bg-red-50', 'text-red-700');
+    }
+  }
+
+  function updateInstagramStats(data) {
+    const usernameEl = document.getElementById('igUsername');
+    const followersEl = document.getElementById('igFollowers');
+    const mediaEl = document.getElementById('igMediaCount');
+    const lastSyncEl = document.getElementById('igLastSync');
+
+    if (usernameEl && data.instagram_username) {
+      usernameEl.textContent = '@' + data.instagram_username;
+    }
+    if (followersEl && typeof data.followers_count !== 'undefined') {
+      followersEl.textContent = data.followers_count;
+    }
+    if (mediaEl && typeof data.media_count !== 'undefined') {
+      mediaEl.textContent = data.media_count;
+    }
+    if (lastSyncEl && data.last_synced_at) {
+      const timestamp = new Date(data.last_synced_at);
+      if (!Number.isNaN(timestamp.getTime())) {
+        lastSyncEl.textContent = timestamp.toLocaleString();
+      }
+    }
+  }
+
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.disabled = true;
+      syncBtn.textContent = 'Syncing...';
+
+      try {
+        const response = await fetch('/instagram/sync/', {
+          method: 'GET',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.message || 'Failed to sync Instagram metrics.');
+        }
+
+        updateInstagramStats(payload);
+        showInstagramMessage('Instagram metrics were synced successfully.', true);
+      } catch (error) {
+        showInstagramMessage(error.message || 'Unable to sync Instagram metrics right now.', false);
+      } finally {
+        syncBtn.disabled = false;
+        syncBtn.textContent = 'Sync now';
+      }
+    });
+  }
 </script>
 {% endblock %}
