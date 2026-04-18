@@ -38,6 +38,7 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('shopify/', include('shopify_app.urls')),
     path('collect/', include('collect.urls')),
+    path('instagram/', include('instagram_connect.urls')),
     path('verification/', include('verify_email.urls')),
     path('', include('merchantlist.urls')),
     ]

@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'rest_framework.authtoken',
+    'instagram_connect',
 
 ]
 
@@ -229,6 +230,11 @@ SHOPIFY_APP_URL = os.environ.get("SHOPIFY_APP_URL", _default_shopify_app_url)
 SHOPIFY_REDIRECT_URI = os.environ.get(
     "SHOPIFY_REDIRECT_URI", _default_shopify_redirect_uri
 )
+
+META_APP_ID = os.environ["META_APP_ID"]
+META_APP_SECRET = os.environ["META_APP_SECRET"]
+META_REDIRECT_URI = os.environ["META_REDIRECT_URI"]
+META_API_VERSION = os.environ.get("META_API_VERSION", "v22.0")
 
 
 TEMPLATES = [
