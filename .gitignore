@@ -21,6 +21,7 @@ migrations/
 !shopify_app/migrations/
 !accounts/migrations/
 !creators/migrations/
+!instagram_connect/migrations/
 
 # Environment
 .env
