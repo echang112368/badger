@@ -8,12 +8,9 @@ from .models import InstagramConnection
 from .services import (
     MetaAPIError,
     build_oauth_url,
-    choose_page_with_instagram,
     exchange_code_for_access_token,
     generate_oauth_state,
     get_instagram_user,
-    get_user_pages,
-    get_user_profile,
     token_expiry_from_response,
 )
 
@@ -82,59 +79,30 @@ def instagram_callback(request):
                 status=400,
             )
 
-        profile = get_user_profile(access_token)
-        pages_payload = get_user_pages(access_token)
-
-        pages = pages_payload.get("data")
-        if not isinstance(pages, list) or not pages:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "no_pages",
-                    "message": "No Facebook Pages were returned for this account.",
-                },
-                status=400,
-            )
-
-        page = choose_page_with_instagram(pages_payload)
-        if not page:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "no_instagram_business_account",
-                    "message": (
-                        "A linked Instagram professional account was not found "
-                        "on your Facebook Pages."
-                    ),
-                },
-                status=400,
-            )
-
-        ig_account = page.get("instagram_business_account") or {}
-        ig_user_id = ig_account.get("id")
+        ig_user = get_instagram_user(access_token)
+        ig_user_id = ig_user.get("user_id") or ig_user.get("id")
         if not ig_user_id:
             return JsonResponse(
                 {
                     "success": False,
                     "error": "missing_instagram_id",
-                    "message": "Linked Instagram account ID was missing.",
+                    "message": "Instagram user ID was missing from Meta response.",
                 },
                 status=400,
             )
 
-        ig_user = get_instagram_user(ig_user_id, access_token)
         now = timezone.now()
 
         connection, created = InstagramConnection.objects.update_or_create(
             user=request.user,
             defaults={
-                "facebook_user_id": str(profile.get("id") or ""),
-                "page_id": str(page.get("id") or ""),
-                "page_name": page.get("name") or "",
+                "facebook_user_id": "",
+                "page_id": "",
+                "page_name": "",
                 "instagram_user_id": str(ig_user.get("id") or ig_user_id),
                 "instagram_username": ig_user.get("username") or "",
-                "followers_count": int(ig_user.get("followers_count") or 0),
-                "media_count": int(ig_user.get("media_count") or 0),
+                "followers_count": int(ig_user.get("followers_count") or 0) if ig_user.get("followers_count") else 0,
+                "media_count": int(ig_user.get("media_count") or 0) if ig_user.get("media_count") else 0,
                 "access_token": access_token,
                 "token_expires_at": token_expiry_from_response(token_data),
                 "last_synced_at": now,
@@ -217,7 +185,7 @@ def instagram_sync(request):
         )
 
     try:
-        ig_user = get_instagram_user(connection.instagram_user_id, connection.access_token)
+        ig_user = get_instagram_user(connection.access_token)
     except MetaAPIError as exc:
         return JsonResponse(
             {
