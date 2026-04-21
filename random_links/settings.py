@@ -235,6 +235,21 @@ META_APP_ID = os.environ["META_APP_ID"]
 META_APP_SECRET = os.environ["META_APP_SECRET"]
 META_REDIRECT_URI = os.environ["META_REDIRECT_URI"]
 META_API_VERSION = os.environ.get("META_API_VERSION", "v22.0")
+META_OAUTH_SCOPES = [
+    scope.strip()
+    for scope in os.environ.get(
+        "META_OAUTH_SCOPES",
+        (
+            "instagram_business_basic,"
+            "instagram_business_manage_messages,"
+            "instagram_business_manage_comments,"
+            "instagram_business_content_publish"
+        ),
+    ).split(",")
+    if scope.strip()
+]
+META_ENABLE_FB_LOGIN = os.environ.get("META_ENABLE_FB_LOGIN", "true").strip().lower() != "false"
+META_FORCE_REAUTH = os.environ.get("META_FORCE_REAUTH", "false").strip().lower() == "true"
 
 
 TEMPLATES = [
