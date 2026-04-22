@@ -29,7 +29,7 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost","842c-2607-b400-26-0-a853-7460-d565-2d8d.ngrok-free.app"]
 
 MERCHANT_LIST_PATH = BASE_DIR / "merchantlist" / "static" / "merchant_list.json"
 try:
