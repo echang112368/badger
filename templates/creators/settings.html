@@ -141,6 +141,13 @@
     }
   }
 
+  const oauthResult = new URLSearchParams(window.location.search).get('instagram_oauth');
+  if (oauthResult === 'success') {
+    showInstagramMessage('Instagram connected successfully.', true);
+  } else if (oauthResult === 'error') {
+    showInstagramMessage('Instagram connection failed. Please try again.', false);
+  }
+
   if (syncBtn) {
     syncBtn.addEventListener('click', async () => {
       syncBtn.disabled = true;
