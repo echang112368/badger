@@ -6,6 +6,7 @@ from django.views.decorators.http import require_GET
 from django.shortcuts import redirect
 
 from .models import InstagramConnection
+from creators.services.social_dashboard import InstagramAnalyticsService
 from .services import (
     MetaAPIError,
     build_oauth_url,
@@ -190,6 +191,9 @@ def instagram_sync(request):
 
     try:
         ig_user = get_instagram_user(connection.access_token)
+        snapshot_payload = InstagramAnalyticsService(request.user).fetch_and_cache(
+            connection
+        )
     except MetaAPIError as exc:
         return JsonResponse(
             {
@@ -201,8 +205,16 @@ def instagram_sync(request):
         )
 
     connection.instagram_username = ig_user.get("username") or connection.instagram_username
-    connection.followers_count = int(ig_user.get("followers_count") or 0)
-    connection.media_count = int(ig_user.get("media_count") or 0)
+    connection.followers_count = int(
+        snapshot_payload.get("account", {}).get("followers_count")
+        or ig_user.get("followers_count")
+        or 0
+    )
+    connection.media_count = int(
+        snapshot_payload.get("account", {}).get("media_count")
+        or ig_user.get("media_count")
+        or 0
+    )
     connection.last_synced_at = timezone.now()
     connection.save(
         update_fields=[
