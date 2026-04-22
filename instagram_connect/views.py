@@ -279,6 +279,7 @@ def instagram_sync(request):
             "instagram_username": connection.instagram_username,
             "followers_count": connection.followers_count,
             "media_count": connection.media_count,
+            "failed_requests": snapshot_payload.get("failed_requests", []),
             "last_synced_at": connection.last_synced_at.isoformat(),
         }
     )
