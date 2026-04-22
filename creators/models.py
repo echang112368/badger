@@ -54,31 +54,3 @@ class CreatorMeta(models.Model):
     def balance(self):
         from ledger.models import LedgerEntry
         return LedgerEntry.creator_balance(self.user)
-
-
-class SocialAnalyticsSnapshot(models.Model):
-    PLATFORM_INSTAGRAM = "instagram"
-    PLATFORM_TIKTOK = "tiktok"
-    PLATFORM_YOUTUBE = "youtube"
-
-    PLATFORM_CHOICES = (
-        (PLATFORM_INSTAGRAM, "Instagram"),
-        (PLATFORM_TIKTOK, "TikTok"),
-        (PLATFORM_YOUTUBE, "YouTube"),
-    )
-
-    user = models.ForeignKey(
-        "accounts.CustomUser",
-        on_delete=models.CASCADE,
-        related_name="social_analytics_snapshots",
-    )
-    platform = models.CharField(max_length=50, choices=PLATFORM_CHOICES)
-    payload = models.JSONField(default=dict, blank=True)
-    synced_at = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ("user", "platform")
-
-    def __str__(self):
-        return f"{self.user.username} - {self.platform}"
