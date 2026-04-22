@@ -2,9 +2,12 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
+from accounts.models import CustomUser
+from instagram_connect.models import InstagramConnection
 from instagram_connect.services import (
     build_oauth_url,
     exchange_code_for_access_token,
@@ -169,3 +172,46 @@ class MetaOAuthScopeTests(SimpleTestCase):
 
     def test_should_refresh_token_when_expiry_far_in_future(self):
         self.assertFalse(should_refresh_token(timezone.now() + timedelta(days=7)))
+
+
+class InstagramCallbackRedirectTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="ig_callback_user",
+            email="ig_callback@example.com",
+            password="pass123",
+            is_creator=True,
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["meta_oauth_state"] = "state_abc"
+        session.save()
+
+    @patch("instagram_connect.views.get_instagram_user")
+    @patch("instagram_connect.views.exchange_code_for_access_token")
+    def test_callback_redirects_to_settings_with_success_flag(self, mock_exchange, mock_get_user):
+        mock_exchange.return_value = {"access_token": "token_123", "expires_in": 5184000}
+        mock_get_user.return_value = {
+            "id": "ig_1",
+            "username": "creator_name",
+            "followers_count": 42,
+            "media_count": 3,
+        }
+
+        response = self.client.get(
+            reverse("instagram_callback"),
+            {"code": "code_123", "state": "state_abc"},
+        )
+
+        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=success")
+        connection = InstagramConnection.objects.get(user=self.user)
+        self.assertEqual(connection.instagram_user_id, "ig_1")
+
+    def test_callback_redirects_to_settings_with_error_flag_for_oauth_error(self):
+        response = self.client.get(
+            reverse("instagram_callback"),
+            {"error": "access_denied", "state": "state_abc"},
+        )
+
+        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=error")
+        self.assertFalse(InstagramConnection.objects.filter(user=self.user).exists())
