@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
@@ -22,7 +23,10 @@ def connect_instagram(request):
 
     state = generate_oauth_state()
     request.session["meta_oauth_state"] = state
-    return redirect(build_oauth_url(state))
+    oauth_url = build_oauth_url(state)
+    print("META_REDIRECT_URI:", settings.META_REDIRECT_URI)
+    print("OAuth URL:", oauth_url)
+    return redirect(oauth_url)
 
 
 @login_required
