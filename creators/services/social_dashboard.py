@@ -214,6 +214,8 @@ class InstagramAnalyticsService:
             },
         )
         data = media_payload.get("data") if isinstance(media_payload, dict) else []
+        if not isinstance(data, list):
+            return []
         return [item for item in data if isinstance(item, dict)]
 
     def fetch_engagement_metrics(
