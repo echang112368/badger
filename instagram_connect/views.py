@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.http import JsonResponse
@@ -21,8 +23,10 @@ from .services import (
 )
 
 
-def _ensure_fresh_access_token(connection: InstagramConnection) -> None:
-    if not should_refresh_token(connection.token_expires_at):
+def _ensure_fresh_access_token(
+    connection: InstagramConnection, *, force_refresh: bool = False
+) -> None:
+    if not force_refresh and not should_refresh_token(connection.token_expires_at):
         return
 
     refreshed_token_data = refresh_long_lived_access_token(connection.access_token)
@@ -33,6 +37,49 @@ def _ensure_fresh_access_token(connection: InstagramConnection) -> None:
     connection.access_token = refreshed_access_token
     connection.token_expires_at = token_expiry_from_response(refreshed_token_data)
     connection.save(update_fields=["access_token", "token_expires_at"])
+
+
+def _is_token_invalid_error(error: MetaAPIError) -> bool:
+    message = str(error).lower()
+    return "session key invalid" in message or "invalid oauth access token" in message
+
+
+def _get_instagram_user_with_latest_token(
+    connection: InstagramConnection,
+) -> dict[str, Any]:
+    try:
+        return get_instagram_user(connection.access_token)
+    except MetaAPIError as exc:
+        if not _is_token_invalid_error(exc):
+            raise
+
+    try:
+        refreshed_token_data = refresh_long_lived_access_token(connection.access_token)
+    except MetaAPIError as exc:
+        if _is_token_invalid_error(exc):
+            raise MetaAPIError(
+                "Instagram access token is no longer valid. Please reconnect Instagram."
+            ) from exc
+        raise
+
+    refreshed_access_token = refreshed_token_data.get("access_token")
+    if not refreshed_access_token:
+        raise MetaAPIError(
+            "Instagram access token is no longer valid. Please reconnect Instagram."
+        )
+
+    connection.access_token = refreshed_access_token
+    connection.token_expires_at = token_expiry_from_response(refreshed_token_data)
+    connection.save(update_fields=["access_token", "token_expires_at"])
+
+    try:
+        return get_instagram_user(connection.access_token)
+    except MetaAPIError as exc:
+        if _is_token_invalid_error(exc):
+            raise MetaAPIError(
+                "Instagram access token is no longer valid. Please reconnect Instagram."
+            ) from exc
+        raise
 
 
 @login_required
@@ -171,17 +218,22 @@ def instagram_sync(request):
         )
 
     try:
-        _ensure_fresh_access_token(connection)
-        ig_user = get_instagram_user(connection.access_token)
+        _ensure_fresh_access_token(connection, force_refresh=True)
+        ig_user = _get_instagram_user_with_latest_token(connection)
         snapshot_payload = InstagramAnalyticsService(request.user).fetch_and_cache(
             connection
         )
     except MetaAPIError as exc:
+        message = str(exc)
+        if _is_token_invalid_error(exc):
+            message = (
+                "Instagram access token is no longer valid. Please reconnect Instagram."
+            )
         return JsonResponse(
             {
                 "success": False,
                 "error": "meta_api_error",
-                "message": str(exc),
+                "message": message,
             },
             status=400,
         )
