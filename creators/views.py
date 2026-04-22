@@ -33,7 +33,6 @@ from shopify_app.token_management import refresh_shopify_token
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 from instagram_connect.models import InstagramConnection
-from .services.social_dashboard import SocialDashboardService
 
 logger = logging.getLogger(__name__)
 
@@ -1217,23 +1216,6 @@ def creator_profile(request):
 @login_required
 def creator_support(request):
     return render(request, "creators/support.html")
-
-
-@login_required
-def creator_social_media(request):
-    refresh_platform = request.GET.get("refresh")
-    dashboard = SocialDashboardService(request.user).build_dashboard(
-        refresh_platform=refresh_platform
-    )
-    return render(
-        request,
-        "creators/social_media.html",
-        {
-            "social_overall": dashboard["overall"],
-            "social_platforms": dashboard["platforms"],
-            "refreshed_platform": refresh_platform,
-        },
-    )
 
 
 @login_required
