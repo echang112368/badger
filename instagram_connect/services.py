@@ -116,7 +116,10 @@ def exchange_code_for_access_token(code: str) -> dict[str, Any]:
 def get_instagram_user(access_token: str) -> dict[str, Any]:
     response = requests.get(
         f"{get_meta_api_base()}/me",
-        params={"fields": "user_id,username", "access_token": access_token},
+        params={
+            "fields": "id,user_id,username,followers_count,media_count",
+            "access_token": access_token,
+        },
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
     return _response_json(response)
