@@ -6,6 +6,7 @@ from django.test import SimpleTestCase, override_settings
 from instagram_connect.services import (
     build_oauth_url,
     exchange_code_for_access_token,
+    get_instagram_user,
     resolve_meta_oauth_scopes,
 )
 
@@ -94,3 +95,26 @@ class MetaOAuthScopeTests(SimpleTestCase):
             },
         )
         self.assertEqual(token_data["access_token"], "token_abc")
+
+    @patch("instagram_connect.services.requests.get")
+    def test_get_instagram_user_requests_metrics_fields(self, mock_get):
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {
+            "id": "1789",
+            "username": "creator",
+            "followers_count": 123,
+            "media_count": 45,
+        }
+        mock_get.return_value = response
+
+        get_instagram_user("token_abc")
+
+        mock_get.assert_called_once_with(
+            "https://graph.instagram.com/me",
+            params={
+                "fields": "id,user_id,username,followers_count,media_count",
+                "access_token": "token_abc",
+            },
+            timeout=15,
+        )
