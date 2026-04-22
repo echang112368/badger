@@ -11,10 +11,27 @@ from .services import (
     MetaAPIError,
     build_oauth_url,
     exchange_code_for_access_token,
+    exchange_for_long_lived_access_token,
     generate_oauth_state,
     get_instagram_user,
+    refresh_long_lived_access_token,
+    should_refresh_token,
     token_expiry_from_response,
 )
+
+
+def _ensure_fresh_access_token(connection: InstagramConnection) -> None:
+    if not should_refresh_token(connection.token_expires_at):
+        return
+
+    refreshed_token_data = refresh_long_lived_access_token(connection.access_token)
+    refreshed_access_token = refreshed_token_data.get("access_token")
+    if not refreshed_access_token:
+        raise MetaAPIError("Meta did not return a refreshed access token.")
+
+    connection.access_token = refreshed_access_token
+    connection.token_expires_at = token_expiry_from_response(refreshed_token_data)
+    connection.save(update_fields=["access_token", "token_expires_at"])
 
 
 @login_required
@@ -83,6 +100,15 @@ def instagram_callback(request):
                 },
                 status=400,
             )
+
+        expires_in = token_data.get("expires_in")
+        if isinstance(expires_in, int) and expires_in <= 2 * 60 * 60:
+            long_lived_token_data = exchange_for_long_lived_access_token(access_token)
+            long_lived_access_token = long_lived_token_data.get("access_token")
+            if not long_lived_access_token:
+                raise MetaAPIError("Meta did not return a long-lived access token.")
+            token_data = long_lived_token_data
+            access_token = long_lived_access_token
 
         ig_user = get_instagram_user(access_token)
         ig_user_id = ig_user.get("user_id") or ig_user.get("id")
@@ -155,6 +181,12 @@ def instagram_status(request):
     except InstagramConnection.DoesNotExist:
         return JsonResponse({"connected": False})
 
+    try:
+        _ensure_fresh_access_token(connection)
+    except MetaAPIError:
+        # Preserve status visibility even if token refresh fails.
+        pass
+
     return JsonResponse(
         {
             "connected": True,
@@ -167,6 +199,9 @@ def instagram_status(request):
             else None,
             "connected_at": connection.connected_at.isoformat()
             if connection.connected_at
+            else None,
+            "token_expires_at": connection.token_expires_at.isoformat()
+            if connection.token_expires_at
             else None,
         }
     )
@@ -190,6 +225,7 @@ def instagram_sync(request):
         )
 
     try:
+        _ensure_fresh_access_token(connection)
         ig_user = get_instagram_user(connection.access_token)
         snapshot_payload = InstagramAnalyticsService(request.user).fetch_and_cache(
             connection

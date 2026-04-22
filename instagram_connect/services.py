@@ -113,6 +113,37 @@ def exchange_code_for_access_token(code: str) -> dict[str, Any]:
     return payload
 
 
+def exchange_for_long_lived_access_token(short_lived_token: str) -> dict[str, Any]:
+    response = requests.get(
+        f"{get_meta_api_base()}/access_token",
+        params={
+            "grant_type": "ig_exchange_token",
+            "client_secret": settings.META_APP_SECRET,
+            "access_token": short_lived_token,
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    return _response_json(response)
+
+
+def refresh_long_lived_access_token(access_token: str) -> dict[str, Any]:
+    response = requests.get(
+        f"{get_meta_api_base()}/refresh_access_token",
+        params={
+            "grant_type": "ig_refresh_token",
+            "access_token": access_token,
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    return _response_json(response)
+
+
+def should_refresh_token(token_expires_at, *, buffer_seconds: int = 24 * 60 * 60) -> bool:
+    if not token_expires_at:
+        return True
+    return token_expires_at <= timezone.now() + timedelta(seconds=buffer_seconds)
+
+
 def get_instagram_user(access_token: str) -> dict[str, Any]:
     response = requests.get(
         f"{get_meta_api_base()}/me",
