@@ -29,7 +29,11 @@ SECRET_KEY = 'django-insecure-1@#i+ivuv)%n68yqzwzg%ggqdzfqe9j$@gan+^0)!0e3%3^0x2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost","842c-2607-b400-26-0-a853-7460-d565-2d8d.ngrok-free.app"]
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    ".ngrok-free.app",
+]
 
 MERCHANT_LIST_PATH = BASE_DIR / "merchantlist" / "static" / "merchant_list.json"
 try:
@@ -122,6 +126,13 @@ if ENV_PATH.exists():
 # rely on a standalone `.env` file continue to work without additional
 # configuration.
 load_dotenv()
+
+_extra_allowed_hosts = os.environ.get("EXTRA_ALLOWED_HOSTS")
+if _extra_allowed_hosts:
+    for host in _extra_allowed_hosts.split(","):
+        candidate = host.strip().lower()
+        if candidate and candidate not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(candidate)
 
 
 def _normalise_origin(value: str | None) -> tuple[str | None, str | None]:
@@ -360,6 +371,9 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 CSRF_TRUSTED_ORIGINS: list[str] = []
 if SHOPIFY_APP_ORIGIN:
     CSRF_TRUSTED_ORIGINS.append(SHOPIFY_APP_ORIGIN)
+
+# Allow transient ngrok preview URLs during local development.
+CSRF_TRUSTED_ORIGINS.append("https://*.ngrok-free.app")
 
 _extra_csrf_origins = os.environ.get("EXTRA_CSRF_TRUSTED_ORIGINS")
 if _extra_csrf_origins:
