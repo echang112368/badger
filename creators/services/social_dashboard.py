@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -34,6 +35,7 @@ class InstagramAnalyticsService:
 
     def __init__(self, user):
         self.user = user
+        self.failed_requests: list[dict[str, Any]] = []
 
     def build_platform_data(self, refresh: bool = False) -> PlatformDashboardData:
         connection = getattr(self.user, "instagram_connection", None)
@@ -80,6 +82,7 @@ class InstagramAnalyticsService:
         snapshot: SocialAnalyticsSnapshot | None = None,
     ) -> dict[str, Any]:
         now = timezone.now()
+        self.failed_requests = []
         ig_user_id = self._resolve_ig_user_id(connection)
         payload = self.empty_metrics()
         payload["account"] = self.fetch_account(connection, ig_user_id)
@@ -90,6 +93,7 @@ class InstagramAnalyticsService:
         payload["engagement"] = self.fetch_engagement_metrics(connection, recent_media)
         payload["story"] = self.fetch_story_metrics(connection, recent_media)
         payload["comments"] = self.fetch_comments(connection, recent_media)
+        payload["failed_requests"] = list(self.failed_requests)
         payload["synced_at"] = now.isoformat()
 
         if snapshot is not None:
@@ -373,6 +377,7 @@ class InstagramAnalyticsService:
             },
             "story": payload.get("story") or {},
             "comments": payload.get("comments") or {},
+            "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
         }
 
@@ -408,15 +413,77 @@ class InstagramAnalyticsService:
         return {}
 
     def _safe_json_get(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+        safe_params = dict(params)
+        if "access_token" in safe_params:
+            safe_params["access_token"] = "***redacted***"
+
         try:
             response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
             data = response.json()
+            print(
+                "[InstagramAnalyticsService] Graph API response:",
+                json.dumps(
+                    {
+                        "url": url,
+                        "params": safe_params,
+                        "status_code": response.status_code,
+                        "json": data if isinstance(data, dict) else str(data),
+                    },
+                    default=str,
+                ),
+            )
             if response.status_code >= 400:
+                self.failed_requests.append(
+                    {
+                        "url": url,
+                        "params": safe_params,
+                        "status_code": response.status_code,
+                        "error": data.get("error") if isinstance(data, dict) else None,
+                    }
+                )
                 return {}
             if isinstance(data, dict):
+                if data.get("data") in (None, []) and any(
+                    key in safe_params for key in ("metric", "fields", "breakdown")
+                ):
+                    self.failed_requests.append(
+                        {
+                            "url": url,
+                            "params": safe_params,
+                            "status_code": response.status_code,
+                            "error": "empty_data",
+                        }
+                    )
                 return data
+            self.failed_requests.append(
+                {
+                    "url": url,
+                    "params": safe_params,
+                    "status_code": response.status_code,
+                    "error": "non_dict_json",
+                }
+            )
             return {}
-        except Exception:
+        except Exception as exc:
+            print(
+                "[InstagramAnalyticsService] Graph API request failed:",
+                json.dumps(
+                    {
+                        "url": url,
+                        "params": safe_params,
+                        "error": str(exc),
+                    },
+                    default=str,
+                ),
+            )
+            self.failed_requests.append(
+                {
+                    "url": url,
+                    "params": safe_params,
+                    "status_code": None,
+                    "error": str(exc),
+                }
+            )
             return {}
 
     @staticmethod
@@ -494,6 +561,7 @@ class InstagramAnalyticsService:
                 "audience_quality_score": None,
                 "nlp_notes": "NLP pipeline placeholder for sentiment and audience quality insights.",
             },
+            "failed_requests": [],
             "synced_at": None,
         }
 
