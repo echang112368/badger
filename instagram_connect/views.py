@@ -1,6 +1,7 @@
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.http import JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django.shortcuts import redirect
@@ -50,56 +51,27 @@ def connect_instagram(request):
 @login_required
 @require_GET
 def instagram_callback(request):
-    """Complete OAuth callback, persist the connected Instagram account, and return JSON."""
+    """Complete OAuth callback, persist account data, and send user back to Settings."""
+
+    settings_url = reverse("creator_settings")
 
     if request.GET.get("error"):
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "oauth_denied",
-                "message": request.GET.get(
-                    "error_description",
-                    "Authorization was denied by Meta.",
-                ),
-            },
-            status=400,
-        )
+        return redirect(f"{settings_url}?instagram_oauth=error")
 
     code = request.GET.get("code")
     if not code:
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "missing_code",
-                "message": "Missing authorization code from Meta callback.",
-            },
-            status=400,
-        )
+        return redirect(f"{settings_url}?instagram_oauth=error")
 
     expected_state = request.session.get("meta_oauth_state")
     received_state = request.GET.get("state")
     if not expected_state or expected_state != received_state:
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "invalid_state",
-                "message": "OAuth state validation failed.",
-            },
-            status=400,
-        )
+        return redirect(f"{settings_url}?instagram_oauth=error")
 
     try:
         token_data = exchange_code_for_access_token(code)
         access_token = token_data.get("access_token")
         if not access_token:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "missing_access_token",
-                    "message": "Meta did not return an access token.",
-                },
-                status=400,
-            )
+            return redirect(f"{settings_url}?instagram_oauth=error")
 
         expires_in = token_data.get("expires_in")
         if isinstance(expires_in, int) and expires_in <= 2 * 60 * 60:
@@ -113,14 +85,7 @@ def instagram_callback(request):
         ig_user = get_instagram_user(access_token)
         ig_user_id = ig_user.get("user_id") or ig_user.get("id")
         if not ig_user_id:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "missing_instagram_id",
-                    "message": "Instagram user ID was missing from Meta response.",
-                },
-                status=400,
-            )
+            return redirect(f"{settings_url}?instagram_oauth=error")
 
         now = timezone.now()
 
@@ -144,31 +109,12 @@ def instagram_callback(request):
             connection.connected_at = now
             connection.save(update_fields=["connected_at"])
 
-    except MetaAPIError as exc:
-        return JsonResponse(
-            {
-                "success": False,
-                "error": "meta_api_error",
-                "message": str(exc),
-            },
-            status=400,
-        )
+    except MetaAPIError:
+        return redirect(f"{settings_url}?instagram_oauth=error")
     finally:
         request.session.pop("meta_oauth_state", None)
 
-    return JsonResponse(
-        {
-            "success": True,
-            "connected": True,
-            "instagram_user_id": connection.instagram_user_id,
-            "instagram_username": connection.instagram_username,
-            "followers_count": connection.followers_count,
-            "media_count": connection.media_count,
-            "last_synced_at": connection.last_synced_at.isoformat()
-            if connection.last_synced_at
-            else None,
-        }
-    )
+    return redirect(f"{settings_url}?instagram_oauth=success")
 
 
 @login_required
