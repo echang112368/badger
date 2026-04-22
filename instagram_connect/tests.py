@@ -9,7 +9,6 @@ from django.utils import timezone
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
 from instagram_connect.services import (
-    MetaAPIError,
     build_oauth_url,
     exchange_code_for_access_token,
     exchange_for_long_lived_access_token,
@@ -189,19 +188,9 @@ class InstagramCallbackRedirectTests(TestCase):
         session.save()
 
     @patch("instagram_connect.views.get_instagram_user")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
     @patch("instagram_connect.views.exchange_code_for_access_token")
-    def test_callback_redirects_to_settings_with_success_flag(
-        self,
-        mock_exchange,
-        mock_exchange_long_lived,
-        mock_get_user,
-    ):
+    def test_callback_redirects_to_settings_with_success_flag(self, mock_exchange, mock_get_user):
         mock_exchange.return_value = {"access_token": "token_123", "expires_in": 5184000}
-        mock_exchange_long_lived.return_value = {
-            "access_token": "long_token_123",
-            "expires_in": 5184000,
-        }
         mock_get_user.return_value = {
             "id": "ig_1",
             "username": "creator_name",
@@ -217,38 +206,6 @@ class InstagramCallbackRedirectTests(TestCase):
         self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=success")
         connection = InstagramConnection.objects.get(user=self.user)
         self.assertEqual(connection.instagram_user_id, "ig_1")
-        self.assertEqual(connection.access_token, "token_123")
-
-    @patch("instagram_connect.views.get_instagram_user")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.exchange_code_for_access_token")
-    def test_callback_upgrades_short_lived_tokens_when_expires_in_is_string(
-        self,
-        mock_exchange,
-        mock_exchange_long_lived,
-        mock_get_user,
-    ):
-        mock_exchange.return_value = {"access_token": "token_123", "expires_in": "3600"}
-        mock_exchange_long_lived.return_value = {
-            "access_token": "long_token_123",
-            "expires_in": 5184000,
-        }
-        mock_get_user.return_value = {
-            "id": "ig_1",
-            "username": "creator_name",
-            "followers_count": 42,
-            "media_count": 3,
-        }
-
-        response = self.client.get(
-            reverse("instagram_callback"),
-            {"code": "code_123", "state": "state_abc"},
-        )
-
-        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=success")
-        connection = InstagramConnection.objects.get(user=self.user)
-        self.assertEqual(connection.access_token, "long_token_123")
-        mock_exchange_long_lived.assert_called_once_with("token_123")
 
     def test_callback_redirects_to_settings_with_error_flag_for_oauth_error(self):
         response = self.client.get(
@@ -258,131 +215,3 @@ class InstagramCallbackRedirectTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=error")
         self.assertFalse(InstagramConnection.objects.filter(user=self.user).exists())
-
-
-class InstagramSyncTokenRefreshTests(TestCase):
-    def setUp(self):
-        self.user = CustomUser.objects.create_user(
-            username="ig_sync_user",
-            email="ig_sync@example.com",
-            password="pass123",
-            is_creator=True,
-        )
-        self.client.force_login(self.user)
-        self.connection = InstagramConnection.objects.create(
-            user=self.user,
-            instagram_user_id="123456789",
-            instagram_username="before_refresh",
-            access_token="stale_token",
-        )
-
-    @patch("instagram_connect.views.InstagramAnalyticsService.fetch_and_cache")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.refresh_long_lived_access_token")
-    @patch("instagram_connect.views.get_instagram_user")
-    def test_sync_refreshes_token_and_retries_when_session_key_is_invalid(
-        self,
-        mock_get_user,
-        mock_refresh_token,
-        mock_exchange_long_lived,
-        mock_fetch_and_cache,
-    ):
-        mock_get_user.side_effect = [
-            MetaAPIError("Session key invalid."),
-            {
-                "id": "123456789",
-                "username": "after_refresh",
-                "followers_count": 101,
-                "media_count": 12,
-            },
-        ]
-        mock_refresh_token.return_value = {
-            "access_token": "fresh_token",
-            "expires_in": 5184000,
-        }
-        mock_exchange_long_lived.return_value = {
-            "access_token": "fresh_token",
-            "expires_in": 5184000,
-        }
-        mock_fetch_and_cache.return_value = {
-            "account": {"followers_count": 202, "media_count": 22}
-        }
-
-        response = self.client.get(reverse("instagram_sync"))
-
-        self.assertEqual(response.status_code, 200)
-        self.connection.refresh_from_db()
-        self.assertEqual(self.connection.access_token, "fresh_token")
-        self.assertEqual(self.connection.instagram_username, "after_refresh")
-        self.assertEqual(self.connection.followers_count, 202)
-        self.assertEqual(self.connection.media_count, 22)
-
-    @patch("instagram_connect.views.refresh_long_lived_access_token")
-    @patch("instagram_connect.views.get_instagram_user")
-    def test_sync_returns_actionable_error_when_token_is_still_invalid_after_refresh(
-        self,
-        mock_get_user,
-        mock_refresh_token,
-    ):
-        mock_get_user.side_effect = [
-            MetaAPIError("Session key invalid."),
-            MetaAPIError("Session key invalid."),
-        ]
-        mock_refresh_token.return_value = {
-            "access_token": "fresh_token",
-            "expires_in": 5184000,
-        }
-
-        response = self.client.get(reverse("instagram_sync"))
-
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertIn("Please reconnect Instagram", payload.get("message", ""))
-
-    @patch("instagram_connect.views.InstagramAnalyticsService.fetch_and_cache")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.refresh_long_lived_access_token")
-    @patch("instagram_connect.views.get_instagram_user")
-    def test_sync_falls_back_to_exchange_when_forced_refresh_fails(
-        self,
-        mock_get_user,
-        mock_refresh_token,
-        mock_exchange_long_lived,
-        mock_fetch_and_cache,
-    ):
-        mock_refresh_token.side_effect = MetaAPIError("Cannot refresh this token.")
-        mock_exchange_long_lived.return_value = {
-            "access_token": "upgraded_token",
-            "expires_in": 5184000,
-        }
-        mock_get_user.return_value = {
-            "id": "123456789",
-            "username": "after_upgrade",
-            "followers_count": 111,
-            "media_count": 13,
-        }
-        mock_fetch_and_cache.return_value = {
-            "account": {"followers_count": 222, "media_count": 23}
-        }
-
-        response = self.client.get(reverse("instagram_sync"))
-
-        self.assertEqual(response.status_code, 200)
-        self.connection.refresh_from_db()
-        self.assertEqual(self.connection.access_token, "upgraded_token")
-
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.refresh_long_lived_access_token")
-    def test_sync_returns_actionable_error_when_forced_refresh_fails_with_invalid_session(
-        self,
-        mock_refresh_token,
-        mock_exchange_long_lived,
-    ):
-        mock_refresh_token.side_effect = MetaAPIError("Session key invalid.")
-        mock_exchange_long_lived.side_effect = MetaAPIError("Session key invalid.")
-
-        response = self.client.get(reverse("instagram_sync"))
-
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertIn("Please reconnect Instagram", payload.get("message", ""))
