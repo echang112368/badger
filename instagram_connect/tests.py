@@ -1,13 +1,18 @@
+from datetime import timedelta
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase, override_settings
+from django.utils import timezone
 
 from instagram_connect.services import (
     build_oauth_url,
     exchange_code_for_access_token,
+    exchange_for_long_lived_access_token,
     get_instagram_user,
+    refresh_long_lived_access_token,
     resolve_meta_oauth_scopes,
+    should_refresh_token,
 )
 
 
@@ -118,3 +123,49 @@ class MetaOAuthScopeTests(SimpleTestCase):
             },
             timeout=15,
         )
+
+    @override_settings(META_APP_SECRET="secret_123")
+    @patch("instagram_connect.services.requests.get")
+    def test_exchange_for_long_lived_access_token_uses_expected_endpoint(self, mock_get):
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"access_token": "long_token", "expires_in": 5184000}
+        mock_get.return_value = response
+
+        token_data = exchange_for_long_lived_access_token("short_token")
+
+        mock_get.assert_called_once_with(
+            "https://graph.instagram.com/access_token",
+            params={
+                "grant_type": "ig_exchange_token",
+                "client_secret": "secret_123",
+                "access_token": "short_token",
+            },
+            timeout=15,
+        )
+        self.assertEqual(token_data["access_token"], "long_token")
+
+    @patch("instagram_connect.services.requests.get")
+    def test_refresh_long_lived_access_token_uses_expected_endpoint(self, mock_get):
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"access_token": "new_token", "expires_in": 5184000}
+        mock_get.return_value = response
+
+        token_data = refresh_long_lived_access_token("old_token")
+
+        mock_get.assert_called_once_with(
+            "https://graph.instagram.com/refresh_access_token",
+            params={
+                "grant_type": "ig_refresh_token",
+                "access_token": "old_token",
+            },
+            timeout=15,
+        )
+        self.assertEqual(token_data["access_token"], "new_token")
+
+    def test_should_refresh_token_when_expiry_missing(self):
+        self.assertTrue(should_refresh_token(None))
+
+    def test_should_refresh_token_when_expiry_far_in_future(self):
+        self.assertFalse(should_refresh_token(timezone.now() + timedelta(days=7)))
