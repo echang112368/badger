@@ -92,6 +92,7 @@ def _response_json(response: requests.Response) -> dict[str, Any]:
 
 def exchange_code_for_access_token(code: str) -> dict[str, Any]:
     token_url = "https://api.instagram.com/oauth/access_token"
+    print("Token exchange redirect_uri:", settings.META_REDIRECT_URI)
     response = requests.post(
         token_url,
         data={
