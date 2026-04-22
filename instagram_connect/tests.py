@@ -305,12 +305,21 @@ class InstagramSyncTokenRefreshTests(TestCase):
             "expires_in": 5184000,
         }
         mock_fetch_and_cache.return_value = {
-            "account": {"followers_count": 202, "media_count": 22}
+            "account": {"followers_count": 202, "media_count": 22},
+            "failed_requests": [
+                {
+                    "url": "https://graph.facebook.com/v23.0/123456789/insights",
+                    "params": {"metric": "website_clicks"},
+                    "status_code": 400,
+                    "error": "Unsupported metric",
+                }
+            ],
         }
 
         response = self.client.get(reverse("instagram_sync"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json().get("failed_requests", [])), 1)
         self.connection.refresh_from_db()
         self.assertEqual(self.connection.access_token, "fresh_token")
         self.assertEqual(self.connection.instagram_username, "after_refresh")
