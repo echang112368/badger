@@ -6,8 +6,9 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
+from creators.models import SocialAnalyticsSnapshot
 from creators.services.social_dashboard import InstagramAnalyticsService
 
 from .models import InstagramConnection
@@ -195,6 +196,20 @@ def instagram_callback(request):
         request.session.pop("meta_oauth_state", None)
 
     return redirect(f"{settings_url}?instagram_oauth=success")
+
+
+
+@login_required
+@require_POST
+def instagram_disconnect(request):
+    SocialAnalyticsSnapshot.objects.filter(
+        user=request.user,
+        platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+    ).delete()
+    InstagramConnection.objects.filter(user=request.user).delete()
+    request.session.pop("meta_oauth_state", None)
+
+    return redirect(f"{reverse('creator_settings')}?instagram_disconnect=success")
 
 
 @login_required
