@@ -23,33 +23,33 @@ from instagram_connect.services import (
 class MetaOAuthScopeTests(SimpleTestCase):
     @override_settings(
         META_OAUTH_SCOPES=(
-            "instagram_business_basic,instagram_business_manage_comments,"
-            "instagram_business_manage_comments"
+            "instagram_basic,instagram_manage_comments,"
+            "instagram_manage_comments"
         )
     )
     def test_resolve_meta_oauth_scopes_deduplicates_string_value(self):
         self.assertEqual(
             resolve_meta_oauth_scopes(),
-            "instagram_business_basic,instagram_business_manage_comments",
+            "instagram_basic,instagram_manage_comments",
         )
 
     @override_settings(
         META_OAUTH_SCOPES=[
-            "instagram_business_basic",
-            "instagram_business_manage_messages",
-            "instagram_business_basic",
+            "instagram_basic",
+            "instagram_manage_insights",
+            "instagram_basic",
         ]
     )
     def test_resolve_meta_oauth_scopes_deduplicates_iterables(self):
         self.assertEqual(
             resolve_meta_oauth_scopes(),
-            "instagram_business_basic,instagram_business_manage_messages",
+            "instagram_basic,instagram_manage_insights",
         )
 
     @override_settings(META_APP_ID="app_123", META_REDIRECT_URI="https://example.com/callback")
     def test_build_oauth_url_uses_configured_scopes(self):
         with override_settings(
-            META_OAUTH_SCOPES=["instagram_business_basic", "instagram_business_content_publish"],
+            META_OAUTH_SCOPES=["instagram_basic", "instagram_manage_insights"],
             META_ENABLE_FB_LOGIN=False,
             META_FORCE_REAUTH=True,
         ):
@@ -62,7 +62,7 @@ class MetaOAuthScopeTests(SimpleTestCase):
         self.assertEqual(params["redirect_uri"], ["https://example.com/callback"])
         self.assertEqual(
             params["scope"],
-            ["instagram_business_basic,instagram_business_content_publish"],
+            ["instagram_basic,instagram_manage_insights"],
         )
         self.assertEqual(params["state"], ["state_abc"])
         self.assertEqual(params["response_type"], ["code"])
@@ -83,7 +83,7 @@ class MetaOAuthScopeTests(SimpleTestCase):
                 {
                     "access_token": "token_abc",
                     "user_id": "1789",
-                    "permissions": "instagram_business_basic",
+                    "permissions": "instagram_basic",
                 }
             ]
         }
