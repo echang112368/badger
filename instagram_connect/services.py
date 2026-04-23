@@ -46,6 +46,9 @@ def build_oauth_url(state: str) -> str:
         "response_type": "code",
         "state": state,
     }
+    meta_config_id = getattr(settings, "META_CONFIG_ID", "").strip()
+    if meta_config_id:
+        params["config_id"] = meta_config_id
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 
 

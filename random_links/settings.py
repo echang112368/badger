@@ -245,6 +245,7 @@ SHOPIFY_REDIRECT_URI = os.environ.get(
 META_APP_ID = os.environ["META_APP_ID"]
 META_APP_SECRET = os.environ["META_APP_SECRET"]
 META_REDIRECT_URI = os.environ["META_REDIRECT_URI"]
+META_CONFIG_ID = os.environ.get("META_CONFIG_ID", "").strip()
 META_API_VERSION = os.environ.get("META_API_VERSION", "v22.0")
 META_OAUTH_SCOPES = [
     scope.strip()
