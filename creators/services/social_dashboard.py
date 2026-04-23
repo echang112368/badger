@@ -10,12 +10,12 @@ from django.utils import timezone
 
 from creators.models import SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
-from instagram_connect.services import get_instagram_user
+from instagram_connect.services import get_graph_api_base, get_instagram_user
 
 
 REQUEST_TIMEOUT_SECONDS = 15
-GRAPH_BASE_URL = "https://graph.instagram.com"
-GRAPH_BASIC_URL = "https://graph.instagram.com"
+GRAPH_BASE_URL = get_graph_api_base()
+GRAPH_BASIC_URL = get_graph_api_base()
 
 
 @dataclass
@@ -384,7 +384,7 @@ class InstagramAnalyticsService:
     def _resolve_ig_user_id(self, connection: InstagramConnection) -> str:
         candidate_ids = [str(connection.instagram_user_id or "").strip()]
         try:
-            me = get_instagram_user(connection.access_token)
+            me = get_instagram_user(connection.instagram_user_id, connection.access_token)
             for field in ["user_id", "id"]:
                 value = me.get(field)
                 if value:

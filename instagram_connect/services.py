@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import timedelta
 from typing import Any
@@ -8,11 +9,14 @@ from django.conf import settings
 from django.utils import timezone
 
 
+logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_META_OAUTH_SCOPES = (
+    "public_profile",
+    "pages_show_list",
     "instagram_basic",
     "instagram_manage_insights",
-    "instagram_manage_comments",
+    "pages_read_engagement",
 )
 
 
@@ -20,12 +24,13 @@ class MetaAPIError(Exception):
     """Raised when Meta Graph API returns an error response."""
 
 
-def get_meta_api_base() -> str:
-    return "https://graph.instagram.com"
+def get_graph_api_base() -> str:
+    api_version = getattr(settings, "META_API_VERSION", "v22.0")
+    return f"https://graph.facebook.com/{api_version}"
 
 
 def get_oauth_url_base() -> str:
-    return "https://www.instagram.com/oauth/authorize"
+    return "https://www.facebook.com/dialog/oauth"
 
 
 def generate_oauth_state() -> str:
@@ -40,15 +45,11 @@ def build_oauth_url(state: str) -> str:
         "scope": scope_value,
         "response_type": "code",
         "state": state,
-        "enable_fb_login": str(getattr(settings, "META_ENABLE_FB_LOGIN", True)).lower(),
-        "force_reauth": str(getattr(settings, "META_FORCE_REAUTH", False)).lower(),
     }
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 
 
 def resolve_meta_oauth_scopes() -> str:
-    """Return OAuth scopes from settings as a stable comma-separated string."""
-
     raw_scopes = getattr(settings, "META_OAUTH_SCOPES", DEFAULT_META_OAUTH_SCOPES)
     if isinstance(raw_scopes, str):
         scope_list = [part.strip() for part in raw_scopes.split(",") if part.strip()]
@@ -90,46 +91,27 @@ def _response_json(response: requests.Response) -> dict[str, Any]:
 
 
 def exchange_code_for_access_token(code: str) -> dict[str, Any]:
-    token_url = "https://api.instagram.com/oauth/access_token"
-    response = requests.post(
-        token_url,
-        data={
+    response = requests.get(
+        f"{get_graph_api_base()}/oauth/access_token",
+        params={
             "client_id": settings.META_APP_ID,
             "client_secret": settings.META_APP_SECRET,
-            "grant_type": "authorization_code",
             "redirect_uri": settings.META_REDIRECT_URI,
             "code": code,
-        },
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    payload = _response_json(response)
-
-    # Instagram Business Login may return either a flat payload or a data list.
-    data_items = payload.get("data")
-    if isinstance(data_items, list) and data_items and isinstance(data_items[0], dict):
-        return data_items[0]
-    return payload
-
-
-def exchange_for_long_lived_access_token(short_lived_token: str) -> dict[str, Any]:
-    response = requests.get(
-        f"{get_meta_api_base()}/access_token",
-        params={
-            "grant_type": "ig_exchange_token",
-            "client_secret": settings.META_APP_SECRET,
-            "access_token": short_lived_token,
         },
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
     return _response_json(response)
 
 
-def refresh_long_lived_access_token(access_token: str) -> dict[str, Any]:
+def exchange_for_long_lived_access_token(short_lived_token: str) -> dict[str, Any]:
     response = requests.get(
-        f"{get_meta_api_base()}/refresh_access_token",
+        f"{get_graph_api_base()}/oauth/access_token",
         params={
-            "grant_type": "ig_refresh_token",
-            "access_token": access_token,
+            "grant_type": "fb_exchange_token",
+            "client_id": settings.META_APP_ID,
+            "client_secret": settings.META_APP_SECRET,
+            "fb_exchange_token": short_lived_token,
         },
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
@@ -142,11 +124,49 @@ def should_refresh_token(token_expires_at, *, buffer_seconds: int = 24 * 60 * 60
     return token_expires_at <= timezone.now() + timedelta(seconds=buffer_seconds)
 
 
-def get_instagram_user(access_token: str) -> dict[str, Any]:
+def get_facebook_user(access_token: str) -> dict[str, Any]:
     response = requests.get(
-        f"{get_meta_api_base()}/me",
+        f"{get_graph_api_base()}/me",
+        params={"fields": "id,name", "access_token": access_token},
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    return _response_json(response)
+
+
+def get_user_pages(access_token: str) -> list[dict[str, Any]]:
+    response = requests.get(
+        f"{get_graph_api_base()}/me/accounts",
+        params={"fields": "id,name,access_token", "access_token": access_token},
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    payload = _response_json(response)
+    data = payload.get("data")
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def get_page_instagram_business_account(page_id: str, page_access_token: str) -> dict[str, Any] | None:
+    response = requests.get(
+        f"{get_graph_api_base()}/{page_id}",
         params={
-            "fields": "id,user_id,username,followers_count,media_count",
+            "fields": "instagram_business_account{id,username,followers_count,media_count}",
+            "access_token": page_access_token,
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    payload = _response_json(response)
+    ig_account = payload.get("instagram_business_account")
+    if isinstance(ig_account, dict):
+        return ig_account
+    return None
+
+
+def get_instagram_user(ig_user_id: str, access_token: str) -> dict[str, Any]:
+    response = requests.get(
+        f"{get_graph_api_base()}/{ig_user_id}",
+        params={
+            "fields": "id,username,followers_count,media_count,account_type",
             "access_token": access_token,
         },
         timeout=REQUEST_TIMEOUT_SECONDS,
