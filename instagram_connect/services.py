@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_META_OAUTH_SCOPES = (
     "pages_show_list",
-    "pages_read_engagement",
     "instagram_basic",
-    "instagram_manage_insights",
 )
 
 
