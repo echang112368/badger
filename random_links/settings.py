@@ -252,7 +252,7 @@ META_OAUTH_SCOPES = [
     for scope in os.environ.get(
         "META_OAUTH_SCOPES",
         (
-            "public_profile,"
+            "business_management,"
             "pages_show_list,"
             "pages_read_engagement,"
             "instagram_basic,"
