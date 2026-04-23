@@ -27,7 +27,11 @@ class MetaOAuthScopeTests(SimpleTestCase):
             "instagram_basic,pages_show_list,instagram_manage_insights",
         )
 
-    @override_settings(META_APP_ID="app_123", META_REDIRECT_URI="https://example.com/callback")
+    @override_settings(
+        META_APP_ID="app_123",
+        META_REDIRECT_URI="https://example.com/callback",
+        META_CONFIG_ID="config_456",
+    )
     def test_connect_route_uses_facebook_oauth_dialog(self):
         user = CustomUser.objects.create_user(
             username="oauth_start_user",
@@ -48,6 +52,7 @@ class MetaOAuthScopeTests(SimpleTestCase):
         params = parse_qs(parsed.query)
         self.assertEqual(params["client_id"], ["app_123"])
         self.assertEqual(params["redirect_uri"], ["https://example.com/callback"])
+        self.assertEqual(params["config_id"], ["config_456"])
         self.assertEqual(params["response_type"], ["code"])
         self.assertTrue(params["state"][0])
 
