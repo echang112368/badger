@@ -5,6 +5,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import CustomUser
+from creators.models import SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
 from instagram_connect.services import (
     build_oauth_url,
@@ -294,3 +295,54 @@ class InstagramSyncFailureTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "meta_api_error")
+
+
+class InstagramDisconnectTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="ig_disconnect_user",
+            email="ig_disconnect@example.com",
+            password="pass123",
+            is_creator=True,
+        )
+        self.client.force_login(self.user)
+
+    def test_disconnect_removes_connection_and_instagram_snapshot(self):
+        InstagramConnection.objects.create(
+            user=self.user,
+            instagram_user_id="123456789",
+            access_token="token",
+        )
+        SocialAnalyticsSnapshot.objects.create(
+            user=self.user,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload={"account": {"followers_count": 10}},
+        )
+
+        response = self.client.post(reverse("instagram_disconnect"))
+
+        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_disconnect=success")
+        self.assertFalse(InstagramConnection.objects.filter(user=self.user).exists())
+        self.assertFalse(
+            SocialAnalyticsSnapshot.objects.filter(
+                user=self.user,
+                platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            ).exists()
+        )
+
+    def test_disconnect_without_connection_still_clears_instagram_snapshot(self):
+        SocialAnalyticsSnapshot.objects.create(
+            user=self.user,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload={"account": {"followers_count": 7}},
+        )
+
+        response = self.client.post(reverse("instagram_disconnect"))
+
+        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_disconnect=success")
+        self.assertFalse(
+            SocialAnalyticsSnapshot.objects.filter(
+                user=self.user,
+                platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            ).exists()
+        )
