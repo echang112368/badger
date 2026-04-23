@@ -21,11 +21,20 @@ from .services import (
     get_instagram_user,
     get_page_instagram_business_account,
     get_user_pages,
+    resolve_meta_oauth_scopes,
     should_refresh_token,
     token_expiry_from_response,
 )
 
 logger = logging.getLogger(__name__)
+
+OAUTH_PERMISSION_REASONS = {
+    "public_profile": "identify the logged-in Facebook user",
+    "pages_show_list": "list Facebook Pages the user can manage",
+    "pages_read_engagement": "read Page-level engagement data and metadata",
+    "instagram_basic": "read Instagram Business/Creator account profile fields",
+    "instagram_manage_insights": "read Instagram insights and analytics metrics",
+}
 
 
 def _ensure_fresh_access_token(
@@ -84,11 +93,21 @@ def connect_instagram(request):
     state = generate_oauth_state()
     request.session["meta_oauth_state"] = state
     oauth_url = build_oauth_url(state)
+    requested_permissions = [scope.strip() for scope in resolve_meta_oauth_scopes().split(",") if scope.strip()]
+    permission_reasons = {
+        permission: OAUTH_PERMISSION_REASONS.get(
+            permission,
+            "required by current Meta app flow configuration",
+        )
+        for permission in requested_permissions
+    }
     print(
         "[instagram_oauth] connect route selected",
         {
             "action": action,
             "user_id": request.user.id,
+            "requested_permissions": requested_permissions,
+            "permission_reasons": permission_reasons,
             "redirect_url": oauth_url,
             "state": state,
         },
