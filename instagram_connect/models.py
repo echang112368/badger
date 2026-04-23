@@ -17,6 +17,8 @@ class InstagramConnection(models.Model):
     followers_count = models.IntegerField(default=0)
     media_count = models.IntegerField(default=0)
     access_token = models.TextField()
+    user_access_token = models.TextField(blank=True)
+    page_access_token = models.TextField(blank=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
     connected_at = models.DateTimeField(default=timezone.now)
     last_synced_at = models.DateTimeField(null=True, blank=True)
