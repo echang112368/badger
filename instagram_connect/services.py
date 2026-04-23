@@ -12,11 +12,11 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_META_OAUTH_SCOPES = (
-    "public_profile",
+    "business_management",
     "pages_show_list",
+    "pages_read_engagement",
     "instagram_basic",
     "instagram_manage_insights",
-    "pages_read_engagement",
 )
 
 
@@ -38,17 +38,21 @@ def generate_oauth_state() -> str:
 
 
 def build_oauth_url(state: str) -> str:
-    scope_value = resolve_meta_oauth_scopes()
     params = {
         "client_id": settings.META_APP_ID,
         "redirect_uri": settings.META_REDIRECT_URI,
-        "scope": scope_value,
         "response_type": "code",
         "state": state,
     }
+
     meta_config_id = getattr(settings, "META_CONFIG_ID", "").strip()
     if meta_config_id:
+        # Facebook Login for Business config-driven flows should rely on
+        # configuration-defined permissions instead of runtime `scope`.
         params["config_id"] = meta_config_id
+    else:
+        params["scope"] = resolve_meta_oauth_scopes()
+
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 
 
@@ -152,7 +156,7 @@ def should_refresh_token(token_expires_at, *, buffer_seconds: int = 24 * 60 * 60
 def get_facebook_user(access_token: str) -> dict[str, Any]:
     response = requests.get(
         f"{get_graph_api_base()}/me",
-        params={"fields": "id,name", "access_token": access_token},
+        params={"fields": "id", "access_token": access_token},
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
     return _response_json(response)

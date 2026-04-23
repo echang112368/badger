@@ -7,6 +7,7 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
 from instagram_connect.services import (
+    build_oauth_url,
     exchange_code_for_access_token,
     get_instagram_user,
     get_page_instagram_business_account,
@@ -15,7 +16,7 @@ from instagram_connect.services import (
 )
 
 
-class MetaOAuthScopeTests(SimpleTestCase):
+class MetaOAuthScopeTests(TestCase):
     @override_settings(
         META_OAUTH_SCOPES=(
             "instagram_basic,pages_show_list,pages_show_list,instagram_manage_insights"
@@ -54,6 +55,7 @@ class MetaOAuthScopeTests(SimpleTestCase):
         self.assertEqual(params["redirect_uri"], ["https://example.com/callback"])
         self.assertEqual(params["config_id"], ["config_456"])
         self.assertEqual(params["response_type"], ["code"])
+        self.assertNotIn("scope", params)
         self.assertTrue(params["state"][0])
 
 
@@ -84,6 +86,19 @@ class MetaServiceHttpTests(SimpleTestCase):
             timeout=15,
         )
         self.assertEqual(token_data["access_token"], "token_abc")
+
+    @override_settings(
+        META_APP_ID="app_123",
+        META_REDIRECT_URI="https://example.com/callback",
+        META_CONFIG_ID="",
+        META_OAUTH_SCOPES=("instagram_basic", "pages_show_list"),
+    )
+    def test_build_oauth_url_includes_scope_without_config_id(self):
+        url = build_oauth_url("state_abc")
+        parsed = urlparse(url)
+        params = parse_qs(parsed.query)
+
+        self.assertEqual(params["scope"], ["instagram_basic,pages_show_list"])
 
     @override_settings(META_API_VERSION="v22.0")
     @patch("instagram_connect.services.requests.get")
