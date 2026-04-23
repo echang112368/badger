@@ -10,10 +10,9 @@ from django.utils import timezone
 
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_META_OAUTH_SCOPES = (
-    "instagram_business_basic",
-    "instagram_business_manage_messages",
-    "instagram_business_manage_comments",
-    "instagram_business_content_publish",
+    "instagram_basic",
+    "instagram_manage_insights",
+    "instagram_manage_comments",
 )
 
 
