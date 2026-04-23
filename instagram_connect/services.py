@@ -12,7 +12,6 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_META_OAUTH_SCOPES = (
-    "business_management",
     "pages_show_list",
     "pages_read_engagement",
     "instagram_basic",
@@ -43,15 +42,8 @@ def build_oauth_url(state: str) -> str:
         "redirect_uri": settings.META_REDIRECT_URI,
         "response_type": "code",
         "state": state,
+        "scope": resolve_meta_oauth_scopes(),
     }
-
-    meta_config_id = getattr(settings, "META_CONFIG_ID", "").strip()
-    if meta_config_id:
-        # Facebook Login for Business config-driven flows should rely on
-        # configuration-defined permissions instead of runtime `scope`.
-        params["config_id"] = meta_config_id
-    else:
-        params["scope"] = resolve_meta_oauth_scopes()
 
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 
