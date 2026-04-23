@@ -67,6 +67,10 @@
           <div class="mt-5 flex flex-wrap gap-3">
             <button type="button" id="instagramSyncBtn" class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">Sync now</button>
             <a href="/instagram/connect/" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-sm hover:bg-gray-50">Reconnect Instagram</a>
+            <form method="post" action="{% url 'instagram_disconnect' %}" class="inline-flex">
+              {% csrf_token %}
+              <button type="submit" class="inline-flex items-center rounded-md border border-red-300 bg-white px-4 py-2 text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500">Disconnect Instagram</button>
+            </form>
           </div>
         {% else %}
           <div class="mt-5">
@@ -146,6 +150,11 @@
     showInstagramMessage('Instagram connected successfully.', true);
   } else if (oauthResult === 'error') {
     showInstagramMessage('Instagram connection failed. Please try again.', false);
+  }
+
+  const disconnectResult = new URLSearchParams(window.location.search).get('instagram_disconnect');
+  if (disconnectResult === 'success') {
+    showInstagramMessage('Instagram was disconnected and synced data was removed.', true);
   }
 
   if (syncBtn) {
