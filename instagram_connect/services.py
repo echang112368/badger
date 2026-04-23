@@ -91,6 +91,16 @@ def _response_json(response: requests.Response) -> dict[str, Any]:
 
 
 def exchange_code_for_access_token(code: str) -> dict[str, Any]:
+    print(
+        "[instagram_oauth] exchanging code for access token",
+        {
+            "endpoint": f"{get_graph_api_base()}/oauth/access_token",
+            "client_id": settings.META_APP_ID,
+            "redirect_uri": settings.META_REDIRECT_URI,
+            "code_preview": f"{code[:10]}..." if code else "",
+        },
+        flush=True,
+    )
     response = requests.get(
         f"{get_graph_api_base()}/oauth/access_token",
         params={
@@ -105,6 +115,18 @@ def exchange_code_for_access_token(code: str) -> dict[str, Any]:
 
 
 def exchange_for_long_lived_access_token(short_lived_token: str) -> dict[str, Any]:
+    print(
+        "[instagram_oauth] exchanging for long-lived access token",
+        {
+            "endpoint": f"{get_graph_api_base()}/oauth/access_token",
+            "grant_type": "fb_exchange_token",
+            "client_id": settings.META_APP_ID,
+            "short_lived_token_preview": (
+                f"{short_lived_token[:10]}..." if short_lived_token else ""
+            ),
+        },
+        flush=True,
+    )
     response = requests.get(
         f"{get_graph_api_base()}/oauth/access_token",
         params={

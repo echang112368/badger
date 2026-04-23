@@ -80,9 +80,20 @@ def _select_page_with_instagram_account(access_token: str) -> tuple[dict[str, An
 @login_required
 @require_GET
 def connect_instagram(request):
+    action = "reconnect_instagram" if hasattr(request.user, "instagram_connection") else "connect_instagram"
     state = generate_oauth_state()
     request.session["meta_oauth_state"] = state
     oauth_url = build_oauth_url(state)
+    print(
+        "[instagram_oauth] connect route selected",
+        {
+            "action": action,
+            "user_id": request.user.id,
+            "redirect_url": oauth_url,
+            "state": state,
+        },
+        flush=True,
+    )
     return redirect(oauth_url)
 
 
@@ -90,6 +101,14 @@ def connect_instagram(request):
 @require_GET
 def instagram_callback(request):
     settings_url = reverse("creator_settings")
+    print(
+        "[instagram_oauth] callback received",
+        {
+            "user_id": request.user.id,
+            "query_params": dict(request.GET),
+        },
+        flush=True,
+    )
 
     if request.GET.get("error"):
         return redirect(f"{settings_url}?instagram_oauth=error")
