@@ -14,7 +14,7 @@ from instagram_connect.services import get_instagram_user
 
 
 REQUEST_TIMEOUT_SECONDS = 15
-GRAPH_BASE_URL = "https://graph.facebook.com/v23.0"
+GRAPH_BASE_URL = "https://graph.instagram.com"
 GRAPH_BASIC_URL = "https://graph.instagram.com"
 
 
