@@ -33,6 +33,7 @@ class MetaOAuthScopeTests(TestCase):
         META_APP_ID="app_123",
         META_REDIRECT_URI="https://example.com/callback",
         META_CONFIG_ID="config_456",
+        META_OAUTH_SCOPES=("instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"),
     )
     def test_connect_route_uses_facebook_oauth_dialog(self):
         user = CustomUser.objects.create_user(
@@ -54,9 +55,12 @@ class MetaOAuthScopeTests(TestCase):
         params = parse_qs(parsed.query)
         self.assertEqual(params["client_id"], ["app_123"])
         self.assertEqual(params["redirect_uri"], ["https://example.com/callback"])
-        self.assertEqual(params["config_id"], ["config_456"])
         self.assertEqual(params["response_type"], ["code"])
-        self.assertNotIn("scope", params)
+        self.assertEqual(
+            params["scope"],
+            ["instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement"],
+        )
+        self.assertNotIn("config_id", params)
         self.assertTrue(params["state"][0])
 
 
@@ -91,10 +95,9 @@ class MetaServiceHttpTests(SimpleTestCase):
     @override_settings(
         META_APP_ID="app_123",
         META_REDIRECT_URI="https://example.com/callback",
-        META_CONFIG_ID="",
         META_OAUTH_SCOPES=("instagram_basic", "pages_show_list"),
     )
-    def test_build_oauth_url_includes_scope_without_config_id(self):
+    def test_build_oauth_url_includes_scope(self):
         url = build_oauth_url("state_abc")
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
