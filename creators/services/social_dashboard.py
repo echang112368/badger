@@ -458,6 +458,9 @@ class InstagramAnalyticsService:
         engagement_rate = round((total_engagement / followers) * 100, 2) if followers > 0 else 0
         reach_ratio = round((reach / followers), 2) if followers > 0 else 0
 
+        media_insights = payload.get("media_insights") or []
+        content_performance = self._build_content_performance_rows(media_insights)
+
         return {
             "account": {
                 "username": account.get("username") or connection.instagram_username,
@@ -485,11 +488,52 @@ class InstagramAnalyticsService:
                 "engagement_rate": engagement_rate,
             },
             "story": payload.get("story") or {},
-            "media_insights": payload.get("media_insights") or [],
+            "media_insights": media_insights,
+            "content_performance": content_performance,
             "comments": payload.get("comments") or {},
             "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
         }
+
+    @staticmethod
+    def _build_content_performance_rows(media_insights: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for item in media_insights:
+            if not isinstance(item, dict):
+                continue
+            metric_values: dict[str, int] = {}
+            for metric in item.get("metrics", []):
+                if not isinstance(metric, dict):
+                    continue
+                name = str(metric.get("name") or "")
+                if not name:
+                    continue
+                metric_values[name] = int(metric.get("value") or 0)
+
+            likes = metric_values.get("likes", 0)
+            comments = metric_values.get("comments", 0)
+            saves = metric_values.get("saved", 0)
+            shares = metric_values.get("shares", 0)
+            views = metric_values.get("views", 0)
+            engagement_total = likes + comments + saves + shares
+            rows.append(
+                {
+                    "media_id": str(item.get("media_id") or "-"),
+                    "media_type": str(item.get("media_type") or "UNKNOWN"),
+                    "media_product_type": str(item.get("media_product_type") or "UNKNOWN"),
+                    "views": views,
+                    "likes": likes,
+                    "comments": comments,
+                    "saves": saves,
+                    "shares": shares,
+                    "engagement_total": engagement_total,
+                    "engagement_to_view_rate": round((engagement_total / views) * 100, 2) if views else 0,
+                    "performance_score": (views * 2) + (engagement_total * 3),
+                }
+            )
+
+        rows.sort(key=lambda row: (row["performance_score"], row["views"], row["engagement_total"]), reverse=True)
+        return rows
 
     def _resolve_ig_user_id(self, connection: InstagramConnection) -> str:
         candidate_ids = [str(connection.instagram_user_id or "").strip()]
@@ -696,6 +740,7 @@ class InstagramAnalyticsService:
             "engagement": {},
             "story": {},
             "media_insights": [],
+            "content_performance": [],
             "comments": {
                 "sample_comments": [],
                 "sentiment_score": None,
