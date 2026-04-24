@@ -1,79 +1,139 @@
 {% extends 'creators/base.html' %}
 {% block title %}Social Media Dashboard{% endblock %}
 {% block content %}
-<div class="py-4">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-      <h1 class="h3 mb-1">Social Media</h1>
-      <p class="text-muted mb-0">Unified creator intelligence across connected social platforms.</p>
+<div class="py-4 social-media-page">
+  <style>
+    .social-media-page .hero-card {
+      background: linear-gradient(135deg, #1f3b7a 0%, #304f91 45%, #4466b0 100%);
+      color: #fff;
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(48, 79, 145, .22);
+    }
+    .social-media-page .hero-chip {
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(255,255,255,.12);
+      border-radius: 999px;
+      padding: .3rem .75rem;
+      font-size: .8rem;
+    }
+    .social-media-page .metric-card {
+      border: 1px solid #e9eef6;
+      border-radius: .85rem;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(15, 34, 66, .05);
+      height: 100%;
+    }
+    .social-media-page .metric-card .metric-label {
+      color: #5c6a80;
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+    }
+    .social-media-page .metric-card .metric-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #152647;
+    }
+    .social-media-page .panel {
+      border: 1px solid #e8edf5;
+      border-radius: .9rem;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(21, 38, 71, .05);
+    }
+    .social-media-page .platform-header {
+      background: #f3f6fc;
+      border-radius: .8rem;
+      padding: .9rem 1rem;
+      border: 1px solid #dfe7f5;
+    }
+    .social-media-page .table thead th {
+      font-size: .78rem;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: #5a6b86;
+      background: #f8faff;
+      border-bottom: 1px solid #e7eef8;
+    }
+  </style>
+
+  <section class="hero-card p-4 p-lg-5 mb-4">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+      <div>
+        <h1 class="h3 mb-2">Social Intelligence Workspace</h1>
+        <p class="mb-3 text-white-50">Track account performance, audience quality, and post-level outcomes in one professional view.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="hero-chip"><i class="bi bi-graph-up-arrow me-1"></i>Performance trends</span>
+          <span class="hero-chip"><i class="bi bi-camera-video me-1"></i>Post-level analytics</span>
+          <span class="hero-chip"><i class="bi bi-people me-1"></i>Audience insights</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="?refresh=instagram" class="btn btn-light fw-semibold">
+          <i class="bi bi-arrow-repeat me-1"></i>Refresh Instagram
+        </a>
+      </div>
     </div>
-    <div class="d-flex gap-2">
-      <a href="?refresh=instagram" class="btn btn-primary">
-        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Data
-      </a>
-    </div>
-  </div>
+  </section>
 
   {% if refreshed_platform %}
     <div class="alert alert-info">Data refresh requested for <strong>{{ refreshed_platform|title }}</strong>.</div>
   {% endif %}
 
-  <section class="mb-4">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body">
-        <h2 class="h5">Overall Social Dashboard Summary</h2>
-        <div class="row g-3 mt-1">
-          <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Total Followers</div><div class="h4 mb-0">{{ social_overall.total_followers }}</div></div></div>
-          <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Estimated Reach</div><div class="h4 mb-0">{{ social_overall.total_reach }}</div></div></div>
-          <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Engagement</div><div class="h4 mb-0">{{ social_overall.total_engagement }}</div></div></div>
-          <div class="col-md-3"><div class="border rounded p-3"><div class="text-muted small">Avg Engagement Rate</div><div class="h4 mb-0">{{ social_overall.average_engagement_rate }}%</div></div></div>
-          <div class="col-md-3"><div class="border rounded p-3"><div class="text-muted small">Connected Platforms</div><div class="h4 mb-0">{{ social_overall.connected_platforms_count }}</div></div></div>
-          <div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Last Updated</div><div class="mb-0">{% if social_overall.last_updated %}<time class="local-time" datetime="{{ social_overall.last_updated|date:'c' }}">{{ social_overall.last_updated }}</time>{% else %}Never{% endif %}</div></div></div>
-        </div>
+  <section class="panel p-3 p-lg-4 mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <h2 class="h5 mb-0">Overall Performance Snapshot</h2>
+      <small class="text-muted">{% if social_overall.last_updated %}Updated <time class="local-time" datetime="{{ social_overall.last_updated|date:'c' }}">{{ social_overall.last_updated }}</time>{% else %}No sync yet{% endif %}</small>
+    </div>
 
-        <div class="row g-3 mt-2">
-          <div class="col-md-4">
-            <h3 class="h6">Top Audience Demographics</h3>
-            <ul class="list-group small">
-              {% for row in social_overall.top_audience_demographics %}
-                <li class="list-group-item d-flex justify-content-between"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-              {% empty %}
-                <li class="list-group-item text-muted">No data yet.</li>
-              {% endfor %}
-            </ul>
-          </div>
-          <div class="col-md-4">
-            <h3 class="h6">Top Countries</h3>
-            <ul class="list-group small">
-              {% for row in social_overall.top_countries %}
-                <li class="list-group-item d-flex justify-content-between"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-              {% empty %}
-                <li class="list-group-item text-muted">No data yet.</li>
-              {% endfor %}
-            </ul>
-          </div>
-          <div class="col-md-4">
-            <h3 class="h6">Top Cities</h3>
-            <ul class="list-group small">
-              {% for row in social_overall.top_cities %}
-                <li class="list-group-item d-flex justify-content-between"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-              {% empty %}
-                <li class="list-group-item text-muted">No data yet.</li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
+    <div class="row g-3">
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Total Followers</div><div class="metric-value">{{ social_overall.total_followers }}</div></div></div>
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Estimated Reach</div><div class="metric-value">{{ social_overall.total_reach }}</div></div></div>
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Engagement</div><div class="metric-value">{{ social_overall.total_engagement }}</div></div></div>
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Avg Engagement Rate</div><div class="metric-value">{{ social_overall.average_engagement_rate }}%</div></div></div>
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Connected Platforms</div><div class="metric-value">{{ social_overall.connected_platforms_count }}</div></div></div>
+    </div>
+
+    <div class="row g-3 mt-2">
+      <div class="col-lg-4">
+        <h3 class="h6 text-muted">Top Audience Segments</h3>
+        <ul class="list-group list-group-flush small">
+          {% for row in social_overall.top_audience_demographics %}
+            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
+          {% empty %}
+            <li class="list-group-item text-muted px-0">No data yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <h3 class="h6 text-muted">Top Countries</h3>
+        <ul class="list-group list-group-flush small">
+          {% for row in social_overall.top_countries %}
+            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
+          {% empty %}
+            <li class="list-group-item text-muted px-0">No data yet.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <h3 class="h6 text-muted">Top Cities</h3>
+        <ul class="list-group list-group-flush small">
+          {% for row in social_overall.top_cities %}
+            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
+          {% empty %}
+            <li class="list-group-item text-muted px-0">No data yet.</li>
+          {% endfor %}
+        </ul>
       </div>
     </div>
   </section>
 
   <section>
-    <h2 class="h5 mb-3">Platform Breakdown</h2>
+    <h2 class="h5 mb-3">Platform Analytics</h2>
     <div class="accordion" id="socialPlatformsAccordion">
       {% for platform in social_platforms %}
-      <div class="accordion-item mb-2 border rounded">
+      <div class="accordion-item mb-3 border-0">
         <h2 class="accordion-header" id="heading-{{ platform.slug }}">
-          <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ platform.slug }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+          <button class="accordion-button platform-header {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ platform.slug }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
             <div class="w-100 d-flex justify-content-between align-items-center me-3">
               <span class="fw-semibold">{{ platform.name }}</span>
               {% if platform.connected %}
@@ -85,19 +145,19 @@
           </button>
         </h2>
         <div id="collapse-{{ platform.slug }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#socialPlatformsAccordion">
-          <div class="accordion-body">
+          <div class="accordion-body panel p-3 p-lg-4 mt-2">
             {% if not platform.connected %}
-              <p class="text-muted">{{ platform.name }} is not connected yet.</p>
+              <p class="text-muted mb-3">{{ platform.name }} is not connected yet.</p>
               {% if platform.can_connect %}
                 <a href="{{ platform.connect_url }}" class="btn btn-outline-primary">Connect {{ platform.name }}</a>
               {% else %}
                 <button class="btn btn-outline-secondary" disabled>Coming Soon</button>
               {% endif %}
             {% elif platform.slug == 'instagram' %}
-              <div class="row g-3">
+              <div class="row g-3 mb-3">
                 <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">A. Account Overview</h3>
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Account Overview</h3>
                     <dl class="row small mb-0">
                       <dt class="col-5 text-muted">Username</dt><dd class="col-7">@{{ platform.metrics.account.username }}</dd>
                       <dt class="col-5 text-muted">Bio</dt><dd class="col-7">{{ platform.metrics.account.bio|default:'-' }}</dd>
@@ -109,118 +169,70 @@
                   </div>
                 </div>
                 <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">B. Audience Demographics</h3>
-                    <p class="text-muted small mb-2">Gender/Age, Country, and City breakdown.</p>
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Audience Demographics</h3>
                     <div class="row g-2 small">
-                      <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">C. Performance Metrics</h3>
-                    <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li>
-                    </ul>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">D. Engagement Metrics</h3>
-                    <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between bg-warning-subtle"><span><strong>Saves</strong></span><strong>{{ platform.metrics.engagement.saves }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li>
-                    </ul>
-                    <div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div>
-                  </div>
-                </div>
-
-                <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">E. Story Metrics</h3>
-                    <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between"><span>Views</span><strong>{{ platform.metrics.story.views|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Reach</span><strong>{{ platform.metrics.story.reach|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Replies</span><strong>{{ platform.metrics.story.replies|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Shares</span><strong>{{ platform.metrics.story.shares|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Profile Visits</span><strong>{{ platform.metrics.story.profile_visits|default:0 }}</strong></li>
-                    </ul>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="border rounded p-3 h-100">
-                    <h3 class="h6">F. Comment Analysis</h3>
-                    <p class="small text-muted mb-2">Sample comments + NLP-ready placeholders.</p>
-                    <ul class="small ps-3">
-                      {% for comment in platform.metrics.comments.sample_comments|slice:':4' %}
-                        <li><strong>@{{ comment.username }}</strong>: {{ comment.text|truncatechars:80 }}</li>
-                      {% empty %}
-                        <li class="text-muted">No comment samples available yet.</li>
-                      {% endfor %}
-                    </ul>
-                    <div class="small mt-2">
-                      <div>Sentiment score: <span class="text-muted">{{ platform.metrics.comments.sentiment_score|default:'Pending NLP integration' }}</span></div>
-                      <div>Audience quality: <span class="text-muted">{{ platform.metrics.comments.audience_quality_score|default:'Pending NLP integration' }}</span></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-12">
-                  <div class="border rounded p-3">
-                    <h3 class="h6">G. Media Insights (Instagram Login)</h3>
-                    <div class="table-responsive">
-                      <table class="table table-sm align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th>Media</th>
-                            <th>Metric</th>
-                            <th>Value</th>
-                            <th>Period</th>
-                            <th>Fetched At</th>
-                            <th>Breakdowns</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {% for item in platform.metrics.media_insights %}
-                            {% for metric in item.metrics %}
-                              <tr>
-                                <td>{{ item.media_type }}<br><span class="text-muted small">{{ item.media_id }}</span></td>
-                                <td>{{ metric.name }}</td>
-                                <td>{{ metric.value }}</td>
-                                <td>{{ metric.period }}</td>
-                                <td><time class="local-time" datetime="{{ metric.fetched_at }}">{{ metric.fetched_at }}</time></td>
-                                <td>
-                                  {% if metric.breakdowns %}
-                                    {% for row in metric.breakdowns|slice:':3' %}
-                                      <div class="small">{{ row.label }}: {{ row.value }}</div>
-                                    {% endfor %}
-                                  {% else %}
-                                    <span class="text-muted small">-</span>
-                                  {% endif %}
-                                </td>
-                              </tr>
-                            {% endfor %}
-                          {% empty %}
-                            <tr>
-                              <td colspan="6" class="text-muted">No media insights data yet.</td>
-                            </tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
+                      <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
+                      <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
+                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0 mt-1">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
                     </div>
                   </div>
                 </div>
               </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Performance Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li></ul></div></div>
+                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
+              </div>
+
+              <div class="metric-card p-3 mb-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                  <h3 class="h6 mb-0">Post Performance Explorer</h3>
+                  <div class="d-flex gap-2 align-items-center">
+                    <label class="small text-muted" for="content-search-{{ platform.slug }}">Find media</label>
+                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm" style="width: 220px;" placeholder="Search by media ID or type">
+                  </div>
+                </div>
+                <p class="small text-muted mb-3">Relate views and engagement to specific posts/videos. Sorted by highest performance score.</p>
+
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
+                    <thead>
+                      <tr>
+                        <th>Media ID</th>
+                        <th>Type</th>
+                        <th>Views</th>
+                        <th>Engagement</th>
+                        <th>Likes</th>
+                        <th>Comments</th>
+                        <th>Saves</th>
+                        <th>Shares</th>
+                        <th>Eng/View %</th>
+                        <th>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in platform.metrics.content_performance %}
+                        <tr>
+                          <td><code>{{ row.media_id }}</code></td>
+                          <td><span class="badge rounded-pill text-bg-light border">{{ row.media_type }}</span></td>
+                          <td>{{ row.views }}</td>
+                          <td>{{ row.engagement_total }}</td>
+                          <td>{{ row.likes }}</td>
+                          <td>{{ row.comments }}</td>
+                          <td>{{ row.saves }}</td>
+                          <td>{{ row.shares }}</td>
+                          <td>{{ row.engagement_to_view_rate }}%</td>
+                          <td><strong>{{ row.performance_score }}</strong></td>
+                        </tr>
+                      {% empty %}
+                        <tr><td colspan="10" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="text-muted small mt-3">
                 Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Never{% endif %}
               </div>
@@ -234,4 +246,18 @@
     </div>
   </section>
 </div>
+
+<script>
+  document.querySelectorAll('[data-search-target]').forEach(function(input){
+    input.addEventListener('input', function(){
+      var query = (input.value || '').toLowerCase().trim();
+      var tableId = input.getAttribute('data-search-target');
+      var rows = document.querySelectorAll('#' + tableId + ' tbody tr');
+      rows.forEach(function(row){
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.indexOf(query) === -1 ? 'none' : '';
+      });
+    });
+  });
+</script>
 {% endblock %}
