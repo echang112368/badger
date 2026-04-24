@@ -25,7 +25,6 @@
         <div class="row g-3 mt-1">
           <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Total Followers</div><div class="h4 mb-0">{{ social_overall.total_followers }}</div></div></div>
           <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Estimated Reach</div><div class="h4 mb-0">{{ social_overall.total_reach }}</div></div></div>
-          <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Impressions</div><div class="h4 mb-0">{{ social_overall.total_impressions }}</div></div></div>
           <div class="col-md-3"><div class="border rounded p-3 bg-light"><div class="text-muted small">Engagement</div><div class="h4 mb-0">{{ social_overall.total_engagement }}</div></div></div>
           <div class="col-md-3"><div class="border rounded p-3"><div class="text-muted small">Avg Engagement Rate</div><div class="h4 mb-0">{{ social_overall.average_engagement_rate }}%</div></div></div>
           <div class="col-md-3"><div class="border rounded p-3"><div class="text-muted small">Connected Platforms</div><div class="h4 mb-0">{{ social_overall.connected_platforms_count }}</div></div></div>
@@ -112,12 +111,11 @@
                 <div class="col-lg-6">
                   <div class="border rounded p-3 h-100">
                     <h3 class="h6">B. Audience Demographics</h3>
-                    <p class="text-muted small mb-2">Gender/Age, Country, City, Locale breakdown.</p>
+                    <p class="text-muted small mb-2">Gender/Age, Country, and City breakdown.</p>
                     <div class="row g-2 small">
                       <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
                       <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>Locale</strong><ul class="list-unstyled mb-0">{% for row in platform.metrics.demographics.audience_locale|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
+                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
                     </div>
                   </div>
                 </div>
@@ -126,7 +124,6 @@
                   <div class="border rounded p-3 h-100">
                     <h3 class="h6">C. Performance Metrics</h3>
                     <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between"><span>Impressions</span><strong>{{ platform.metrics.performance.impressions }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li>

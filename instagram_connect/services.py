@@ -11,23 +11,29 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 15
-DEFAULT_META_OAUTH_SCOPES = (
-    "pages_show_list",
-    "instagram_basic",
+DEFAULT_INSTAGRAM_OAUTH_SCOPES = (
+    "instagram_business_basic",
+    "instagram_business_manage_insights",
+    "instagram_business_manage_comments",
+    "instagram_business_content_publish",
 )
 
 
 class MetaAPIError(Exception):
-    """Raised when Meta Graph API returns an error response."""
+    """Raised when Instagram API returns an error response."""
 
 
-def get_graph_api_base() -> str:
+def get_instagram_api_base() -> str:
     api_version = getattr(settings, "META_API_VERSION", "v22.0")
-    return f"https://graph.facebook.com/{api_version}"
+    return f"https://graph.instagram.com/{api_version}"
 
 
 def get_oauth_url_base() -> str:
-    return "https://www.facebook.com/dialog/oauth"
+    return "https://www.instagram.com/oauth/authorize"
+
+
+def get_oauth_token_url() -> str:
+    return "https://api.instagram.com/oauth/access_token"
 
 
 def generate_oauth_state() -> str:
@@ -42,18 +48,17 @@ def build_oauth_url(state: str) -> str:
         "state": state,
         "scope": resolve_meta_oauth_scopes(),
     }
-
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 
 
 def resolve_meta_oauth_scopes() -> str:
-    raw_scopes = getattr(settings, "META_OAUTH_SCOPES", DEFAULT_META_OAUTH_SCOPES)
+    raw_scopes = getattr(settings, "META_OAUTH_SCOPES", DEFAULT_INSTAGRAM_OAUTH_SCOPES)
     if isinstance(raw_scopes, str):
         scope_list = [part.strip() for part in raw_scopes.split(",") if part.strip()]
     elif isinstance(raw_scopes, (list, tuple, set)):
         scope_list = [str(part).strip() for part in raw_scopes if str(part).strip()]
     else:
-        scope_list = [scope for scope in DEFAULT_META_OAUTH_SCOPES]
+        scope_list = [scope for scope in DEFAULT_INSTAGRAM_OAUTH_SCOPES]
 
     deduped: list[str] = []
     for scope in scope_list:
@@ -61,7 +66,7 @@ def resolve_meta_oauth_scopes() -> str:
             deduped.append(scope)
 
     if not deduped:
-        deduped = [scope for scope in DEFAULT_META_OAUTH_SCOPES]
+        deduped = [scope for scope in DEFAULT_INSTAGRAM_OAUTH_SCOPES]
 
     return ",".join(deduped)
 
@@ -70,39 +75,26 @@ def _response_json(response: requests.Response) -> dict[str, Any]:
     try:
         payload = response.json()
     except ValueError as exc:
-        raise MetaAPIError("Meta API returned a non-JSON response.") from exc
+        raise MetaAPIError("Instagram API returned a non-JSON response.") from exc
 
     if not isinstance(payload, dict):
-        raise MetaAPIError("Meta API returned an unexpected payload.")
+        raise MetaAPIError("Instagram API returned an unexpected payload.")
 
-    if response.status_code >= 400:
-        error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
-        message = error.get("message") or "Meta API request failed."
-        raise MetaAPIError(message)
-
-    if isinstance(payload.get("error"), dict):
-        message = payload["error"].get("message") or "Meta API request failed."
+    error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+    if response.status_code >= 400 or error:
+        message = error.get("message") or payload.get("error_message") or "Instagram API request failed."
         raise MetaAPIError(message)
 
     return payload
 
 
 def exchange_code_for_access_token(code: str) -> dict[str, Any]:
-    print(
-        "[instagram_oauth] exchanging code for access token",
-        {
-            "endpoint": f"{get_graph_api_base()}/oauth/access_token",
-            "client_id": settings.META_APP_ID,
-            "redirect_uri": settings.META_REDIRECT_URI,
-            "code_preview": f"{code[:10]}..." if code else "",
-        },
-        flush=True,
-    )
-    response = requests.get(
-        f"{get_graph_api_base()}/oauth/access_token",
-        params={
+    response = requests.post(
+        get_oauth_token_url(),
+        data={
             "client_id": settings.META_APP_ID,
             "client_secret": settings.META_APP_SECRET,
+            "grant_type": "authorization_code",
             "redirect_uri": settings.META_REDIRECT_URI,
             "code": code,
         },
@@ -112,25 +104,24 @@ def exchange_code_for_access_token(code: str) -> dict[str, Any]:
 
 
 def exchange_for_long_lived_access_token(short_lived_token: str) -> dict[str, Any]:
-    print(
-        "[instagram_oauth] exchanging for long-lived access token",
-        {
-            "endpoint": f"{get_graph_api_base()}/oauth/access_token",
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.META_APP_ID,
-            "short_lived_token_preview": (
-                f"{short_lived_token[:10]}..." if short_lived_token else ""
-            ),
-        },
-        flush=True,
-    )
     response = requests.get(
-        f"{get_graph_api_base()}/oauth/access_token",
+        f"{get_instagram_api_base()}/access_token",
         params={
-            "grant_type": "fb_exchange_token",
-            "client_id": settings.META_APP_ID,
+            "grant_type": "ig_exchange_token",
             "client_secret": settings.META_APP_SECRET,
-            "fb_exchange_token": short_lived_token,
+            "access_token": short_lived_token,
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    return _response_json(response)
+
+
+def refresh_long_lived_access_token(long_lived_token: str) -> dict[str, Any]:
+    response = requests.get(
+        f"{get_instagram_api_base()}/refresh_access_token",
+        params={
+            "grant_type": "ig_refresh_token",
+            "access_token": long_lived_token,
         },
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
@@ -143,49 +134,11 @@ def should_refresh_token(token_expires_at, *, buffer_seconds: int = 24 * 60 * 60
     return token_expires_at <= timezone.now() + timedelta(seconds=buffer_seconds)
 
 
-def get_facebook_user(access_token: str) -> dict[str, Any]:
+def get_instagram_user(access_token: str, ig_user_id: str = "me") -> dict[str, Any]:
     response = requests.get(
-        f"{get_graph_api_base()}/me",
-        params={"fields": "id", "access_token": access_token},
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    return _response_json(response)
-
-
-def get_user_pages(access_token: str) -> list[dict[str, Any]]:
-    response = requests.get(
-        f"{get_graph_api_base()}/me/accounts",
-        params={"fields": "id,name,access_token", "access_token": access_token},
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    payload = _response_json(response)
-    data = payload.get("data")
-    if not isinstance(data, list):
-        return []
-    return [item for item in data if isinstance(item, dict)]
-
-
-def get_page_instagram_business_account(page_id: str, page_access_token: str) -> dict[str, Any] | None:
-    response = requests.get(
-        f"{get_graph_api_base()}/{page_id}",
+        f"{get_instagram_api_base()}/{ig_user_id}",
         params={
-            "fields": "instagram_business_account{id,username,followers_count,media_count}",
-            "access_token": page_access_token,
-        },
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    payload = _response_json(response)
-    ig_account = payload.get("instagram_business_account")
-    if isinstance(ig_account, dict):
-        return ig_account
-    return None
-
-
-def get_instagram_user(ig_user_id: str, access_token: str) -> dict[str, Any]:
-    response = requests.get(
-        f"{get_graph_api_base()}/{ig_user_id}",
-        params={
-            "fields": "id,username,followers_count,media_count,account_type",
+            "fields": "id,username,biography,followers_count,follows_count,media_count,account_type",
             "access_token": access_token,
         },
         timeout=REQUEST_TIMEOUT_SECONDS,
