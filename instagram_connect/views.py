@@ -226,6 +226,17 @@ def instagram_sync(request):
             "raw_profile_data",
         ]
     )
+    print(
+        "[instagram_sync] Pulled Instagram data:",
+        {
+            "ig_user": ig_user,
+            "snapshot_payload": snapshot_payload,
+            "instagram_username": connection.instagram_username,
+            "followers_count": connection.followers_count,
+            "media_count": connection.media_count,
+            "last_synced_at": connection.last_synced_at.isoformat(),
+        },
+    )
 
     return JsonResponse(
         {
