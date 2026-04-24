@@ -317,7 +317,7 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
     @patch.object(InstagramAnalyticsService, "_safe_json_get")
     def test_fetch_recent_media_handles_null_data(self, mock_safe_json_get):
         service = InstagramAnalyticsService(user=None)
-        connection = SimpleNamespace(access_token="token_123")
+        connection = SimpleNamespace(instagram_access_token="token_123")
         mock_safe_json_get.return_value = {"data": None}
 
         media = service.fetch_recent_media(connection, "123456789")

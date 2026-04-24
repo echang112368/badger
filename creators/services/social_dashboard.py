@@ -10,12 +10,11 @@ from django.utils import timezone
 
 from creators.models import SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
-from instagram_connect.services import get_graph_api_base, get_instagram_user
+from instagram_connect.services import get_instagram_api_base, get_instagram_user
 
 
 REQUEST_TIMEOUT_SECONDS = 15
-GRAPH_BASE_URL = get_graph_api_base()
-GRAPH_BASIC_URL = get_graph_api_base()
+GRAPH_BASE_URL = get_instagram_api_base()
 
 
 @dataclass
@@ -108,27 +107,34 @@ class InstagramAnalyticsService:
     def fetch_account(self, connection: InstagramConnection, ig_user_id: str) -> dict[str, Any]:
         fields = "id,username,biography,followers_count,follows_count,media_count,account_type"
         return self._get_with_fallback(
-            [
-                f"{GRAPH_BASE_URL}/{ig_user_id}",
-                f"{GRAPH_BASIC_URL}/me",
-            ],
+            [f"{GRAPH_BASE_URL}/{ig_user_id}", f"{GRAPH_BASE_URL}/me"],
             {
                 "fields": fields,
-                "access_token": connection.access_token,
+                "access_token": connection.instagram_access_token,
             },
         )
 
     def fetch_account_performance(
         self, connection: InstagramConnection, ig_user_id: str
-    ) -> dict[str, int]:
+    ) -> dict[str, int | None]:
         metrics = {
-            "impressions": 0,
-            "reach": 0,
-            "profile_views": 0,
-            "website_clicks": 0,
+            "reach": None,
+            "follower_count": None,
+            "website_clicks": None,
+            "profile_views": None,
+            "online_followers": None,
+            "accounts_engaged": None,
+            "total_interactions": None,
+            "likes": None,
+            "comments": None,
+            "shares": None,
+            "saves": None,
+            "replies": None,
+            "views": None,
+            "follows_and_unfollows": None,
+            "profile_links_taps": None,
         }
-        # Try account-level insights first.
-        for metric_name in ["impressions", "reach", "profile_views", "website_clicks"]:
+        for metric_name in list(metrics.keys()):
             metrics[metric_name] = self.fetch_single_account_metric(
                 connection,
                 ig_user_id,
@@ -141,15 +147,17 @@ class InstagramAnalyticsService:
         connection: InstagramConnection,
         ig_user_id: str,
         metric: str,
-    ) -> int:
+    ) -> int | None:
         payload = self._safe_json_get(
             f"{GRAPH_BASE_URL}/{ig_user_id}/insights",
             {
                 "metric": metric,
                 "period": "day",
-                "access_token": connection.access_token,
+                "access_token": connection.instagram_access_token,
             },
         )
+        if not payload:
+            return None
         return self._extract_metric_value(payload)
 
     def fetch_demographics(
@@ -172,17 +180,10 @@ class InstagramAnalyticsService:
             ig_user_id,
             breakdown="city",
         )
-        locales = self.fetch_demographic_breakdown(
-            connection,
-            ig_user_id,
-            breakdown="locale",
-        )
-
         return {
             "audience_gender_age": gender_age,
             "audience_country": countries,
             "audience_city": cities,
-            "audience_locale": locales,
         }
 
     def fetch_demographic_breakdown(
@@ -198,7 +199,7 @@ class InstagramAnalyticsService:
                 "period": "lifetime",
                 "breakdown": breakdown,
                 "metric_type": "total_value",
-                "access_token": connection.access_token,
+                "access_token": connection.instagram_access_token,
             },
         )
         return self._extract_breakdown_rows(payload)
@@ -214,7 +215,7 @@ class InstagramAnalyticsService:
             {
                 "fields": "id,media_type,like_count,comments_count,timestamp",
                 "limit": limit,
-                "access_token": connection.access_token,
+                "access_token": connection.instagram_access_token,
             },
         )
         data = media_payload.get("data") if isinstance(media_payload, dict) else []
@@ -243,12 +244,17 @@ class InstagramAnalyticsService:
             totals["likes"] += int(item.get("like_count") or 0)
             totals["comments"] += int(item.get("comments_count") or 0)
 
-            metric_candidates = ["saved", "shares", "views", "plays"]
+            media_type = str(item.get("media_type") or "").upper()
+            metric_candidates = ["saved", "shares"]
+            if media_type in {"VIDEO", "REEL", "STORY"}:
+                metric_candidates.append("views")
+            if media_type in {"REEL"}:
+                metric_candidates.append("plays")
             insight_payload = self._safe_json_get(
                 f"{GRAPH_BASE_URL}/{media_id}/insights",
                 {
                     "metric": ",".join(metric_candidates),
-                    "access_token": connection.access_token,
+                    "access_token": connection.instagram_access_token,
                 },
             )
             metric_rows = insight_payload.get("data") if isinstance(insight_payload, dict) else []
@@ -278,7 +284,7 @@ class InstagramAnalyticsService:
                 f"{GRAPH_BASE_URL}/{story_id}/insights",
                 {
                     "metric": "exits,replies,taps_forward,taps_back",
-                    "access_token": connection.access_token,
+                    "access_token": connection.instagram_access_token,
                 },
             )
             rows = payload.get("data") if isinstance(payload, dict) else []
@@ -305,7 +311,7 @@ class InstagramAnalyticsService:
                 {
                     "fields": "text,username,timestamp",
                     "limit": 5,
-                    "access_token": connection.access_token,
+                    "access_token": connection.instagram_access_token,
                 },
             )
             for item in comments_payload.get("data", []) if isinstance(comments_payload, dict) else []:
@@ -335,7 +341,6 @@ class InstagramAnalyticsService:
 
         followers = int(account.get("followers_count") or connection.followers_count or 0)
         reach = int(performance.get("reach") or 0)
-        impressions = int(performance.get("impressions") or 0)
         profile_visits = int(performance.get("profile_views") or 0)
         website_clicks = int(performance.get("website_clicks") or 0)
 
@@ -360,11 +365,11 @@ class InstagramAnalyticsService:
             },
             "demographics": payload.get("demographics") or {},
             "performance": {
-                "impressions": impressions,
                 "reach": reach,
                 "reach_ratio": reach_ratio,
                 "profile_visits": profile_visits,
                 "website_clicks": website_clicks,
+                "insights": performance,
             },
             "engagement": {
                 "likes": int(engagement.get("likes") or 0),
@@ -384,7 +389,7 @@ class InstagramAnalyticsService:
     def _resolve_ig_user_id(self, connection: InstagramConnection) -> str:
         candidate_ids = [str(connection.instagram_user_id or "").strip()]
         try:
-            me = get_instagram_user(connection.instagram_user_id, connection.access_token)
+            me = get_instagram_user(connection.instagram_access_token, connection.instagram_user_id)
             for field in ["user_id", "id"]:
                 value = me.get(field)
                 if value:
@@ -419,7 +424,18 @@ class InstagramAnalyticsService:
 
         try:
             response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
-            data = response.json()
+            try:
+                data = response.json()
+            except ValueError:
+                self.failed_requests.append(
+                    {
+                        "url": url,
+                        "params": safe_params,
+                        "status_code": response.status_code,
+                        "error": "non_json_response",
+                    }
+                )
+                return {}
             print(
                 "[InstagramAnalyticsService] Graph API response:",
                 json.dumps(
@@ -432,7 +448,7 @@ class InstagramAnalyticsService:
                     default=str,
                 ),
             )
-            if response.status_code >= 400:
+            if response.status_code >= 400 or (isinstance(data, dict) and isinstance(data.get("error"), dict)):
                 self.failed_requests.append(
                     {
                         "url": url,
@@ -552,7 +568,11 @@ class InstagramAnalyticsService:
         return {
             "account": {},
             "performance": {},
-            "demographics": {},
+            "demographics": {
+                "audience_gender_age": [],
+                "audience_country": [],
+                "audience_city": [],
+            },
             "engagement": {},
             "story": {},
             "comments": {
@@ -612,7 +632,6 @@ class SocialDashboardService:
         connected = [platform for platform in platforms if platform.connected]
         total_followers = 0
         total_reach = 0
-        total_impressions = 0
         total_engagement = 0
         engagement_rates = []
         latest_sync = None
@@ -629,7 +648,6 @@ class SocialDashboardService:
 
             total_followers += int(account.get("followers_count") or 0)
             total_reach += int(performance.get("reach") or 0)
-            total_impressions += int(performance.get("impressions") or 0)
             total_engagement += int(engagement.get("total_engagement") or 0)
             if isinstance(engagement.get("engagement_rate"), (int, float)):
                 engagement_rates.append(float(engagement["engagement_rate"]))
@@ -649,7 +667,6 @@ class SocialDashboardService:
         return {
             "total_followers": total_followers,
             "total_reach": total_reach,
-            "total_impressions": total_impressions,
             "total_engagement": total_engagement,
             "average_engagement_rate": round(sum(engagement_rates) / len(engagement_rates), 2)
             if engagement_rates
