@@ -342,6 +342,7 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
         self.assertTrue(insights)
         for url, params in calls:
             self.assertEqual(urlparse(url).netloc, "graph.instagram.com")
+            self.assertNotEqual(urlparse(url).netloc, "graph.facebook.com")
             self.assertNotIn(params.get("metric"), {"impressions", "plays", "video_views"})
             self.assertNotIn(params.get("metric"), {"total_comments", "total_likes", "total_views"})
         requested_metrics = {params.get("metric") for _, params in calls}
@@ -393,3 +394,117 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
 
         self.assertEqual(payload, {})
         self.assertEqual(service.failed_requests, [])
+
+    @patch.object(InstagramAnalyticsService, "fetch_single_account_metric")
+    def test_account_performance_requests_only_account_level_metrics(self, mock_fetch_single_account_metric):
+        mock_fetch_single_account_metric.return_value = 1
+        service = InstagramAnalyticsService(user=None)
+        connection = SimpleNamespace(instagram_access_token="token_123")
+
+        performance = service.fetch_account_performance(connection, "1789")
+
+        requested = [call.args[2] for call in mock_fetch_single_account_metric.call_args_list]
+        self.assertEqual(
+            requested,
+            [
+                "reach",
+                "follower_count",
+                "online_followers",
+                "profile_views",
+                "website_clicks",
+                "accounts_engaged",
+                "total_interactions",
+                "views",
+                "follows_and_unfollows",
+                "profile_links_taps",
+            ],
+        )
+        self.assertNotIn("likes", performance)
+        self.assertNotIn("comments", performance)
+        self.assertNotIn("shares", performance)
+        self.assertNotIn("saved", performance)
+
+    @patch.object(InstagramAnalyticsService, "_safe_json_get")
+    def test_feed_media_metrics_do_not_request_reposts(self, mock_safe_json_get):
+        service = InstagramAnalyticsService(user=None)
+        connection = SimpleNamespace(instagram_access_token="token_123")
+        media = [{"id": "feed1", "media_type": "CAROUSEL_ALBUM", "media_product_type": "FEED"}]
+        calls: list[tuple[str, dict]] = []
+
+        def _record(url, params):
+            calls.append((url, params))
+            return {"data": []}
+
+        mock_safe_json_get.side_effect = _record
+        service.fetch_media_insights(connection, media)
+
+        requested = {params.get("metric") for _, params in calls}
+        self.assertNotIn("reposts", requested)
+
+    @patch("creators.services.social_dashboard.requests.get")
+    def test_empty_data_payload_is_not_marked_as_failed_request(self, mock_get):
+        response = SimpleNamespace(status_code=200, json=lambda: {"data": []})
+        mock_get.return_value = response
+        service = InstagramAnalyticsService(user=None)
+
+        payload = service._safe_json_get(
+            "https://graph.instagram.com/v25.0/123/insights",
+            {"metric": "reach", "access_token": "token_123"},
+        )
+
+        self.assertEqual(payload, {"data": []})
+        self.assertEqual(service.failed_requests, [])
+
+    @patch.object(InstagramAnalyticsService, "_safe_json_get")
+    def test_fetch_demographics_calls_follower_demographics_breakdowns(self, mock_safe_json_get):
+        service = InstagramAnalyticsService(user=None)
+        connection = SimpleNamespace(instagram_access_token="token_123")
+        calls: list[tuple[str, dict]] = []
+
+        def _record(url, params):
+            calls.append((url, params))
+            if params.get("breakdown") == "country":
+                return {
+                    "data": [
+                        {
+                            "name": "follower_demographics",
+                            "total_value": {
+                                "breakdowns": [
+                                    {
+                                        "results": [
+                                            {"dimension_values": ["US"], "value": 20},
+                                            {"dimension_values": ["CA"], "value": 10},
+                                        ]
+                                    }
+                                ]
+                            },
+                        }
+                    ]
+                }
+            return {"data": []}
+
+        mock_safe_json_get.side_effect = _record
+        demographics = service.fetch_demographics(connection, "1789")
+
+        self.assertEqual(len(calls), 3)
+        for url, params in calls:
+            self.assertEqual(urlparse(url).netloc, "graph.instagram.com")
+            self.assertEqual(params.get("metric"), "follower_demographics")
+            self.assertEqual(params.get("period"), "lifetime")
+            self.assertEqual(params.get("metric_type"), "total_value")
+        self.assertEqual(demographics["audience_country"], [{"label": "US", "value": 20}, {"label": "CA", "value": 10}])
+
+    def test_media_engagement_totals_aggregate_from_media_insights(self):
+        service = InstagramAnalyticsService(user=None)
+        media_insights = [
+            {"metrics": [{"name": "likes", "value": 2}, {"name": "comments", "value": 1}]},
+            {"metrics": [{"name": "likes", "value": 3}, {"name": "shares", "value": 4}]},
+            {"metrics": [{"name": "saved", "value": 5}, {"name": "views", "value": 6}]},
+        ]
+
+        totals = service.fetch_engagement_metrics(media_insights)
+
+        self.assertEqual(
+            totals,
+            {"likes": 5, "comments": 1, "saved": 5, "shares": 4, "views": 6},
+        )
