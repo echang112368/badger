@@ -253,7 +253,9 @@ META_OAUTH_SCOPES = [
         "META_OAUTH_SCOPES",
         (
             "pages_show_list,"
-            "instagram_basic"
+            "pages_read_engagement,"
+            "instagram_basic,"
+            "instagram_manage_insights"
         ),
     ).split(",")
     if scope.strip()
