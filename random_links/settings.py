@@ -252,8 +252,9 @@ META_OAUTH_SCOPES = [
     for scope in os.environ.get(
         "META_OAUTH_SCOPES",
         (
-            "pages_show_list,"
-            "instagram_basic"
+            "instagram_business_basic,"
+            "instagram_business_manage_insights,"
+            "instagram_business_manage_comments"
         ),
     ).split(",")
     if scope.strip()

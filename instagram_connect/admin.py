@@ -10,7 +10,7 @@ class InstagramConnectionAdmin(admin.ModelAdmin):
         "user",
         "instagram_username",
         "instagram_user_id",
-        "page_name",
+        "platform",
         "followers_count",
         "media_count",
         "last_synced_at",
@@ -20,7 +20,5 @@ class InstagramConnectionAdmin(admin.ModelAdmin):
         "user__email",
         "instagram_username",
         "instagram_user_id",
-        "page_id",
-        "facebook_user_id",
     )
     list_select_related = ("user",)

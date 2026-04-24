@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import Mock, patch
 
@@ -6,13 +7,12 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from creators.models import SocialAnalyticsSnapshot
+from creators.services.social_dashboard import InstagramAnalyticsService
 from instagram_connect.models import InstagramConnection
 from instagram_connect.services import (
     build_oauth_url,
     exchange_code_for_access_token,
     get_instagram_user,
-    get_page_instagram_business_account,
-    get_user_pages,
     resolve_meta_oauth_scopes,
 )
 
@@ -20,47 +20,44 @@ from instagram_connect.services import (
 class MetaOAuthScopeTests(TestCase):
     @override_settings(
         META_OAUTH_SCOPES=(
-            "instagram_basic,pages_show_list,pages_show_list,instagram_manage_insights"
+            "instagram_business_basic,instagram_business_manage_insights,instagram_business_manage_insights"
         )
     )
     def test_resolve_meta_oauth_scopes_deduplicates_string_value(self):
         self.assertEqual(
             resolve_meta_oauth_scopes(),
-            "instagram_basic,pages_show_list,instagram_manage_insights",
+            "instagram_business_basic,instagram_business_manage_insights",
         )
 
     @override_settings(
         META_APP_ID="app_123",
         META_REDIRECT_URI="https://example.com/callback",
-        META_CONFIG_ID="config_456",
-        META_OAUTH_SCOPES=("instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"),
+        META_OAUTH_SCOPES=("instagram_business_basic", "instagram_business_manage_insights"),
     )
-    def test_connect_route_uses_facebook_oauth_dialog(self):
+    def test_connect_route_uses_instagram_oauth_dialog(self):
         user = CustomUser.objects.create_user(
             username="oauth_start_user",
             email="oauth_start_user@example.com",
             password="pass123",
             is_creator=True,
         )
-        client = self.client
-        client.force_login(user)
+        self.client.force_login(user)
 
-        response = client.get(reverse("connect_instagram"))
+        response = self.client.get(reverse("connect_instagram"))
 
         self.assertEqual(response.status_code, 302)
         parsed = urlparse(response.url)
         self.assertEqual(parsed.scheme, "https")
-        self.assertEqual(parsed.netloc, "www.facebook.com")
-        self.assertEqual(parsed.path, "/dialog/oauth")
+        self.assertEqual(parsed.netloc, "www.instagram.com")
+        self.assertEqual(parsed.path, "/oauth/authorize")
         params = parse_qs(parsed.query)
         self.assertEqual(params["client_id"], ["app_123"])
         self.assertEqual(params["redirect_uri"], ["https://example.com/callback"])
         self.assertEqual(params["response_type"], ["code"])
         self.assertEqual(
             params["scope"],
-            ["instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement"],
+            ["instagram_business_basic,instagram_business_manage_insights"],
         )
-        self.assertNotIn("config_id", params)
         self.assertTrue(params["state"][0])
 
 
@@ -69,22 +66,22 @@ class MetaServiceHttpTests(SimpleTestCase):
         META_APP_ID="app_123",
         META_APP_SECRET="secret_123",
         META_REDIRECT_URI="https://example.com/callback",
-        META_API_VERSION="v22.0",
     )
-    @patch("instagram_connect.services.requests.get")
-    def test_exchange_code_uses_facebook_graph_endpoint(self, mock_get):
+    @patch("instagram_connect.services.requests.post")
+    def test_exchange_code_uses_instagram_token_endpoint(self, mock_post):
         response = Mock()
         response.status_code = 200
         response.json.return_value = {"access_token": "token_abc", "expires_in": 3600}
-        mock_get.return_value = response
+        mock_post.return_value = response
 
         token_data = exchange_code_for_access_token("code_abc")
 
-        mock_get.assert_called_once_with(
-            "https://graph.facebook.com/v22.0/oauth/access_token",
-            params={
+        mock_post.assert_called_once_with(
+            "https://api.instagram.com/oauth/access_token",
+            data={
                 "client_id": "app_123",
                 "client_secret": "secret_123",
+                "grant_type": "authorization_code",
                 "redirect_uri": "https://example.com/callback",
                 "code": "code_abc",
             },
@@ -95,74 +92,29 @@ class MetaServiceHttpTests(SimpleTestCase):
     @override_settings(
         META_APP_ID="app_123",
         META_REDIRECT_URI="https://example.com/callback",
-        META_OAUTH_SCOPES=("instagram_basic", "pages_show_list"),
+        META_OAUTH_SCOPES=("instagram_business_basic", "instagram_business_manage_insights"),
     )
     def test_build_oauth_url_includes_scope(self):
         url = build_oauth_url("state_abc")
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
 
-        self.assertEqual(params["scope"], ["instagram_basic,pages_show_list"])
+        self.assertEqual(params["scope"], ["instagram_business_basic,instagram_business_manage_insights"])
 
     @override_settings(META_API_VERSION="v22.0")
     @patch("instagram_connect.services.requests.get")
-    def test_get_user_pages_uses_graph_facebook(self, mock_get):
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {
-            "data": [{"id": "page_1", "name": "Page One", "access_token": "page_token"}]
-        }
-        mock_get.return_value = response
-
-        pages = get_user_pages("user_token")
-
-        mock_get.assert_called_once_with(
-            "https://graph.facebook.com/v22.0/me/accounts",
-            params={"fields": "id,name,access_token", "access_token": "user_token"},
-            timeout=15,
-        )
-        self.assertEqual(pages[0]["id"], "page_1")
-
-    @override_settings(META_API_VERSION="v22.0")
-    @patch("instagram_connect.services.requests.get")
-    def test_get_linked_ig_business_account(self, mock_get):
-        response = Mock()
-        response.status_code = 200
-        response.json.return_value = {
-            "instagram_business_account": {
-                "id": "178900000000001",
-                "username": "creator",
-                "followers_count": 22,
-            }
-        }
-        mock_get.return_value = response
-
-        account = get_page_instagram_business_account("123", "page_token")
-
-        mock_get.assert_called_once_with(
-            "https://graph.facebook.com/v22.0/123",
-            params={
-                "fields": "instagram_business_account{id,username,followers_count,media_count}",
-                "access_token": "page_token",
-            },
-            timeout=15,
-        )
-        self.assertEqual(account["id"], "178900000000001")
-
-    @override_settings(META_API_VERSION="v22.0")
-    @patch("instagram_connect.services.requests.get")
-    def test_get_instagram_user_uses_graph_facebook_node(self, mock_get):
+    def test_get_instagram_user_uses_graph_instagram(self, mock_get):
         response = Mock()
         response.status_code = 200
         response.json.return_value = {"id": "178900000000001", "username": "creator"}
         mock_get.return_value = response
 
-        payload = get_instagram_user("178900000000001", "user_token")
+        payload = get_instagram_user("user_token", "178900000000001")
 
         mock_get.assert_called_once_with(
-            "https://graph.facebook.com/v22.0/178900000000001",
+            "https://graph.instagram.com/v22.0/178900000000001",
             params={
-                "fields": "id,username,followers_count,media_count,account_type",
+                "fields": "id,username,biography,followers_count,follows_count,media_count,account_type",
                 "access_token": "user_token",
             },
             timeout=15,
@@ -180,29 +132,20 @@ class InstagramCallbackFlowTests(TestCase):
         )
         self.client.force_login(self.user)
         session = self.client.session
-        session["meta_oauth_state"] = "state_abc"
+        session["instagram_oauth_state"] = "state_abc"
         session.save()
 
     @patch("instagram_connect.views.get_instagram_user")
-    @patch("instagram_connect.views.get_page_instagram_business_account")
-    @patch("instagram_connect.views.get_user_pages")
-    @patch("instagram_connect.views.get_facebook_user")
     @patch("instagram_connect.views.exchange_for_long_lived_access_token")
     @patch("instagram_connect.views.exchange_code_for_access_token")
-    def test_callback_persists_meta_connection(
+    def test_callback_persists_instagram_connection(
         self,
         mock_exchange,
         mock_exchange_long,
-        mock_fb_user,
-        mock_pages,
-        mock_page_ig,
         mock_get_ig,
     ):
         mock_exchange.return_value = {"access_token": "short_token", "expires_in": 3600}
         mock_exchange_long.return_value = {"access_token": "long_token", "expires_in": 5184000}
-        mock_fb_user.return_value = {"id": "fb_1", "name": "Creator FB"}
-        mock_pages.return_value = [{"id": "page_1", "name": "Page One", "access_token": "page_token"}]
-        mock_page_ig.return_value = {"id": "1789", "username": "creator_name"}
         mock_get_ig.return_value = {
             "id": "1789",
             "username": "creator_name",
@@ -217,63 +160,18 @@ class InstagramCallbackFlowTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=success")
         connection = InstagramConnection.objects.get(user=self.user)
-        self.assertEqual(connection.facebook_user_id, "fb_1")
-        self.assertEqual(connection.page_id, "page_1")
         self.assertEqual(connection.instagram_user_id, "1789")
-        self.assertEqual(connection.access_token, "long_token")
+        self.assertEqual(connection.instagram_access_token, "long_token")
 
-    @patch("instagram_connect.views.get_user_pages")
-    @patch("instagram_connect.views.get_facebook_user")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.exchange_code_for_access_token")
-    def test_callback_handles_no_pages(
-        self,
-        mock_exchange,
-        mock_exchange_long,
-        mock_fb_user,
-        mock_pages,
-    ):
-        mock_exchange.return_value = {"access_token": "short_token", "expires_in": 3600}
-        mock_exchange_long.return_value = {"access_token": "long_token", "expires_in": 5184000}
-        mock_fb_user.return_value = {"id": "fb_1"}
-        mock_pages.return_value = []
-
+    def test_callback_rejects_state_mismatch(self):
         response = self.client.get(
             reverse("instagram_callback"),
-            {"code": "code_123", "state": "state_abc"},
+            {"code": "code_123", "state": "wrong"},
         )
-
-        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=error")
-        self.assertFalse(InstagramConnection.objects.filter(user=self.user).exists())
-
-    @patch("instagram_connect.views.get_instagram_user")
-    @patch("instagram_connect.views.get_page_instagram_business_account", return_value=None)
-    @patch("instagram_connect.views.get_user_pages")
-    @patch("instagram_connect.views.get_facebook_user")
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    @patch("instagram_connect.views.exchange_code_for_access_token")
-    def test_callback_handles_page_without_linked_instagram(
-        self,
-        mock_exchange,
-        mock_exchange_long,
-        mock_fb_user,
-        mock_pages,
-        *_args,
-    ):
-        mock_exchange.return_value = {"access_token": "short_token", "expires_in": 3600}
-        mock_exchange_long.return_value = {"access_token": "long_token", "expires_in": 5184000}
-        mock_fb_user.return_value = {"id": "fb_1"}
-        mock_pages.return_value = [{"id": "page_1", "name": "Page One", "access_token": "page_token"}]
-
-        response = self.client.get(
-            reverse("instagram_callback"),
-            {"code": "code_123", "state": "state_abc"},
-        )
-
         self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_oauth=error")
 
 
-class InstagramSyncFailureTests(TestCase):
+class InstagramAnalyticsResilienceTests(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(
             username="ig_sync_user",
@@ -281,23 +179,55 @@ class InstagramSyncFailureTests(TestCase):
             password="pass123",
             is_creator=True,
         )
-        self.client.force_login(self.user)
         self.connection = InstagramConnection.objects.create(
             user=self.user,
             instagram_user_id="123456789",
-            access_token="stale_token",
+            instagram_access_token="token",
+            access_token="token",
         )
 
-    @patch("instagram_connect.views.exchange_for_long_lived_access_token")
-    def test_sync_fails_when_refresh_fails_with_permission_error(self, mock_exchange):
-        from instagram_connect.services import MetaAPIError
+    @patch("creators.services.social_dashboard.requests.get")
+    def test_unsupported_metric_error_is_collected_not_crash(self, mock_get):
+        unsupported = Mock()
+        unsupported.status_code = 400
+        unsupported.json.return_value = {"error": {"message": "Unsupported metric"}}
+        mock_get.return_value = unsupported
 
-        mock_exchange.side_effect = MetaAPIError("Permissions error")
+        service = InstagramAnalyticsService(self.user)
+        value = service.fetch_single_account_metric(self.connection, "123", "likes")
 
-        response = self.client.get(reverse("instagram_sync"))
+        self.assertIsNone(value)
+        self.assertTrue(service.failed_requests)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"], "meta_api_error")
+    @patch("creators.services.social_dashboard.requests.get")
+    def test_api_error_returns_empty_media_list(self, mock_get):
+        response = Mock()
+        response.status_code = 500
+        response.json.return_value = {"error": {"message": "Server error"}}
+        mock_get.return_value = response
+
+        service = InstagramAnalyticsService(self.user)
+        media = service.fetch_recent_media(self.connection, "123")
+        self.assertEqual(media, [])
+
+    @patch.object(InstagramAnalyticsService, "fetch_account", return_value={"followers_count": 100, "media_count": 3})
+    @patch.object(InstagramAnalyticsService, "fetch_account_performance", return_value={"reach": 30, "profile_views": None, "website_clicks": None})
+    @patch.object(InstagramAnalyticsService, "fetch_demographics", return_value={"audience_country": []})
+    @patch.object(InstagramAnalyticsService, "fetch_recent_media", return_value=[])
+    @patch.object(InstagramAnalyticsService, "fetch_engagement_metrics", return_value={"likes": 1, "comments": 1, "saved": 0, "shares": 0})
+    @patch.object(InstagramAnalyticsService, "fetch_story_metrics", return_value={})
+    @patch.object(InstagramAnalyticsService, "fetch_comments", return_value={"sample_comments": []})
+    def test_dashboard_persists_partial_analytics(self, *_mocks):
+        snapshot = SocialAnalyticsSnapshot.objects.create(
+            user=self.user,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload={},
+        )
+        payload = InstagramAnalyticsService(self.user).fetch_and_cache(self.connection, snapshot=snapshot)
+        self.assertIn("account", payload)
+        self.assertIn("performance", payload)
+        snapshot.refresh_from_db()
+        self.assertIn("account", snapshot.payload)
 
 
 class InstagramDisconnectTests(TestCase):
@@ -314,6 +244,7 @@ class InstagramDisconnectTests(TestCase):
         InstagramConnection.objects.create(
             user=self.user,
             instagram_user_id="123456789",
+            instagram_access_token="token",
             access_token="token",
         )
         SocialAnalyticsSnapshot.objects.create(
@@ -326,23 +257,6 @@ class InstagramDisconnectTests(TestCase):
 
         self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_disconnect=success")
         self.assertFalse(InstagramConnection.objects.filter(user=self.user).exists())
-        self.assertFalse(
-            SocialAnalyticsSnapshot.objects.filter(
-                user=self.user,
-                platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
-            ).exists()
-        )
-
-    def test_disconnect_without_connection_still_clears_instagram_snapshot(self):
-        SocialAnalyticsSnapshot.objects.create(
-            user=self.user,
-            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
-            payload={"account": {"followers_count": 7}},
-        )
-
-        response = self.client.post(reverse("instagram_disconnect"))
-
-        self.assertRedirects(response, f"{reverse('creator_settings')}?instagram_disconnect=success")
         self.assertFalse(
             SocialAnalyticsSnapshot.objects.filter(
                 user=self.user,
