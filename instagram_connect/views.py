@@ -1,4 +1,5 @@
 import logging
+import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -225,6 +226,19 @@ def instagram_sync(request):
             "last_synced_at",
             "raw_profile_data",
         ]
+    )
+    print(
+        "[instagram_sync] collected_instagram_data:",
+        json.dumps(
+            {
+                "instagram_user": ig_user if isinstance(ig_user, dict) else {},
+                "snapshot_payload": snapshot_payload if isinstance(snapshot_payload, dict) else {},
+                "failed_requests": snapshot_payload.get("failed_requests", [])
+                if isinstance(snapshot_payload, dict)
+                else [],
+            },
+            default=str,
+        ),
     )
 
     return JsonResponse(
