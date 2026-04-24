@@ -17,6 +17,74 @@ REQUEST_TIMEOUT_SECONDS = 15
 GRAPH_BASE_URL = get_instagram_api_base()
 INSTAGRAM_LOGIN_INSIGHTS_BASE_URL = "https://graph.instagram.com/v25.0"
 
+ACCOUNT_INSIGHT_METRICS = [
+    "reach",
+    "follower_count",
+    "online_followers",
+    "profile_views",
+    "website_clicks",
+    "accounts_engaged",
+    "total_interactions",
+    "views",
+    "follows_and_unfollows",
+    "profile_links_taps",
+]
+
+DEMOGRAPHIC_INSIGHT_REQUESTS = [
+    {"breakdown": "age,gender"},
+    {"breakdown": "country"},
+    {"breakdown": "city"},
+]
+
+MEDIA_INSIGHT_METRICS_BY_PRODUCT_TYPE = {
+    "FEED": [
+        "comments",
+        "likes",
+        "profile_activity",
+        "profile_visits",
+        "reach",
+        "saved",
+        "shares",
+        "total_interactions",
+        "views",
+    ],
+    "REELS": [
+        "comments",
+        "likes",
+        "reach",
+        "saved",
+        "shares",
+        "total_interactions",
+        "views",
+        "ig_reels_avg_watch_time",
+        "ig_reels_video_view_total_time",
+        "reels_skip_rate",
+        "crossposted_views",
+        "facebook_views",
+    ],
+    "STORY": [
+        "facebook_views",
+        "follows",
+        "navigation",
+        "profile_activity",
+        "profile_visits",
+        "reach",
+        "replies",
+        "shares",
+        "total_interactions",
+        "views",
+    ],
+}
+
+BREAKDOWN_INSIGHT_REQUESTS = {
+    "FEED": [("profile_activity", "action_type")],
+    "REELS": [],
+    "STORY": [
+        ("navigation", "story_navigation_action_type"),
+        ("profile_activity", "action_type"),
+    ],
+}
+
 
 @dataclass
 class PlatformDashboardData:
@@ -120,23 +188,7 @@ class InstagramAnalyticsService:
     def fetch_account_performance(
         self, connection: InstagramConnection, ig_user_id: str
     ) -> dict[str, int | None]:
-        metrics = {
-            "reach": None,
-            "follower_count": None,
-            "website_clicks": None,
-            "profile_views": None,
-            "online_followers": None,
-            "accounts_engaged": None,
-            "total_interactions": None,
-            "likes": None,
-            "comments": None,
-            "shares": None,
-            "saves": None,
-            "replies": None,
-            "views": None,
-            "follows_and_unfollows": None,
-            "profile_links_taps": None,
-        }
+        metrics = {metric_name: None for metric_name in ACCOUNT_INSIGHT_METRICS}
         for metric_name in list(metrics.keys()):
             metrics[metric_name] = self.fetch_single_account_metric(
                 connection,
@@ -168,25 +220,18 @@ class InstagramAnalyticsService:
         connection: InstagramConnection,
         ig_user_id: str,
     ) -> dict[str, list[dict[str, Any]]]:
-        gender_age = self.fetch_demographic_breakdown(
-            connection,
-            ig_user_id,
-            breakdown="age,gender",
-        )
-        countries = self.fetch_demographic_breakdown(
-            connection,
-            ig_user_id,
-            breakdown="country",
-        )
-        cities = self.fetch_demographic_breakdown(
-            connection,
-            ig_user_id,
-            breakdown="city",
-        )
+        rows_by_breakdown: dict[str, list[dict[str, Any]]] = {}
+        for request in DEMOGRAPHIC_INSIGHT_REQUESTS:
+            breakdown = request["breakdown"]
+            rows_by_breakdown[breakdown] = self.fetch_demographic_breakdown(
+                connection,
+                ig_user_id,
+                breakdown=breakdown,
+            )
         return {
-            "audience_gender_age": gender_age,
-            "audience_country": countries,
-            "audience_city": cities,
+            "audience_gender_age": rows_by_breakdown.get("age,gender", []),
+            "audience_country": rows_by_breakdown.get("country", []),
+            "audience_city": rows_by_breakdown.get("city", []),
         }
 
     def fetch_demographic_breakdown(
@@ -280,7 +325,6 @@ class InstagramAnalyticsService:
             "reach": 0,
             "replies": 0,
             "shares": 0,
-            "reposts": 0,
             "profile_visits": 0,
             "follows": 0,
         }
@@ -348,62 +392,13 @@ class InstagramAnalyticsService:
         media_product_type = str(media_item.get("media_product_type") or "").upper()
 
         if media_type == "STORY":
-            return (
-                [
-                    "facebook_views",
-                    "follows",
-                    "navigation",
-                    "profile_activity",
-                    "profile_visits",
-                    "reach",
-                    "replies",
-                    "reposts",
-                    "shares",
-                    "total_interactions",
-                    "views",
-                ],
-                [
-                    ("navigation", "story_navigation_action_type"),
-                    ("profile_activity", "action_type"),
-                ],
-            )
+            return (MEDIA_INSIGHT_METRICS_BY_PRODUCT_TYPE["STORY"], BREAKDOWN_INSIGHT_REQUESTS["STORY"])
 
         is_reel = media_product_type == "REELS" or media_type == "REEL"
         if is_reel:
-            return (
-                [
-                    "comments",
-                    "crossposted_views",
-                    "facebook_views",
-                    "ig_reels_avg_watch_time",
-                    "ig_reels_video_view_total_time",
-                    "likes",
-                    "reach",
-                    "reels_skip_rate",
-                    "reposts",
-                    "saved",
-                    "shares",
-                    "total_interactions",
-                    "views",
-                ],
-                [],
-            )
+            return (MEDIA_INSIGHT_METRICS_BY_PRODUCT_TYPE["REELS"], BREAKDOWN_INSIGHT_REQUESTS["REELS"])
 
-        return (
-            [
-                "comments",
-                "likes",
-                "profile_activity",
-                "profile_visits",
-                "reach",
-                "reposts",
-                "saved",
-                "shares",
-                "total_interactions",
-                "views",
-            ],
-            [("profile_activity", "action_type")],
-        )
+        return (MEDIA_INSIGHT_METRICS_BY_PRODUCT_TYPE["FEED"], BREAKDOWN_INSIGHT_REQUESTS["FEED"])
 
     def fetch_comments(
         self,
@@ -576,17 +571,6 @@ class InstagramAnalyticsService:
                 )
                 return {}
             if isinstance(data, dict):
-                if data.get("data") in (None, []) and any(
-                    key in safe_params for key in ("metric", "fields", "breakdown")
-                ):
-                    self.failed_requests.append(
-                        {
-                            "url": url,
-                            "params": safe_params,
-                            "status_code": response.status_code,
-                            "error": "empty_data",
-                        }
-                    )
                 return data
             self.failed_requests.append(
                 {
