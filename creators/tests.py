@@ -1,6 +1,7 @@
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import urlparse
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -323,3 +324,72 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
         media = service.fetch_recent_media(connection, "123456789")
 
         self.assertEqual(media, [])
+
+    @patch.object(InstagramAnalyticsService, "_safe_json_get")
+    def test_media_insights_use_graph_instagram_and_supported_metrics(self, mock_safe_json_get):
+        service = InstagramAnalyticsService(user=None)
+        connection = SimpleNamespace(instagram_access_token="token_123")
+        media = [{"id": "m1", "media_type": "IMAGE", "media_product_type": "FEED"}]
+        calls: list[tuple[str, dict]] = []
+
+        def _record(url, params):
+            calls.append((url, params))
+            return {"data": [{"name": params.get("metric"), "period": "lifetime", "values": [{"value": 1}]}]}
+
+        mock_safe_json_get.side_effect = _record
+        insights = service.fetch_media_insights(connection, media)
+
+        self.assertTrue(insights)
+        for url, params in calls:
+            self.assertEqual(urlparse(url).netloc, "graph.instagram.com")
+            self.assertNotIn(params.get("metric"), {"impressions", "plays", "video_views"})
+            self.assertNotIn(params.get("metric"), {"total_comments", "total_likes", "total_views"})
+        requested_metrics = {params.get("metric") for _, params in calls}
+        self.assertIn("views", requested_metrics)
+        self.assertNotIn("impressions", requested_metrics)
+
+    @patch.object(InstagramAnalyticsService, "_safe_json_get")
+    def test_breakdown_metrics_requested_separately(self, mock_safe_json_get):
+        service = InstagramAnalyticsService(user=None)
+        connection = SimpleNamespace(instagram_access_token="token_123")
+        media = [{"id": "story1", "media_type": "STORY", "media_product_type": "STORY"}]
+        calls: list[tuple[str, dict]] = []
+
+        def _record(url, params):
+            calls.append((url, params))
+            return {"data": []}
+
+        mock_safe_json_get.side_effect = _record
+        service.fetch_media_insights(connection, media)
+
+        self.assertTrue(any(params.get("metric") == "navigation" for _, params in calls))
+        self.assertTrue(
+            any(
+                params.get("metric") == "navigation"
+                and params.get("breakdown") == "story_navigation_action_type"
+                for _, params in calls
+            )
+        )
+        self.assertTrue(
+            any(
+                params.get("metric") == "profile_activity" and params.get("breakdown") == "action_type"
+                for _, params in calls
+            )
+        )
+
+    @patch("creators.services.social_dashboard.requests.get")
+    def test_story_error_code_10_and_empty_data_do_not_crash(self, mock_get):
+        response = SimpleNamespace(
+            status_code=400,
+            json=lambda: {"error": {"code": 10, "message": "Not available for this story"}},
+        )
+        mock_get.return_value = response
+        service = InstagramAnalyticsService(user=None)
+
+        payload = service._safe_json_get(
+            "https://graph.instagram.com/v25.0/story123/insights",
+            {"metric": "views", "access_token": "token_123"},
+        )
+
+        self.assertEqual(payload, {})
+        self.assertEqual(service.failed_requests, [])

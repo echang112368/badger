@@ -139,7 +139,7 @@
                       <li class="list-group-item d-flex justify-content-between"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between bg-warning-subtle"><span><strong>Saves</strong></span><strong>{{ platform.metrics.engagement.saves }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Video Views/Plays</span><strong>{{ platform.metrics.engagement.video_views }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li>
                     </ul>
                     <div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div>
                   </div>
@@ -149,10 +149,12 @@
                   <div class="border rounded p-3 h-100">
                     <h3 class="h6">E. Story Metrics</h3>
                     <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between"><span>Exits</span><strong>{{ platform.metrics.story.exits|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Taps Forward</span><strong>{{ platform.metrics.story.taps_forward|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between"><span>Taps Back</span><strong>{{ platform.metrics.story.taps_back|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Views</span><strong>{{ platform.metrics.story.views|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Reach</span><strong>{{ platform.metrics.story.reach|default:0 }}</strong></li>
                       <li class="list-group-item d-flex justify-content-between"><span>Replies</span><strong>{{ platform.metrics.story.replies|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Shares</span><strong>{{ platform.metrics.story.shares|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Reposts</span><strong>{{ platform.metrics.story.reposts|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between"><span>Profile Visits</span><strong>{{ platform.metrics.story.profile_visits|default:0 }}</strong></li>
                     </ul>
                   </div>
                 </div>
@@ -170,6 +172,52 @@
                     <div class="small mt-2">
                       <div>Sentiment score: <span class="text-muted">{{ platform.metrics.comments.sentiment_score|default:'Pending NLP integration' }}</span></div>
                       <div>Audience quality: <span class="text-muted">{{ platform.metrics.comments.audience_quality_score|default:'Pending NLP integration' }}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12">
+                  <div class="border rounded p-3">
+                    <h3 class="h6">G. Media Insights (Instagram Login)</h3>
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Media</th>
+                            <th>Metric</th>
+                            <th>Value</th>
+                            <th>Period</th>
+                            <th>Fetched At</th>
+                            <th>Breakdowns</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for item in platform.metrics.media_insights %}
+                            {% for metric in item.metrics %}
+                              <tr>
+                                <td>{{ item.media_type }}<br><span class="text-muted small">{{ item.media_id }}</span></td>
+                                <td>{{ metric.name }}</td>
+                                <td>{{ metric.value }}</td>
+                                <td>{{ metric.period }}</td>
+                                <td><time class="local-time" datetime="{{ metric.fetched_at }}">{{ metric.fetched_at }}</time></td>
+                                <td>
+                                  {% if metric.breakdowns %}
+                                    {% for row in metric.breakdowns|slice:':3' %}
+                                      <div class="small">{{ row.label }}: {{ row.value }}</div>
+                                    {% endfor %}
+                                  {% else %}
+                                    <span class="text-muted small">-</span>
+                                  {% endif %}
+                                </td>
+                              </tr>
+                            {% endfor %}
+                          {% empty %}
+                            <tr>
+                              <td colspan="6" class="text-muted">No media insights data yet.</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>

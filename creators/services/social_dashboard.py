@@ -15,6 +15,7 @@ from instagram_connect.services import get_instagram_api_base, get_instagram_use
 
 REQUEST_TIMEOUT_SECONDS = 15
 GRAPH_BASE_URL = get_instagram_api_base()
+INSTAGRAM_LOGIN_INSIGHTS_BASE_URL = "https://graph.instagram.com/v25.0"
 
 
 @dataclass
@@ -89,8 +90,10 @@ class InstagramAnalyticsService:
         payload["demographics"] = self.fetch_demographics(connection, ig_user_id)
 
         recent_media = self.fetch_recent_media(connection, ig_user_id, limit=20)
-        payload["engagement"] = self.fetch_engagement_metrics(connection, recent_media)
-        payload["story"] = self.fetch_story_metrics(connection, recent_media)
+        media_insights = self.fetch_media_insights(connection, recent_media)
+        payload["media_insights"] = media_insights
+        payload["engagement"] = self.fetch_engagement_metrics(media_insights)
+        payload["story"] = self.fetch_story_metrics(media_insights)
         payload["comments"] = self.fetch_comments(connection, recent_media)
         payload["failed_requests"] = list(self.failed_requests)
         payload["synced_at"] = now.isoformat()
@@ -213,7 +216,7 @@ class InstagramAnalyticsService:
         media_payload = self._safe_json_get(
             f"{GRAPH_BASE_URL}/{ig_user_id}/media",
             {
-                "fields": "id,media_type,like_count,comments_count,timestamp",
+                "fields": "id,media_type,media_product_type,like_count,comments_count,timestamp",
                 "limit": limit,
                 "access_token": connection.instagram_access_token,
             },
@@ -223,78 +226,184 @@ class InstagramAnalyticsService:
             return []
         return [item for item in data if isinstance(item, dict)]
 
-    def fetch_engagement_metrics(
+    def fetch_media_insights(
         self,
         connection: InstagramConnection,
         media: list[dict[str, Any]],
-    ) -> dict[str, int]:
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for item in media:
+            media_id = item.get("id")
+            if not media_id:
+                continue
+            rows.append(
+                {
+                    "media_id": str(media_id),
+                    "media_type": str(item.get("media_type") or "").upper(),
+                    "media_product_type": str(item.get("media_product_type") or "").upper(),
+                    "metrics": self._fetch_media_insights_for_item(connection, str(media_id), item),
+                }
+            )
+        return rows
+
+    def fetch_engagement_metrics(self, media_insights: list[dict[str, Any]]) -> dict[str, int]:
         totals = {
             "likes": 0,
             "comments": 0,
             "saved": 0,
             "shares": 0,
-            "video_views": 0,
+            "views": 0,
         }
-
-        for item in media:
-            media_id = item.get("id")
-            if not media_id:
-                continue
-
-            totals["likes"] += int(item.get("like_count") or 0)
-            totals["comments"] += int(item.get("comments_count") or 0)
-
-            media_type = str(item.get("media_type") or "").upper()
-            metric_candidates = ["saved", "shares"]
-            if media_type in {"VIDEO", "REEL", "STORY"}:
-                metric_candidates.append("views")
-            if media_type in {"REEL"}:
-                metric_candidates.append("plays")
-            insight_payload = self._safe_json_get(
-                f"{GRAPH_BASE_URL}/{media_id}/insights",
-                {
-                    "metric": ",".join(metric_candidates),
-                    "access_token": connection.instagram_access_token,
-                },
-            )
-            metric_rows = insight_payload.get("data") if isinstance(insight_payload, dict) else []
-            for row in metric_rows:
-                if not isinstance(row, dict):
-                    continue
-                name = row.get("name")
-                value = self._extract_metric_value({"data": [row]})
-                if name == "saved":
+        for item in media_insights:
+            for metric in item.get("metrics", []) if isinstance(item, dict) else []:
+                name = metric.get("name")
+                value = int(metric.get("value") or 0)
+                if name == "likes":
+                    totals["likes"] += value
+                elif name == "comments":
+                    totals["comments"] += value
+                elif name == "saved":
                     totals["saved"] += value
                 elif name == "shares":
                     totals["shares"] += value
-                elif name in {"views", "plays"}:
-                    totals["video_views"] += value
+                elif name == "views":
+                    totals["views"] += value
 
         return totals
 
     def fetch_story_metrics(
         self,
-        connection: InstagramConnection,
-        media: list[dict[str, Any]],
+        media_insights: list[dict[str, Any]],
     ) -> dict[str, int]:
-        metrics = {"exits": 0, "taps_forward": 0, "taps_back": 0, "replies": 0}
-        story_ids = [item.get("id") for item in media if item.get("media_type") == "STORY"]
-        for story_id in story_ids[:10]:
+        metrics = {
+            "views": 0,
+            "reach": 0,
+            "replies": 0,
+            "shares": 0,
+            "reposts": 0,
+            "profile_visits": 0,
+            "follows": 0,
+        }
+        for item in media_insights:
+            if str(item.get("media_type") or "").upper() != "STORY":
+                continue
+            for metric in item.get("metrics", []) if isinstance(item, dict) else []:
+                name = metric.get("name")
+                if name in metrics:
+                    metrics[name] += int(metric.get("value") or 0)
+        return metrics
+
+    def _fetch_media_insights_for_item(
+        self,
+        connection: InstagramConnection,
+        media_id: str,
+        media_item: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        metrics: list[dict[str, Any]] = []
+        standard_metrics, breakdown_specs = self._metric_specs_for_media_item(media_item)
+        for metric_name in standard_metrics:
             payload = self._safe_json_get(
-                f"{GRAPH_BASE_URL}/{story_id}/insights",
+                f"{INSTAGRAM_LOGIN_INSIGHTS_BASE_URL}/{media_id}/insights",
                 {
-                    "metric": "exits,replies,taps_forward,taps_back",
+                    "metric": metric_name,
                     "access_token": connection.instagram_access_token,
                 },
             )
-            rows = payload.get("data") if isinstance(payload, dict) else []
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                metric_name = row.get("name")
-                if metric_name in metrics:
-                    metrics[metric_name] += self._extract_metric_value({"data": [row]})
+            metric_rows = payload.get("data") if isinstance(payload, dict) else []
+            if not metric_rows:
+                print(f"[InstagramAnalyticsService] Empty dataset for metric={metric_name} media_id={media_id}")
+                continue
+            for row in metric_rows:
+                parsed = self._parse_insight_row(row)
+                if parsed:
+                    metrics.append(parsed)
+
+        for breakdown_metric, breakdown in breakdown_specs:
+            payload = self._safe_json_get(
+                f"{INSTAGRAM_LOGIN_INSIGHTS_BASE_URL}/{media_id}/insights",
+                {
+                    "metric": breakdown_metric,
+                    "breakdown": breakdown,
+                    "access_token": connection.instagram_access_token,
+                },
+            )
+            metric_rows = payload.get("data") if isinstance(payload, dict) else []
+            if not metric_rows:
+                print(
+                    f"[InstagramAnalyticsService] Empty breakdown dataset for metric={breakdown_metric} "
+                    f"breakdown={breakdown} media_id={media_id}"
+                )
+                continue
+            for row in metric_rows:
+                parsed = self._parse_insight_row(row)
+                if parsed:
+                    metrics.append(parsed)
         return metrics
+
+    def _metric_specs_for_media_item(
+        self,
+        media_item: dict[str, Any],
+    ) -> tuple[list[str], list[tuple[str, str]]]:
+        media_type = str(media_item.get("media_type") or "").upper()
+        media_product_type = str(media_item.get("media_product_type") or "").upper()
+
+        if media_type == "STORY":
+            return (
+                [
+                    "facebook_views",
+                    "follows",
+                    "navigation",
+                    "profile_activity",
+                    "profile_visits",
+                    "reach",
+                    "replies",
+                    "reposts",
+                    "shares",
+                    "total_interactions",
+                    "views",
+                ],
+                [
+                    ("navigation", "story_navigation_action_type"),
+                    ("profile_activity", "action_type"),
+                ],
+            )
+
+        is_reel = media_product_type == "REELS" or media_type == "REEL"
+        if is_reel:
+            return (
+                [
+                    "comments",
+                    "crossposted_views",
+                    "facebook_views",
+                    "ig_reels_avg_watch_time",
+                    "ig_reels_video_view_total_time",
+                    "likes",
+                    "reach",
+                    "reels_skip_rate",
+                    "reposts",
+                    "saved",
+                    "shares",
+                    "total_interactions",
+                    "views",
+                ],
+                [],
+            )
+
+        return (
+            [
+                "comments",
+                "likes",
+                "profile_activity",
+                "profile_visits",
+                "reach",
+                "reposts",
+                "saved",
+                "shares",
+                "total_interactions",
+                "views",
+            ],
+            [("profile_activity", "action_type")],
+        )
 
     def fetch_comments(
         self,
@@ -376,11 +485,12 @@ class InstagramAnalyticsService:
                 "comments": int(engagement.get("comments") or 0),
                 "saves": int(engagement.get("saved") or 0),
                 "shares": int(engagement.get("shares") or 0),
-                "video_views": int(engagement.get("video_views") or 0),
+                "views": int(engagement.get("views") or 0),
                 "total_engagement": total_engagement,
                 "engagement_rate": engagement_rate,
             },
             "story": payload.get("story") or {},
+            "media_insights": payload.get("media_insights") or [],
             "comments": payload.get("comments") or {},
             "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
@@ -449,12 +559,19 @@ class InstagramAnalyticsService:
                 ),
             )
             if response.status_code >= 400 or (isinstance(data, dict) and isinstance(data.get("error"), dict)):
+                error = data.get("error") if isinstance(data, dict) else None
+                if isinstance(error, dict) and error.get("code") == 10 and "/insights" in url:
+                    print(
+                        "[InstagramAnalyticsService] Story insights unavailable for this media "
+                        f"(code 10): url={url}"
+                    )
+                    return {}
                 self.failed_requests.append(
                     {
                         "url": url,
                         "params": safe_params,
                         "status_code": response.status_code,
-                        "error": data.get("error") if isinstance(data, dict) else None,
+                        "error": error,
                     }
                 )
                 return {}
@@ -564,6 +681,25 @@ class InstagramAnalyticsService:
         return rows[:10]
 
     @staticmethod
+    def _parse_insight_row(row: Any) -> dict[str, Any] | None:
+        if not isinstance(row, dict):
+            return None
+        period = row.get("period") or "lifetime"
+        name = row.get("name")
+        if not name:
+            return None
+        parsed = {
+            "name": name,
+            "value": InstagramAnalyticsService._extract_metric_value({"data": [row]}),
+            "period": period,
+            "fetched_at": timezone.now().isoformat(),
+        }
+        breakdown_rows = InstagramAnalyticsService._extract_breakdown_rows({"data": [row]})
+        if breakdown_rows:
+            parsed["breakdowns"] = breakdown_rows
+        return parsed
+
+    @staticmethod
     def empty_metrics() -> dict[str, Any]:
         return {
             "account": {},
@@ -575,6 +711,7 @@ class InstagramAnalyticsService:
             },
             "engagement": {},
             "story": {},
+            "media_insights": [],
             "comments": {
                 "sample_comments": [],
                 "sentiment_score": None,
