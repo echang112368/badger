@@ -275,7 +275,7 @@ class InstagramAnalyticsService:
         media_payload = self._safe_json_get(
             f"{GRAPH_BASE_URL}/{ig_user_id}/media",
             {
-                "fields": "id,media_type,media_product_type,like_count,comments_count,timestamp",
+                "fields": "id,media_type,media_product_type,like_count,comments_count,timestamp,media_url,thumbnail_url,permalink",
                 "limit": limit,
                 "access_token": connection.instagram_access_token,
             },
@@ -600,6 +600,9 @@ class InstagramAnalyticsService:
                     "media_id": str(item.get("media_id") or "-"),
                     "media_type": str(item.get("media_type") or "UNKNOWN"),
                     "media_product_type": str(item.get("media_product_type") or "UNKNOWN"),
+                    "timestamp": item.get("timestamp"),
+                    "thumbnail_url": item.get("thumbnail_url") or item.get("media_url") or "",
+                    "permalink": item.get("permalink") or "",
                     "views": views,
                     "likes": likes,
                     "comments": comments,
