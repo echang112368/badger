@@ -18,6 +18,14 @@ from links.models import (
 )
 from merchants.models import MerchantMeta, ItemGroup, MerchantItem
 from rest_framework_simplejwt.tokens import RefreshToken
+from .services.instagram_metrics import (
+    add_post_rates,
+    build_data_quality,
+    build_insight_cards,
+    calculate_creator_metrics,
+    normalize_demographics,
+    safe_divide,
+)
 from .services.social_dashboard import InstagramAnalyticsService
 
 
@@ -508,3 +516,84 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
             totals,
             {"likes": 5, "comments": 1, "saved": 5, "shares": 4, "views": 6},
         )
+
+
+class InstagramMetricsModuleTests(SimpleTestCase):
+    def test_safe_division_handles_zero(self):
+        self.assertEqual(safe_divide(10, 0), 0.0)
+        self.assertEqual(safe_divide(None, 5), 0.0)
+        self.assertEqual(safe_divide(10, 2), 5.0)
+
+    def test_demographic_parsing_builds_summary_fields(self):
+        missing = []
+        demographics = normalize_demographics(
+            {
+                "audience_gender_age": [
+                    {"label": "female,18-24", "value": 60},
+                    {"label": "male,25-34", "value": 40},
+                ],
+                "audience_country": [{"label": "US", "value": 70}, {"label": "CA", "value": 30}],
+                "audience_city": [{"label": "Blacksburg", "value": 55}],
+            },
+            missing,
+        )
+        self.assertEqual(demographics["dominant_city"], "Blacksburg")
+        self.assertEqual(demographics["dominant_country"], "US")
+        self.assertEqual(demographics["percent_us_followers"], 70.0)
+        self.assertEqual(missing, [])
+
+    def test_post_metric_calculations_add_rates(self):
+        posts = add_post_rates(
+            [
+                {
+                    "media_id": "1",
+                    "reach": 100,
+                    "likes": 20,
+                    "comments": 5,
+                    "saved": 5,
+                    "shares": 10,
+                    "views": 150,
+                    "profile_visits": 8,
+                    "total_interactions": 40,
+                }
+            ]
+        )
+        self.assertEqual(posts[0]["engagement_rate"], 0.4)
+        self.assertEqual(posts[0]["save_rate"], 0.05)
+        self.assertEqual(posts[0]["view_to_reach_ratio"], 1.5)
+
+    def test_creator_score_calculation_is_bounded(self):
+        rated_posts = add_post_rates(
+            [
+                {"media_id": "1", "reach": 200, "likes": 30, "comments": 10, "saved": 20, "shares": 10, "views": 260, "profile_visits": 15, "total_interactions": 70},
+                {"media_id": "2", "reach": 220, "likes": 28, "comments": 9, "saved": 15, "shares": 11, "views": 240, "profile_visits": 12, "total_interactions": 63},
+            ]
+        )
+        metrics = calculate_creator_metrics(
+            rated_posts,
+            followers_count=5000,
+            audience={"percent_us_followers": 65, "percent_target_age_18_34": 58},
+        )
+        self.assertGreaterEqual(metrics["creator_value_score"], 0)
+        self.assertLessEqual(metrics["creator_value_score"], 100)
+
+    def test_empty_api_response_handling_data_quality(self):
+        data_quality = build_data_quality(
+            profile={},
+            audience={},
+            posts=[],
+            missing_metrics=["reach_1d", "media_insights"],
+        )
+        self.assertFalse(data_quality["has_media_insights"])
+        self.assertIn("reach_1d", data_quality["missing_metrics"])
+        self.assertTrue(data_quality["warnings"])
+
+    def test_insight_card_generation(self):
+        cards = build_insight_cards(
+            metrics={"average_engagement_rate": 0.12, "average_post_reach": 200, "average_share_rate": 0.05},
+            audience={"dominant_city": "Blacksburg", "dominant_country": "Virginia", "percent_us_followers": 67},
+            account_metrics={"followers_count": 1000, "profile_views": None, "profile_links_taps": None},
+            missing_metrics=["profile_views"],
+        )
+        self.assertTrue(cards)
+        self.assertIn("title", cards[0])
