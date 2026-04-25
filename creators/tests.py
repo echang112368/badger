@@ -517,6 +517,41 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
             {"likes": 5, "comments": 1, "saved": 5, "shares": 4, "views": 6},
         )
 
+    def test_build_content_performance_rows_include_thumbnail_and_timestamp_details(self):
+        rows = InstagramAnalyticsService._build_content_performance_rows(
+            [
+                {
+                    "media_id": "m1",
+                    "media_type": "IMAGE",
+                    "media_product_type": "FEED",
+                    "timestamp": "2026-04-20T15:30:00+0000",
+                    "media_url": "https://cdn.example.com/media.jpg",
+                    "thumbnail_url": "https://cdn.example.com/thumb.jpg",
+                    "permalink": "https://instagram.com/p/test1/",
+                    "metrics": [
+                        {"name": "likes", "value": 10},
+                        {"name": "comments", "value": 2},
+                        {"name": "saved", "value": 3},
+                        {"name": "shares", "value": 1},
+                        {"name": "views", "value": 100},
+                    ],
+                },
+                {
+                    "media_id": "m2",
+                    "media_type": "VIDEO",
+                    "media_product_type": "REELS",
+                    "timestamp": "2026-04-19T10:00:00+0000",
+                    "media_url": "https://cdn.example.com/reel.jpg",
+                    "metrics": [{"name": "views", "value": 50}],
+                },
+            ]
+        )
+
+        self.assertEqual(rows[0]["thumbnail_url"], "https://cdn.example.com/thumb.jpg")
+        self.assertEqual(rows[0]["timestamp"], "2026-04-20T15:30:00+0000")
+        self.assertEqual(rows[0]["permalink"], "https://instagram.com/p/test1/")
+        self.assertEqual(rows[1]["thumbnail_url"], "https://cdn.example.com/reel.jpg")
+
 
 class InstagramMetricsModuleTests(SimpleTestCase):
     def test_safe_division_handles_zero(self):
