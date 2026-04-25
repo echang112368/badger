@@ -6,16 +6,29 @@ from datetime import datetime
 from typing import Any
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 
 from creators.models import SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
 from instagram_connect.services import get_instagram_api_base, get_instagram_user
+from .instagram_metrics import (
+    add_post_rates,
+    build_dashboard_payload,
+    build_data_quality,
+    build_insight_cards,
+    build_labels,
+    calculate_creator_metrics,
+    normalize_account_metrics,
+    normalize_demographics,
+    normalize_media_posts,
+)
 
 
 REQUEST_TIMEOUT_SECONDS = 15
 GRAPH_BASE_URL = get_instagram_api_base()
 INSTAGRAM_LOGIN_INSIGHTS_BASE_URL = "https://graph.instagram.com/v25.0"
+INSTAGRAM_DEBUG_LOGGING = getattr(settings, "INSTAGRAM_DEBUG_LOGGING", False)
 
 ACCOUNT_INSIGHT_METRICS = [
     "reach",
@@ -158,6 +171,7 @@ class InstagramAnalyticsService:
         payload["demographics"] = self.fetch_demographics(connection, ig_user_id)
 
         recent_media = self.fetch_recent_media(connection, ig_user_id, limit=20)
+        payload["recent_media"] = recent_media
         media_insights = self.fetch_media_insights(connection, recent_media)
         payload["media_insights"] = media_insights
         payload["engagement"] = self.fetch_engagement_metrics(media_insights)
@@ -355,7 +369,10 @@ class InstagramAnalyticsService:
             )
             metric_rows = payload.get("data") if isinstance(payload, dict) else []
             if not metric_rows:
-                print(f"[InstagramAnalyticsService] Empty dataset for metric={metric_name} media_id={media_id}")
+                if INSTAGRAM_DEBUG_LOGGING:
+                    print(
+                        f"[InstagramAnalyticsService] Empty dataset for metric={metric_name} media_id={media_id}"
+                    )
                 continue
             for row in metric_rows:
                 parsed = self._parse_insight_row(row)
@@ -373,10 +390,11 @@ class InstagramAnalyticsService:
             )
             metric_rows = payload.get("data") if isinstance(payload, dict) else []
             if not metric_rows:
-                print(
-                    f"[InstagramAnalyticsService] Empty breakdown dataset for metric={breakdown_metric} "
-                    f"breakdown={breakdown} media_id={media_id}"
-                )
+                if INSTAGRAM_DEBUG_LOGGING:
+                    print(
+                        f"[InstagramAnalyticsService] Empty breakdown dataset for metric={breakdown_metric} "
+                        f"breakdown={breakdown} media_id={media_id}"
+                    )
                 continue
             for row in metric_rows:
                 parsed = self._parse_insight_row(row)
@@ -442,11 +460,21 @@ class InstagramAnalyticsService:
         account = payload.get("account", {})
         performance = payload.get("performance", {})
         engagement = payload.get("engagement", {})
+        demographics = payload.get("demographics") or {}
+        recent_media = payload.get("recent_media") or []
+        missing_metrics: list[str] = []
 
-        followers = int(account.get("followers_count") or connection.followers_count or 0)
-        reach = int(performance.get("reach") or 0)
-        profile_visits = int(performance.get("profile_views") or 0)
-        website_clicks = int(performance.get("website_clicks") or 0)
+        account_metrics = normalize_account_metrics(account, performance, missing_metrics)
+        normalized_audience = normalize_demographics(demographics, missing_metrics)
+        posts = normalize_media_posts(recent_media, payload.get("media_insights") or [], missing_metrics)
+        rated_posts = add_post_rates(posts)
+
+        followers = int(
+            account_metrics.get("followers_count") or connection.followers_count or 0
+        )
+        reach = int(account_metrics.get("reach_1d") or 0)
+        profile_visits = int(account_metrics.get("profile_views") or 0)
+        website_clicks = int(account_metrics.get("website_clicks") or 0)
 
         total_engagement = (
             int(engagement.get("likes") or 0)
@@ -460,6 +488,50 @@ class InstagramAnalyticsService:
 
         media_insights = payload.get("media_insights") or []
         content_performance = self._build_content_performance_rows(media_insights)
+        creator_metrics = calculate_creator_metrics(
+            rated_posts,
+            followers_count=followers,
+            audience=normalized_audience,
+            target_filters=None,
+        )
+        recommendation_labels = build_labels(
+            creator_metrics,
+            normalized_audience,
+            followers,
+            missing_metrics,
+        )
+        insight_cards = build_insight_cards(
+            creator_metrics,
+            normalized_audience,
+            account_metrics,
+            missing_metrics,
+        )
+        data_quality = build_data_quality(
+            {
+                "username": account.get("username") or connection.instagram_username,
+                "followers_count": followers,
+            },
+            normalized_audience,
+            rated_posts,
+            missing_metrics,
+        )
+        dashboard_payload = build_dashboard_payload(
+            {
+                "username": account.get("username") or connection.instagram_username,
+                "biography": account.get("biography") or "",
+                "followers_count": followers,
+                "follows_count": int(account.get("follows_count") or 0),
+                "media_count": int(account.get("media_count") or connection.media_count or 0),
+                "account_type": account.get("account_type") or "Creator",
+            },
+            account_metrics,
+            normalized_audience,
+            rated_posts,
+            creator_metrics,
+            recommendation_labels,
+            insight_cards,
+            data_quality,
+        )
 
         return {
             "account": {
@@ -490,6 +562,13 @@ class InstagramAnalyticsService:
             "story": payload.get("story") or {},
             "media_insights": media_insights,
             "content_performance": content_performance,
+            "normalized_posts": rated_posts,
+            "insight_cards": insight_cards,
+            "recommendation_labels": recommendation_labels,
+            "creator_value_score": creator_metrics.get("creator_value_score", 0),
+            "summary_metrics": creator_metrics,
+            "data_quality": data_quality,
+            "dashboard": dashboard_payload,
             "comments": payload.get("comments") or {},
             "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
@@ -585,25 +664,27 @@ class InstagramAnalyticsService:
                     }
                 )
                 return {}
-            print(
-                "[InstagramAnalyticsService] Graph API response:",
-                json.dumps(
-                    {
-                        "url": url,
-                        "params": safe_params,
-                        "status_code": response.status_code,
-                        "json": data if isinstance(data, dict) else str(data),
-                    },
-                    default=str,
-                ),
-            )
+            if INSTAGRAM_DEBUG_LOGGING:
+                print(
+                    "[InstagramAnalyticsService] Graph API response:",
+                    json.dumps(
+                        {
+                            "url": url,
+                            "params": safe_params,
+                            "status_code": response.status_code,
+                            "json": data if isinstance(data, dict) else str(data),
+                        },
+                        default=str,
+                    ),
+                )
             if response.status_code >= 400 or (isinstance(data, dict) and isinstance(data.get("error"), dict)):
                 error = data.get("error") if isinstance(data, dict) else None
                 if isinstance(error, dict) and error.get("code") == 10 and "/insights" in url:
-                    print(
-                        "[InstagramAnalyticsService] Story insights unavailable for this media "
-                        f"(code 10): url={url}"
-                    )
+                    if INSTAGRAM_DEBUG_LOGGING:
+                        print(
+                            "[InstagramAnalyticsService] Story insights unavailable for this media "
+                            f"(code 10): url={url}"
+                        )
                     return {}
                 self.failed_requests.append(
                     {
@@ -626,17 +707,18 @@ class InstagramAnalyticsService:
             )
             return {}
         except Exception as exc:
-            print(
-                "[InstagramAnalyticsService] Graph API request failed:",
-                json.dumps(
-                    {
-                        "url": url,
-                        "params": safe_params,
-                        "error": str(exc),
-                    },
-                    default=str,
-                ),
-            )
+            if INSTAGRAM_DEBUG_LOGGING:
+                print(
+                    "[InstagramAnalyticsService] Graph API request failed:",
+                    json.dumps(
+                        {
+                            "url": url,
+                            "params": safe_params,
+                            "error": str(exc),
+                        },
+                        default=str,
+                    ),
+                )
             self.failed_requests.append(
                 {
                     "url": url,
@@ -739,6 +821,7 @@ class InstagramAnalyticsService:
             },
             "engagement": {},
             "story": {},
+            "recent_media": [],
             "media_insights": [],
             "content_performance": [],
             "comments": {

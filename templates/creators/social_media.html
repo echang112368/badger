@@ -185,6 +185,55 @@
                 <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
               </div>
 
+              <div class="row g-3 mb-3">
+                <div class="col-lg-4">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6 mb-2">Creator Value Score</h3>
+                    <div class="metric-value">{{ platform.metrics.creator_value_score }}</div>
+                    <div class="small text-muted">Weighted score from engagement, saves, shares, audience match, consistency, and profile visits.</div>
+                  </div>
+                </div>
+                <div class="col-lg-8">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6 mb-2">Recommendation Labels</h3>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for label in platform.metrics.recommendation_labels %}
+                        <span class="badge rounded-pill text-bg-light border">{{ label }}</span>
+                      {% empty %}
+                        <span class="text-muted small">No recommendation labels yet.</span>
+                      {% endfor %}
+                    </div>
+                    {% if platform.metrics.data_quality.warnings %}
+                      <div class="mt-2 small text-warning">
+                        {% for warning in platform.metrics.data_quality.warnings %}
+                          <div>• {{ warning }}</div>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3">
+                <h3 class="h6 mb-2">Brand Insight Cards</h3>
+                <div class="row g-2">
+                  {% for card in platform.metrics.insight_cards %}
+                    <div class="col-lg-6">
+                      <div class="border rounded p-2 h-100">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong>{{ card.title }}</strong>
+                          <span class="badge text-bg-{% if card.severity == 'positive' %}success{% elif card.severity == 'warning' %}warning{% else %}secondary{% endif %}">{{ card.severity }}</span>
+                        </div>
+                        <div class="small text-muted mt-1">{{ card.description }}</div>
+                        <div class="small mt-2"><span class="text-muted">{{ card.supporting_metric }}:</span> {{ card.value }}</div>
+                      </div>
+                    </div>
+                  {% empty %}
+                    <div class="col-12 text-muted small">No insights available yet.</div>
+                  {% endfor %}
+                </div>
+              </div>
+
               <div class="metric-card p-3 mb-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <h3 class="h6 mb-0">Post Performance Explorer</h3>
