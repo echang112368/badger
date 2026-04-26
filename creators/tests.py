@@ -23,8 +23,12 @@ from .services.instagram_metrics import (
     build_data_quality,
     build_insight_cards,
     calculate_creator_metrics,
+    mean,
+    median,
     normalize_demographics,
+    percentage,
     safe_divide,
+    standard_deviation,
 )
 from .services.social_dashboard import InstagramAnalyticsService
 
@@ -563,15 +567,16 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
         self.assertEqual(rows[0]["timestamp"], "2026-04-20T15:30:00+0000")
         self.assertEqual(rows[0]["permalink"], "https://instagram.com/p/test1/")
         self.assertEqual(rows[1]["thumbnail_url"], "https://cdn.example.com/reel.jpg")
+        self.assertIn("raw_activity_score", rows[0])
 
     def test_attach_media_details_backfills_thumbnail_and_timestamp_from_recent_media(self):
         rows = [
             {
                 "media_id": "m1",
                 "views": 100,
-                "engagement_total": 10,
-                "engagement_to_view_rate": 10.0,
-                "performance_score": 230,
+                "engagement": 10,
+                "engagement_rate": 0.1,
+                "raw_activity_score": 230,
             }
         ]
         media_insights = [{"media_id": "m1", "metrics": []}]
@@ -611,9 +616,16 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
 
 class InstagramMetricsModuleTests(SimpleTestCase):
     def test_safe_division_handles_zero(self):
-        self.assertEqual(safe_divide(10, 0), 0.0)
-        self.assertEqual(safe_divide(None, 5), 0.0)
+        self.assertIsNone(safe_divide(10, 0))
+        self.assertIsNone(safe_divide(None, 5))
         self.assertEqual(safe_divide(10, 2), 5.0)
+        self.assertEqual(safe_divide(10, 0, default=0.0), 0.0)
+
+    def test_stat_helpers(self):
+        self.assertEqual(percentage(0.125), 12.5)
+        self.assertEqual(mean([1, 2, None, 3]), 2.0)
+        self.assertEqual(median([1, 3, 2]), 2.0)
+        self.assertGreater(standard_deviation([1, 3, 5]), 0)
 
     def test_demographic_parsing_builds_summary_fields(self):
         missing = []
@@ -628,9 +640,10 @@ class InstagramMetricsModuleTests(SimpleTestCase):
             },
             missing,
         )
-        self.assertEqual(demographics["dominant_city"], "Blacksburg")
-        self.assertEqual(demographics["dominant_country"], "US")
+        self.assertEqual(demographics["top_city"], "Blacksburg")
+        self.assertEqual(demographics["top_country"], "US")
         self.assertEqual(demographics["percent_us_followers"], 70.0)
+        self.assertEqual(demographics["percent_18_34_followers"], 100.0)
         self.assertEqual(missing, [])
 
     def test_post_metric_calculations_add_rates(self):
@@ -651,22 +664,21 @@ class InstagramMetricsModuleTests(SimpleTestCase):
         )
         self.assertEqual(posts[0]["engagement_rate"], 0.4)
         self.assertEqual(posts[0]["save_rate"], 0.05)
-        self.assertEqual(posts[0]["view_to_reach_ratio"], 1.5)
+        self.assertEqual(posts[0]["view_rate"], 1.5)
+        self.assertIn("standardized_performance_score", posts[0])
 
     def test_creator_score_calculation_is_bounded(self):
-        rated_posts = add_post_rates(
-            [
-                {"media_id": "1", "reach": 200, "likes": 30, "comments": 10, "saved": 20, "shares": 10, "views": 260, "profile_visits": 15, "total_interactions": 70},
-                {"media_id": "2", "reach": 220, "likes": 28, "comments": 9, "saved": 15, "shares": 11, "views": 240, "profile_visits": 12, "total_interactions": 63},
-            ]
-        )
         metrics = calculate_creator_metrics(
-            rated_posts,
+            [
+                {"media_id": "1", "reach": 200, "likes": 30, "comments": 10, "saved": 20, "shares": 10, "views": 260, "profile_visits": 15},
+                {"media_id": "2", "reach": 220, "likes": 28, "comments": 9, "saved": 15, "shares": 11, "views": 240, "profile_visits": 12},
+            ],
             followers_count=5000,
-            audience={"percent_us_followers": 65, "percent_target_age_18_34": 58},
+            audience={"percent_us_followers": 65, "percent_18_34_followers": 58},
         )
-        self.assertGreaterEqual(metrics["creator_value_score"], 0)
-        self.assertLessEqual(metrics["creator_value_score"], 100)
+        self.assertGreaterEqual(metrics["standardized_performance_score"], 0)
+        self.assertLessEqual(metrics["standardized_performance_score"], 100)
+        self.assertIn("best_post_by_share_rate", metrics)
 
     def test_empty_api_response_handling_data_quality(self):
         data_quality = build_data_quality(
@@ -681,10 +693,11 @@ class InstagramMetricsModuleTests(SimpleTestCase):
 
     def test_insight_card_generation(self):
         cards = build_insight_cards(
-            metrics={"average_engagement_rate": 0.12, "average_post_reach": 200, "average_share_rate": 0.05},
-            audience={"dominant_city": "Blacksburg", "dominant_country": "Virginia", "percent_us_followers": 67},
+            metrics={"average_engagement_rate": 0.12, "average_reach": 200, "average_share_rate": 0.05, "posts": [{}]},
+            audience={"top_city": "Blacksburg", "top_country": "US", "percent_us_followers": 67, "percent_top_city_followers": 33},
             account_metrics={"followers_count": 1000, "profile_views": None, "profile_links_taps": None},
             missing_metrics=["profile_views"],
         )
         self.assertTrue(cards)
         self.assertIn("title", cards[0])
+        self.assertIn("metric_name", cards[0])
