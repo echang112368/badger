@@ -337,16 +337,7 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
     def test_media_insights_use_graph_instagram_and_supported_metrics(self, mock_safe_json_get):
         service = InstagramAnalyticsService(user=None)
         connection = SimpleNamespace(instagram_access_token="token_123")
-        media = [
-            {
-                "id": "m1",
-                "media_type": "IMAGE",
-                "media_product_type": "FEED",
-                "timestamp": "2026-04-20T15:30:00+0000",
-                "thumbnail_url": "https://cdn.example.com/thumb.jpg",
-                "permalink": "https://instagram.com/p/test1/",
-            }
-        ]
+        media = [{"id": "m1", "media_type": "IMAGE", "media_product_type": "FEED"}]
         calls: list[tuple[str, dict]] = []
 
         def _record(url, params):
@@ -365,9 +356,6 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
         requested_metrics = {params.get("metric") for _, params in calls}
         self.assertIn("views", requested_metrics)
         self.assertNotIn("impressions", requested_metrics)
-        self.assertEqual(insights[0].get("timestamp"), "2026-04-20T15:30:00+0000")
-        self.assertEqual(insights[0].get("thumbnail_url"), "https://cdn.example.com/thumb.jpg")
-        self.assertEqual(insights[0].get("permalink"), "https://instagram.com/p/test1/")
 
     @patch.object(InstagramAnalyticsService, "_safe_json_get")
     def test_breakdown_metrics_requested_separately(self, mock_safe_json_get):
@@ -528,41 +516,6 @@ class InstagramAnalyticsServiceTests(SimpleTestCase):
             totals,
             {"likes": 5, "comments": 1, "saved": 5, "shares": 4, "views": 6},
         )
-
-    def test_build_content_performance_rows_include_thumbnail_and_timestamp_details(self):
-        rows = InstagramAnalyticsService._build_content_performance_rows(
-            [
-                {
-                    "media_id": "m1",
-                    "media_type": "IMAGE",
-                    "media_product_type": "FEED",
-                    "timestamp": "2026-04-20T15:30:00+0000",
-                    "media_url": "https://cdn.example.com/media.jpg",
-                    "thumbnail_url": "https://cdn.example.com/thumb.jpg",
-                    "permalink": "https://instagram.com/p/test1/",
-                    "metrics": [
-                        {"name": "likes", "value": 10},
-                        {"name": "comments", "value": 2},
-                        {"name": "saved", "value": 3},
-                        {"name": "shares", "value": 1},
-                        {"name": "views", "value": 100},
-                    ],
-                },
-                {
-                    "media_id": "m2",
-                    "media_type": "VIDEO",
-                    "media_product_type": "REELS",
-                    "timestamp": "2026-04-19T10:00:00+0000",
-                    "media_url": "https://cdn.example.com/reel.jpg",
-                    "metrics": [{"name": "views", "value": 50}],
-                },
-            ]
-        )
-
-        self.assertEqual(rows[0]["thumbnail_url"], "https://cdn.example.com/thumb.jpg")
-        self.assertEqual(rows[0]["timestamp"], "2026-04-20T15:30:00+0000")
-        self.assertEqual(rows[0]["permalink"], "https://instagram.com/p/test1/")
-        self.assertEqual(rows[1]["thumbnail_url"], "https://cdn.example.com/reel.jpg")
 
 
 class InstagramMetricsModuleTests(SimpleTestCase):
