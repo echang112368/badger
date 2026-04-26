@@ -1,4 +1,5 @@
 {% extends 'creators/base.html' %}
+{% load creators_formatting %}
 {% block title %}Social Media Dashboard{% endblock %}
 {% block content %}
 <div class="py-4 social-media-page">
@@ -198,7 +199,7 @@
                     <h3 class="h6 mb-2">Overview</h3>
                     <div class="row g-2 small mb-2">
                       <div class="col-md-3"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
-                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|default_if_none:'-' }}</strong></div>
+                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|percent_sigfigs:4 }}</strong></div>
                       <div class="col-md-3"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
                       <div class="col-md-3"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
                     </div>
