@@ -45,6 +45,7 @@
         <ul class="nav nav-pills flex-column mb-auto">
             <li><a href="{% url 'merchant_dashboard' %}" class="nav-link {% if current_url == 'merchant_dashboard' and request.GET.view != 'analytics' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
             <li><a href="{% url 'merchant_marketplace' %}" class="nav-link {% if current_url == 'merchant_marketplace' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-shop me-2"></i>Marketplace</a></li>
+            <li><a href="{% url 'merchant_creator_discovery' %}" class="nav-link {% if current_url == 'merchant_creator_discovery' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-compass me-2"></i>Creator Discovery</a></li>
             <li><a href="{% url 'merchant_items' %}" class="nav-link {% if current_url == 'merchant_items' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-megaphone me-2"></i>Campaigns</a></li>
             <li><a href="{% url 'merchant_creators' %}" class="nav-link {% if current_url == 'merchant_creators' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-people me-2"></i>Creators</a></li>
             <li><a href="{% url 'merchant_dashboard' %}?view=analytics" class="nav-link {% if current_url == 'merchant_dashboard' and request.GET.view == 'analytics' %}bg-primary text-white{% else %}text-dark{% endif %}"><i class="bi bi-graph-up me-2"></i>Analytics</a></li>
