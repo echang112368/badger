@@ -188,14 +188,21 @@
               <div class="row g-3 mb-3">
                 <div class="col-lg-4">
                   <div class="metric-card p-3 h-100">
-                    <h3 class="h6 mb-2">Creator Value Score</h3>
-                    <div class="metric-value">{{ platform.metrics.creator_value_score }}</div>
-                    <div class="small text-muted">Weighted score from engagement, saves, shares, audience match, consistency, and profile visits.</div>
+                    <h3 class="h6 mb-2">Standardized Performance Score</h3>
+                    <div class="metric-value">{{ platform.metrics.standardized_performance_score }}</div>
+                    <div class="small text-muted">0-100 blended score from engagement rate, save rate, share rate, profile visit rate, and view efficiency.</div>
                   </div>
                 </div>
                 <div class="col-lg-8">
                   <div class="metric-card p-3 h-100">
-                    <h3 class="h6 mb-2">Recommendation Labels</h3>
+                    <h3 class="h6 mb-2">Overview</h3>
+                    <div class="row g-2 small mb-2">
+                      <div class="col-md-3"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
+                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|default_if_none:'-' }}</strong></div>
+                      <div class="col-md-3"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
+                      <div class="col-md-3"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
+                    </div>
+                    <h4 class="h6 mb-2 mt-3">Recommendation Labels</h4>
                     <div class="d-flex flex-wrap gap-2">
                       {% for label in platform.metrics.recommendation_labels %}
                         <span class="badge rounded-pill text-bg-light border">{{ label }}</span>
@@ -215,17 +222,17 @@
               </div>
 
               <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">Brand Insight Cards</h3>
+                <h3 class="h6 mb-2">Insights</h3>
                 <div class="row g-2">
                   {% for card in platform.metrics.insight_cards %}
                     <div class="col-lg-6">
                       <div class="border rounded p-2 h-100">
                         <div class="d-flex justify-content-between align-items-center">
                           <strong>{{ card.title }}</strong>
-                          <span class="badge text-bg-{% if card.severity == 'positive' %}success{% elif card.severity == 'warning' %}warning{% else %}secondary{% endif %}">{{ card.severity }}</span>
+                          <span class="badge text-bg-{% if card.type == 'positive' %}success{% elif card.type == 'warning' %}warning{% else %}secondary{% endif %}">{{ card.type }}</span>
                         </div>
                         <div class="small text-muted mt-1">{{ card.description }}</div>
-                        <div class="small mt-2"><span class="text-muted">{{ card.supporting_metric }}:</span> {{ card.value }}</div>
+                        <div class="small mt-2"><span class="text-muted">{{ card.metric_name }}:</span> {{ card.metric_value }}</div>
                       </div>
                     </div>
                   {% empty %}
@@ -242,7 +249,7 @@
                     <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm" style="width: 220px;" placeholder="Search by media ID or type">
                   </div>
                 </div>
-                <p class="small text-muted mb-3">Relate views and engagement to specific posts/videos. Sorted by highest performance score.</p>
+                <p class="small text-muted mb-3">Standardized post analytics ranked by standardized performance score.</p>
 
                 <div class="table-responsive">
                   <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
@@ -253,13 +260,12 @@
                         <th>Type</th>
                         <th>Post Date</th>
                         <th>Views</th>
-                        <th>Engagement</th>
-                        <th>Likes</th>
-                        <th>Comments</th>
-                        <th>Saves</th>
-                        <th>Shares</th>
-                        <th>Eng/View %</th>
-                        <th>Score</th>
+                        <th>Reach</th>
+                        <th>Engagement Rate</th>
+                        <th>Save Rate</th>
+                        <th>Share Rate</th>
+                        <th>Profile Visit Rate</th>
+                        <th>Standardized Score</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -281,26 +287,36 @@
                           <td><code>{{ row.media_id }}</code></td>
                           <td><span class="badge rounded-pill text-bg-light border">{{ row.media_type }}</span></td>
                           <td>
-                            {% if row.timestamp %}
-                              <time class="local-time" datetime="{{ row.timestamp }}">{{ row.timestamp }}</time>
+                            {% if row.timestamp or row.post_date %}
+                              <time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>
                             {% else %}
                               <span class="text-muted small">N/A</span>
                             {% endif %}
                           </td>
                           <td>{{ row.views }}</td>
-                          <td>{{ row.engagement_total }}</td>
-                          <td>{{ row.likes }}</td>
-                          <td>{{ row.comments }}</td>
-                          <td>{{ row.saves }}</td>
-                          <td>{{ row.shares }}</td>
-                          <td>{{ row.engagement_to_view_rate }}%</td>
-                          <td><strong>{{ row.performance_score }}</strong></td>
+                          <td>{{ row.reach }}</td>
+                          <td>{{ row.engagement_rate|default_if_none:'-' }}</td>
+                          <td>{{ row.save_rate|default_if_none:'-' }}</td>
+                          <td>{{ row.share_rate|default_if_none:'-' }}</td>
+                          <td>{{ row.profile_visit_rate|default_if_none:'-' }}</td>
+                          <td><strong>{{ row.standardized_performance_score|default:row.raw_activity_score }}</strong></td>
                         </tr>
                       {% empty %}
-                        <tr><td colspan="12" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
+                        <tr><td colspan="10" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
                       {% endfor %}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3">
+                <h3 class="h6 mb-2">Audience</h3>
+                <div class="row g-2 small">
+                  <div class="col-md-4"><span class="text-muted d-block">Top city</span><strong>{{ platform.metrics.dashboard.audience.top_city|default:'-' }}</strong></div>
+                  <div class="col-md-4"><span class="text-muted d-block">Top country</span><strong>{{ platform.metrics.dashboard.audience.top_country|default:'-' }}</strong></div>
+                  <div class="col-md-4"><span class="text-muted d-block">Top age group</span><strong>{{ platform.metrics.dashboard.audience.top_age_group|default:'-' }}</strong></div>
+                  <div class="col-md-4"><span class="text-muted d-block">% US followers</span><strong>{{ platform.metrics.dashboard.audience.percent_us_followers|default:'-' }}</strong></div>
+                  <div class="col-md-4"><span class="text-muted d-block">% 18-34 followers</span><strong>{{ platform.metrics.dashboard.audience.percent_18_34_followers|default:'-' }}</strong></div>
                 </div>
               </div>
 
