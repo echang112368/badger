@@ -174,7 +174,6 @@ class InstagramAnalyticsService:
         payload["recent_media"] = recent_media
         media_insights = self.fetch_media_insights(connection, recent_media)
         payload["media_insights"] = media_insights
-        payload["content_performance"] = self._build_content_performance_rows(media_insights)
         payload["engagement"] = self.fetch_engagement_metrics(media_insights)
         payload["story"] = self.fetch_story_metrics(media_insights)
         payload["comments"] = self.fetch_comments(connection, recent_media)
@@ -276,7 +275,7 @@ class InstagramAnalyticsService:
         media_payload = self._safe_json_get(
             f"{GRAPH_BASE_URL}/{ig_user_id}/media",
             {
-                "fields": "id,media_type,media_product_type,like_count,comments_count,timestamp,media_url,thumbnail_url,permalink",
+                "fields": "id,media_type,media_product_type,like_count,comments_count,timestamp",
                 "limit": limit,
                 "access_token": connection.instagram_access_token,
             },
@@ -301,9 +300,6 @@ class InstagramAnalyticsService:
                     "media_id": str(media_id),
                     "media_type": str(item.get("media_type") or "").upper(),
                     "media_product_type": str(item.get("media_product_type") or "").upper(),
-                    "timestamp": item.get("timestamp"),
-                    "thumbnail_url": item.get("thumbnail_url") or item.get("media_url") or "",
-                    "permalink": item.get("permalink") or "",
                     "metrics": self._fetch_media_insights_for_item(connection, str(media_id), item),
                 }
             )
@@ -492,15 +488,6 @@ class InstagramAnalyticsService:
 
         media_insights = payload.get("media_insights") or []
         content_performance = self._build_content_performance_rows(media_insights)
-        if not content_performance and isinstance(payload.get("content_performance"), list):
-            content_performance = [
-                row for row in payload.get("content_performance", []) if isinstance(row, dict)
-            ]
-        content_performance = self._attach_media_details(
-            content_performance,
-            media_insights=media_insights,
-            recent_media=recent_media,
-        )
         creator_metrics = calculate_creator_metrics(
             rated_posts,
             followers_count=followers,
@@ -613,9 +600,6 @@ class InstagramAnalyticsService:
                     "media_id": str(item.get("media_id") or "-"),
                     "media_type": str(item.get("media_type") or "UNKNOWN"),
                     "media_product_type": str(item.get("media_product_type") or "UNKNOWN"),
-                    "timestamp": item.get("timestamp"),
-                    "thumbnail_url": item.get("thumbnail_url") or item.get("media_url") or "",
-                    "permalink": item.get("permalink") or "",
                     "views": views,
                     "likes": likes,
                     "comments": comments,
@@ -629,39 +613,6 @@ class InstagramAnalyticsService:
 
         rows.sort(key=lambda row: (row["performance_score"], row["views"], row["engagement_total"]), reverse=True)
         return rows
-
-    @staticmethod
-    def _attach_media_details(
-        rows: list[dict[str, Any]],
-        media_insights: list[dict[str, Any]],
-        recent_media: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
-        metadata_by_media_id: dict[str, dict[str, Any]] = {}
-        for source in [recent_media, media_insights]:
-            for item in source:
-                if not isinstance(item, dict):
-                    continue
-                media_id = str(item.get("media_id") or item.get("id") or "").strip()
-                if not media_id:
-                    continue
-                metadata_by_media_id[media_id] = {
-                    "timestamp": item.get("timestamp"),
-                    "thumbnail_url": item.get("thumbnail_url") or item.get("media_url") or "",
-                    "permalink": item.get("permalink") or "",
-                }
-
-        enriched_rows: list[dict[str, Any]] = []
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            media_id = str(row.get("media_id") or "").strip()
-            metadata = metadata_by_media_id.get(media_id, {})
-            enriched = dict(row)
-            enriched["timestamp"] = row.get("timestamp") or metadata.get("timestamp")
-            enriched["thumbnail_url"] = row.get("thumbnail_url") or metadata.get("thumbnail_url") or ""
-            enriched["permalink"] = row.get("permalink") or metadata.get("permalink") or ""
-            enriched_rows.append(enriched)
-        return enriched_rows
 
     def _resolve_ig_user_id(self, connection: InstagramConnection) -> str:
         candidate_ids = [str(connection.instagram_user_id or "").strip()]
