@@ -491,7 +491,13 @@ class InstagramAnalyticsService:
         reach_ratio = round((reach / followers), 2) if followers > 0 else 0
 
         media_insights = payload.get("media_insights") or []
-        content_performance = self._build_content_performance_rows(media_insights)
+        creator_metrics = calculate_creator_metrics(
+            rated_posts,
+            followers_count=followers,
+            audience=normalized_audience,
+            target_filters=None,
+        )
+        content_performance = creator_metrics.get("posts") or rated_posts
         if not content_performance and isinstance(payload.get("content_performance"), list):
             content_performance = [
                 row for row in payload.get("content_performance", []) if isinstance(row, dict)
@@ -500,12 +506,6 @@ class InstagramAnalyticsService:
             content_performance,
             media_insights=media_insights,
             recent_media=recent_media,
-        )
-        creator_metrics = calculate_creator_metrics(
-            rated_posts,
-            followers_count=followers,
-            audience=normalized_audience,
-            target_filters=None,
         )
         recommendation_labels = build_labels(
             creator_metrics,
@@ -578,7 +578,7 @@ class InstagramAnalyticsService:
             "normalized_posts": rated_posts,
             "insight_cards": insight_cards,
             "recommendation_labels": recommendation_labels,
-            "creator_value_score": creator_metrics.get("creator_value_score", 0),
+            "standardized_performance_score": creator_metrics.get("standardized_performance_score", 0),
             "summary_metrics": creator_metrics,
             "data_quality": data_quality,
             "dashboard": dashboard_payload,
@@ -608,26 +608,34 @@ class InstagramAnalyticsService:
             shares = metric_values.get("shares", 0)
             views = metric_values.get("views", 0)
             engagement_total = likes + comments + saves + shares
+            reach = metric_values.get("reach", 0)
+            profile_visits = metric_values.get("profile_visits", 0)
             rows.append(
                 {
                     "media_id": str(item.get("media_id") or "-"),
                     "media_type": str(item.get("media_type") or "UNKNOWN"),
                     "media_product_type": str(item.get("media_product_type") or "UNKNOWN"),
                     "timestamp": item.get("timestamp"),
+                    "post_date": item.get("timestamp"),
                     "thumbnail_url": item.get("thumbnail_url") or item.get("media_url") or "",
                     "permalink": item.get("permalink") or "",
                     "views": views,
+                    "reach": reach,
                     "likes": likes,
                     "comments": comments,
                     "saves": saves,
                     "shares": shares,
-                    "engagement_total": engagement_total,
-                    "engagement_to_view_rate": round((engagement_total / views) * 100, 2) if views else 0,
-                    "performance_score": (views * 2) + (engagement_total * 3),
+                    "profile_visits": profile_visits,
+                    "engagement": engagement_total,
+                    "engagement_rate": round((engagement_total / reach), 4) if reach else None,
+                    "save_rate": round((saves / reach), 4) if reach else None,
+                    "share_rate": round((shares / reach), 4) if reach else None,
+                    "profile_visit_rate": round((profile_visits / reach), 4) if reach else None,
+                    "raw_activity_score": (views * 2) + (engagement_total * 3),
                 }
             )
 
-        rows.sort(key=lambda row: (row["performance_score"], row["views"], row["engagement_total"]), reverse=True)
+        rows.sort(key=lambda row: (row.get("raw_activity_score") or 0, row.get("views") or 0, row.get("engagement") or 0), reverse=True)
         return rows
 
     @staticmethod
