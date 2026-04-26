@@ -1,4 +1,5 @@
 {% extends 'creators/base.html' %}
+{% load creators_formatting %}
 {% block title %}Social Media Dashboard{% endblock %}
 {% block content %}
 <div class="py-4 social-media-page">
@@ -89,7 +90,7 @@
       <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Total Followers</div><div class="metric-value">{{ social_overall.total_followers }}</div></div></div>
       <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Estimated Reach</div><div class="metric-value">{{ social_overall.total_reach }}</div></div></div>
       <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Engagement</div><div class="metric-value">{{ social_overall.total_engagement }}</div></div></div>
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Avg Engagement Rate</div><div class="metric-value">{{ social_overall.average_engagement_rate }}%</div></div></div>
+      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Avg Engagement Rate</div><div class="metric-value">{{ social_overall.average_engagement_rate|as_percentage }}</div></div></div>
       <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Connected Platforms</div><div class="metric-value">{{ social_overall.connected_platforms_count }}</div></div></div>
     </div>
 
@@ -198,7 +199,7 @@
                     <h3 class="h6 mb-2">Overview</h3>
                     <div class="row g-2 small mb-2">
                       <div class="col-md-3"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
-                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|default_if_none:'-' }}</strong></div>
+                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|as_percentage }}</strong></div>
                       <div class="col-md-3"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
                       <div class="col-md-3"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
                     </div>
