@@ -54,6 +54,11 @@ from collect.models import AffiliateClick, ReferralConversion, ReferralVisit
 from collect.utils import compute_commission_schedule
 
 from .access import resolve_merchant_permissions
+from .services.creator_discovery import (
+    DISCOVERY_PLATFORM_OPTIONS,
+    build_creator_discovery_results,
+    build_discovery_filters,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -995,6 +1000,44 @@ def merchant_marketplace(request):
             "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
             "follower_range_options": FOLLOWER_RANGE_OPTIONS,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+        },
+    )
+
+
+@login_required
+def merchant_creator_discovery(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return redirect("login")
+
+    merchant_user = permissions.merchant
+    merchant_meta = _get_merchant_meta(merchant_user)
+    if not merchant_meta:
+        return redirect("merchant_dashboard")
+
+    filters = build_discovery_filters(request.GET)
+    discovery_payload = build_creator_discovery_results(filters)
+    creator_cards = discovery_payload["cards"]
+
+    return render(
+        request,
+        "merchants/creator_discovery.html",
+        {
+            "merchant": merchant_user,
+            "merchant_meta": merchant_meta,
+            "permissions": permissions,
+            "creator_cards": creator_cards,
+            "filter_values": filters,
+            "available_niches": discovery_payload["available_niches"],
+            "available_age_bands": discovery_payload["available_age_bands"],
+            "available_locations": discovery_payload["available_locations"],
+            "platform_options": DISCOVERY_PLATFORM_OPTIONS,
+            "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+            "placeholder_filters": [
+                "content_type",
+                "posting_recency",
+                "comment_quality",
+            ],
         },
     )
 

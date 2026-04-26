@@ -5,6 +5,8 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from .models import MerchantMeta
+from creators.models import CreatorMeta, SocialAnalyticsSnapshot
+from instagram_connect.models import InstagramConnection
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -587,3 +589,107 @@ class ItemGroupFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("affiliate_percent", form.errors)
         self.assertIn("return_policy_days", form.errors)
+
+
+class CreatorDiscoveryTests(TestCase):
+    def setUp(self):
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant_discovery",
+            password="pass123",
+            email="merchant_discovery@example.com",
+            is_merchant=True,
+        )
+        self.creator = CustomUser.objects.create_user(
+            username="creator_discovery",
+            password="pass123",
+            email="creator_discovery@example.com",
+            is_creator=True,
+            first_name="Ava",
+            last_name="Stone",
+        )
+        self.creator_meta = CreatorMeta.objects.get(user=self.creator)
+        self.creator_meta.marketplace_enabled = True
+        self.creator_meta.content_skills = ["Beauty", "Skincare"]
+        self.creator_meta.save()
+
+        InstagramConnection.objects.create(
+            user=self.creator,
+            instagram_user_id="ig_creator_discovery",
+            instagram_username="ava_beauty",
+            followers_count=87654,
+        )
+        SocialAnalyticsSnapshot.objects.create(
+            user=self.creator,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload={
+                "account": {"followers_count": 87654, "username": "ava_beauty"},
+                "summary_metrics": {
+                    "average_engagement_rate": 0.061,
+                    "average_reach": 32000,
+                    "average_comment_rate": 0.012,
+                    "average_save_rate": 0.02,
+                    "average_share_rate": 0.01,
+                },
+                "demographics": {
+                    "audience_gender_age": [
+                        {"label": "female,18-24", "value": 62},
+                        {"label": "male,25-34", "value": 38},
+                    ],
+                    "audience_country": [{"label": "US", "value": 70}],
+                    "audience_city": [{"label": "Austin", "value": 41}],
+                },
+                "performance": {"reach": 42000, "website_clicks": 101, "profile_visits": 204},
+            },
+        )
+
+    def test_page_loads_for_merchant(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Creator Discovery")
+        self.assertContains(response, "Ava Stone")
+
+    def test_filters_apply_correctly(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(
+            reverse("merchant_creator_discovery"),
+            {"niche": "Fitness"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No creators match your filters")
+        response = self.client.get(
+            reverse("merchant_creator_discovery"),
+            {"niche": "Beauty", "min_engagement_rate": "5.0"},
+        )
+        self.assertContains(response, "Ava Stone")
+
+    def test_missing_analytics_does_not_crash(self):
+        creator_without_snapshot = CustomUser.objects.create_user(
+            username="creator_no_snapshot",
+            password="pass123",
+            email="creator_no_snapshot@example.com",
+            is_creator=True,
+        )
+        creator_meta = CreatorMeta.objects.get(user=creator_without_snapshot)
+        creator_meta.marketplace_enabled = True
+        creator_meta.save(update_fields=["marketplace_enabled"])
+
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "N/A")
+
+    def test_non_merchant_cannot_access_discovery(self):
+        creator_only = CustomUser.objects.create_user(
+            username="creator_only",
+            password="pass123",
+            email="creator_only@example.com",
+            is_creator=True,
+        )
+        self.client.force_login(creator_only)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response.url)
