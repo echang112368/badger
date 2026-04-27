@@ -1,0 +1,73 @@
+{% extends 'merchants/base.html' %}
+{% block title %}Preferences Questionnaire{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 980px;">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="h3 mb-1">Preferences Questionnaire</h1>
+            <p class="text-muted mb-0">Optional responses to improve creator match ranking. Existing analytics filters still apply separately.</p>
+        </div>
+        <a href="{{ next_url }}" class="btn btn-outline-secondary">Back to discovery</a>
+    </div>
+
+    <form method="post" class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next_url }}">
+
+            <section class="mb-4">
+                <h2 class="h5">Campaign goal</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.campaign_goal.label_tag }}{{ form.campaign_goal }}</div>
+                    <div class="col-md-6">{{ form.campaign_stage.label_tag }}{{ form.campaign_stage }}</div>
+                    <div class="col-md-6">{{ form.budget_range.label_tag }}{{ form.budget_range }}</div>
+                </div>
+            </section>
+
+            <section class="mb-4">
+                <h2 class="h5">Brand fit</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.brand_tone.label_tag }}{{ form.brand_tone }}</div>
+                    <div class="col-12">{{ form.brand_description.label_tag }}{{ form.brand_description }}</div>
+                    <div class="col-12">{{ form.product_or_service_description.label_tag }}{{ form.product_or_service_description }}</div>
+                    <div class="col-12">{{ form.ideal_creator_description.label_tag }}{{ form.ideal_creator_description }}</div>
+                </div>
+            </section>
+
+            <section class="mb-4">
+                <h2 class="h5">Content style</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.preferred_creator_style.label_tag }}{{ form.preferred_creator_style }}</div>
+                    <div class="col-md-6">{{ form.content_deliverables.label_tag }}{{ form.content_deliverables }}</div>
+                </div>
+            </section>
+
+            <section class="mb-4">
+                <h2 class="h5">Performance priorities</h2>
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form.performance_priority.label_tag }}{{ form.performance_priority }}</div>
+                    <div class="col-md-6">{{ form.risk_tolerance.label_tag }}{{ form.risk_tolerance }}</div>
+                    <div class="col-12">{{ form.campaign_success_definition.label_tag }}{{ form.campaign_success_definition }}</div>
+                </div>
+            </section>
+
+            <section class="mb-2">
+                <h2 class="h5">Restrictions / notes</h2>
+                <div class="row g-3">
+                    <div class="col-12">{{ form.content_to_avoid.label_tag }}{{ form.content_to_avoid }}</div>
+                    <div class="col-12">{{ form.competitor_or_conflict_notes.label_tag }}{{ form.competitor_or_conflict_notes }}</div>
+                    <div class="col-12">{{ form.example_creators_or_brands.label_tag }}{{ form.example_creators_or_brands }}</div>
+                </div>
+            </section>
+
+            {% if form.errors %}
+                <div class="alert alert-danger mt-3 mb-0">Please fix the highlighted fields and try again.</div>
+            {% endif %}
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-end gap-2">
+            <a href="{{ next_url }}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save preferences</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ import logging
 import secrets
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.shortcuts import render, redirect, get_object_or_404
@@ -21,6 +22,7 @@ from links.models import (
 )
 from creators.models import CreatorMeta
 from .forms import (
+    CompanyCreatorPreferencesForm,
     MerchantSettingsForm,
     ItemGroupForm,
     TeamMemberCreateForm,
@@ -28,7 +30,13 @@ from .forms import (
 )
 from accounts.forms import UserNameForm
 from accounts.models import CustomUser
-from .models import MerchantItem, MerchantMeta, ItemGroup, MerchantTeamMember
+from .models import (
+    CompanyCreatorPreferences,
+    MerchantItem,
+    MerchantMeta,
+    ItemGroup,
+    MerchantTeamMember,
+)
 from shopify_app import billing as shopify_billing
 from shopify_app.shopify_client import ShopifyClient, ShopifyInvalidCredentialsError
 from shopify_app.token_management import clear_shopify_token_for_shop, refresh_shopify_token
@@ -1015,9 +1023,11 @@ def merchant_creator_discovery(request):
     if not merchant_meta:
         return redirect("merchant_dashboard")
 
+    preferences = CompanyCreatorPreferences.objects.filter(merchant=merchant_user).first()
     filters = build_discovery_filters(request.GET)
-    discovery_payload = build_creator_discovery_results(filters)
+    discovery_payload = build_creator_discovery_results(filters, preferences=preferences)
     creator_cards = discovery_payload["cards"]
+    questionnaire_url = f"{reverse('merchant_creator_preferences')}?{urlencode({'next': request.get_full_path()})}"
 
     return render(
         request,
@@ -1032,12 +1042,56 @@ def merchant_creator_discovery(request):
             "available_age_bands": discovery_payload["available_age_bands"],
             "available_locations": discovery_payload["available_locations"],
             "platform_options": DISCOVERY_PLATFORM_OPTIONS,
+            "preferences_saved": bool(preferences and preferences.has_any_preferences),
+            "questionnaire_url": questionnaire_url,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
             "placeholder_filters": [
                 "content_type",
                 "posting_recency",
                 "comment_quality",
             ],
+        },
+    )
+
+
+@login_required
+def merchant_creator_preferences(request):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return redirect("login")
+
+    merchant_user = permissions.merchant
+    if not merchant_user:
+        return redirect("merchant_dashboard")
+
+    merchant_meta = _get_merchant_meta(merchant_user)
+    if not merchant_meta:
+        return redirect("merchant_dashboard")
+
+    preferences, _ = CompanyCreatorPreferences.objects.get_or_create(merchant=merchant_user)
+    next_url = request.GET.get("next") or request.POST.get("next") or reverse("merchant_creator_discovery")
+    if next_url.startswith("http://") or next_url.startswith("https://"):
+        next_url = reverse("merchant_creator_discovery")
+
+    if request.method == "POST":
+        form = CompanyCreatorPreferencesForm(request.POST, instance=preferences)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Preferences saved. We’ll use them to improve match ranking.")
+            return redirect(next_url)
+    else:
+        form = CompanyCreatorPreferencesForm(instance=preferences)
+
+    return render(
+        request,
+        "merchants/creator_preferences_form.html",
+        {
+            "permissions": permissions,
+            "merchant": merchant_user,
+            "merchant_meta": merchant_meta,
+            "form": form,
+            "next_url": next_url,
+            "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
         },
     )
 
