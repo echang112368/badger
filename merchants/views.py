@@ -21,7 +21,6 @@ from links.models import (
     STATUS_INACTIVE,
 )
 from creators.models import CreatorMeta
-from creators.services.social_dashboard import SocialDashboardService
 from .forms import (
     CompanyCreatorPreferencesForm,
     MerchantSettingsForm,
@@ -1056,45 +1055,6 @@ def merchant_creator_discovery(request):
                 "posting_recency",
                 "comment_quality",
             ],
-        },
-    )
-
-
-@login_required
-def merchant_creator_profile(request, creator_uuid):
-    permissions = resolve_merchant_permissions(request.user)
-    if not permissions.can_view_dashboard:
-        return redirect("login")
-
-    merchant_user = permissions.merchant
-    merchant_meta = _get_merchant_meta(merchant_user)
-    if not merchant_meta:
-        return redirect("merchant_dashboard")
-
-    creator_meta = get_object_or_404(
-        CreatorMeta.objects.select_related("user"),
-        uuid=creator_uuid,
-        user__is_creator=True,
-    )
-    dashboard = SocialDashboardService(creator_meta.user).build_dashboard()
-
-    next_url = request.GET.get("next") or reverse("merchant_creator_discovery")
-    if next_url.startswith("http://") or next_url.startswith("https://"):
-        next_url = reverse("merchant_creator_discovery")
-
-    return render(
-        request,
-        "merchants/creator_profile.html",
-        {
-            "merchant": merchant_user,
-            "merchant_meta": merchant_meta,
-            "permissions": permissions,
-            "creator_meta": creator_meta,
-            "creator_user": creator_meta.user,
-            "social_overall": dashboard["overall"],
-            "social_platforms": dashboard["platforms"],
-            "next_url": next_url,
-            "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
         },
     )
 

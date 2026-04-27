@@ -284,7 +284,6 @@ def _extract_creator_data(meta: CreatorMeta) -> dict[str, Any]:
 
     return {
         "creator_id": user.id,
-        "creator_uuid": str(meta.uuid),
         "name": name,
         "handle": handle,
         "platform": platform,
