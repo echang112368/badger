@@ -828,6 +828,10 @@ class CreatorDiscoveryTests(TestCase):
         content = response.content.decode("utf-8")
         self.assertLess(content.index("Lena Miles"), content.index("Ava Stone"))
 
+        response = self.client.get(reverse("merchant_creator_discovery"), {"use_preferences": "0"})
+        content = response.content.decode("utf-8")
+        self.assertLess(content.index("Ava Stone"), content.index("Lena Miles"))
+
     def test_unauthorized_users_cannot_edit_other_company_preferences(self):
         other_merchant = CustomUser.objects.create_user(
             username="merchant_other",
