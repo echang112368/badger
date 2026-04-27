@@ -7,7 +7,13 @@ from django.utils.text import slugify
 
 from shopify_app.oauth import normalise_shop_domain
 
-from .models import ItemGroup, MerchantItem, MerchantMeta, MerchantTeamMember
+from .models import (
+    CompanyCreatorPreferences,
+    ItemGroup,
+    MerchantItem,
+    MerchantMeta,
+    MerchantTeamMember,
+)
 
 
 class TeamMemberCreateForm(forms.Form):
@@ -228,3 +234,82 @@ class ItemGroupForm(forms.ModelForm):
                 "Some selected items already belong to another group."
             )
         return items
+
+
+class CompanyCreatorPreferencesForm(forms.ModelForm):
+    CREATOR_STYLE_CHOICES = [
+        ("educational", "Educational"),
+        ("lifestyle", "Lifestyle"),
+        ("comedic", "Comedic"),
+        ("aesthetic", "Aesthetic"),
+        ("review_testimonial", "Review / testimonial"),
+        ("storytelling", "Storytelling"),
+        ("technical_expert", "Technical expert"),
+    ]
+    CONTENT_DELIVERABLE_CHOICES = [
+        ("reels", "Reels"),
+        ("feed_posts", "Feed posts"),
+        ("stories", "Stories"),
+        ("ugc_only", "UGC only"),
+        ("product_reviews", "Product reviews"),
+        ("tutorials", "Tutorials"),
+    ]
+
+    preferred_creator_style = forms.MultipleChoiceField(
+        choices=CREATOR_STYLE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    content_deliverables = forms.MultipleChoiceField(
+        choices=CONTENT_DELIVERABLE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = CompanyCreatorPreferences
+        fields = [
+            "campaign_goal",
+            "campaign_stage",
+            "preferred_creator_style",
+            "brand_tone",
+            "content_deliverables",
+            "performance_priority",
+            "risk_tolerance",
+            "budget_range",
+            "ideal_creator_description",
+            "brand_description",
+            "product_or_service_description",
+            "campaign_success_definition",
+            "content_to_avoid",
+            "competitor_or_conflict_notes",
+            "example_creators_or_brands",
+        ]
+        widgets = {
+            "campaign_goal": forms.Select(attrs={"class": "form-select"}),
+            "campaign_stage": forms.Select(attrs={"class": "form-select"}),
+            "brand_tone": forms.Select(attrs={"class": "form-select"}),
+            "performance_priority": forms.Select(attrs={"class": "form-select"}),
+            "risk_tolerance": forms.Select(attrs={"class": "form-select"}),
+            "budget_range": forms.Select(attrs={"class": "form-select"}),
+            "ideal_creator_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "brand_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "product_or_service_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "campaign_success_definition": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "content_to_avoid": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "competitor_or_conflict_notes": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "example_creators_or_brands": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in (
+            "campaign_goal",
+            "campaign_stage",
+            "brand_tone",
+            "performance_priority",
+            "risk_tolerance",
+            "budget_range",
+        ):
+            self.fields[name].required = False
+            self.fields[name].choices = [("", "No preference")] + list(self.fields[name].choices)

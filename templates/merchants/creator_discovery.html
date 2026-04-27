@@ -14,6 +14,11 @@
 @media (max-width: 992px){.discovery-shell{grid-template-columns:1fr}.discovery-sidebar{position:static;}}
 </style>
 <div class="container-fluid py-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">Creator Discovery</h1>
@@ -101,6 +106,21 @@
                         <a href="{% url 'merchant_creator_discovery' %}" class="btn btn-outline-secondary">Reset</a>
                     </div>
                     <hr>
+                    <div class="p-3 rounded border bg-light-subtle mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="text-uppercase small text-muted">Matching preferences</div>
+                                {% if preferences_saved %}
+                                    <div class="small text-success fw-semibold">Preferences saved</div>
+                                {% else %}
+                                    <div class="small text-muted">Add preferences to improve matches</div>
+                                {% endif %}
+                            </div>
+                            <a href="{{ questionnaire_url }}" class="btn btn-sm btn-outline-primary">
+                                {% if preferences_saved %}Edit preferences{% else %}Preferences Questionnaire{% endif %}
+                            </a>
+                        </div>
+                    </div>
                     <p class="small text-muted mb-0">Planned next filters: {{ placeholder_filters|join:", " }}.</p>
                 </div>
             </form>

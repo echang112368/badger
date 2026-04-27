@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from creators.models import CreatorMeta, SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
+from merchants.models import CompanyCreatorPreferences
 
 DISCOVERY_PLATFORM_OPTIONS = ["instagram", "tiktok", "youtube", "linkedin"]
 MATCH_STRONG_THRESHOLD = 80
@@ -106,7 +107,90 @@ def _top_demographic_label(rows: list[dict[str, Any]]) -> str:
     return str(top.get("label") or "")
 
 
-def _build_match_score(card: dict[str, Any], filters: DiscoveryFilters) -> int:
+def _text_contains_any(content: str, terms: list[str]) -> bool:
+    lower_content = (content or "").lower()
+    return any(term in lower_content for term in terms if term)
+
+
+def _preferences_score_adjustment(
+    card: dict[str, Any],
+    preferences: CompanyCreatorPreferences | None,
+) -> int:
+    if not preferences:
+        return 0
+
+    adjustment = 0
+    engagement_rate = card.get("engagement_rate") or 0
+    average_reach = card.get("average_reach") or 0
+    profile_views = card.get("profile_views") or 0
+    website_clicks = card.get("website_clicks") or 0
+    comment_rate = card.get("average_comment_rate") or 0
+    save_rate = card.get("average_save_rate") or 0
+    share_rate = card.get("average_share_rate") or 0
+
+    if preferences.campaign_goal == CompanyCreatorPreferences.CampaignGoal.BRAND_AWARENESS:
+        if average_reach >= 15000:
+            adjustment += 8
+        if share_rate and share_rate >= 1.0:
+            adjustment += 3
+    elif preferences.campaign_goal == CompanyCreatorPreferences.CampaignGoal.CONVERSIONS_SALES:
+        if profile_views:
+            adjustment += min(8, int(profile_views / 60))
+        if website_clicks:
+            adjustment += min(10, int(website_clicks / 25))
+        if save_rate and save_rate >= 1.2:
+            adjustment += 3
+    elif preferences.campaign_goal == CompanyCreatorPreferences.CampaignGoal.UGC_CONTENT_CREATION:
+        if card.get("niche_text"):
+            adjustment += 3
+        if engagement_rate and engagement_rate >= 2.5:
+            adjustment += 4
+    elif preferences.campaign_goal == CompanyCreatorPreferences.CampaignGoal.COMMUNITY_GROWTH:
+        if comment_rate and comment_rate >= 0.6:
+            adjustment += 7
+        if engagement_rate and engagement_rate >= 3.5:
+            adjustment += 4
+
+    if preferences.performance_priority == CompanyCreatorPreferences.PerformancePriority.REACH:
+        if average_reach >= 20000:
+            adjustment += 7
+    elif preferences.performance_priority == CompanyCreatorPreferences.PerformancePriority.ENGAGEMENT:
+        if engagement_rate >= 4.0:
+            adjustment += 7
+    elif preferences.performance_priority == CompanyCreatorPreferences.PerformancePriority.CONVERSIONS:
+        adjustment += min(8, int(website_clicks / 30))
+        adjustment += min(5, int(profile_views / 120))
+    elif preferences.performance_priority == CompanyCreatorPreferences.PerformancePriority.CONTENT_QUALITY:
+        if save_rate >= 1.5:
+            adjustment += 5
+        if share_rate >= 1.0:
+            adjustment += 4
+
+    style_keywords = {
+        "educational": ["educat", "tutorial", "how-to"],
+        "lifestyle": ["lifestyle", "daily"],
+        "comedic": ["comedy", "funny", "humor"],
+        "aesthetic": ["aesthetic", "visual"],
+        "review_testimonial": ["review", "testimonial", "comparison"],
+        "storytelling": ["story", "storytelling", "journey"],
+        "technical_expert": ["technical", "expert", "deep dive"],
+    }
+    niche_text = card.get("niche_text", "")
+    matched_styles = 0
+    for style in preferences.preferred_creator_style or []:
+        if _text_contains_any(niche_text, style_keywords.get(style, [])):
+            matched_styles += 1
+    adjustment += min(6, matched_styles * 2)
+    # TODO: Incorporate free-response preference fields via an AI scoring service.
+
+    return max(0, min(20, adjustment))
+
+
+def _build_match_score(
+    card: dict[str, Any],
+    filters: DiscoveryFilters,
+    preferences: CompanyCreatorPreferences | None = None,
+) -> int:
     score = 40
     engagement_rate = card.get("engagement_rate")
     if engagement_rate is not None:
@@ -129,6 +213,7 @@ def _build_match_score(card: dict[str, Any], filters: DiscoveryFilters) -> int:
     if synced_at and synced_at >= timezone.now() - timedelta(days=21):
         score += 10
 
+    score += _preferences_score_adjustment(card, preferences)
     return max(0, min(100, score))
 
 
@@ -265,7 +350,10 @@ def _passes_filters(card: dict[str, Any], filters: DiscoveryFilters) -> bool:
     return True
 
 
-def build_creator_discovery_results(filters: DiscoveryFilters) -> dict[str, Any]:
+def build_creator_discovery_results(
+    filters: DiscoveryFilters,
+    preferences: CompanyCreatorPreferences | None = None,
+) -> dict[str, Any]:
     creator_qs = (
         CreatorMeta.objects.select_related("user")
         .filter(
@@ -290,7 +378,7 @@ def build_creator_discovery_results(filters: DiscoveryFilters) -> dict[str, Any]
 
     for meta in creator_qs:
         card = _extract_creator_data(meta)
-        card["match_score"] = _build_match_score(card, filters)
+        card["match_score"] = _build_match_score(card, filters, preferences)
         card["match_label"] = _match_label(card["match_score"])
         if _passes_filters(card, filters):
             cards.append(card)
