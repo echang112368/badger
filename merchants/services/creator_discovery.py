@@ -29,6 +29,7 @@ class DiscoveryFilters:
     audience_location: str = ""
     min_match_score: int | None = None
     view: str = "grid"
+    use_saved_preferences: bool = True
 
 
 
@@ -62,6 +63,9 @@ def build_discovery_filters(params) -> DiscoveryFilters:
     if min_match_score is not None:
         min_match_score = max(0, min(100, min_match_score))
 
+    use_saved_preferences_raw = (params.get("use_preferences") or "1").strip().lower()
+    use_saved_preferences = use_saved_preferences_raw not in {"0", "false", "off", "no"}
+
     return DiscoveryFilters(
         query=(params.get("q") or "").strip(),
         platform=platform,
@@ -74,6 +78,7 @@ def build_discovery_filters(params) -> DiscoveryFilters:
         audience_location=(params.get("audience_location") or "").strip(),
         min_match_score=min_match_score,
         view=view,
+        use_saved_preferences=use_saved_preferences,
     )
 
 

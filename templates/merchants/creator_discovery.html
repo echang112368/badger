@@ -120,6 +120,23 @@
                                 {% if preferences_saved %}Edit preferences{% else %}Preferences Questionnaire{% endif %}
                             </a>
                         </div>
+                        <div class="form-check form-switch mt-3 mb-0">
+                            <input type="hidden" name="use_preferences" value="0">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id="usePreferencesSwitch"
+                                name="use_preferences"
+                                value="1"
+                                {% if filter_values.use_saved_preferences and preferences_saved %}checked{% endif %}
+                                {% if not preferences_saved %}disabled{% endif %}
+                                onchange="this.form.submit()"
+                            >
+                            <label class="form-check-label small" for="usePreferencesSwitch">
+                                Use saved preferences for ranking
+                            </label>
+                        </div>
                     </div>
                     <p class="small text-muted mb-0">Planned next filters: {{ placeholder_filters|join:", " }}.</p>
                 </div>
