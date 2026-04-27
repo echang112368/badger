@@ -4,7 +4,7 @@ import json
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from .models import MerchantMeta
+from .models import CompanyCreatorPreferences, MerchantMeta
 from creators.models import CreatorMeta, SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
 from decimal import Decimal
@@ -638,7 +638,49 @@ class CreatorDiscoveryTests(TestCase):
                     "audience_country": [{"label": "US", "value": 70}],
                     "audience_city": [{"label": "Austin", "value": 41}],
                 },
-                "performance": {"reach": 42000, "website_clicks": 101, "profile_visits": 204},
+                "performance": {"reach": 42000, "website_clicks": 8, "profile_visits": 80},
+            },
+        )
+        self.creator_two = CustomUser.objects.create_user(
+            username="creator_conversion",
+            password="pass123",
+            email="creator_conversion@example.com",
+            is_creator=True,
+            first_name="Lena",
+            last_name="Miles",
+        )
+        self.creator_two_meta = CreatorMeta.objects.get(user=self.creator_two)
+        self.creator_two_meta.marketplace_enabled = True
+        self.creator_two_meta.content_skills = ["Storytelling", "Beauty"]
+        self.creator_two_meta.save()
+
+        InstagramConnection.objects.create(
+            user=self.creator_two,
+            instagram_user_id="ig_creator_conversion",
+            instagram_username="lena_converts",
+            followers_count=45000,
+        )
+        SocialAnalyticsSnapshot.objects.create(
+            user=self.creator_two,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload={
+                "account": {"followers_count": 45000, "username": "lena_converts"},
+                "summary_metrics": {
+                    "average_engagement_rate": 0.039,
+                    "average_reach": 18000,
+                    "average_comment_rate": 0.008,
+                    "average_save_rate": 0.024,
+                    "average_share_rate": 0.011,
+                },
+                "demographics": {
+                    "audience_gender_age": [
+                        {"label": "female,25-34", "value": 58},
+                        {"label": "male,18-24", "value": 42},
+                    ],
+                    "audience_country": [{"label": "US", "value": 77}],
+                    "audience_city": [{"label": "Seattle", "value": 35}],
+                },
+                "performance": {"reach": 21000, "website_clicks": 222, "profile_visits": 510},
             },
         )
 
@@ -693,3 +735,115 @@ class CreatorDiscoveryTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("login"), response.url)
+
+    def test_company_can_open_preferences_form(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_preferences"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Preferences Questionnaire")
+
+    def test_company_can_save_preferences_and_load_them_again(self):
+        self.client.force_login(self.merchant)
+        payload = {
+            "campaign_goal": "conversions_sales",
+            "campaign_stage": "ready_to_contact",
+            "preferred_creator_style": ["storytelling", "review_testimonial"],
+            "brand_tone": "professional",
+            "content_deliverables": ["reels", "product_reviews"],
+            "performance_priority": "conversions",
+            "risk_tolerance": "balanced",
+            "budget_range": "1500_5000",
+            "ideal_creator_description": "Needs strong trust-based storytelling.",
+            "brand_description": "Science-backed skincare startup.",
+            "product_or_service_description": "Acne-safe routine kits.",
+            "campaign_success_definition": "Landing-page traffic and orders.",
+            "content_to_avoid": "No misleading before/after claims.",
+            "competitor_or_conflict_notes": "Avoid creators in paid contracts with direct competitors.",
+            "example_creators_or_brands": "Creators similar to @dermdoc",
+            "next": reverse("merchant_creator_discovery"),
+        }
+        response = self.client.post(reverse("merchant_creator_preferences"), payload)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("merchant_creator_discovery"))
+
+        saved = CompanyCreatorPreferences.objects.get(merchant=self.merchant)
+        self.assertEqual(saved.campaign_goal, "conversions_sales")
+        self.assertIn("storytelling", saved.preferred_creator_style)
+
+        response = self.client.get(reverse("merchant_creator_preferences"))
+        self.assertContains(response, "conversions_sales")
+        self.assertContains(response, "Science-backed skincare startup.")
+
+    def test_preferences_persist_after_refresh(self):
+        self.client.force_login(self.merchant)
+        CompanyCreatorPreferences.objects.create(
+            merchant=self.merchant,
+            campaign_goal="brand_awareness",
+            preferred_creator_style=["educational"],
+            brand_description="Persistent value",
+        )
+        response = self.client.get(reverse("merchant_creator_preferences"))
+        self.assertContains(response, "brand_awareness")
+        self.assertContains(response, "Persistent value")
+        response = self.client.get(reverse("merchant_creator_preferences"))
+        self.assertContains(response, "Persistent value")
+
+    def test_preferences_form_allows_partial_optional_answers(self):
+        self.client.force_login(self.merchant)
+        response = self.client.post(
+            reverse("merchant_creator_preferences"),
+            {"brand_description": "Only one field filled", "next": reverse("merchant_creator_discovery")},
+        )
+        self.assertEqual(response.status_code, 302)
+        saved = CompanyCreatorPreferences.objects.get(merchant=self.merchant)
+        self.assertEqual(saved.brand_description, "Only one field filled")
+
+    def test_discovery_with_and_without_preferences(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ava Stone")
+
+        CompanyCreatorPreferences.objects.create(
+            merchant=self.merchant,
+            campaign_goal="community_growth",
+            performance_priority="engagement",
+        )
+        response = self.client.get(reverse("merchant_creator_discovery"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ava Stone")
+
+    def test_preferences_affect_match_ranking(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+        self.assertContains(response, "Ava Stone")
+
+        CompanyCreatorPreferences.objects.create(
+            merchant=self.merchant,
+            campaign_goal="conversions_sales",
+            performance_priority="conversions",
+            preferred_creator_style=["storytelling"],
+        )
+        response = self.client.get(reverse("merchant_creator_discovery"))
+        content = response.content.decode("utf-8")
+        self.assertLess(content.index("Lena Miles"), content.index("Ava Stone"))
+
+    def test_unauthorized_users_cannot_edit_other_company_preferences(self):
+        other_merchant = CustomUser.objects.create_user(
+            username="merchant_other",
+            password="pass123",
+            email="merchant_other@example.com",
+            is_merchant=True,
+        )
+        CompanyCreatorPreferences.objects.create(
+            merchant=other_merchant,
+            brand_description="Do not change",
+        )
+
+        self.client.force_login(self.merchant)
+        self.client.post(
+            reverse("merchant_creator_preferences"),
+            {"brand_description": "Attempted edit", "next": reverse("merchant_creator_discovery")},
+        )
+        other_preferences = CompanyCreatorPreferences.objects.get(merchant=other_merchant)
+        self.assertEqual(other_preferences.brand_description, "Do not change")

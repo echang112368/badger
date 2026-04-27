@@ -230,6 +230,102 @@ class MerchantMeta(models.Model):
 
         return not self.shopify_access_token or not self.shopify_store_domain
 
+
+class CompanyCreatorPreferences(models.Model):
+    class CampaignGoal(models.TextChoices):
+        BRAND_AWARENESS = "brand_awareness", "Brand awareness"
+        CONVERSIONS_SALES = "conversions_sales", "Conversions / sales"
+        WEBSITE_TRAFFIC = "website_traffic", "Website traffic"
+        UGC_CONTENT_CREATION = "ugc_content_creation", "UGC content creation"
+        PRODUCT_LAUNCH = "product_launch", "Product launch"
+        COMMUNITY_GROWTH = "community_growth", "Community growth"
+
+    class CampaignStage(models.TextChoices):
+        EXPLORING = "exploring", "Exploring"
+        READY_TO_CONTACT = "ready_to_contact", "Ready to contact"
+        ACTIVE_CAMPAIGN = "active_campaign", "Active campaign"
+
+    class BrandTone(models.TextChoices):
+        CASUAL = "casual", "Casual"
+        PREMIUM = "premium", "Premium"
+        PLAYFUL = "playful", "Playful"
+        PROFESSIONAL = "professional", "Professional"
+        SCIENCE_BACKED = "science_backed", "Science-backed"
+        LUXURY = "luxury", "Luxury"
+
+    class PerformancePriority(models.TextChoices):
+        REACH = "reach", "Reach"
+        ENGAGEMENT = "engagement", "Engagement"
+        CONVERSIONS = "conversions", "Conversions"
+        AUDIENCE_FIT = "audience_fit", "Audience fit"
+        CONTENT_QUALITY = "content_quality", "Content quality"
+
+    class RiskTolerance(models.TextChoices):
+        CONSERVATIVE = "conservative_brand_safe", "Conservative / brand-safe"
+        BALANCED = "balanced", "Balanced"
+        EXPERIMENTAL = "experimental_trend_driven", "Experimental / trend-driven"
+
+    class BudgetRange(models.TextChoices):
+        UNDER_500 = "under_500", "Under $500"
+        FROM_500_TO_1500 = "500_1500", "$500-$1,500"
+        FROM_1500_TO_5000 = "1500_5000", "$1,500-$5,000"
+        FROM_5000_PLUS = "5000_plus", "$5,000+"
+
+    merchant = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="creator_preferences",
+    )
+    campaign_goal = models.CharField(max_length=40, choices=CampaignGoal.choices, blank=True)
+    campaign_stage = models.CharField(max_length=32, choices=CampaignStage.choices, blank=True)
+    preferred_creator_style = models.JSONField(default=list, blank=True)
+    brand_tone = models.CharField(max_length=32, choices=BrandTone.choices, blank=True)
+    content_deliverables = models.JSONField(default=list, blank=True)
+    performance_priority = models.CharField(
+        max_length=32,
+        choices=PerformancePriority.choices,
+        blank=True,
+    )
+    risk_tolerance = models.CharField(max_length=40, choices=RiskTolerance.choices, blank=True)
+    budget_range = models.CharField(max_length=32, choices=BudgetRange.choices, blank=True)
+    ideal_creator_description = models.TextField(blank=True)
+    brand_description = models.TextField(blank=True)
+    product_or_service_description = models.TextField(blank=True)
+    campaign_success_definition = models.TextField(blank=True)
+    content_to_avoid = models.TextField(blank=True)
+    competitor_or_conflict_notes = models.TextField(blank=True)
+    example_creators_or_brands = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Company creator preferences"
+        verbose_name_plural = "Company creator preferences"
+
+    def __str__(self):
+        return f"Creator preferences for {self.merchant.username}"
+
+    @property
+    def has_any_preferences(self) -> bool:
+        values = [
+            self.campaign_goal,
+            self.campaign_stage,
+            self.preferred_creator_style,
+            self.brand_tone,
+            self.content_deliverables,
+            self.performance_priority,
+            self.risk_tolerance,
+            self.budget_range,
+            self.ideal_creator_description,
+            self.brand_description,
+            self.product_or_service_description,
+            self.campaign_success_definition,
+            self.content_to_avoid,
+            self.competitor_or_conflict_notes,
+            self.example_creators_or_brands,
+        ]
+        return any(value for value in values)
+
 class MerchantItem(models.Model):
     merchant = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
