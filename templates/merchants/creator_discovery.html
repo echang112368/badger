@@ -190,7 +190,7 @@
                             {% else %}
                                 <span class="card-pill match-badge-low">{{ creator.match_label }}</span>
                             {% endif %}
-                            <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary float-end">View creator</a>
+                            <a href="{% url 'merchant_creators' %}" class="btn btn-primary float-end">View creator</a>
                         </div>
                     </article>
                 {% empty %}
