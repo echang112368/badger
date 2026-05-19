@@ -4,6 +4,11 @@
 {% block content %}
 <div class="py-4 social-media-page">
   <style>
+    .social-media-page {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
     .social-media-page .hero-card {
       background: linear-gradient(135deg, #1f3b7a 0%, #304f91 45%, #4466b0 100%);
       color: #fff;
@@ -54,6 +59,30 @@
       color: #5a6b86;
       background: #f8faff;
       border-bottom: 1px solid #e7eef8;
+    }
+    .social-media-page .panel,
+    .social-media-page .accordion,
+    .social-media-page .accordion-body,
+    .social-media-page .row,
+    .social-media-page [class*="col-"] {
+      min-width: 0;
+    }
+    .social-media-page .table-responsive {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+    .social-media-page .table {
+      width: 100%;
+      table-layout: auto;
+    }
+    .social-media-page .table th,
+    .social-media-page .table td {
+      white-space: normal;
+      word-break: break-word;
+    }
+    .social-media-page .form-control {
+      max-width: 100%;
     }
   </style>
 
@@ -247,7 +276,7 @@
                   <h3 class="h6 mb-0">Post Performance Explorer</h3>
                   <div class="d-flex gap-2 align-items-center">
                     <label class="small text-muted" for="content-search-{{ platform.slug }}">Find media</label>
-                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm" style="width: 220px;" placeholder="Search by media ID or type">
+                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm w-auto" style="min-width: 160px;" placeholder="Search by media ID or type">
                   </div>
                 </div>
                 <p class="small text-muted mb-3">Standardized post analytics ranked by standardized performance score.</p>
