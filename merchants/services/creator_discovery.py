@@ -10,8 +10,6 @@ from django.utils import timezone
 from creators.models import CreatorMeta, SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
 from merchants.models import CompanyCreatorPreferences
-from creatorMatch.services.matching.context_builders import build_business_context
-from creatorMatch.services.matching.orchestrator import apply_matching_scores
 
 DISCOVERY_PLATFORM_OPTIONS = ["instagram", "tiktok", "youtube", "linkedin"]
 MATCH_STRONG_THRESHOLD = 80
@@ -232,7 +230,6 @@ def _match_label(score: int) -> str:
     return "Low Match"
 
 
-
 def _extract_creator_data(meta: CreatorMeta) -> dict[str, Any]:
     user = meta.user
     profile_platform, _, avatar_url = meta.primary_platform_data()
@@ -385,11 +382,12 @@ def build_creator_discovery_results(
     age_bands: set[str] = set()
     location_values: set[str] = set()
 
-    business_context = build_business_context(preferences, filters)
-
     for meta in creator_qs:
         card = _extract_creator_data(meta)
-        card["fallback_match_score"] = _build_match_score(card, filters, preferences)
+        card["match_score"] = _build_match_score(card, filters, preferences)
+        card["match_label"] = _match_label(card["match_score"])
+        if _passes_filters(card, filters):
+            cards.append(card)
 
         for skill in card.get("niche") or []:
             niche_values.add(skill)
@@ -398,20 +396,10 @@ def build_creator_discovery_results(
         if card.get("audience_location"):
             location_values.add(str(card["audience_location"]))
 
-        cards.append(card)
-
-    cards = apply_matching_scores(cards, business_context=business_context, fallback_score_key="fallback_match_score")
-
-    filtered_cards: list[dict[str, Any]] = []
-    for card in cards:
-        card["match_label"] = _match_label(card["match_score"])
-        if _passes_filters(card, filters):
-            filtered_cards.append(card)
-
-    filtered_cards.sort(key=lambda row: (-(row.get("match_score") or 0), -(row.get("engagement_rate") or 0), -(row.get("followers_count") or 0), row.get("name", "").lower()))
+    cards.sort(key=lambda row: (-(row.get("match_score") or 0), -(row.get("engagement_rate") or 0), -(row.get("followers_count") or 0), row.get("name", "").lower()))
 
     return {
-        "cards": filtered_cards,
+        "cards": cards,
         "available_niches": sorted(niche_values),
         "available_age_bands": sorted(age_bands),
         "available_locations": sorted(location_values),
