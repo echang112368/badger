@@ -265,6 +265,18 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
+    budget_min = forms.IntegerField(
+        required=False,
+        min_value=0,
+        label="Budget minimum",
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "e.g. 1000"}),
+    )
+    budget_max = forms.IntegerField(
+        required=False,
+        min_value=0,
+        label="Budget maximum",
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "e.g. 5000"}),
+    )
 
     class Meta:
         model = CompanyCreatorPreferences
@@ -276,7 +288,8 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
             "content_deliverables",
             "performance_priority",
             "risk_tolerance",
-            "budget_range",
+            "budget_min",
+            "budget_max",
             "ideal_creator_description",
             "brand_description",
             "product_or_service_description",
@@ -291,7 +304,6 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
             "brand_tone": forms.Select(attrs={"class": "form-select"}),
             "performance_priority": forms.Select(attrs={"class": "form-select"}),
             "risk_tolerance": forms.Select(attrs={"class": "form-select"}),
-            "budget_range": forms.Select(attrs={"class": "form-select"}),
             "ideal_creator_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "brand_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "product_or_service_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
@@ -309,7 +321,16 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
             "brand_tone",
             "performance_priority",
             "risk_tolerance",
-            "budget_range",
         ):
             self.fields[name].required = False
             self.fields[name].choices = [("", "No preference")] + list(self.fields[name].choices)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        budget_min = cleaned_data.get("budget_min")
+        budget_max = cleaned_data.get("budget_max")
+
+        if budget_min is not None and budget_max is not None and budget_min > budget_max:
+            self.add_error("budget_max", "Maximum budget must be greater than or equal to minimum budget.")
+
+        return cleaned_data
