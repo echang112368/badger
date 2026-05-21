@@ -288,6 +288,8 @@ class CompanyCreatorPreferences(models.Model):
     )
     risk_tolerance = models.CharField(max_length=40, choices=RiskTolerance.choices, blank=True)
     budget_range = models.CharField(max_length=32, choices=BudgetRange.choices, blank=True)
+    budget_min = models.PositiveIntegerField(blank=True, null=True)
+    budget_max = models.PositiveIntegerField(blank=True, null=True)
     ideal_creator_description = models.TextField(blank=True)
     brand_description = models.TextField(blank=True)
     product_or_service_description = models.TextField(blank=True)
@@ -316,6 +318,8 @@ class CompanyCreatorPreferences(models.Model):
             self.performance_priority,
             self.risk_tolerance,
             self.budget_range,
+            self.budget_min,
+            self.budget_max,
             self.ideal_creator_description,
             self.brand_description,
             self.product_or_service_description,
