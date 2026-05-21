@@ -752,7 +752,8 @@ class CreatorDiscoveryTests(TestCase):
             "content_deliverables": ["reels", "product_reviews"],
             "performance_priority": "conversions",
             "risk_tolerance": "balanced",
-            "budget_range": "1500_5000",
+            "budget_min": "1500",
+            "budget_max": "5000",
             "ideal_creator_description": "Needs strong trust-based storytelling.",
             "brand_description": "Science-backed skincare startup.",
             "product_or_service_description": "Acne-safe routine kits.",
@@ -769,6 +770,8 @@ class CreatorDiscoveryTests(TestCase):
         saved = CompanyCreatorPreferences.objects.get(merchant=self.merchant)
         self.assertEqual(saved.campaign_goal, "conversions_sales")
         self.assertIn("storytelling", saved.preferred_creator_style)
+        self.assertEqual(saved.budget_min, 1500)
+        self.assertEqual(saved.budget_max, 5000)
 
         response = self.client.get(reverse("merchant_creator_preferences"))
         self.assertContains(response, "conversions_sales")
@@ -797,6 +800,17 @@ class CreatorDiscoveryTests(TestCase):
         self.assertEqual(response.status_code, 302)
         saved = CompanyCreatorPreferences.objects.get(merchant=self.merchant)
         self.assertEqual(saved.brand_description, "Only one field filled")
+
+    def test_preferences_budget_range_supports_open_ended_values(self):
+        self.client.force_login(self.merchant)
+        response = self.client.post(
+            reverse("merchant_creator_preferences"),
+            {"budget_min": "3000", "next": reverse("merchant_creator_discovery")},
+        )
+        self.assertEqual(response.status_code, 302)
+        saved = CompanyCreatorPreferences.objects.get(merchant=self.merchant)
+        self.assertEqual(saved.budget_min, 3000)
+        self.assertIsNone(saved.budget_max)
 
     def test_discovery_with_and_without_preferences(self):
         self.client.force_login(self.merchant)

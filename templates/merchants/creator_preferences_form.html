@@ -20,7 +20,14 @@
                 <div class="row g-3">
                     <div class="col-md-6">{{ form.campaign_goal.label_tag }}{{ form.campaign_goal }}</div>
                     <div class="col-md-6">{{ form.campaign_stage.label_tag }}{{ form.campaign_stage }}</div>
-                    <div class="col-md-6">{{ form.budget_range.label_tag }}{{ form.budget_range }}</div>
+                    <div class="col-md-3">{{ form.budget_min.label_tag }}{{ form.budget_min }}</div>
+                    <div class="col-md-3">{{ form.budget_max.label_tag }}{{ form.budget_max }}</div>
+                    <div class="col-12">
+                        <small class="text-muted">
+                            Budget range is optional. Leave minimum blank for any budget up to your maximum.
+                            Leave maximum blank for any budget above your minimum.
+                        </small>
+                    </div>
                 </div>
             </section>
 
