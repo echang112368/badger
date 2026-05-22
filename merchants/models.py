@@ -241,9 +241,9 @@ class CompanyCreatorPreferences(models.Model):
         COMMUNITY_GROWTH = "community_growth", "Community growth"
 
     class CampaignStage(models.TextChoices):
-        EXPLORING = "exploring", "Exploring"
-        READY_TO_CONTACT = "ready_to_contact", "Ready to contact"
-        ACTIVE_CAMPAIGN = "active_campaign", "Active campaign"
+        EXPLORING = "exploring", "Exploring (broader discovery)"
+        READY_TO_CONTACT = "ready_to_contact", "Ready to contact (shortlist quality)"
+        ACTIVE_CAMPAIGN = "active_campaign", "Active campaign (execution-focused)"
 
     class BrandTone(models.TextChoices):
         CASUAL = "casual", "Casual"
@@ -252,6 +252,7 @@ class CompanyCreatorPreferences(models.Model):
         PROFESSIONAL = "professional", "Professional"
         SCIENCE_BACKED = "science_backed", "Science-backed"
         LUXURY = "luxury", "Luxury"
+
 
     class PerformancePriority(models.TextChoices):
         REACH = "reach", "Reach"
@@ -290,6 +291,15 @@ class CompanyCreatorPreferences(models.Model):
     budget_range = models.CharField(max_length=32, choices=BudgetRange.choices, blank=True)
     budget_min = models.PositiveIntegerField(blank=True, null=True)
     budget_max = models.PositiveIntegerField(blank=True, null=True)
+    brand_tone_keywords = models.CharField(max_length=120, blank=True)
+    target_customer_age_range = models.CharField(max_length=50, blank=True)
+    target_customer_gender_skew = models.CharField(max_length=50, blank=True)
+    target_customer_location = models.CharField(max_length=120, blank=True)
+    preferred_platforms = models.JSONField(default=list, blank=True)
+    minimum_engagement_rate = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
+    success_metric_priority = models.CharField(max_length=40, blank=True)
+    has_run_influencer_campaigns_before = models.BooleanField(blank=True, null=True)
+    past_campaign_learnings = models.TextField(blank=True)
     ideal_creator_description = models.TextField(blank=True)
     brand_description = models.TextField(blank=True)
     product_or_service_description = models.TextField(blank=True)
@@ -320,6 +330,15 @@ class CompanyCreatorPreferences(models.Model):
             self.budget_range,
             self.budget_min,
             self.budget_max,
+            self.brand_tone_keywords,
+            self.target_customer_age_range,
+            self.target_customer_gender_skew,
+            self.target_customer_location,
+            self.preferred_platforms,
+            self.minimum_engagement_rate,
+            self.success_metric_priority,
+            self.has_run_influencer_campaigns_before,
+            self.past_campaign_learnings,
             self.ideal_creator_description,
             self.brand_description,
             self.product_or_service_description,
