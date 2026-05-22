@@ -32,8 +32,11 @@ def _build_bulk_prompt(candidates: list[dict[str, Any]], business_context: dict[
     payload = {"candidates": candidates, "business": business_context}
     return (
         "You are a creator-brand partnership analyst. Score each creator candidate. "
+        "Use the business questionnaire/preferences data heavily when ranking compatibility. "
+        "The compatibility score must reflect both creator performance signals and how well the creator matches what the business asked for in the questionnaire. "
+        "In reasoning and summary, mention specific business needs and why this creator is or is not a fit for those needs. "
         "Return strict JSON: {\"results\": [{\"creator_id\": int, \"score\": int 0-100, \"reasoning\": string, \"creator_summary\": string, \"highlights\": [string up to 3]}]}. "
-        "No markdown. Keep reasoning concise.\n\n"
+        "No markdown. Keep reasoning concise but specific.\n\n"
         f"Data:\n{json.dumps(payload, ensure_ascii=False)}"
     )
 
