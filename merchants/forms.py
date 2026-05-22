@@ -254,6 +254,20 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
         ("product_reviews", "Product reviews"),
         ("tutorials", "Tutorials"),
     ]
+    PLATFORM_CHOICES = [
+        ("instagram", "Instagram"),
+        ("tiktok", "TikTok"),
+        ("youtube", "YouTube"),
+        ("facebook", "Facebook"),
+        ("pinterest", "Pinterest"),
+    ]
+    SUCCESS_METRIC_CHOICES = [
+        ("link_clicks", "Link clicks"),
+        ("promo_code_redemptions", "Promo code redemptions"),
+        ("follower_growth", "Follower growth"),
+        ("content_saves", "Content saves"),
+        ("brand_mentions", "Brand mentions"),
+    ]
 
     preferred_creator_style = forms.MultipleChoiceField(
         choices=CREATOR_STYLE_CHOICES,
@@ -262,6 +276,11 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
     )
     content_deliverables = forms.MultipleChoiceField(
         choices=CONTENT_DELIVERABLE_CHOICES,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    preferred_platforms = forms.MultipleChoiceField(
+        choices=PLATFORM_CHOICES,
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
@@ -277,6 +296,14 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
         label="Budget maximum",
         widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "e.g. 5000"}),
     )
+    minimum_engagement_rate = forms.DecimalField(
+        required=False,
+        min_value=0,
+        max_value=100,
+        decimal_places=2,
+        label="Minimum engagement rate (%)",
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "e.g. 3.00"}),
+    )
 
     class Meta:
         model = CompanyCreatorPreferences
@@ -285,11 +312,20 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
             "campaign_stage",
             "preferred_creator_style",
             "brand_tone",
+            "brand_tone_keywords",
+            "target_customer_age_range",
+            "target_customer_gender_skew",
+            "target_customer_location",
+            "preferred_platforms",
             "content_deliverables",
             "performance_priority",
             "risk_tolerance",
             "budget_min",
             "budget_max",
+            "minimum_engagement_rate",
+            "success_metric_priority",
+            "has_run_influencer_campaigns_before",
+            "past_campaign_learnings",
             "ideal_creator_description",
             "brand_description",
             "product_or_service_description",
@@ -301,13 +337,19 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
         widgets = {
             "campaign_goal": forms.Select(attrs={"class": "form-select"}),
             "campaign_stage": forms.Select(attrs={"class": "form-select"}),
-            "brand_tone": forms.Select(attrs={"class": "form-select"}),
             "performance_priority": forms.Select(attrs={"class": "form-select"}),
             "risk_tolerance": forms.Select(attrs={"class": "form-select"}),
+            "brand_tone_keywords": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. warm, evidence-led, optimistic"}),
+            "target_customer_age_range": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 25-40"}),
+            "target_customer_gender_skew": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. 70% women, 30% men"}),
+            "target_customer_location": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. United States, urban metros"}),
+            "success_metric_priority": forms.Select(attrs={"class": "form-select"}),
+            "has_run_influencer_campaigns_before": forms.Select(attrs={"class": "form-select"}),
+            "past_campaign_learnings": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "ideal_creator_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
-            "brand_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
-            "product_or_service_description": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
-            "campaign_success_definition": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "brand_description": forms.Textarea(attrs={"rows": 3, "class": "form-control", "placeholder": "e.g. We make clean skincare for busy moms who want effective products without harsh chemicals."}),
+            "product_or_service_description": forms.Textarea(attrs={"rows": 3, "class": "form-control", "placeholder": "e.g. Hero product is a fragrance-free vitamin C serum for sensitive skin."}),
+            "campaign_success_definition": forms.Textarea(attrs={"rows": 3, "class": "form-control", "placeholder": "e.g. 500 qualified clicks and 50 first-time purchases in 30 days."}),
             "content_to_avoid": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "competitor_or_conflict_notes": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
             "example_creators_or_brands": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
@@ -318,12 +360,24 @@ class CompanyCreatorPreferencesForm(forms.ModelForm):
         for name in (
             "campaign_goal",
             "campaign_stage",
-            "brand_tone",
             "performance_priority",
             "risk_tolerance",
         ):
             self.fields[name].required = False
             self.fields[name].choices = [("", "No preference")] + list(self.fields[name].choices)
+        self.fields["performance_priority"].choices[0] = ("", "No preference (we'll balance reach, engagement, and conversions)")
+        self.fields["risk_tolerance"].choices = [
+            ("", "No preference"),
+            ("conservative_brand_safe", "Low risk (brand-safe, conservative content)"),
+            ("balanced", "Balanced"),
+            ("experimental_trend_driven", "High risk (edgier creators, bigger upside)"),
+        ]
+        self.fields["success_metric_priority"].choices = [("", "No preference")] + self.SUCCESS_METRIC_CHOICES
+        self.fields["has_run_influencer_campaigns_before"].choices = [
+            ("", "Select one"),
+            ("True", "Yes"),
+            ("False", "No"),
+        ]
 
     def clean(self):
         cleaned_data = super().clean()
