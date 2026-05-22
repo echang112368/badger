@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
             <h1 class="h3 mb-1">Preferences Questionnaire</h1>
-            <p class="text-muted mb-0">Optional responses to improve creator match ranking. Existing analytics filters still apply separately.</p>
+            <p class="text-muted mb-0">Step 1 (required): campaign goal + target customer. Step 2 (optional): refine results with style, performance, and restrictions.</p>
         </div>
         <a href="{{ next_url }}" class="btn btn-outline-secondary">Back to discovery</a>
     </div>
@@ -32,9 +32,20 @@
             </section>
 
             <section class="mb-4">
+                <h2 class="h5">Target customer demographics</h2>
+                <div class="row g-3">
+                    <div class="col-md-4">{{ form.target_customer_age_range.label_tag }}{{ form.target_customer_age_range }}</div>
+                    <div class="col-md-4">{{ form.target_customer_gender_skew.label_tag }}{{ form.target_customer_gender_skew }}</div>
+                    <div class="col-md-4">{{ form.target_customer_location.label_tag }}{{ form.target_customer_location }}</div>
+                    <div class="col-md-6">{{ form.preferred_platforms.label_tag }}{{ form.preferred_platforms }}</div>
+                    <div class="col-md-6">{{ form.minimum_engagement_rate.label_tag }}{{ form.minimum_engagement_rate }}</div>
+                </div>
+            </section>
+
+            <section class="mb-4">
                 <h2 class="h5">Brand fit</h2>
                 <div class="row g-3">
-                    <div class="col-md-6">{{ form.brand_tone.label_tag }}{{ form.brand_tone }}</div>
+                    <div class="col-md-6">{{ form.brand_tone_keywords.label_tag }}{{ form.brand_tone_keywords }}</div>
                     <div class="col-12">{{ form.brand_description.label_tag }}{{ form.brand_description }}</div>
                     <div class="col-12">{{ form.product_or_service_description.label_tag }}{{ form.product_or_service_description }}</div>
                     <div class="col-12">{{ form.ideal_creator_description.label_tag }}{{ form.ideal_creator_description }}</div>
@@ -54,6 +65,9 @@
                 <div class="row g-3">
                     <div class="col-md-6">{{ form.performance_priority.label_tag }}{{ form.performance_priority }}</div>
                     <div class="col-md-6">{{ form.risk_tolerance.label_tag }}{{ form.risk_tolerance }}</div>
+                    <div class="col-md-6">{{ form.success_metric_priority.label_tag }}{{ form.success_metric_priority }}</div>
+                    <div class="col-md-6">{{ form.has_run_influencer_campaigns_before.label_tag }}{{ form.has_run_influencer_campaigns_before }}</div>
+                    <div class="col-12">{{ form.past_campaign_learnings.label_tag }}{{ form.past_campaign_learnings }}</div>
                     <div class="col-12">{{ form.campaign_success_definition.label_tag }}{{ form.campaign_success_definition }}</div>
                 </div>
             </section>
