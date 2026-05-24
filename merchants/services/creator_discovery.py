@@ -362,6 +362,7 @@ def _passes_filters(card: dict[str, Any], filters: DiscoveryFilters) -> bool:
 def build_creator_discovery_results(
     filters: DiscoveryFilters,
     preferences: CompanyCreatorPreferences | None = None,
+    force_refresh: bool = False,
 ) -> dict[str, Any]:
     creator_qs = (
         CreatorMeta.objects.select_related("user")
@@ -400,7 +401,12 @@ def build_creator_discovery_results(
 
         cards.append(card)
 
-    cards = apply_matching_scores(cards, business_context=business_context, fallback_score_key="fallback_match_score")
+    cards = apply_matching_scores(
+        cards,
+        business_context=business_context,
+        fallback_score_key="fallback_match_score",
+        force_refresh=force_refresh,
+    )
 
     filtered_cards: list[dict[str, Any]] = []
     for card in cards:
