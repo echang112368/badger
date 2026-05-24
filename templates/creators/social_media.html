@@ -218,9 +218,25 @@
               <div class="row g-3 mb-3">
                 <div class="col-lg-4">
                   <div class="metric-card p-3 h-100">
-                    <h3 class="h6 mb-2">Standardized Performance Score <span class="ms-1 text-muted" title="Score is a 0-100 standardized performance index blended from engagement rate, save rate, share rate, profile visit rate, and view efficiency." aria-label="Score explanation">ⓘ</span></h3>
-                    <div class="metric-value">{{ platform.metrics.standardized_performance_score }}</div>
-                    <div class="small text-muted">0-100 blended score from engagement rate, save rate, share rate, profile visit rate, and view efficiency.</div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <div>
+                        <h3 class="h6 mb-1">Profile analyzer</h3>
+                        <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
+                      </div>
+                      <a href="?refresh={{ platform.slug }}" class="btn btn-sm btn-outline-secondary">Re-analyze</a>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 mt-3">
+                      <div class="rounded-circle border border-success d-flex align-items-center justify-content-center" style="height:86px;width:86px;">
+                        <div class="text-center">
+                          <div class="h4 mb-0">{{ platform.metrics.ai_profile_feedback.overall_score|default:'—' }}</div>
+                          <div class="small text-muted">/100</div>
+                        </div>
+                      </div>
+                      <div>
+                        <span class="badge rounded-pill text-bg-success-subtle border mb-2">{{ platform.metrics.ai_profile_feedback.verdict|default:'Awaiting AI profile evaluation' }}</span>
+                        <div class="fw-semibold">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="col-lg-8">
@@ -252,22 +268,86 @@
               </div>
 
               <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">Insights</h3>
+                <h3 class="h6 mb-2">AI Feedback</h3>
+                <div class="row g-2 mb-2">
+                  <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|default:'-' }}%</div></div>
+                  <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|default:'-' }}%</div></div>
+                  <div class="col-md-3"><strong>Audience Concentration</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.audience_concentration_pct|default:'-' }}%</div></div>
+                  <div class="col-md-3"><strong>Save Activity</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.save_rate_pct|default:'-' }}%</div></div>
+                </div>
                 <div class="row g-2">
-                  {% for card in platform.metrics.insight_cards %}
+                  {% for key, dimension in platform.metrics.ai_profile_feedback.dimension_scores.items %}
                     <div class="col-lg-6">
                       <div class="border rounded p-2 h-100">
                         <div class="d-flex justify-content-between align-items-center">
-                          <strong>{{ card.title }}</strong>
-                          <span class="badge text-bg-{% if card.type == 'positive' %}success{% elif card.type == 'warning' %}warning{% else %}secondary{% endif %}">{{ card.type }}</span>
+                          <strong>
+                            {% if key == 'engagement_health' %}Engagement health
+                            {% elif key == 'audience_quality' %}Audience quality
+                            {% elif key == 'content_consistency' %}Content consistency
+                            {% elif key == 'brand_readiness' %}Brand readiness
+                            {% else %}{{ key|cut:'_'|title }}{% endif %}
+                          </strong>
+                          <span class="badge text-bg-secondary">
+                            {{ dimension.score }}
+                            {% if key == 'engagement_health' %}/20{% elif key == 'audience_quality' %}/25{% elif key == 'content_consistency' %}/25{% elif key == 'brand_readiness' %}/30{% endif %}
+                          </span>
                         </div>
-                        <div class="small text-muted mt-1">{{ card.description }}</div>
-                        <div class="small mt-2"><span class="text-muted">{{ card.metric_name }}:</span> {{ card.metric_value }}</div>
+                        <div class="progress mt-2" role="progressbar" aria-label="Dimension score">
+                          <div class="progress-bar {% if key == 'brand_readiness' and dimension.score < 15 %}bg-danger{% elif dimension.score < 12 %}bg-warning{% else %}bg-success{% endif %}" style="width: {% if key == 'engagement_health' %}{% widthratio dimension.score 20 100 %}{% elif key == 'audience_quality' or key == 'content_consistency' %}{% widthratio dimension.score 25 100 %}{% elif key == 'brand_readiness' %}{% widthratio dimension.score 30 100 %}{% else %}0{% endif %}%"></div>
+                        </div>
+                        <div class="small text-muted mt-1">{{ dimension.diagnosis }}</div>
+                        <ul class="small mt-2 mb-0">
+                          {% for action in dimension.actions %}<li>{{ action }}</li>{% endfor %}
+                        </ul>
                       </div>
                     </div>
                   {% empty %}
-                    <div class="col-12 text-muted small">No insights available yet.</div>
+                    <div class="col-12 text-muted small">No AI feedback available yet.</div>
                   {% endfor %}
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3">
+                <h3 class="h6 mb-2">Top 3 priority actions</h3>
+                <ol class="mb-0">
+                  {% for action in platform.metrics.ai_profile_feedback.top_priority_actions|slice:':3' %}
+                    <li class="mb-2">
+                      <div class="fw-semibold">{{ action }}</div>
+                      <div class="small text-muted">This is a high-impact action based on your current profile gaps.</div>
+                    </li>
+                  {% empty %}
+                    <li class="text-muted small">No priority actions available yet.</li>
+                  {% endfor %}
+                </ol>
+              </div>
+
+              <div class="metric-card p-3 mb-3">
+                <h3 class="h6 mb-2">Benchmark vs. {{ platform.metrics.ai_profile_feedback.benchmark_comparison.niche|default:'niche' }} / {{ platform.name }} average</h3>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <tbody>
+                      <tr>
+                        <td>Engagement rate</td>
+                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|default:'-' }}%</td>
+                        <td class="text-end"><span class="badge text-bg-success-subtle border">above avg</span></td>
+                      </tr>
+                      <tr>
+                        <td>Follower count</td>
+                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.follower_count|default:'-' }}</td>
+                        <td class="text-end"><span class="badge text-bg-secondary">on par</span></td>
+                      </tr>
+                      <tr>
+                        <td>Profile completeness</td>
+                        <td class="text-end">{{ platform.metrics.data_quality.completeness_score|default:'-' }}</td>
+                        <td class="text-end"><span class="badge text-bg-danger-subtle border">below avg</span></td>
+                      </tr>
+                      <tr>
+                        <td>Past brand deals logged</td>
+                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.past_brand_deals_count|default:'-' }}</td>
+                        <td class="text-end"><span class="badge text-bg-danger-subtle border">below avg</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
