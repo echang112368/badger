@@ -23,7 +23,6 @@ from .instagram_metrics import (
     normalize_demographics,
     normalize_media_posts,
 )
-from .ai_profile_feedback import build_ai_profile_feedback
 
 
 REQUEST_TIMEOUT_SECONDS = 15
@@ -546,22 +545,6 @@ class InstagramAnalyticsService:
             insight_cards,
             data_quality,
         )
-        ai_profile_feedback = build_ai_profile_feedback(
-            user=self.user,
-            platform=self.platform,
-            account={
-                "username": account.get("username") or connection.instagram_username,
-                "biography": account.get("biography") or "",
-                "followers_count": followers,
-            },
-            summary_metrics=creator_metrics,
-            audience=normalized_audience,
-            performance={
-                "reach": reach,
-                "profile_visits": profile_visits,
-                "website_clicks": website_clicks,
-            },
-        )
 
         return {
             "account": {
@@ -595,7 +578,7 @@ class InstagramAnalyticsService:
             "normalized_posts": rated_posts,
             "insight_cards": insight_cards,
             "recommendation_labels": recommendation_labels,
-            "ai_profile_feedback": ai_profile_feedback,
+            "standardized_performance_score": creator_metrics.get("standardized_performance_score", 0),
             "summary_metrics": creator_metrics,
             "data_quality": data_quality,
             "dashboard": dashboard_payload,
@@ -905,7 +888,6 @@ class InstagramAnalyticsService:
                 "audience_quality_score": None,
                 "nlp_notes": "NLP pipeline placeholder for sentiment and audience quality insights.",
             },
-            "ai_profile_feedback": {},
             "failed_requests": [],
             "synced_at": None,
         }
