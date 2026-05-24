@@ -1,7 +1,24 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
+from django.core.cache import cache
+
 from creatorMatch.services.matching.strategies.openai import score_candidates_with_ai_diagnostics
 from creatorMatch.services.matching.types import MatchConfig
+
+CACHE_TTL_SECONDS = 60 * 60
+
+
+def _build_ai_cache_key(
+    business_context: dict,
+) -> str:
+    key_payload = {
+        "filters": business_context.get("filters", {}),
+    }
+    key_json = json.dumps(key_payload, sort_keys=True, default=str, ensure_ascii=False)
+    return f"creator_match_ai:{hashlib.sha256(key_json.encode('utf-8')).hexdigest()}"
 
 
 def apply_matching_scores(
@@ -9,6 +26,7 @@ def apply_matching_scores(
     business_context: dict,
     fallback_score_key: str = "fallback_match_score",
     config: MatchConfig | None = None,
+    force_refresh: bool = False,
 ) -> list[dict]:
     config = config or MatchConfig()
 
@@ -38,11 +56,27 @@ def apply_matching_scores(
         }
         for card in ai_pool
     ]
-    ai_by_creator_id, ai_call_diagnostics = score_candidates_with_ai_diagnostics(
-        ai_payload,
-        business_context,
-        config=config,
-    )
+    ai_cache_key = _build_ai_cache_key(business_context)
+    cached_payload = None if force_refresh else cache.get(ai_cache_key)
+    if cached_payload:
+        ai_by_creator_id = cached_payload.get("results", {})
+        ai_call_diagnostics = cached_payload.get("diagnostics", {})
+        ai_call_diagnostics.setdefault("cache_hit", True)
+    else:
+        ai_by_creator_id, ai_call_diagnostics = score_candidates_with_ai_diagnostics(
+            ai_payload,
+            business_context,
+            config=config,
+        )
+        cache.set(
+            ai_cache_key,
+            {
+                "results": ai_by_creator_id,
+                "diagnostics": ai_call_diagnostics,
+            },
+            CACHE_TTL_SECONDS,
+        )
+        ai_call_diagnostics.setdefault("cache_hit", False)
     ai_candidate_ids = {int(row.get("creator_id") or 0) for row in ai_payload}
     ai_scored_count = 0
 
@@ -71,6 +105,7 @@ def apply_matching_scores(
         "ai_error_code": ai_call_diagnostics.get("error_code"),
         "ai_error_message": ai_call_diagnostics.get("error_message"),
         "ai_response_id": ai_call_diagnostics.get("response_id"),
+        "ai_cache_hit": bool(ai_call_diagnostics.get("cache_hit")),
     }
     for card in cards:
         card["match_diagnostics"] = diagnostics
