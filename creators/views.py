@@ -1165,6 +1165,18 @@ def creator_settings(request):
 def creator_profile(request):
     creator_meta, _ = CreatorMeta.objects.get_or_create(user=request.user)
     if request.method == "POST":
+        def _safe_non_negative_int(value):
+            try:
+                return max(0, int(value or 0))
+            except (TypeError, ValueError):
+                return 0
+
+        def _safe_non_negative_float(value):
+            try:
+                return max(0.0, float(value or 0))
+            except (TypeError, ValueError):
+                return 0.0
+
         user_form = UserNameForm(request.POST, instance=request.user)
         email = request.POST.get("email", "").strip()
         short_pitch = _normalize_short_pitch(request.POST.get("short_pitch", ""))
@@ -1172,6 +1184,11 @@ def creator_profile(request):
         content_languages = request.POST.get("content_languages", "").strip()
         social_media_profiles = _parse_social_media_profiles(request.POST)
         content_skills = _parse_content_skills(request.POST.get("content_skills"))
+        paid_brand_deals_count = _safe_non_negative_int(request.POST.get("paid_brand_deals_count", "0"))
+        gifted_brand_deals_count = _safe_non_negative_int(request.POST.get("gifted_brand_deals_count", "0"))
+        affiliate_brand_deals_count = _safe_non_negative_int(request.POST.get("affiliate_brand_deals_count", "0"))
+        avg_sponsored_conversion_rate_pct = _safe_non_negative_float(request.POST.get("avg_sponsored_conversion_rate_pct", "0"))
+        partnership_history_notes = request.POST.get("partnership_history_notes", "").strip()
         if user_form.is_valid():
             user = user_form.save(commit=False)
             if email:
@@ -1182,6 +1199,11 @@ def creator_profile(request):
             creator_meta.content_languages = content_languages
             creator_meta.social_media_profiles = social_media_profiles
             creator_meta.content_skills = content_skills
+            creator_meta.paid_brand_deals_count = paid_brand_deals_count
+            creator_meta.gifted_brand_deals_count = gifted_brand_deals_count
+            creator_meta.affiliate_brand_deals_count = affiliate_brand_deals_count
+            creator_meta.avg_sponsored_conversion_rate_pct = avg_sponsored_conversion_rate_pct
+            creator_meta.partnership_history_notes = partnership_history_notes
             creator_meta.save()
             return redirect("creator_profile")
     else:

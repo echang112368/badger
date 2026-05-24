@@ -14,6 +14,11 @@ class CreatorMeta(models.Model):
     content_languages = models.CharField(max_length=200, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     marketplace_enabled = models.BooleanField(default=False)
+    paid_brand_deals_count = models.PositiveIntegerField(default=0)
+    gifted_brand_deals_count = models.PositiveIntegerField(default=0)
+    affiliate_brand_deals_count = models.PositiveIntegerField(default=0)
+    avg_sponsored_conversion_rate_pct = models.FloatField(default=0.0)
+    partnership_history_notes = models.TextField(blank=True)
 
 
     def __str__(self):
