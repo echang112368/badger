@@ -208,6 +208,7 @@ SHOPIFY_SCOPES = os.environ.get(
 )
 
 
+
 def _parse_decimal_setting(value: str | None, default: Decimal) -> Decimal:
     if value is None:
         return default
