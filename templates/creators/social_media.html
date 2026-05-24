@@ -218,9 +218,9 @@
               <div class="row g-3 mb-3">
                 <div class="col-lg-4">
                   <div class="metric-card p-3 h-100">
-                    <h3 class="h6 mb-2">AI Profile Strength Score</h3>
-                    <div class="metric-value">{{ platform.metrics.ai_profile_feedback.overall_score|default:'—' }}</div>
-                    <div class="small text-muted">{{ platform.metrics.ai_profile_feedback.verdict|default:'Awaiting AI profile evaluation' }}</div>
+                    <h3 class="h6 mb-2">Standardized Performance Score <span class="ms-1 text-muted" title="Score is a 0-100 standardized performance index blended from engagement rate, save rate, share rate, profile visit rate, and view efficiency." aria-label="Score explanation">ⓘ</span></h3>
+                    <div class="metric-value">{{ platform.metrics.standardized_performance_score }}</div>
+                    <div class="small text-muted">0-100 blended score from engagement rate, save rate, share rate, profile visit rate, and view efficiency.</div>
                   </div>
                 </div>
                 <div class="col-lg-8">
@@ -252,30 +252,21 @@
               </div>
 
               <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">AI Feedback</h3>
-                <div class="small text-muted mb-3">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated profile diagnostics including hard metrics and improvement plan.' }}</div>
-                <div class="row g-2 mb-2">
-                  <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Audience Concentration</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.audience_concentration_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Save Activity</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.save_rate_pct|default:'-' }}%</div></div>
-                </div>
+                <h3 class="h6 mb-2">Insights</h3>
                 <div class="row g-2">
-                  {% for key, dimension in platform.metrics.ai_profile_feedback.dimension_scores.items %}
+                  {% for card in platform.metrics.insight_cards %}
                     <div class="col-lg-6">
                       <div class="border rounded p-2 h-100">
                         <div class="d-flex justify-content-between align-items-center">
-                          <strong>{{ key|cut:'_'|title }}</strong>
-                          <span class="badge text-bg-secondary">{{ dimension.score }}</span>
+                          <strong>{{ card.title }}</strong>
+                          <span class="badge text-bg-{% if card.type == 'positive' %}success{% elif card.type == 'warning' %}warning{% else %}secondary{% endif %}">{{ card.type }}</span>
                         </div>
-                        <div class="small text-muted mt-1">{{ dimension.diagnosis }}</div>
-                        <ul class="small mt-2 mb-0">
-                          {% for action in dimension.actions %}<li>{{ action }}</li>{% endfor %}
-                        </ul>
+                        <div class="small text-muted mt-1">{{ card.description }}</div>
+                        <div class="small mt-2"><span class="text-muted">{{ card.metric_name }}:</span> {{ card.metric_value }}</div>
                       </div>
                     </div>
                   {% empty %}
-                    <div class="col-12 text-muted small">No AI feedback available yet.</div>
+                    <div class="col-12 text-muted small">No insights available yet.</div>
                   {% endfor %}
                 </div>
               </div>
