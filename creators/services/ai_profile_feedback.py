@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 import requests
-from django.conf import settings
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
         }
     }
 
-    api_key = getattr(settings, "OPENAI_API_KEY", "")
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         msg = "OpenAI API key missing: set OPENAI_API_KEY in server environment."
         logger.error("AI profile feedback disabled for user_id=%s platform=%s: %s", user.id, platform, msg)
@@ -69,7 +69,7 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": getattr(settings, "OPENAI_SOCIAL_ANALYZER_MODEL", "gpt-4.1-mini"),
+                "model": os.environ.get("OPENAI_SOCIAL_ANALYZER_MODEL", "gpt-4.1-mini").strip(),
                 "temperature": 0.2,
                 "messages": [
                     {"role": "system", "content": "Return JSON only for creator profile evaluation."},
