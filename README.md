@@ -220,3 +220,76 @@ This keeps webhook destinations controlled by Django environment config instead 
 Yes. This setup is better for deployment because production should set `SHOPIFY_APP_ORIGIN` to your real domain
 (for example `https://app.example.com`) and should not depend on ngrok. In development, point the same variable
 to your current tunnel URL.
+
+## Creator Scoring Dimensions (AI Profile Feedback)
+
+The creator scoring system evaluates profile health with a 0–100 overall score split into four dimensions. The implementation lives in `creators/services/ai_profile_feedback.py` and consumes profile + analytics inputs.
+
+### 1) Engagement (0–20)
+**Question answered:** Is this creator’s audience actively paying attention?
+
+**Required inputs:**
+- `engagement_rate_pct`
+- `save_rate_pct`
+- `reach`
+- `follower_count`
+
+**Scoring logic:**
+- Uses holistic judgment but treats `engagement_rate_pct` as the primary signal.
+- `<2%` engagement is a warning floor.
+- `>4%` is strong; `>8%` is exceptional.
+- Save behavior is used as an intent signal and should meaningfully affect diagnosis/actions.
+- Reach relative to followers should influence confidence (distribution strength).
+
+### 2) Audience Quality (0–25)
+**Question answered:** Can a brand confidently target this audience?
+
+**Required inputs:**
+- `audience_age_range`
+- `audience_gender_split`
+- `audience_concentration_pct`
+- `niche`
+
+**Scoring logic:**
+- Missing demographic fields are treated as trust-reducing gaps (not neutral).
+- Strong scores require clearly mappable demographics and coherent market concentration.
+- Scattered geography with no dominant segment is treated as a targeting risk.
+
+### 3) Growth Activity (0–25)
+**Question answered:** Is this creator a reliable, active partner right now?
+
+**Required inputs:**
+- `posting_frequency`
+- `reach`
+- `content_style_description`
+
+**Scoring logic:**
+- Consistency is weighted over burst volume.
+- Declining/inactive patterns should lower confidence in delivery reliability.
+- Clear, recurring content format is a positive predictor for partnership fit.
+
+### 4) Monetization (0–30)
+**Question answered:** Has this creator shown they can convert audience behavior into commercial outcomes?
+
+**Required inputs:**
+- `conversion_rate_pct`
+- `past_brand_deals_count`
+- `paid_brand_deals_count`
+- `gifted_brand_deals_count`
+- `affiliate_brand_deals_count`
+- `partnership_history`
+
+**Scoring logic:**
+- Paid deals are strongest proof; gifted/affiliate signal weaker confidence.
+- Distinguishes **untested potential** (no deals + strong profile) from weak commercial performance.
+- Low engagement + no deals + low activity should be scored as a real risk pattern.
+
+### Data collection and field source details
+- If deal/performance inputs are unavailable from analytics providers, creators can provide them directly in profile fields:
+  - `paid_brand_deals_count`
+  - `gifted_brand_deals_count`
+  - `affiliate_brand_deals_count`
+  - `avg_sponsored_conversion_rate_pct`
+  - `partnership_history_notes`
+- The AI payload uses creator-provided sponsored conversion rate when present, otherwise falls back to analytics-based profile-visit conversion.
+

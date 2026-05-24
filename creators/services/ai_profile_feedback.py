@@ -39,6 +39,12 @@ def _error_feedback(payload: dict[str, Any], message: str, *, error_code: str = 
 
 def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], summary_metrics: dict[str, Any], audience: dict[str, Any], performance: dict[str, Any]) -> dict[str, Any]:
     creator_meta = getattr(user, "creatormeta", None)
+    paid_deals = _safe_int(getattr(creator_meta, "paid_brand_deals_count", 0))
+    gifted_deals = _safe_int(getattr(creator_meta, "gifted_brand_deals_count", 0))
+    affiliate_deals = _safe_int(getattr(creator_meta, "affiliate_brand_deals_count", 0))
+    total_brand_deals = paid_deals + gifted_deals + affiliate_deals
+    profile_visit_conversion = _safe_float(summary_metrics.get("average_profile_visit_rate"))
+    sponsored_conversion = _safe_float(getattr(creator_meta, "avg_sponsored_conversion_rate_pct", 0.0))
     profile_payload = {
         "inputs": {
             "platform": platform,
@@ -49,11 +55,14 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
             "audience_age_range": [row.get("label") for row in (audience.get("top_age_groups") or [])[:3]],
             "audience_gender_split": audience.get("gender_split") or {},
             "audience_concentration_pct": _safe_float(audience.get("percent_top_city_followers")),
-            "conversion_rate_pct": _safe_float(summary_metrics.get("average_profile_visit_rate")),
+            "conversion_rate_pct": sponsored_conversion or profile_visit_conversion,
             "save_rate_pct": _safe_float(summary_metrics.get("average_save_rate")),
-            "past_brand_deals_count": _safe_int(summary_metrics.get("past_brand_deals_count")),
+            "past_brand_deals_count": total_brand_deals,
+            "paid_brand_deals_count": paid_deals,
+            "gifted_brand_deals_count": gifted_deals,
+            "affiliate_brand_deals_count": affiliate_deals,
             "content_style_description": (creator_meta.bio if creator_meta else "") or account.get("biography") or "",
-            "partnership_history": [],
+            "partnership_history": (getattr(creator_meta, "partnership_history_notes", "") or "").strip(),
             "reach": _safe_int(performance.get("reach")),
         }
     }
@@ -74,8 +83,21 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
                 "messages": [
                     {"role": "system", "content": "Return JSON only for creator profile evaluation."},
                     {"role": "user", "content": json.dumps({
-                        "task": "Score creator profile health and return overall score, verdict, 4 dimension scores with diagnosis/actions, top priority actions, and benchmark comparison.",
+                        "task": "Score creator profile health across 4 dimensions using holistic reasoning: Engagement (0-20), Audience Quality (0-25), Growth Activity (0-25), Monetization (0-30). Use engagement rate as primary engagement signal (<2% warning, >4% strong, >8% exceptional). Treat missing audience fields as negative trust gaps. For monetization, distinguish untested potential (strong profile but no deals) from weak performance (low engagement + no deals + low activity). Gifted deals count less than paid deals. Always include concrete number-referenced rationale and specific next steps.",
                         "inputs": profile_payload["inputs"],
+                        "output_schema": {
+                            "overall_score": "number 0-100",
+                            "verdict": "string",
+                            "summary": "string",
+                            "dimension_scores": {
+                                "engagement": {"score": "0-20", "rationale": "string", "actions": ["string"]},
+                                "audience_quality": {"score": "0-25", "rationale": "string", "actions": ["string"]},
+                                "growth_activity": {"score": "0-25", "rationale": "string", "actions": ["string"]},
+                                "monetization": {"score": "0-30", "rationale": "string", "actions": ["string"]}
+                            },
+                            "top_priority_actions": ["string"],
+                            "benchmark_comparison": "object"
+                        }
                     })},
                 ],
                 "response_format": {"type": "json_object"},
