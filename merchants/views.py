@@ -1027,9 +1027,11 @@ def merchant_creator_discovery(request):
     preferences = CompanyCreatorPreferences.objects.filter(merchant=merchant_user).first()
     filters = build_discovery_filters(request.GET)
     should_apply_preferences = bool(preferences and preferences.has_any_preferences and filters.use_saved_preferences)
+    force_refresh = request.GET.get("refresh") == "1"
     discovery_payload = build_creator_discovery_results(
         filters,
         preferences=preferences if should_apply_preferences else None,
+        force_refresh=force_refresh,
     )
     creator_cards = discovery_payload["cards"]
     questionnaire_url = f"{reverse('merchant_creator_preferences')}?{urlencode({'next': request.get_full_path()})}"
@@ -1051,6 +1053,7 @@ def merchant_creator_discovery(request):
             "use_saved_preferences": should_apply_preferences,
             "questionnaire_url": questionnaire_url,
             "show_invoices_tab": _should_show_invoices_tab(merchant_meta),
+            "force_refresh": force_refresh,
             "placeholder_filters": [
                 "content_type",
                 "posting_recency",
