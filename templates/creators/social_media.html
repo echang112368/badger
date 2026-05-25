@@ -335,10 +335,10 @@
               <div class="metric-card p-3 mb-3">
                 <h3 class="h6 mb-2">AI Feedback</h3>
                 <div class="row g-2 mb-2">
-                  <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Audience Concentration</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.audience_concentration_pct|default:'-' }}%</div></div>
-                  <div class="col-md-3"><strong>Save Activity</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.save_rate_pct|default:'-' }}%</div></div>
+                  <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|percent_sigfigs:4 }}</div></div>
+                  <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|percent_sigfigs:4 }}</div></div>
+                  <div class="col-md-3"><strong>Audience Concentration</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.audience_concentration_pct|pct_sigfigs:4 }}</div></div>
+                  <div class="col-md-3"><strong>Save Activity</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.save_rate_pct|percent_sigfigs:4 }}</div></div>
                 </div>
                 <div class="row g-2">
                   {% for key, dimension in platform.metrics.ai_profile_feedback.dimension_scores.items %}
