@@ -146,7 +146,7 @@ class InstagramAnalyticsService:
             payload = self.fetch_and_cache(connection, snapshot)
             refreshed = True
 
-        metrics = self.normalize_payload(connection, payload)
+        metrics = self.normalize_payload(connection, payload, snapshot=snapshot)
         return PlatformDashboardData(
             slug=self.platform,
             name="Instagram",
@@ -165,6 +165,8 @@ class InstagramAnalyticsService:
     ) -> dict[str, Any]:
         now = timezone.now()
         self.failed_requests = []
+        # Carry the AI cache forward so it survives the payload overwrite below.
+        old_ai_cache = (snapshot.payload or {}).get("_ai_cache") if snapshot else None
         ig_user_id = self._resolve_ig_user_id(connection)
         payload = self.empty_metrics()
         payload["account"] = self.fetch_account(connection, ig_user_id)
@@ -181,6 +183,8 @@ class InstagramAnalyticsService:
         payload["comments"] = self.fetch_comments(connection, recent_media)
         payload["failed_requests"] = list(self.failed_requests)
         payload["synced_at"] = now.isoformat()
+        if old_ai_cache:
+            payload["_ai_cache"] = old_ai_cache
 
         if snapshot is not None:
             snapshot.payload = payload
@@ -461,6 +465,7 @@ class InstagramAnalyticsService:
         self,
         connection: InstagramConnection,
         payload: dict[str, Any],
+        snapshot: SocialAnalyticsSnapshot | None = None,
     ) -> dict[str, Any]:
         account = payload.get("account", {})
         performance = payload.get("performance", {})
@@ -546,6 +551,7 @@ class InstagramAnalyticsService:
             insight_cards,
             data_quality,
         )
+        ai_cache = payload.get("_ai_cache") or {}
         ai_profile_feedback = build_ai_profile_feedback(
             user=self.user,
             platform=self.platform,
@@ -561,7 +567,20 @@ class InstagramAnalyticsService:
                 "profile_visits": profile_visits,
                 "website_clicks": website_clicks,
             },
+            cached_hash=ai_cache.get("hash"),
+            cached_feedback=ai_cache.get("feedback"),
         )
+        # Persist cache when inputs produced a fresh score (no error, hash changed).
+        new_hash = ai_profile_feedback.get("_input_hash")
+        if (
+            new_hash
+            and new_hash != ai_cache.get("hash")
+            and not ai_profile_feedback.get("error")
+            and snapshot is not None
+        ):
+            payload["_ai_cache"] = {"hash": new_hash, "feedback": ai_profile_feedback}
+            snapshot.payload = payload
+            snapshot.save(update_fields=["payload"])
 
         return {
             "account": {

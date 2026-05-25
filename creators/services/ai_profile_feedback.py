@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from typing import Any
@@ -8,6 +9,12 @@ import requests
 import os
 
 logger = logging.getLogger(__name__)
+
+
+def _inputs_fingerprint(inputs: dict[str, Any]) -> str:
+    """Stable SHA-256 of the AI input dict. Same inputs → same hash."""
+    canonical = json.dumps(inputs, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -37,7 +44,17 @@ def _error_feedback(payload: dict[str, Any], message: str, *, error_code: str = 
     }
 
 
-def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], summary_metrics: dict[str, Any], audience: dict[str, Any], performance: dict[str, Any]) -> dict[str, Any]:
+def build_ai_profile_feedback(
+    *,
+    user,
+    platform: str,
+    account: dict[str, Any],
+    summary_metrics: dict[str, Any],
+    audience: dict[str, Any],
+    performance: dict[str, Any],
+    cached_hash: str | None = None,
+    cached_feedback: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     creator_meta = getattr(user, "creatormeta", None)
     paid_deals = _safe_int(getattr(creator_meta, "paid_brand_deals_count", 0))
     gifted_deals = _safe_int(getattr(creator_meta, "gifted_brand_deals_count", 0))
@@ -67,11 +84,27 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
         }
     }
 
+    input_hash = _inputs_fingerprint(profile_payload["inputs"])
+
+    # Return the cached score when nothing in the inputs has changed.
+    if cached_hash == input_hash and cached_feedback and not cached_feedback.get("error"):
+        logger.debug(
+            "AI profile feedback cache hit for user_id=%s platform=%s hash=%s",
+            user.id, platform, input_hash[:12],
+        )
+        result = dict(cached_feedback)
+        result["_input_hash"] = input_hash
+        return result
+
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         msg = "OpenAI API key missing: set OPENAI_API_KEY in server environment."
         logger.error("AI profile feedback disabled for user_id=%s platform=%s: %s", user.id, platform, msg)
         return _error_feedback(profile_payload, msg, error_code="missing_api_key")
+    logger.info(
+        "AI profile feedback recomputing for user_id=%s platform=%s (inputs changed)",
+        user.id, platform,
+    )
 
     try:
         response = requests.post(
@@ -120,6 +153,7 @@ def build_ai_profile_feedback(*, user, platform: str, account: dict[str, Any], s
         content = response.json().get("choices", [{}])[0].get("message", {}).get("content", "{}")
         parsed = json.loads(content)
         parsed["inputs"] = profile_payload["inputs"]
+        parsed["_input_hash"] = input_hash
         return parsed
     except requests.Timeout as exc:
         logger.exception("OpenAI API timeout for user_id=%s platform=%s", user.id, platform)
