@@ -89,24 +89,22 @@
       background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
     }
     .social-media-page .analyzer-score-ring {
-      height: 102px;
-      width: 102px;
+      height: 110px;
+      width: 110px;
       border-radius: 999px;
-      border: 2px solid #8ec5a5;
+      border: 3px solid #8ec5a5;
       background: #fff;
       flex-shrink: 0;
     }
+    .social-media-page .analyzer-score-ring--poor  { border-color: #dc3545; }
+    .social-media-page .analyzer-score-ring--fair  { border-color: #f0ad4e; }
+    .social-media-page .analyzer-score-ring--good  { border-color: #198754; }
     .social-media-page .analyzer-summary {
       overflow-wrap: anywhere;
-      font-size: 1rem;
-      line-height: 1.6;
-      font-weight: 500;
-      color: #1f2f4d;
+      font-size: .95rem;
+      line-height: 1.65;
+      color: #334060;
       margin-bottom: 0;
-      display: -webkit-box;
-      -webkit-line-clamp: 6;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
     .social-media-page .analyzer-metrics-grid {
       display: grid;
@@ -297,31 +295,31 @@
                 </div>
 
                 <div class="analyzer-top">
-                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center">
+                  {% with score=platform.metrics.ai_profile_feedback.overall_score %}
+                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center{% if score %}{% if score < 40 %} analyzer-score-ring--poor{% elif score < 70 %} analyzer-score-ring--fair{% else %} analyzer-score-ring--good{% endif %}{% endif %}">
                     <div class="text-center">
-                      <div class="h2 mb-0">{{ platform.metrics.ai_profile_feedback.overall_score|default:'—' }}</div>
+                      <div class="h2 mb-0">{{ score|default:'—' }}</div>
                       <div class="small text-muted">/100</div>
                     </div>
                   </div>
+                  {% endwith %}
                   <div class="analyzer-body">
-                    <span class="badge rounded-pill text-bg-success-subtle border mb-2">{{ platform.metrics.ai_profile_feedback.verdict|default:'Awaiting AI profile evaluation' }}</span>
+                    {% if platform.metrics.ai_profile_feedback.verdict %}
+                      <span class="label-chip d-inline-block mb-2">{{ platform.metrics.ai_profile_feedback.verdict }}</span>
+                    {% endif %}
                     <p class="analyzer-summary">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</p>
                   </div>
                 </div>
                 <div class="analyzer-overview">
-                    <h4 class="h6 mb-2">Overview</h4>
-                    <div class="analyzer-metrics-grid small mb-2">
+                    <div class="analyzer-metrics-grid small mb-3">
                       <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
                       <div class="analyzer-metric"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|percent_sigfigs:4 }}</strong></div>
                       <div class="analyzer-metric"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
                       <div class="analyzer-metric"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
                     </div>
-                    <h4 class="h6 mb-2 mt-3">Recommendation Labels</h4>
                     <div class="d-flex flex-wrap gap-2">
                       {% for label in platform.metrics.recommendation_labels %}
                         <span class="label-chip">{{ label }}</span>
-                      {% empty %}
-                        <span class="text-muted small">No recommendation labels yet.</span>
                       {% endfor %}
                     </div>
                     {% if platform.metrics.data_quality.warnings %}
