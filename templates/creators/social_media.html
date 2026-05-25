@@ -84,6 +84,78 @@
     .social-media-page .form-control {
       max-width: 100%;
     }
+
+    .social-media-page .analyzer-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+    }
+    .social-media-page .analyzer-score-ring {
+      height: 102px;
+      width: 102px;
+      border-radius: 999px;
+      border: 2px solid #8ec5a5;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .social-media-page .analyzer-summary {
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      line-height: 1.6;
+      font-weight: 500;
+      color: #1f2f4d;
+      margin-bottom: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 6;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .social-media-page .analyzer-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: .75rem;
+    }
+    .social-media-page .analyzer-metric {
+      border: 1px solid #e4ebf8;
+      border-radius: .75rem;
+      padding: .65rem .75rem;
+      background: #f9fbff;
+    }
+    .social-media-page .analyzer-metric strong {
+      font-size: 1.35rem;
+      color: #152647;
+      display: block;
+      line-height: 1.1;
+      margin-top: .2rem;
+    }
+    .social-media-page .label-chip {
+      background: #eef3ff;
+      color: #1f3767;
+      border: 1px solid #d8e4ff;
+      font-weight: 600;
+      padding: .42rem .72rem;
+      border-radius: 999px;
+    }
+    .social-media-page .analyzer-top {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+    .social-media-page .analyzer-body {
+      min-width: 0;
+    }
+    .social-media-page .analyzer-overview {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e4ebf8;
+    }
+    @media (max-width: 991.98px) {
+      .social-media-page .analyzer-top {
+        grid-template-columns: 1fr;
+      }
+      .social-media-page .analyzer-score-ring {
+        margin-inline: auto;
+      }
+    }
   </style>
 
   <section class="hero-card p-4 p-lg-5 mb-4">
@@ -215,43 +287,39 @@
                 <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
               </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-lg-4">
-                  <div class="metric-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                      <div>
-                        <h3 class="h6 mb-1">Profile analyzer</h3>
-                        <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
-                      </div>
-                      <a href="?refresh={{ platform.slug }}" class="btn btn-sm btn-outline-secondary">Re-analyze</a>
-                    </div>
-                    <div class="d-flex align-items-center gap-3 mt-3">
-                      <div class="rounded-circle border border-success d-flex align-items-center justify-content-center" style="height:86px;width:86px;">
-                        <div class="text-center">
-                          <div class="h4 mb-0">{{ platform.metrics.ai_profile_feedback.overall_score|default:'—' }}</div>
-                          <div class="small text-muted">/100</div>
-                        </div>
-                      </div>
-                      <div>
-                        <span class="badge rounded-pill text-bg-success-subtle border mb-2">{{ platform.metrics.ai_profile_feedback.verdict|default:'Awaiting AI profile evaluation' }}</span>
-                        <div class="fw-semibold">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</div>
-                      </div>
+              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h3 class="h5 mb-1">Profile analyzer</h3>
+                    <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
+                  </div>
+                  <a href="?refresh={{ platform.slug }}" class="btn btn-sm btn-outline-secondary">Re-analyze</a>
+                </div>
+
+                <div class="analyzer-top">
+                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center">
+                    <div class="text-center">
+                      <div class="h2 mb-0">{{ platform.metrics.ai_profile_feedback.overall_score|default:'—' }}</div>
+                      <div class="small text-muted">/100</div>
                     </div>
                   </div>
+                  <div class="analyzer-body">
+                    <span class="badge rounded-pill text-bg-success-subtle border mb-2">{{ platform.metrics.ai_profile_feedback.verdict|default:'Awaiting AI profile evaluation' }}</span>
+                    <p class="analyzer-summary">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</p>
+                  </div>
                 </div>
-                <div class="col-lg-8">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6 mb-2">Overview</h3>
-                    <div class="row g-2 small mb-2">
-                      <div class="col-md-3"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
-                      <div class="col-md-3"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|percent_sigfigs:4 }}</strong></div>
-                      <div class="col-md-3"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
-                      <div class="col-md-3"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
+                <div class="analyzer-overview">
+                    <h4 class="h6 mb-2">Overview</h4>
+                    <div class="analyzer-metrics-grid small mb-2">
+                      <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
+                      <div class="analyzer-metric"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|percent_sigfigs:4 }}</strong></div>
+                      <div class="analyzer-metric"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
+                      <div class="analyzer-metric"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
                     </div>
                     <h4 class="h6 mb-2 mt-3">Recommendation Labels</h4>
                     <div class="d-flex flex-wrap gap-2">
                       {% for label in platform.metrics.recommendation_labels %}
-                        <span class="badge rounded-pill text-bg-light border">{{ label }}</span>
+                        <span class="label-chip">{{ label }}</span>
                       {% empty %}
                         <span class="text-muted small">No recommendation labels yet.</span>
                       {% endfor %}
@@ -263,7 +331,6 @@
                         {% endfor %}
                       </div>
                     {% endif %}
-                  </div>
                 </div>
               </div>
 
