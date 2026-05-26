@@ -1244,8 +1244,10 @@ def creator_support(request):
 @login_required
 def creator_social_media(request):
     refresh_platform = request.GET.get("refresh")
+    force_reanalyze = bool(request.GET.get("reanalyze"))
     dashboard = SocialDashboardService(request.user).build_dashboard(
-        refresh_platform=refresh_platform
+        refresh_platform=refresh_platform,
+        force_reanalyze=force_reanalyze,
     )
     return render(
         request,

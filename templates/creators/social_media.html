@@ -9,18 +9,10 @@
       max-width: 100%;
       min-width: 0;
     }
-    .social-media-page .hero-card {
-      background: linear-gradient(135deg, #1f3b7a 0%, #304f91 45%, #4466b0 100%);
-      color: #fff;
-      border-radius: 1rem;
-      box-shadow: 0 10px 30px rgba(48, 79, 145, .22);
-    }
-    .social-media-page .hero-chip {
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(255,255,255,.12);
-      border-radius: 999px;
-      padding: .3rem .75rem;
-      font-size: .8rem;
+    .social-media-page .page-header {
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid #e8edf5;
+      margin-bottom: 1.5rem;
     }
     .social-media-page .metric-card {
       border: 1px solid #e9eef6;
@@ -156,24 +148,12 @@
     }
   </style>
 
-  <section class="hero-card p-4 p-lg-5 mb-4">
-    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
-      <div>
-        <h1 class="h3 mb-2">Social Intelligence Workspace</h1>
-        <p class="mb-3 text-white-50">Track account performance, audience quality, and post-level outcomes in one professional view.</p>
-        <div class="d-flex flex-wrap gap-2">
-          <span class="hero-chip"><i class="bi bi-graph-up-arrow me-1"></i>Performance trends</span>
-          <span class="hero-chip"><i class="bi bi-camera-video me-1"></i>Post-level analytics</span>
-          <span class="hero-chip"><i class="bi bi-people me-1"></i>Audience insights</span>
-        </div>
-      </div>
-      <div class="d-flex gap-2">
-        <a href="?refresh=instagram" class="btn btn-light fw-semibold">
-          <i class="bi bi-arrow-repeat me-1"></i>Refresh Instagram
-        </a>
-      </div>
+  <div class="page-header d-flex align-items-center gap-2 flex-wrap">
+    <div>
+      <h1 class="h4 fw-semibold mb-1" style="color:#152647;">Social Media</h1>
+      <p class="mb-0 text-muted" style="font-size:.9rem;">Track account performance, audience quality, and post-level insights.</p>
     </div>
-  </section>
+  </div>
 
   {% if refreshed_platform %}
     <div class="alert alert-info">Data refresh requested for <strong>{{ refreshed_platform|title }}</strong>.</div>
@@ -254,44 +234,17 @@
                 <button class="btn btn-outline-secondary" disabled>Coming Soon</button>
               {% endif %}
             {% elif platform.slug == 'instagram' %}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Account Overview</h3>
-                    <dl class="row small mb-0">
-                      <dt class="col-5 text-muted">Username</dt><dd class="col-7">@{{ platform.metrics.account.username }}</dd>
-                      <dt class="col-5 text-muted">Bio</dt><dd class="col-7">{{ platform.metrics.account.bio|default:'-' }}</dd>
-                      <dt class="col-5 text-muted">Follower count</dt><dd class="col-7">{{ platform.metrics.account.followers_count }}</dd>
-                      <dt class="col-5 text-muted">Following count</dt><dd class="col-7">{{ platform.metrics.account.following_count }}</dd>
-                      <dt class="col-5 text-muted">Media count</dt><dd class="col-7">{{ platform.metrics.account.media_count }}</dd>
-                      <dt class="col-5 text-muted">Account type</dt><dd class="col-7">{{ platform.metrics.account.account_type }}</dd>
-                    </dl>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Audience Demographics</h3>
-                    <div class="row g-2 small">
-                      <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0 mt-1">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Performance Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li></ul></div></div>
-                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
-              </div>
-
+              {# ── Profile Analyzer ── #}
               <div class="metric-card analyzer-card p-3 p-lg-4 mb-3">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                   <div>
                     <h3 class="h5 mb-1">Profile analyzer</h3>
                     <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
                   </div>
-                  <a href="?refresh={{ platform.slug }}" class="btn btn-sm btn-outline-secondary">Re-analyze</a>
+                  <a href="?refresh={{ platform.slug }}&reanalyze=1" class="btn btn-sm btn-outline-secondary fw-semibold">
+                    <i class="bi bi-arrow-repeat me-1"></i>Refresh &amp; Re-analyze
+                  </a>
                 </div>
 
                 <div class="analyzer-top">
@@ -346,19 +299,35 @@
                       <div class="border rounded p-2 h-100">
                         <div class="d-flex justify-content-between align-items-center">
                           <strong>
-                            {% if key == 'engagement_health' %}Engagement health
+                            {% if key == 'engagement' %}Engagement
+                            {% elif key == 'engagement_health' %}Engagement
                             {% elif key == 'audience_quality' %}Audience quality
+                            {% elif key == 'growth_activity' %}Growth activity
                             {% elif key == 'content_consistency' %}Content consistency
-                            {% elif key == 'brand_readiness' %}Brand readiness
-                            {% else %}{{ key|cut:'_'|title }}{% endif %}
+                            {% elif key == 'monetization' %}Monetization
+                            {% elif key == 'brand_readiness' %}Monetization
+                            {% else %}{{ key|title }}{% endif %}
                           </strong>
                           <span class="badge text-bg-secondary">
                             {{ dimension.score }}
-                            {% if key == 'engagement_health' %}/20{% elif key == 'audience_quality' %}/25{% elif key == 'content_consistency' %}/25{% elif key == 'brand_readiness' %}/30{% endif %}
+                            {% if key == 'engagement' or key == 'engagement_health' %}/20
+                            {% elif key == 'audience_quality' %}/25
+                            {% elif key == 'growth_activity' or key == 'content_consistency' %}/25
+                            {% elif key == 'monetization' or key == 'brand_readiness' %}/30{% endif %}
                           </span>
                         </div>
                         <div class="progress mt-2" role="progressbar" aria-label="Dimension score">
-                          <div class="progress-bar {% if key == 'brand_readiness' and dimension.score < 15 %}bg-danger{% elif dimension.score < 12 %}bg-warning{% else %}bg-success{% endif %}" style="width: {% if key == 'engagement_health' %}{% widthratio dimension.score 20 100 %}{% elif key == 'audience_quality' or key == 'content_consistency' %}{% widthratio dimension.score 25 100 %}{% elif key == 'brand_readiness' %}{% widthratio dimension.score 30 100 %}{% else %}0{% endif %}%"></div>
+                          {% if key == 'engagement' or key == 'engagement_health' %}
+                            <div class="progress-bar {% if dimension.score < 8 %}bg-danger{% elif dimension.score < 14 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 20 100 %}%"></div>
+                          {% elif key == 'audience_quality' %}
+                            <div class="progress-bar {% if dimension.score < 10 %}bg-danger{% elif dimension.score < 18 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 25 100 %}%"></div>
+                          {% elif key == 'growth_activity' or key == 'content_consistency' %}
+                            <div class="progress-bar {% if dimension.score < 10 %}bg-danger{% elif dimension.score < 18 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 25 100 %}%"></div>
+                          {% elif key == 'monetization' or key == 'brand_readiness' %}
+                            <div class="progress-bar {% if dimension.score < 12 %}bg-danger{% elif dimension.score < 22 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 30 100 %}%"></div>
+                          {% else %}
+                            <div class="progress-bar bg-secondary" style="width:0%"></div>
+                          {% endif %}
                         </div>
                         <div class="small text-muted mt-1">{{ dimension.diagnosis }}</div>
                         <ul class="small mt-2 mb-0">
@@ -384,6 +353,38 @@
                     <li class="text-muted small">No priority actions available yet.</li>
                   {% endfor %}
                 </ol>
+              </div>
+
+              {# ── Account / Audience / Performance / Engagement ── #}
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Account Overview</h3>
+                    <dl class="row small mb-0">
+                      <dt class="col-5 text-muted">Username</dt><dd class="col-7">@{{ platform.metrics.account.username }}</dd>
+                      <dt class="col-5 text-muted">Bio</dt><dd class="col-7">{{ platform.metrics.account.bio|default:'-' }}</dd>
+                      <dt class="col-5 text-muted">Follower count</dt><dd class="col-7">{{ platform.metrics.account.followers_count }}</dd>
+                      <dt class="col-5 text-muted">Following count</dt><dd class="col-7">{{ platform.metrics.account.following_count }}</dd>
+                      <dt class="col-5 text-muted">Media count</dt><dd class="col-7">{{ platform.metrics.account.media_count }}</dd>
+                      <dt class="col-5 text-muted">Account type</dt><dd class="col-7">{{ platform.metrics.account.account_type }}</dd>
+                    </dl>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Audience Demographics</h3>
+                    <div class="row g-2 small">
+                      <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
+                      <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
+                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0 mt-1">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Performance Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li></ul></div></div>
+                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
               </div>
 
               <div class="metric-card p-3 mb-3">
