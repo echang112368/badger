@@ -388,36 +388,6 @@
               </div>
 
               <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">Benchmark vs. {{ platform.metrics.ai_profile_feedback.benchmark_comparison.niche|default:'niche' }} / {{ platform.name }} average</h3>
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0">
-                    <tbody>
-                      <tr>
-                        <td>Engagement rate</td>
-                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|default:'-' }}%</td>
-                        <td class="text-end"><span class="badge text-bg-success-subtle border">above avg</span></td>
-                      </tr>
-                      <tr>
-                        <td>Follower count</td>
-                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.follower_count|default:'-' }}</td>
-                        <td class="text-end"><span class="badge text-bg-secondary">on par</span></td>
-                      </tr>
-                      <tr>
-                        <td>Profile completeness</td>
-                        <td class="text-end">{{ platform.metrics.data_quality.completeness_score|default:'-' }}</td>
-                        <td class="text-end"><span class="badge text-bg-danger-subtle border">below avg</span></td>
-                      </tr>
-                      <tr>
-                        <td>Past brand deals logged</td>
-                        <td class="text-end">{{ platform.metrics.ai_profile_feedback.inputs.past_brand_deals_count|default:'-' }}</td>
-                        <td class="text-end"><span class="badge text-bg-danger-subtle border">below avg</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="metric-card p-3 mb-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <h3 class="h6 mb-0">Post Performance Explorer</h3>
                   <div class="d-flex gap-2 align-items-center">
