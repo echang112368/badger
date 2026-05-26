@@ -119,7 +119,7 @@ class InstagramAnalyticsService:
         self.user = user
         self.failed_requests: list[dict[str, Any]] = []
 
-    def build_platform_data(self, refresh: bool = False) -> PlatformDashboardData:
+    def build_platform_data(self, refresh: bool = False, force_reanalyze: bool = False) -> PlatformDashboardData:
         connection = getattr(self.user, "instagram_connection", None)
         if not connection:
             return PlatformDashboardData(
@@ -145,6 +145,9 @@ class InstagramAnalyticsService:
         if refresh:
             payload = self.fetch_and_cache(connection, snapshot)
             refreshed = True
+
+        if force_reanalyze:
+            payload.pop("_ai_cache", None)
 
         metrics = self.normalize_payload(connection, payload, snapshot=snapshot)
         return PlatformDashboardData(
@@ -937,11 +940,12 @@ class SocialDashboardService:
             SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM: InstagramAnalyticsService(user),
         }
 
-    def build_dashboard(self, refresh_platform: str | None = None) -> dict[str, Any]:
+    def build_dashboard(self, refresh_platform: str | None = None, force_reanalyze: bool = False) -> dict[str, Any]:
         platforms: list[PlatformDashboardData] = []
         for slug, service in self.registry.items():
             should_refresh = refresh_platform == slug
-            platforms.append(service.build_platform_data(refresh=should_refresh))
+            should_reanalyze = force_reanalyze and should_refresh
+            platforms.append(service.build_platform_data(refresh=should_refresh, force_reanalyze=should_reanalyze))
 
         placeholders = [
             PlatformDashboardData(
