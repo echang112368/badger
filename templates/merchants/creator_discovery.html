@@ -334,6 +334,14 @@ window.addEventListener('load', function () {
 
   sendBtn.addEventListener('click', async () => {
     const message = msgArea.value.trim();
+    const creatorId = (activeCreatorId || '').toString().trim();
+
+    if (!creatorId) {
+      errBox.textContent = 'Unable to identify this creator. Please close and try again.';
+      errBox.classList.remove('d-none');
+      return;
+    }
+
     if (!message) {
       errBox.textContent = 'Please write an opening message.';
       errBox.classList.remove('d-none');
@@ -348,7 +356,7 @@ window.addEventListener('load', function () {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
         body: JSON.stringify({
-          creator_id: Number(activeCreatorId),
+          creator_id: creatorId,
           opening_message: message,
         }),
       });
