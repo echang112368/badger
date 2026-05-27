@@ -663,6 +663,17 @@ def creator_requests(request):
 
     for req in requests:
         meta = getattr(req.merchant, "merchantmeta", None)
+        lines = (req.message or "").splitlines()
+        campaign_type = ""
+        deal_type = ""
+        clean_message_lines = []
+        for line in lines:
+            if line.startswith("Campaign type:"):
+                campaign_type = line.replace("Campaign type:", "").strip()
+            elif line.startswith("Deal type:"):
+                deal_type = line.replace("Deal type:", "").strip()
+            else:
+                clean_message_lines.append(line)
         grouped[req.status].append(
             {
                 "id": req.id,
@@ -671,7 +682,9 @@ def creator_requests(request):
                 "item_name": req.item.title if req.item else (req.item_group.name if req.item_group else None),
                 "status": req.status,
                 "created_at": req.created_at,
-                "message": req.message,
+                "message": "\n".join(clean_message_lines).strip(),
+                "campaign_type": campaign_type,
+                "deal_type": deal_type,
             }
         )
 

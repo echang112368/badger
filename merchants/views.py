@@ -1034,6 +1034,12 @@ def merchant_creator_discovery(request):
         force_refresh=force_refresh,
     )
     creator_cards = discovery_payload["cards"]
+    pending_creator_request_ids = set(
+        PartnershipRequest.objects.filter(
+            merchant=merchant_user,
+            status__in=["pending", "declined"],
+        ).values_list("creator_id", flat=True)
+    )
     questionnaire_url = f"{reverse('merchant_creator_preferences')}?{urlencode({'next': request.get_full_path()})}"
 
     return render(
@@ -1059,7 +1065,59 @@ def merchant_creator_discovery(request):
                 "posting_recency",
                 "comment_quality",
             ],
+            "pending_creator_request_ids": pending_creator_request_ids,
         },
+    )
+
+
+@login_required
+@require_POST
+def merchant_send_partnership_request(request):
+    if not request.user.is_merchant:
+        return JsonResponse({"success": False, "error": "Forbidden"}, status=403)
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON payload"}, status=400)
+
+    creator_id = payload.get("creator_id")
+    opening_message = (payload.get("opening_message") or "").strip()
+    campaign_type = (payload.get("campaign_type") or "").strip()
+    deal_type = (payload.get("deal_type") or "").strip()
+    if not creator_id or not opening_message:
+        return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
+
+    creator = get_object_or_404(CustomUser, id=creator_id, is_creator=True)
+    existing_pending = PartnershipRequest.objects.filter(
+        merchant=request.user,
+        creator=creator,
+        status__in=["pending", "declined"],
+    ).first()
+    if existing_pending:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "You can only send one message until this creator accepts your request",
+            },
+            status=400,
+        )
+
+    request_message = (
+        f"{opening_message}\n\nCampaign type: {campaign_type or 'Not specified'}\n"
+        f"Deal type: {deal_type or 'Not specified'}"
+    )
+    partnership_request = PartnershipRequest.objects.create(
+        merchant=request.user,
+        creator=creator,
+        message=request_message,
+        status="pending",
+    )
+    return JsonResponse(
+        {
+            "success": True,
+            "request_id": partnership_request.id,
+            "message": f"Request sent to @{creator.username}",
+        }
     )
 
 
@@ -1169,8 +1227,41 @@ def merchant_requests(request):
                 "request": req,
                 "creator_card": _creator_card_payload(creator_meta),
                 "item_name": req.item.title if req.item else (req.item_group.name if req.item_group else None),
+                "campaign_type": "",
+                "deal_type": "",
             }
         )
+        lines = (req.message or "").splitlines()
+        campaign_type = ""
+        deal_type = ""
+        clean_lines = []
+        for line in lines:
+            if line.startswith("Campaign type:"):
+                campaign_type = line.replace("Campaign type:", "").strip()
+            elif line.startswith("Deal type:"):
+                deal_type = line.replace("Deal type:", "").strip()
+            else:
+                clean_lines.append(line)
+        request_cards[-1]["campaign_type"] = campaign_type or "General"
+        request_cards[-1]["deal_type"] = deal_type or "Flexible"
+        request_cards[-1]["clean_message"] = "\n".join(clean_lines).strip()
+
+    selected_id = request.GET.get("request")
+    selected_request = request_cards[0] if request_cards else None
+    if selected_id:
+        for entry in request_cards:
+            if str(entry["request"].id) == str(selected_id):
+                selected_request = entry
+                break
+
+    prefill_creator_id = request.GET.get("creator_id", "")
+    prefill_blocked = False
+    if prefill_creator_id:
+        prefill_blocked = PartnershipRequest.objects.filter(
+            merchant=merchant_user,
+            creator_id=prefill_creator_id,
+            status__in=["pending", "declined"],
+        ).exists()
 
     return render(
         request,
@@ -1178,6 +1269,12 @@ def merchant_requests(request):
         {
             "permissions": permissions,
             "request_cards": request_cards,
+            "selected_request": selected_request,
+            "prefill_creator_id": prefill_creator_id,
+            "prefill_creator_name": request.GET.get("creator_name", ""),
+            "prefill_creator_handle": request.GET.get("creator_handle", ""),
+            "prefill_match_score": request.GET.get("match_score", ""),
+            "prefill_blocked": prefill_blocked,
             "show_invoices_tab": _should_show_invoices_tab(_get_merchant_meta(merchant_user)),
         },
     )

@@ -1,66 +1,81 @@
 {% extends 'merchants/base.html' %}
-{% block title %}Requests{% endblock %}
+{% block title %}Partnerships{% endblock %}
 {% block content %}
+<style>
+.partnership-shell{display:grid;grid-template-columns:430px 1fr;min-height:calc(100vh - 2rem);background:#fff;border:1px solid #e9ecef;border-radius:.75rem;overflow:hidden}
+.partnership-sidebar{border-right:1px solid #e9ecef;background:#fafafa}
+.partnership-chat-list .chat-item{display:block;padding:.9rem 1rem;border-left:4px solid transparent;text-decoration:none;color:inherit}
+.partnership-chat-list .chat-item.active{background:#eef1fb;border-left-color:#4052a0}
+.chat-header-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid #ececec;border-top:1px solid #ececec}
+.chat-header-grid > div{padding:.7rem 1rem;border-right:1px solid #ececec}.chat-header-grid > div:last-child{border-right:none}
+@media (max-width: 992px){.partnership-shell{grid-template-columns:1fr}.partnership-sidebar{border-right:none;border-bottom:1px solid #e9ecef}}
+</style>
 <div class="container-fluid py-4">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4">
-        <div>
-            <h1 class="h3 mb-1">Requests</h1>
-            <p class="text-muted mb-0">Review incoming creator requests and approve partnerships.</p>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        {% for entry in request_cards %}
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        {% include "shared/creator_card.html" with creator=entry.creator_card %}
-                        <hr class="my-4">
-                        <div class="row gy-3">
-                            <div class="col-md-4">
-                                <div class="text-uppercase text-muted small">Request source</div>
-                                <div class="fw-semibold">{{ entry.request.request_source }}</div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-uppercase text-muted small">Item</div>
-                                <div>{{ entry.item_name|default:"Business partnership" }}</div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-uppercase text-muted small">Status</div>
-                                {% if entry.request.status == 'accepted' %}
-                                    <span class="badge bg-success">Accepted</span>
-                                {% elif entry.request.status == 'declined' %}
-                                    <span class="badge bg-danger">Declined</span>
-                                {% else %}
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                {% endif %}
-                            </div>
-                            <div class="col-12">
-                                <div class="text-uppercase text-muted small">Request message</div>
-                                <p class="mb-0">{{ entry.request.message|default:"No message provided." }}</p>
-                            </div>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2 mt-4">
-                            <form method="post" action="{% url 'merchant_update_request' entry.request.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="accept">
-                                <button type="submit" class="btn btn-success" {% if entry.request.status != 'pending' or not permissions.can_modify_content %}disabled{% endif %}>Accept</button>
-                            </form>
-                            <form method="post" action="{% url 'merchant_update_request' entry.request.id %}">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="decline">
-                                <button type="submit" class="btn btn-outline-danger" {% if entry.request.status != 'pending' or not permissions.can_modify_content %}disabled{% endif %}>Decline</button>
-                            </form>
-                            <button type="button" class="btn btn-outline-secondary" disabled>View Creator Profile</button>
-                        </div>
+<div class="partnership-shell">
+    <aside class="partnership-sidebar">
+        <div class="p-4 pb-2"><h2 class="h3 mb-0">Messages</h2></div>
+        <div class="px-4 text-uppercase text-muted small fw-semibold">Sent Requests</div>
+        <div class="partnership-chat-list">
+            {% for entry in request_cards %}
+                <a href="{% url 'merchant_requests' %}?request={{ entry.request.id }}" class="chat-item {% if selected_request and selected_request.request.id == entry.request.id %}active{% endif %}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="fw-semibold">{{ entry.creator_card.name }}</div>
+                        <small class="text-muted"><time class="local-time" datetime="{{ entry.request.created_at|date:'c' }}">{{ entry.request.created_at|date:'M j' }}</time></small>
                     </div>
+                    <div class="text-muted small text-truncate">{{ entry.clean_message|default:entry.request.message|default:'No message yet.' }}</div>
+                </a>
+            {% empty %}
+                <div class="p-4 text-muted">No requests yet.</div>
+            {% endfor %}
+        </div>
+    </aside>
+    <section>
+        {% if selected_request %}
+            <div class="p-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="h4 mb-0">{{ selected_request.creator_card.name }}</div>
+                    <div class="text-muted">{{ selected_request.creator_card.email }}</div>
                 </div>
+                <div class="text-success"><i class="bi bi-circle-fill me-1" style="font-size:.6rem"></i>Active</div>
             </div>
-        {% empty %}
-            <div class="col-12">
-                <div class="alert alert-light border">No partnership requests yet.</div>
+            <div class="chat-header-grid">
+                <div><div class="text-muted text-uppercase small">Campaign</div><div class="fw-semibold">{{ selected_request.campaign_type }}</div></div>
+                <div><div class="text-muted text-uppercase small">Deal</div><div class="fw-semibold">{{ selected_request.deal_type }}</div></div>
+                <div><div class="text-muted text-uppercase small">Match</div><div class="fw-semibold">{{ selected_request.creator_card.profile_completeness_score }}%</div></div>
+                <div><div class="text-muted text-uppercase small">Since</div><div class="fw-semibold"><time class="local-time" datetime="{{ selected_request.request.created_at|date:'c' }}">{{ selected_request.request.created_at|date:'Y-m-d' }}</time></div></div>
             </div>
-        {% endfor %}
-    </div>
+            <div class="p-4" style="min-height:380px;">{{ selected_request.clean_message|default:selected_request.request.message|linebreaksbr }}</div>
+        {% else %}
+            <div class="h-100 d-flex align-items-center justify-content-center text-muted">No messages yet</div>
+        {% endif %}
+        <div class="border-top p-3">
+            <div id="sendError" class="alert alert-danger d-none"></div>
+            <div class="row g-2">
+                <div class="col-md-3"><input id="newCreatorHandle" class="form-control" readonly value="{{ prefill_creator_handle }}"></div>
+                <div class="col-md-5"><input id="newMessage" class="form-control" value="Hi {{ prefill_creator_handle }}, we came across your profile on CreatorMatch and think you'd be a great fit for our brand awareness campaign. We'd love to discuss a collaboration."></div>
+                <div class="col-md-2"><select id="newCampaign" class="form-select"><option>Instagram Reel</option><option>TikTok video</option><option>YouTube review</option><option>Story</option><option>Static post</option><option>Other</option></select></div>
+                <div class="col-md-2"><select id="newDeal" class="form-select"><option>Paid</option><option>Affiliate</option><option>Gifted</option></select></div>
+            </div>
+            {% if prefill_blocked %}
+                <div class="small text-muted mt-2">Request already sent. You can send another message only after this creator accepts.</div>
+            {% endif %}
+            <div class="d-flex justify-content-end mt-2">
+                <button id="sendNewRequest" class="btn btn-primary" {% if not prefill_creator_id or prefill_blocked %}disabled{% endif %}><span id="sendSpin" class="spinner-border spinner-border-sm d-none me-2"></span>Send request</button>
+            </div>
+        </div>
+    </section>
 </div>
+</div>
+<script>
+document.getElementById('sendNewRequest')?.addEventListener('click', async function(){
+  const btn=this, spin=document.getElementById('sendSpin');
+  btn.disabled=true; spin.classList.remove('d-none');
+  const creatorId="{{ prefill_creator_id }}";
+  const res = await fetch("{% url 'merchant_send_partnership_request' %}",{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},body:JSON.stringify({creator_id:Number(creatorId),opening_message:document.getElementById('newMessage').value,campaign_type:document.getElementById('newCampaign').value,deal_type:document.getElementById('newDeal').value})});
+  const data = await res.json();
+  if(data.success){window.location.href="{% url 'merchant_requests' %}?request="+data.request_id;return;}
+  const err=document.getElementById('sendError'); err.textContent=data.error||'Unable to send request'; err.classList.remove('d-none');
+  btn.disabled=false; spin.classList.add('d-none');
+});
+</script>
 {% endblock %}
