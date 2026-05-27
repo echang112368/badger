@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import CreatorMeta
+from .models import PartnerMessage
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 from collect.utils import compute_commission_schedule
@@ -909,13 +910,58 @@ def _refresh_shopify_assets(items):
 
 @login_required
 def creator_affiliate_companies(request):
-    metrics = _affiliate_company_metrics(request.user)
+    links = list(
+        MerchantCreatorLink.objects.filter(creator=request.user)
+        .select_related("merchant__merchantmeta", "merchant__creator_preferences")
+        .order_by("merchant__username")
+    )
+    requests_rows, active_rows, archived_rows = [], [], []
+    palette = ["#DBEAFE", "#FEE2E2", "#DCFCE7", "#FEF3C7", "#EDE9FE", "#FCE7F3"]
+    for idx, link in enumerate(links):
+        merchant = link.merchant
+        name = _merchant_display_name(merchant)
+        initials = "".join([p[0] for p in name.split() if p][:2]).upper() or "BR"
+        req = (
+            PartnershipRequest.objects.filter(creator=request.user, merchant=merchant)
+            .order_by("-created_at")
+            .first()
+        )
+        last_message = link.messages.select_related("sender").order_by("-created_at").first()
+        preview = (last_message.content if last_message else (req.message if req else "No messages yet")).strip()
+        preview = preview[:80] + ("..." if len(preview) > 80 else "")
+        prefs = getattr(merchant, "creator_preferences", None)
+        row = {
+            "link_id": link.id,
+            "merchant_name": name,
+            "email": merchant.email,
+            "initials": initials,
+            "avatar_color": palette[idx % len(palette)],
+            "preview": preview,
+            "timestamp": (last_message.created_at if last_message else (req.updated_at if req else None)),
+            "status": link.status,
+            "request_status": req.status if req else None,
+            "match_score": 86,
+            "campaign_type": prefs.get_campaign_goal_display() if prefs and prefs.campaign_goal else "General",
+            "partner_since": req.created_at.date().isoformat() if req else "",
+            "niche": prefs.brand_description[:32] if prefs and prefs.brand_description else "General",
+            "deal_type": prefs.budget_range if prefs and prefs.budget_range else "Flexible",
+            "opening_message": req.message if req else "",
+            "has_unread": False,
+        }
+        if link.status == STATUS_REQUESTED:
+            requests_rows.append(row)
+        elif link.status == STATUS_ACTIVE:
+            active_rows.append(row)
+        else:
+            archived_rows.append(row)
 
     return render(
         request,
         "creators/affiliate_companies.html",
         {
-            "pending_requests": metrics["pending_requests"],
+            "requests_rows": requests_rows,
+            "active_rows": active_rows,
+            "archived_rows": archived_rows,
         },
     )
 
@@ -924,6 +970,36 @@ def creator_affiliate_companies(request):
 def creator_affiliate_companies_data(request):
     metrics = _affiliate_company_metrics(request.user)
     return JsonResponse(metrics)
+
+
+@login_required
+def creator_partner_messages(request, link_id):
+    link = get_object_or_404(MerchantCreatorLink, id=link_id, creator=request.user)
+    if request.method == "POST":
+        content = (request.POST.get("content") or "").strip()
+        if not content:
+            return JsonResponse({"status": "error", "message": "Message cannot be empty."}, status=400)
+        message = PartnerMessage.objects.create(
+            partnership=link,
+            sender=request.user,
+            content=content,
+        )
+        return JsonResponse({
+            "status": "ok",
+            "message": {
+                "id": message.id,
+                "content": message.content,
+                "sender_id": message.sender_id,
+                "created_at": message.created_at.isoformat(),
+            },
+        })
+
+    messages = list(
+        link.messages.select_related("sender").values("id", "sender_id", "content", "created_at")
+    )
+    for message in messages:
+        message["created_at"] = message["created_at"].isoformat()
+    return JsonResponse({"status": "ok", "messages": messages})
 
 
 @login_required
