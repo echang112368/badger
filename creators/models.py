@@ -1,6 +1,23 @@
 from django.db import models
 import uuid
 
+
+class PartnerMessage(models.Model):
+    partnership = models.ForeignKey(
+        "links.MerchantCreatorLink",
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Message {self.id} for partnership {self.partnership_id}"
+
 class CreatorMeta(models.Model):
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
