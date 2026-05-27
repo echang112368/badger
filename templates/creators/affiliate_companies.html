@@ -1,52 +1,15 @@
 {% extends 'creators/base.html' %}
-{% load static %}
-{% block title %}Affiliate Companies{% endblock %}
+{% block title %}Partnerships{% endblock %}
 {% block content %}
-<script src="https://cdn.tailwindcss.com"></script>
-
-<section class="py-6">
-    <h1 class="text-3xl font-bold mb-6">Affiliate Companies</h1>
-
-    {% if pending_requests %}
-    <div class="mb-6 bg-white shadow rounded-md p-4">
-        <h2 class="text-xl font-semibold mb-4">Pending Requests</h2>
-        <ul class="space-y-3">
-            {% for request in pending_requests %}
-            <li class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-gray-200 rounded-md p-3">
-                <div>
-                    <div class="font-semibold">{{ request.name }}</div>
-                    <div class="text-sm text-gray-500">{{ request.email }}</div>
-                </div>
-                <div class="flex gap-2">
-                    <form method="post" action="{% url 'respond_request' request.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="accept">
-                        <button type="submit" class="bg-green-600 text-white px-3 py-2 rounded-md text-sm">Accept</button>
-                    </form>
-                    <form method="post" action="{% url 'respond_request' request.id %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="decline">
-                        <button type="submit" class="border border-red-500 text-red-600 px-3 py-2 rounded-md text-sm">Decline</button>
-                    </form>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <div id="affiliate-companies-root"></div>
-</section>
-
-<form id="bulk-delete-form" method="post" action="{% url 'creator_delete_affiliations' %}" class="d-none">
-    {% csrf_token %}
-</form>
-
-<script>
-    window.AFFILIATE_COMPANIES_DATA_URL = "{% url 'creator_affiliate_companies_data' %}";
-</script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
-<script type="text/babel" src="{% static 'creators/js/affiliate_companies.jsx' %}"></script>
+<section class="py-3"><h1 class="h3 mb-3">Partnerships</h1>
+<div style="display:grid;grid-template-columns:240px 1fr;gap:10px;min-height:70vh;">
+<aside class="border rounded bg-white p-2">
+<div class="mb-3"><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Requests</span><span class="badge bg-light text-dark">{{ requests_rows|length }}</span></div>{% for row in requests_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}" data-niche="{{ row.niche }}" data-deal-type="{{ row.deal_type }}" data-opening-message="{{ row.opening_message|default:'' }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1" style="min-width:0;"><div class="d-flex justify-content-between"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><small class="text-muted">{% if row.timestamp %}{{ row.timestamp|date:'M j' }}{% endif %}</small></div><div class="small text-muted text-truncate">{{ row.preview }}</div></div><span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">{{ row.match_score }}%</span></div></button>{% endfor %}</div>
+<div class="mb-3"><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Active</span><span class="badge bg-light text-dark">{{ active_rows|length }}</span></div>{% for row in active_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1" style="min-width:0;"><div class="d-flex justify-content-between"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><small class="text-muted">{% if row.timestamp %}{{ row.timestamp|date:'M j' }}{% endif %}</small></div><div class="small text-muted text-truncate">{{ row.preview }}</div></div><span class="rounded-circle bg-primary" style="width:8px;height:8px;display:inline-block;margin-top:10px;"></span></div></button>{% endfor %}</div>
+<div><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Archived</span><span class="badge bg-light text-dark">{{ archived_rows|length }}</span></div>{% for row in archived_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><div class="small text-muted text-truncate">{{ row.preview }}</div></div></div></button>{% endfor %}</div>
+</aside>
+<main class="border rounded bg-white d-flex flex-column"><div class="p-3 border-bottom d-flex align-items-center gap-2" id="panelHeader"></div><div class="d-grid" style="grid-template-columns:repeat(3,1fr);" id="infoStrip"></div><div id="requestBanner" class="d-none m-3 p-3 rounded border border-warning bg-warning-subtle"></div><div id="thread" class="flex-grow-1 p-3" style="overflow-y:auto;max-height:48vh;"></div><form id="replyForm" class="p-3 border-top d-flex gap-2">{% csrf_token %}<input id="replyInput" class="form-control" placeholder="Write a message..."/><button class="btn btn-primary" type="submit">Send</button></form></main></div></section>
+<script>const rows=[...document.querySelectorAll('.row-item')];let activeRow=null;const csrftoken=document.querySelector('[name=csrfmiddlewaretoken]').value;function b(m,my){return `<div class="d-flex ${my?'justify-content-end':'justify-content-start'} mb-2"><div style="border-radius:8px;padding:8px 12px;font-size:13px;max-width:70%;background:${my?'#3D5096':'#f8f9fa'};color:${my?'#fff':'#111'}">${m.content}</div></div>`}async function sel(r){if(activeRow)activeRow.classList.remove('border-primary','bg-primary-subtle');activeRow=r;r.classList.add('border-primary','bg-primary-subtle');document.getElementById('panelHeader').innerHTML=`<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:${r.dataset.avatarColor};">${r.dataset.initials}</div><div><div class="fw-semibold">${r.dataset.company}</div><div class="small text-muted">${r.dataset.email}</div></div><span class="badge ms-auto ${r.dataset.status==='active'?'bg-success-subtle text-success-emphasis':'bg-secondary-subtle text-secondary-emphasis'}">${r.dataset.status}</span>`;document.getElementById('infoStrip').innerHTML=`<div class="p-2 border-end bg-light"><small class="text-muted d-block">Campaign Type</small><strong>${r.dataset.campaignType||'General'}</strong></div><div class="p-2 border-end bg-light"><small class="text-muted d-block">Match Score</small><strong>${r.dataset.matchScore||'—'}%</strong></div><div class="p-2 bg-light"><small class="text-muted d-block">Partner Since</small><strong>${r.dataset.partnerSince||'—'}</strong></div>`;const ban=document.getElementById('requestBanner'),th=document.getElementById('thread');if(r.dataset.status==='requested'){ban.classList.remove('d-none');ban.innerHTML=`<div class="fw-semibold mb-1">${r.dataset.company} request</div><div class="small mb-2">${r.dataset.openingMessage||'No opening message provided.'}</div><div class="small mb-2"><span class="badge text-bg-light me-1">${r.dataset.niche||'General'}</span><span class="badge text-bg-light me-1">${r.dataset.campaignType||'General'}</span><span class="badge text-bg-light">${r.dataset.dealType||'Flexible'}</span></div><div class="d-flex gap-2"><button class="btn btn-sm btn-outline-danger" onclick="act('decline')">Decline</button><button class="btn btn-sm btn-outline-secondary">Reply</button><button class="btn btn-sm btn-success" onclick="act('accept')">Accept</button></div>`;th.innerHTML='';return;}ban.classList.add('d-none');const d=await (await fetch(`/creators/affiliate-companies/messages/${r.dataset.linkId}/`)).json();th.innerHTML=(d.messages||[]).map(m=>b(m,m.sender_id==={{ request.user.id }})).join('');}
+async function act(action){if(!activeRow)return;const fd=new FormData();fd.append('csrfmiddlewaretoken',csrftoken);fd.append('action',action);const res=await fetch(`/creators/respond-request/${activeRow.dataset.linkId}/`,{method:'POST',body:fd});if(res.ok)location.reload();}
+document.getElementById('replyForm').addEventListener('submit',async e=>{e.preventDefault();if(!activeRow)return;const c=document.getElementById('replyInput').value.trim();if(!c)return;const fd=new FormData();fd.append('content',c);fd.append('csrfmiddlewaretoken',csrftoken);const res=await fetch(`/creators/affiliate-companies/messages/${activeRow.dataset.linkId}/`,{method:'POST',body:fd});if(res.ok){document.getElementById('replyInput').value='';sel(activeRow);}});rows.forEach(r=>r.addEventListener('click',()=>sel(r)));if(rows.length)sel(rows[0]);</script>
 {% endblock %}
