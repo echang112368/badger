@@ -22,8 +22,6 @@
                             <th>Platform</th>
                             <th>Item</th>
                             <th>Status</th>
-                            <th>Campaign</th>
-                            <th>Deal</th>
                             <th>Sent</th>
                             <th></th>
                         </tr>
@@ -43,8 +41,6 @@
                                         <span class="badge bg-warning text-dark">Pending</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ request.campaign_type|default:"—" }}</td>
-                                <td>{{ request.deal_type|default:"—" }}</td>
                                 <td><time class="local-time" datetime="{{ request.created_at|date:'c' }}">{{ request.created_at }}</time></td>
                                 <td class="text-end">
                                     <button type="button"
@@ -60,7 +56,7 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">No {{ status }} requests.</td>
+                                <td colspan="6" class="text-center text-muted py-4">No {{ status }} requests.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
