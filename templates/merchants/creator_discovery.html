@@ -21,6 +21,8 @@
 .insight-reason {font-size:.84rem;color:#475467;margin:.5rem 0 .35rem 0;line-height:1.35;}
 .insight-highlights {margin:0;padding-left:1rem;color:#475467;font-size:.83rem;}
 .insight-highlights li {margin:.1rem 0;}
+.btn-contact-creator {border:1px solid #3D5096;color:#3D5096;background:transparent;}
+.btn-contact-creator:hover {background:#3D5096;color:#fff;}
 @media (max-width: 992px){.discovery-shell{grid-template-columns:1fr}.discovery-sidebar{position:static;}}
 </style>
 <div class="container-fluid py-4">
@@ -216,14 +218,28 @@
                                     {% endif %}
                                 </details>
                             </div>
-                            {% if creator.match_label == 'Strong Match' %}
-                                <span class="card-pill match-badge-strong">{{ creator.match_label }}</span>
-                            {% elif creator.match_label == 'Possible Match' %}
-                                <span class="card-pill match-badge-possible">{{ creator.match_label }}</span>
-                            {% else %}
-                                <span class="card-pill match-badge-low">{{ creator.match_label }}</span>
-                            {% endif %}
-                            <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary float-end">View creator</a>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div>
+                                    {% if creator.match_label == 'Strong Match' %}
+                                        <span class="card-pill match-badge-strong">{{ creator.match_label }}</span>
+                                    {% elif creator.match_label == 'Possible Match' %}
+                                        <span class="card-pill match-badge-possible">{{ creator.match_label }}</span>
+                                    {% else %}
+                                        <span class="card-pill match-badge-low">{{ creator.match_label }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    {% if creator.user_id in pending_creator_request_ids %}
+                                        <span class="btn btn-sm btn-secondary disabled">Request sent</span>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-contact-creator"
+                                           href="{% url 'merchant_requests' %}?creator_id={{ creator.user_id }}&creator_name={{ creator.name|urlencode }}&creator_handle={{ creator.handle|urlencode }}&match_score={{ creator.match_score }}">
+                                           Contact creator
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-primary">View creator</a>
+                                </div>
+                            </div>
                         </div>
                     </article>
                 {% empty %}
@@ -239,4 +255,5 @@
         </section>
     </div>
 </div>
+
 {% endblock %}
