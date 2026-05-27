@@ -1,15 +1,681 @@
 {% extends 'creators/base.html' %}
 {% block title %}Partnerships{% endblock %}
 {% block content %}
-<section class="py-3"><h1 class="h3 mb-3">Partnerships</h1>
-<div style="display:grid;grid-template-columns:240px 1fr;gap:10px;min-height:70vh;">
-<aside class="border rounded bg-white p-2">
-<div class="mb-3"><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Requests</span><span class="badge bg-light text-dark">{{ requests_rows|length }}</span></div>{% for row in requests_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}" data-niche="{{ row.niche }}" data-deal-type="{{ row.deal_type }}" data-opening-message="{{ row.opening_message|default:'' }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1" style="min-width:0;"><div class="d-flex justify-content-between"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><small class="text-muted">{% if row.timestamp %}{{ row.timestamp|date:'M j' }}{% endif %}</small></div><div class="small text-muted text-truncate">{{ row.preview }}</div></div><span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">{{ row.match_score }}%</span></div></button>{% endfor %}</div>
-<div class="mb-3"><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Active</span><span class="badge bg-light text-dark">{{ active_rows|length }}</span></div>{% for row in active_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1" style="min-width:0;"><div class="d-flex justify-content-between"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><small class="text-muted">{% if row.timestamp %}{{ row.timestamp|date:'M j' }}{% endif %}</small></div><div class="small text-muted text-truncate">{{ row.preview }}</div></div><span class="rounded-circle bg-primary" style="width:8px;height:8px;display:inline-block;margin-top:10px;"></span></div></button>{% endfor %}</div>
-<div><div class="d-flex justify-content-between px-2 small text-muted text-uppercase mb-2"><span>Archived</span><span class="badge bg-light text-dark">{{ archived_rows|length }}</span></div>{% for row in archived_rows %}<button type="button" class="btn btn-sm text-start border row-item" data-link-id="{{ row.link_id }}" data-status="{{ row.status }}" data-company="{{ row.merchant_name }}" data-email="{{ row.email }}" data-initials="{{ row.initials }}" data-avatar-color="{{ row.avatar_color }}" data-campaign-type="{{ row.campaign_type }}" data-match-score="{{ row.match_score }}" data-partner-since="{{ row.partner_since }}"><div class="d-flex gap-2"><div class="rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:{{ row.avatar_color }};font-size:11px;">{{ row.initials }}</div><div class="flex-grow-1"><div class="fw-semibold text-truncate">{{ row.merchant_name }}</div><div class="small text-muted text-truncate">{{ row.preview }}</div></div></div></button>{% endfor %}</div>
-</aside>
-<main class="border rounded bg-white d-flex flex-column"><div class="p-3 border-bottom d-flex align-items-center gap-2" id="panelHeader"></div><div class="d-grid" style="grid-template-columns:repeat(3,1fr);" id="infoStrip"></div><div id="requestBanner" class="d-none m-3 p-3 rounded border border-warning bg-warning-subtle"></div><div id="thread" class="flex-grow-1 p-3" style="overflow-y:auto;max-height:48vh;"></div><form id="replyForm" class="p-3 border-top d-flex gap-2">{% csrf_token %}<input id="replyInput" class="form-control" placeholder="Write a message..."/><button class="btn btn-primary" type="submit">Send</button></form></main></div></section>
-<script>const rows=[...document.querySelectorAll('.row-item')];let activeRow=null;const csrftoken=document.querySelector('[name=csrfmiddlewaretoken]').value;function b(m,my){return `<div class="d-flex ${my?'justify-content-end':'justify-content-start'} mb-2"><div style="border-radius:8px;padding:8px 12px;font-size:13px;max-width:70%;background:${my?'#3D5096':'#f8f9fa'};color:${my?'#fff':'#111'}">${m.content}</div></div>`}async function sel(r){if(activeRow)activeRow.classList.remove('border-primary','bg-primary-subtle');activeRow=r;r.classList.add('border-primary','bg-primary-subtle');document.getElementById('panelHeader').innerHTML=`<div class="rounded-circle d-flex align-items-center justify-content-center" style="width:40px;height:40px;background:${r.dataset.avatarColor};">${r.dataset.initials}</div><div><div class="fw-semibold">${r.dataset.company}</div><div class="small text-muted">${r.dataset.email}</div></div><span class="badge ms-auto ${r.dataset.status==='active'?'bg-success-subtle text-success-emphasis':'bg-secondary-subtle text-secondary-emphasis'}">${r.dataset.status}</span>`;document.getElementById('infoStrip').innerHTML=`<div class="p-2 border-end bg-light"><small class="text-muted d-block">Campaign Type</small><strong>${r.dataset.campaignType||'General'}</strong></div><div class="p-2 border-end bg-light"><small class="text-muted d-block">Match Score</small><strong>${r.dataset.matchScore||'—'}%</strong></div><div class="p-2 bg-light"><small class="text-muted d-block">Partner Since</small><strong>${r.dataset.partnerSince||'—'}</strong></div>`;const ban=document.getElementById('requestBanner'),th=document.getElementById('thread');if(r.dataset.status==='requested'){ban.classList.remove('d-none');ban.innerHTML=`<div class="fw-semibold mb-1">${r.dataset.company} request</div><div class="small mb-2">${r.dataset.openingMessage||'No opening message provided.'}</div><div class="small mb-2"><span class="badge text-bg-light me-1">${r.dataset.niche||'General'}</span><span class="badge text-bg-light me-1">${r.dataset.campaignType||'General'}</span><span class="badge text-bg-light">${r.dataset.dealType||'Flexible'}</span></div><div class="d-flex gap-2"><button class="btn btn-sm btn-outline-danger" onclick="act('decline')">Decline</button><button class="btn btn-sm btn-outline-secondary">Reply</button><button class="btn btn-sm btn-success" onclick="act('accept')">Accept</button></div>`;th.innerHTML='';return;}ban.classList.add('d-none');const d=await (await fetch(`/creators/affiliate-companies/messages/${r.dataset.linkId}/`)).json();th.innerHTML=(d.messages||[]).map(m=>b(m,m.sender_id==={{ request.user.id }})).join('');}
-async function act(action){if(!activeRow)return;const fd=new FormData();fd.append('csrfmiddlewaretoken',csrftoken);fd.append('action',action);const res=await fetch(`/creators/respond-request/${activeRow.dataset.linkId}/`,{method:'POST',body:fd});if(res.ok)location.reload();}
-document.getElementById('replyForm').addEventListener('submit',async e=>{e.preventDefault();if(!activeRow)return;const c=document.getElementById('replyInput').value.trim();if(!c)return;const fd=new FormData();fd.append('content',c);fd.append('csrfmiddlewaretoken',csrftoken);const res=await fetch(`/creators/affiliate-companies/messages/${activeRow.dataset.linkId}/`,{method:'POST',body:fd});if(res.ok){document.getElementById('replyInput').value='';sel(activeRow);}});rows.forEach(r=>r.addEventListener('click',()=>sel(r)));if(rows.length)sel(rows[0]);</script>
+<style>
+  /* ── Full-height shell ── */
+  #dm-shell {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: calc(100vh - 56px);
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* ══════════ SIDEBAR ══════════ */
+  #dm-sidebar {
+    border-right: 1px solid #dbdbdb;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    overflow-y: auto;
+  }
+  .dm-sidebar-title {
+    padding: 18px 16px 6px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: -0.2px;
+  }
+  .dm-section-label {
+    padding: 10px 16px 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #c0c0c0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dm-section-count {
+    background: #f0f0f0;
+    color: #888;
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .dm-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    gap: 12px;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .dm-row:hover { background: #fafafa; }
+  .dm-row.active {
+    background: #f0f2ff;
+    border-left-color: #3D5096;
+  }
+  .dm-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #3D5096;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+  }
+  .dm-row-body { flex: 1; min-width: 0; }
+  .dm-row-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dm-row-preview {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+  .dm-row-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .dm-row-time { font-size: 10.5px; color: #c0c0c0; }
+  .dm-empty-section {
+    padding: 4px 16px 10px;
+    font-size: 12px;
+    color: #ccc;
+    font-style: italic;
+  }
+
+  /* ══════════ MAIN PANEL ══════════ */
+  #dm-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* Empty state */
+  #dm-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #c8c8c8;
+  }
+  .dm-empty-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #d0d0d0;
+  }
+
+  /* Panel header */
+  #dm-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid #efefef;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  #dm-header-av {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #3D5096;
+    flex-shrink: 0;
+  }
+  #dm-header-name {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #111;
+  }
+  #dm-header-sub { font-size: 12px; color: #999; margin-top: 1px; }
+
+  /* Info bar (slim pills row) */
+  #dm-infobar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid #efefef;
+    background: #fafafa;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .info-pill {
+    flex: 1;
+    padding: 7px 14px;
+    border-right: 1px solid #efefef;
+    font-size: 11.5px;
+  }
+  .info-pill:last-child { border-right: none; }
+  .info-pill-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #bbb;
+    margin-bottom: 1px;
+  }
+  .info-pill-val { font-weight: 700; color: #111; font-size: 12px; }
+
+  /* Request banner */
+  #dm-banner {
+    margin: 14px 20px 0;
+    padding: 14px 16px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  .banner-tag {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
+
+  /* Thread */
+  #dm-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    scroll-behavior: smooth;
+  }
+
+  /* Message bubbles */
+  .msg-cluster { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .msg-row { display: flex; }
+  .msg-row.mine { justify-content: flex-end; }
+  .msg-row.theirs { justify-content: flex-start; }
+
+  .bubble {
+    padding: 9px 14px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    max-width: 66%;
+    word-break: break-word;
+    border-radius: 22px;
+  }
+  /* Positional classes set by JS (first/mid/last/only within cluster) */
+  .msg-row.mine.pos-first .bubble   { border-top-right-radius: 22px; border-bottom-right-radius: 6px; }
+  .msg-row.theirs.pos-first .bubble { border-top-left-radius: 22px;  border-bottom-left-radius: 6px; }
+  .msg-row.mine.pos-mid .bubble     { border-radius: 6px 22px 22px 6px; }
+  .msg-row.theirs.pos-mid .bubble   { border-radius: 22px 6px 6px 22px; }
+  .msg-row.mine.pos-last .bubble    { border-top-right-radius: 6px; border-bottom-right-radius: 22px; }
+  .msg-row.theirs.pos-last .bubble  { border-top-left-radius: 6px;  border-bottom-left-radius: 22px; }
+  .msg-row.mine.pos-only .bubble    { border-radius: 22px 22px 6px 22px; }
+  .msg-row.theirs.pos-only .bubble  { border-radius: 22px 22px 22px 6px; }
+
+  .bubble.mine   { background: #3D5096; color: #fff; }
+  .bubble.theirs { background: #f0f0f0; color: #111; }
+
+  .cluster-time {
+    font-size: 10.5px;
+    color: #bbb;
+    margin-top: 4px;
+  }
+  .cluster-time.mine   { text-align: right; padding-right: 2px; }
+  .cluster-time.theirs { text-align: left;  padding-left: 2px; }
+
+  .thread-empty {
+    margin: auto;
+    font-size: 13px;
+    color: #c8c8c8;
+    text-align: center;
+  }
+
+  /* Input bar */
+  #dm-input-area {
+    padding: 10px 16px 14px;
+    border-top: 1px solid #efefef;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+    background: #fff;
+  }
+  #dm-input {
+    flex: 1;
+    border: 1.5px solid #efefef;
+    border-radius: 24px;
+    padding: 9px 16px;
+    font-size: 13.5px;
+    background: #fafafa;
+    outline: none;
+    resize: none;
+    min-height: 40px;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.45;
+    transition: border-color 0.15s, background 0.15s;
+    font-family: inherit;
+  }
+  #dm-input:focus { border-color: #3D5096; background: #fff; }
+  #dm-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: #3D5096;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+  #dm-send:hover:not(:disabled) { background: #263f74; transform: scale(1.05); }
+  #dm-send:disabled { background: #d0d3de; cursor: default; transform: none; }
+
+  /* Status indicators */
+  .status-pip {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .invite-badge {
+    background: #fff8e1;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 9.5px;
+    font-weight: 600;
+  }
+</style>
+
+<div id="dm-shell">
+
+  <!-- ══════ SIDEBAR ══════ -->
+  <div id="dm-sidebar">
+    <div class="dm-sidebar-title">Messages</div>
+
+    {% if requests_rows %}
+    <div class="dm-section-label">
+      Requests <span class="dm-section-count">{{ requests_rows|length }}</span>
+    </div>
+    {% for row in requests_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-company="{{ row.merchant_name }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-niche="{{ row.niche }}"
+      data-deal-type="{{ row.deal_type }}"
+      data-opening-message="{{ row.opening_message|default:'' }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name">{{ row.merchant_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        <span class="invite-badge">Invite</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="dm-section-label">
+      Active <span class="dm-section-count">{{ active_rows|length }}</span>
+    </div>
+    {% for row in active_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-company="{{ row.merchant_name }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-deal-type="{{ row.deal_type }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name">{{ row.merchant_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        <span class="status-pip" style="background:#22c55e;"></span>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not active_rows %}
+    <div class="dm-empty-section">No active partnerships yet</div>
+    {% endif %}
+
+    {% if archived_rows %}
+    <div class="dm-section-label" style="margin-top:6px;">
+      Archived <span class="dm-section-count">{{ archived_rows|length }}</span>
+    </div>
+    {% for row in archived_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-company="{{ row.merchant_name }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-deal-type="{{ row.deal_type }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};opacity:0.65;">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name" style="color:#888;">{{ row.merchant_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- ══════ MAIN PANEL ══════ -->
+  <div id="dm-panel">
+    <div id="dm-empty">
+      <div class="dm-empty-icon"><i class="bi bi-chat"></i></div>
+      <div style="font-size:15px;font-weight:600;color:#888;">Your messages</div>
+      <div style="font-size:13px;color:#c0c0c0;">Select a conversation to start chatting</div>
+    </div>
+  </div>
+</div>
+
+{{ request.user.id|json_script:"me-id" }}
+<script>
+(function () {
+  const ME   = JSON.parse(document.getElementById('me-id').textContent);
+  const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const MSGS_URL = id => `/creators/affiliate-companies/messages/${id}/`;
+  const ACT_URL  = id => `/creators/respond-request/${id}/`;
+
+  let active = null;
+
+  // ── Time formatter ────────────────────────────────────────
+  function fmt(iso) {
+    if (!iso) return '';
+    const d = new Date(iso), now = new Date();
+    const sameDayMs = 86400000;
+    if (now - d < sameDayMs && d.getDate() === now.getDate())
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (now - d < sameDayMs * 2) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Wire sidebar rows ─────────────────────────────────────
+  document.querySelectorAll('.dm-row').forEach(r => r.addEventListener('click', () => open(r)));
+
+  // Auto-open first active, then first of any
+  const firstActive = document.querySelector('.dm-row[data-status="active"]');
+  if (firstActive) open(firstActive);
+  else { const any = document.querySelector('.dm-row'); if (any) open(any); }
+
+  // ── Open a conversation ───────────────────────────────────
+  async function open(row) {
+    document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
+    row.classList.add('active');
+    active = row;
+
+    const d  = row.dataset;
+    const isReq  = d.status === 'requested';
+    const isArc  = d.status === 'inactive';
+
+    // Fetch messages (not for request rows yet)
+    let msgHtml = '<div class="thread-empty">No messages yet</div>';
+    if (!isReq) {
+      try {
+        const res  = await fetch(MSGS_URL(d.linkId));
+        const data = await res.json();
+        if (data.messages && data.messages.length) msgHtml = buildThread(data.messages);
+      } catch(e) { console.error(e); }
+    }
+
+    const statusMeta = {
+      active:    { color: '#22c55e', label: 'Active' },
+      requested: { color: '#f59e0b', label: 'Pending' },
+      inactive:  { color: '#9ca3af', label: 'Archived' },
+    }[d.status] || { color: '#9ca3af', label: d.status };
+
+    document.getElementById('dm-panel').innerHTML = `
+      <div id="dm-header">
+        <div id="dm-header-av" style="background:${esc(d.avatarColor)};">${esc(d.initials)}</div>
+        <div style="flex:1;min-width:0;">
+          <div id="dm-header-name">${esc(d.company)}</div>
+          <div id="dm-header-sub">${esc(d.email)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span class="status-pip" style="background:${statusMeta.color};"></span>
+          <span style="font-size:12px;color:#777;font-weight:500;">${statusMeta.label}</span>
+        </div>
+      </div>
+
+      <div id="dm-infobar">
+        <div class="info-pill">
+          <div class="info-pill-label">Campaign</div>
+          <div class="info-pill-val">${esc(d.campaignType || '—')}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Deal</div>
+          <div class="info-pill-val">${esc(d.dealType || '—')}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Match</div>
+          <div class="info-pill-val">${d.matchScore ? d.matchScore+'%' : '—'}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Since</div>
+          <div class="info-pill-val">${esc(d.partnerSince || '—')}</div>
+        </div>
+      </div>
+
+      ${isReq ? buildBanner(d) : ''}
+
+      <div id="dm-thread">${msgHtml}</div>
+
+      ${!isArc ? `
+      <div id="dm-input-area" ${isReq ? 'style="display:none;"' : ''}>
+        <textarea id="dm-input" rows="1" placeholder="Message ${esc(d.company)}…"></textarea>
+        <button id="dm-send" title="Send">
+          <i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>
+        </button>
+      </div>` : ''}
+    `;
+
+    // Scroll to bottom
+    const thr = document.getElementById('dm-thread');
+    if (thr) thr.scrollTop = thr.scrollHeight;
+
+    // Input events
+    const inp = document.getElementById('dm-input');
+    const btn = document.getElementById('dm-send');
+    if (inp && btn) {
+      btn.addEventListener('click', () => send(d.linkId));
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(d.linkId); }
+      });
+      inp.addEventListener('input', () => {
+        inp.style.height = 'auto';
+        inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+      });
+    }
+
+    // Reply toggle for requests
+    if (isReq) {
+      const tog = document.getElementById('reply-tog');
+      if (tog) tog.addEventListener('click', () => {
+        const ia = document.getElementById('dm-input-area');
+        if (ia) { ia.style.display = 'flex'; document.getElementById('dm-input')?.focus(); }
+      });
+    }
+  }
+
+  // ── Build message thread ───────────────────────────────────
+  function buildThread(msgs) {
+    // Group consecutive messages by sender
+    const clusters = [];
+    for (const m of msgs) {
+      const mine = m.sender_id === ME;
+      if (!clusters.length || clusters.at(-1).mine !== mine)
+        clusters.push({ mine, msgs: [m] });
+      else clusters.at(-1).msgs.push(m);
+    }
+    return clusters.map(c => {
+      const side = c.mine ? 'mine' : 'theirs';
+      const n = c.msgs.length;
+      return `
+      <div class="msg-cluster">
+        ${c.msgs.map((m, i) => {
+          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n - 1 ? 'last' : 'mid';
+          return `<div class="msg-row ${side} pos-${pos}">
+            <div class="bubble ${side}">${esc(m.content)}</div>
+          </div>`;
+        }).join('')}
+        <div class="cluster-time ${side}">${fmt(c.msgs.at(-1).created_at)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Request banner ────────────────────────────────────────
+  function buildBanner(d) {
+    const tags = [d.niche, d.campaignType, d.dealType]
+      .filter(v => v && !['—','General','Flexible'].includes(v))
+      .map(v => `<span class="banner-tag">${esc(v)}</span>`)
+      .join('');
+    return `
+      <div id="dm-banner">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+          <i class="bi bi-envelope-open-fill" style="color:#b45309;font-size:13px;"></i>
+          <span style="font-size:12px;font-weight:700;color:#b45309;">
+            Partnership invitation from ${esc(d.company)}
+          </span>
+        </div>
+        ${d.openingMessage
+          ? `<p style="font-size:13px;color:#78350f;margin:0 0 10px;line-height:1.55;">${esc(d.openingMessage)}</p>`
+          : ''}
+        ${tags ? `<div style="margin-bottom:10px;">${tags}</div>` : ''}
+        <div style="display:flex;gap:8px;">
+          <button onclick="act('decline')"
+            style="border:1.5px solid #ef4444;color:#ef4444;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            Decline
+          </button>
+          <button id="reply-tog"
+            style="border:1.5px solid #3D5096;color:#3D5096;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            Reply
+          </button>
+          <button onclick="act('accept')"
+            style="background:#22c55e;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
+            Accept
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // ── Send a message ─────────────────────────────────────────
+  async function send(linkId) {
+    const inp = document.getElementById('dm-input');
+    const btn = document.getElementById('dm-send');
+    if (!inp) return;
+    const content = inp.value.trim();
+    if (!content) return;
+
+    if (btn) btn.disabled = true;
+    inp.value = ''; inp.style.height = 'auto';
+
+    const fd = new FormData();
+    fd.append('content', content);
+    fd.append('csrfmiddlewaretoken', CSRF);
+
+    try {
+      const res  = await fetch(MSGS_URL(linkId), { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        const thr = document.getElementById('dm-thread');
+        if (thr) {
+          // Remove empty-state placeholder
+          thr.querySelector('.thread-empty')?.remove();
+          const cluster = document.createElement('div');
+          cluster.className = 'msg-cluster';
+          cluster.innerHTML = `
+            <div class="msg-row mine">
+              <div class="bubble mine">${esc(content)}</div>
+            </div>
+            <div class="cluster-time mine">${fmt(data.message.created_at)}</div>`;
+          thr.appendChild(cluster);
+          thr.scrollTop = thr.scrollHeight;
+        }
+        // Update sidebar preview
+        const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
+        row?.querySelector('.dm-row-preview')?.setAttribute('data-updated', content.slice(0,60));
+        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0,60);
+      }
+    } catch(e) { console.error(e); }
+    finally { if (btn) btn.disabled = false; inp.focus(); }
+  }
+
+  // ── Accept / Decline ──────────────────────────────────────
+  window.act = async function(action) {
+    if (!active) return;
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', CSRF);
+    fd.append('action', action);
+    const res = await fetch(ACT_URL(active.dataset.linkId), { method: 'POST', body: fd });
+    if (res.ok) location.reload();
+  };
+})();
+</script>
 {% endblock %}

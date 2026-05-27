@@ -1102,14 +1102,13 @@ def merchant_send_partnership_request(request):
             status=400,
         )
 
-    request_message = (
-        f"{opening_message}\n\nCampaign type: {campaign_type or 'Not specified'}\n"
-        f"Deal type: {deal_type or 'Not specified'}"
-    )
     partnership_request = PartnershipRequest.objects.create(
         merchant=request.user,
         creator=creator,
-        message=request_message,
+        message=opening_message,
+        campaign_type=campaign_type,
+        deal_type=deal_type,
+        merchant_initiated=True,
         status="pending",
     )
     return JsonResponse(

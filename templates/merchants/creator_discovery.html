@@ -232,10 +232,13 @@
                                     {% if creator.user_id in pending_creator_request_ids %}
                                         <span class="btn btn-sm btn-secondary disabled">Request sent</span>
                                     {% else %}
-                                        <a class="btn btn-sm btn-contact-creator"
-                                           href="{% url 'merchant_requests' %}?creator_id={{ creator.user_id }}&creator_name={{ creator.name|urlencode }}&creator_handle={{ creator.handle|urlencode }}&match_score={{ creator.match_score }}">
-                                           Contact creator
-                                        </a>
+                                        <button class="btn btn-sm btn-contact-creator js-contact-btn"
+                                            data-creator-id="{{ creator.user_id }}"
+                                            data-creator-name="{{ creator.name }}"
+                                            data-creator-handle="{{ creator.handle }}"
+                                            data-match-score="{{ creator.match_score }}">
+                                            Contact creator
+                                        </button>
                                     {% endif %}
                                     <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-primary">View creator</a>
                                 </div>
@@ -256,4 +259,129 @@
     </div>
 </div>
 
+<!-- ── Contact creator modal ── -->
+<div class="modal fade" id="contactModal" tabindex="-1" aria-labelledby="contactModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="contactModalLabel">Send a message</h5>
+          <div class="text-muted small mt-1" id="contactModalSub"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div id="contactModalError" class="alert alert-danger d-none py-2 small"></div>
+        <textarea id="contactMessage" class="form-control" rows="5" placeholder="Introduce yourself and why you'd love to collaborate…"></textarea>
+      </div>
+      <div class="modal-footer border-0 pt-1">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="contactSendBtn">
+          <span id="contactSendSpin" class="spinner-border spinner-border-sm d-none me-2"></span>
+          Send request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Success toast ── -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1100;">
+  <div id="contactToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="contactToastMsg">Request sent!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Bootstrap is loaded after this block; use window.load to ensure it's available.
+window.addEventListener('load', function () {
+  const SEND_URL = "{% url 'merchant_send_partnership_request' %}";
+  const CSRF = document.cookie.split(';').map(c => c.trim().split('=')).find(([k]) => k === 'csrftoken')?.[1] || '';
+
+  let activeCreatorId = null;
+  let activeBtn = null;
+
+  const modal    = new bootstrap.Modal(document.getElementById('contactModal'));
+  const toast    = new bootstrap.Toast(document.getElementById('contactToast'), { delay: 3500 });
+  const sendBtn  = document.getElementById('contactSendBtn');
+  const spin     = document.getElementById('contactSendSpin');
+  const errBox   = document.getElementById('contactModalError');
+  const msgArea  = document.getElementById('contactMessage');
+  const toastMsg = document.getElementById('contactToastMsg');
+
+  document.querySelectorAll('.js-contact-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCreatorId = btn.dataset.creatorId;
+      activeBtn = btn;
+      const name   = btn.dataset.creatorName;
+      const handle = btn.dataset.creatorHandle;
+      const score  = btn.dataset.matchScore;
+
+      document.getElementById('contactModalLabel').textContent = `Message ${name}`;
+      document.getElementById('contactModalSub').innerHTML =
+        `<span class="me-2">${handle}</span>` +
+        (score ? `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${score}% match</span>` : '');
+
+      msgArea.value = '';
+      errBox.classList.add('d-none');
+      modal.show();
+      setTimeout(() => msgArea.focus(), 300);
+    });
+  });
+
+  sendBtn.addEventListener('click', async () => {
+    const message = msgArea.value.trim();
+    if (!message) {
+      errBox.textContent = 'Please write an opening message.';
+      errBox.classList.remove('d-none');
+      return;
+    }
+    errBox.classList.add('d-none');
+    sendBtn.disabled = true;
+    spin.classList.remove('d-none');
+
+    try {
+      const res  = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({
+          creator_id: Number(activeCreatorId),
+          opening_message: message,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        modal.hide();
+        if (activeBtn) {
+          const wrapper = document.createElement('span');
+          wrapper.className = 'btn btn-sm btn-secondary disabled';
+          wrapper.textContent = 'Request sent';
+          activeBtn.replaceWith(wrapper);
+          activeBtn = null;
+        }
+        toastMsg.textContent = data.message || 'Request sent!';
+        toast.show();
+      } else {
+        errBox.textContent = data.error || 'Unable to send request. Please try again.';
+        errBox.classList.remove('d-none');
+        sendBtn.disabled = false;
+        spin.classList.add('d-none');
+      }
+    } catch (e) {
+      errBox.textContent = 'Network error — please try again.';
+      errBox.classList.remove('d-none');
+      sendBtn.disabled = false;
+      spin.classList.add('d-none');
+    }
+  });
+
+  document.getElementById('contactModal').addEventListener('hidden.bs.modal', () => {
+    sendBtn.disabled = false;
+    spin.classList.add('d-none');
+  });
+});
+</script>
 {% endblock %}
