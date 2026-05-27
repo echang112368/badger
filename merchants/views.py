@@ -1034,12 +1034,6 @@ def merchant_creator_discovery(request):
         force_refresh=force_refresh,
     )
     creator_cards = discovery_payload["cards"]
-    pending_creator_request_ids = set(
-        PartnershipRequest.objects.filter(
-            merchant=merchant_user,
-            status="pending",
-        ).values_list("creator_id", flat=True)
-    )
     questionnaire_url = f"{reverse('merchant_creator_preferences')}?{urlencode({'next': request.get_full_path()})}"
 
     return render(
@@ -1065,53 +1059,7 @@ def merchant_creator_discovery(request):
                 "posting_recency",
                 "comment_quality",
             ],
-            "pending_creator_request_ids": pending_creator_request_ids,
         },
-    )
-
-
-@login_required
-@require_POST
-def merchant_send_partnership_request(request):
-    if not request.user.is_merchant:
-        return JsonResponse({"success": False, "error": "Forbidden"}, status=403)
-    try:
-        payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"success": False, "error": "Invalid JSON payload"}, status=400)
-
-    creator_id = payload.get("creator_id")
-    opening_message = (payload.get("opening_message") or "").strip()
-    campaign_type = (payload.get("campaign_type") or "").strip()
-    deal_type = (payload.get("deal_type") or "").strip()
-    if not creator_id or not opening_message:
-        return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
-
-    creator = get_object_or_404(CustomUser, id=creator_id, is_creator=True)
-    existing_pending = PartnershipRequest.objects.filter(
-        merchant=request.user,
-        creator=creator,
-        status="pending",
-    ).first()
-    if existing_pending:
-        return JsonResponse({"success": False, "error": "Request already sent to this creator"}, status=400)
-
-    request_message = (
-        f"{opening_message}\n\nCampaign type: {campaign_type or 'Not specified'}\n"
-        f"Deal type: {deal_type or 'Not specified'}"
-    )
-    partnership_request = PartnershipRequest.objects.create(
-        merchant=request.user,
-        creator=creator,
-        message=request_message,
-        status="pending",
-    )
-    return JsonResponse(
-        {
-            "success": True,
-            "request_id": partnership_request.id,
-            "message": f"Request sent to @{creator.username}",
-        }
     )
 
 
