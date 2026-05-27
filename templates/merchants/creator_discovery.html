@@ -21,6 +21,8 @@
 .insight-reason {font-size:.84rem;color:#475467;margin:.5rem 0 .35rem 0;line-height:1.35;}
 .insight-highlights {margin:0;padding-left:1rem;color:#475467;font-size:.83rem;}
 .insight-highlights li {margin:.1rem 0;}
+.btn-contact-creator {border:1px solid #3D5096;color:#3D5096;background:transparent;}
+.btn-contact-creator:hover {background:#3D5096;color:#fff;}
 @media (max-width: 992px){.discovery-shell{grid-template-columns:1fr}.discovery-sidebar{position:static;}}
 </style>
 <div class="container-fluid py-4">
@@ -216,14 +218,35 @@
                                     {% endif %}
                                 </details>
                             </div>
-                            {% if creator.match_label == 'Strong Match' %}
-                                <span class="card-pill match-badge-strong">{{ creator.match_label }}</span>
-                            {% elif creator.match_label == 'Possible Match' %}
-                                <span class="card-pill match-badge-possible">{{ creator.match_label }}</span>
-                            {% else %}
-                                <span class="card-pill match-badge-low">{{ creator.match_label }}</span>
-                            {% endif %}
-                            <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-primary float-end">View creator</a>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div>
+                                    {% if creator.match_label == 'Strong Match' %}
+                                        <span class="card-pill match-badge-strong">{{ creator.match_label }}</span>
+                                    {% elif creator.match_label == 'Possible Match' %}
+                                        <span class="card-pill match-badge-possible">{{ creator.match_label }}</span>
+                                    {% else %}
+                                        <span class="card-pill match-badge-low">{{ creator.match_label }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    {% if creator.user_id in pending_creator_request_ids %}
+                                        <span class="btn btn-sm btn-secondary disabled">Request sent</span>
+                                    {% else %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-contact-creator"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#contactCreatorModal"
+                                                data-creator-id="{{ creator.user_id }}"
+                                                data-creator-name="{{ creator.name }}"
+                                                data-creator-handle="{{ creator.handle }}"
+                                                data-creator-avatar="{{ creator.avatar_url|default:'' }}"
+                                                data-match-score="{{ creator.match_score }}">
+                                            Contact creator
+                                        </button>
+                                    {% endif %}
+                                    <a href="{% url 'merchant_creator_profile' creator.creator_uuid %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-primary">View creator</a>
+                                </div>
+                            </div>
                         </div>
                     </article>
                 {% empty %}
@@ -239,4 +262,86 @@
         </section>
     </div>
 </div>
+
+<div class="modal fade" id="contactCreatorModal" tabindex="-1" aria-labelledby="contactCreatorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactCreatorModalLabel">Contact creator</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <img id="contactCreatorAvatar" src="" alt="" class="rounded-circle" style="width:48px;height:48px;object-fit:cover;">
+                    <div>
+                        <div class="fw-semibold" id="contactCreatorName"></div>
+                        <div class="text-muted" id="contactCreatorHandle"></div>
+                    </div>
+                    <span class="badge bg-success ms-auto" id="contactCreatorScore"></span>
+                </div>
+                <div class="mb-3">
+                    <label for="openingMessage" class="form-label">Opening message</label>
+                    <textarea id="openingMessage" class="form-control" rows="4"></textarea>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="campaignType" class="form-label">Campaign type</label>
+                        <select id="campaignType" class="form-select">
+                            <option>Instagram Reel</option><option>TikTok video</option><option>YouTube review</option><option>Story</option><option>Static post</option><option>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="dealType" class="form-label">Deal type</label>
+                        <select id="dealType" class="form-select">
+                            <option>Paid</option><option>Affiliate</option><option>Gifted</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="sendRequestBtn" class="btn btn-primary">
+                    <span class="spinner-border spinner-border-sm d-none me-2" id="sendRequestSpinner"></span>
+                    Send request
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('contactCreatorModal');
+    if (!modal) return;
+    let currentCreatorId = null;
+    modal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        currentCreatorId = button.getAttribute('data-creator-id');
+        const handle = button.getAttribute('data-creator-handle') || '';
+        document.getElementById('contactCreatorName').textContent = button.getAttribute('data-creator-name') || '';
+        document.getElementById('contactCreatorHandle').textContent = handle;
+        document.getElementById('contactCreatorScore').textContent = `Match score: ${button.getAttribute('data-match-score') || 'N/A'}`;
+        document.getElementById('contactCreatorAvatar').src = button.getAttribute('data-creator-avatar') || '';
+        document.getElementById('openingMessage').value = `Hi ${handle}, we came across your profile on CreatorMatch and think you'd be a great fit for our brand awareness campaign. We'd love to discuss a collaboration.`;
+    });
+    document.getElementById('sendRequestBtn').addEventListener('click', async function () {
+        const btn = this;
+        const spinner = document.getElementById('sendRequestSpinner');
+        btn.disabled = true; spinner.classList.remove('d-none');
+        const payload = {
+            creator_id: Number(currentCreatorId),
+            opening_message: document.getElementById('openingMessage').value,
+            campaign_type: document.getElementById('campaignType').value,
+            deal_type: document.getElementById('dealType').value
+        };
+        const response = await fetch("{% url 'merchant_send_partnership_request' %}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}"},
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        btn.disabled = false; spinner.classList.add('d-none');
+        if (data.success) { window.location.reload(); } else { alert(data.error || 'Unable to send request'); }
+    });
+});
+</script>
 {% endblock %}
