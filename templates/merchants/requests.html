@@ -1,540 +1,517 @@
 {% extends 'merchants/base.html' %}
 {% block title %}Partnerships{% endblock %}
+{% block content_class %}{% endblock %}
 {% block content %}
 <style>
-  /* ── Full-height shell ── */
+  /* ── Shell ── */
   #dm-shell {
     display: grid;
     grid-template-columns: 300px 1fr;
-    height: calc(100vh - 56px);
+    height: 100vh;
     overflow: hidden;
-    background: #fff;
   }
 
-  /* ══════════ SIDEBAR ══════════ */
+  /* ══════ LEFT PANEL (white) ══════ */
   #dm-sidebar {
-    border-right: 1px solid #dbdbdb;
+    background: #fff;
+    border-right: 1px solid #e8eaed;
     display: flex;
     flex-direction: column;
-    background: #fff;
-    overflow-y: auto;
+    overflow: hidden;
   }
-  .dm-sidebar-title {
-    padding: 18px 16px 6px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #111;
-    letter-spacing: -0.2px;
-  }
-  .dm-section-label {
-    padding: 10px 16px 4px;
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: #c0c0c0;
+  .dm-sidebar-hd {
+    padding: 20px 18px 0;
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-  }
-  .dm-section-count {
-    background: #f0f0f0;
-    color: #888;
-    border-radius: 20px;
-    padding: 1px 7px;
-    font-size: 10px;
-    font-weight: 600;
-  }
-  .dm-row {
-    display: flex;
-    align-items: center;
-    padding: 10px 16px;
-    cursor: pointer;
-    gap: 12px;
-    border-left: 3px solid transparent;
-    transition: background 0.1s;
-    user-select: none;
-  }
-  .dm-row:hover { background: #fafafa; }
-  .dm-row.active {
-    background: #f0f2ff;
-    border-left-color: #3D5096;
-  }
-  .dm-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: #3D5096;
     flex-shrink: 0;
-    letter-spacing: 0.5px;
+  }
+  .dm-sidebar-hd-title { font-size: 17px; font-weight: 700; color: #111; }
+  .dm-compose-btn {
+    background: none; border: none;
+    color: #aaa; font-size: 17px;
+    cursor: pointer; padding: 4px; border-radius: 6px;
+    transition: color .12s;
+  }
+  .dm-compose-btn:hover { color: #444; }
+
+  /* Tabs */
+  #dm-tabs {
+    display: flex;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid #e8eaed;
+    flex-shrink: 0;
+  }
+  .dm-tab {
+    background: none; border: none;
+    padding: 8px 14px;
+    font-size: 13px; font-weight: 500;
+    color: #aaa; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .12s;
+    font-family: inherit;
+  }
+  .dm-tab:hover { color: #555; }
+  .dm-tab.dm-tab-active { color: #111; border-bottom-color: #111; }
+
+  /* Search */
+  #dm-search-wrap { padding: 10px 14px 4px; flex-shrink: 0; }
+  #dm-search {
+    width: 100%;
+    background: #f4f5f7;
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+    padding: 7px 12px 7px 32px;
+    font-size: 12.5px; color: #111;
+    outline: none; font-family: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    transition: border-color .12s;
+  }
+  #dm-search::placeholder { color: #bbb; }
+  #dm-search:focus { border-color: #bbb; background: #fff; }
+
+  /* Tab panels */
+  .dm-tab-panel {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .dm-tab-panel.dm-hidden { display: none !important; }
+
+  /* Section label */
+  .dm-section-lbl {
+    padding: 10px 16px 4px;
+    font-size: 9.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: #bbb;
+  }
+  .dm-section-lbl.pending-lbl { color: #d97706; }
+
+  /* Rows */
+  .dm-row {
+    display: flex; align-items: center;
+    padding: 10px 16px; cursor: pointer; gap: 12px;
+    transition: background .1s; user-select: none;
+    flex-shrink: 0;
+  }
+  .dm-row:hover { background: #f5f6fa; }
+  .dm-row.active { background: #eef0f8; }
+
+  .dm-av {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff;
+    flex-shrink: 0; letter-spacing: .4px;
   }
   .dm-row-body { flex: 1; min-width: 0; }
   .dm-row-name {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #111;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 13.5px; font-weight: 600; color: #111;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .dm-row-preview {
-    font-size: 12px;
-    color: #999;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 12px; color: #999;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-top: 2px;
   }
   .dm-row-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 5px;
-    flex-shrink: 0;
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 5px; flex-shrink: 0;
   }
-  .dm-row-time { font-size: 10.5px; color: #c0c0c0; }
-  .dm-empty-section {
-    padding: 4px 16px 10px;
-    font-size: 12px;
-    color: #ccc;
-    font-style: italic;
+  .dm-row-time { font-size: 10.5px; color: #bbb; }
+  .dm-unread-badge {
+    background: #f5c518; color: #131720;
+    border-radius: 50%; width: 18px; height: 18px;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
   }
+  .dm-green-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%; background: #22c55e;
+  }
+  .dm-sent-badge {
+    background: #fff8e1;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 9.5px; font-weight: 600;
+  }
+  .dm-empty-list {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; color: #ccc; font-size: 13px;
+    padding: 24px;
+  }
+  .dm-empty-list i { font-size: 24px; opacity: .5; }
 
-  /* ══════════ MAIN PANEL ══════════ */
+  /* ══════ RIGHT PANEL (white) ══════ */
   #dm-panel {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #fff;
+    display: flex; flex-direction: column;
+    overflow: hidden; background: #fff;
   }
-
-  /* Empty state */
   #dm-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    color: #c8c8c8;
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; color: #c8c8c8;
   }
   .dm-empty-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 2px solid #e0e0e0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: #d0d0d0;
+    width: 72px; height: 72px; border-radius: 50%;
+    border: 2px solid #ebebeb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #d4d4d4;
   }
 
   /* Panel header */
   #dm-header {
-    padding: 12px 20px;
-    border-bottom: 1px solid #efefef;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid #f0f2f5;
+    display: flex; align-items: flex-start; gap: 14px; flex-shrink: 0;
   }
   #dm-header-av {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: #3D5096;
-    flex-shrink: 0;
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
   }
-  #dm-header-name {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: #111;
+  #dm-header-name { font-size: 14.5px; font-weight: 700; color: #111; }
+  #dm-header-sub {
+    font-size: 12px; color: #9aa3b3; margin-top: 3px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0;
   }
-  #dm-header-sub { font-size: 12px; color: #999; margin-top: 1px; }
+  .hdr-dot { margin: 0 5px; color: #ccc; }
+  .hdr-chip {
+    font-size: 11.5px; color: #6b7a94; background: #f4f5f8;
+    padding: 1px 8px; border-radius: 10px; margin-left: 4px;
+  }
 
-  /* Info bar (slim pills row) */
+  /* Info bar */
   #dm-infobar {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    border-bottom: 1px solid #efefef;
-    background: #fafafa;
-    flex-shrink: 0;
-    overflow: hidden;
+    display: flex; border-bottom: 1px solid #f0f2f5;
+    background: #f8f9fa; flex-shrink: 0;
   }
-  .info-pill {
-    flex: 1;
-    padding: 7px 14px;
-    border-right: 1px solid #efefef;
-    font-size: 11.5px;
+  .info-cell {
+    flex: 1; padding: 8px 16px;
+    border-right: 1px solid #f0f2f5;
   }
-  .info-pill:last-child { border-right: none; }
-  .info-pill-label {
-    font-size: 9.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #bbb;
-    margin-bottom: 1px;
+  .info-cell:last-child { border-right: none; }
+  .info-lbl {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em; color: #bbb;
+    margin-bottom: 2px;
   }
-  .info-pill-val { font-weight: 700; color: #111; font-size: 12px; }
-
-  /* Request banner */
-  #dm-banner {
-    margin: 14px 20px 0;
-    padding: 14px 16px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 14px;
-    flex-shrink: 0;
-  }
-  .banner-tag {
-    display: inline-block;
-    background: #fef3c7;
-    color: #92400e;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    margin-right: 4px;
-    margin-bottom: 4px;
-  }
+  .info-val { font-size: 12px; font-weight: 700; color: #111; }
+  .info-val-active { color: #16a34a; }
 
   /* Waiting notice */
   #dm-waiting-notice {
-    margin: 12px 20px 0;
-    padding: 12px 16px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    flex-shrink: 0;
+    margin: 12px 18px 0; padding: 11px 15px;
+    background: #f9fafb; border: 1px solid #e5e7eb;
+    border-radius: 10px; flex-shrink: 0;
   }
 
   /* Thread */
   #dm-thread {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px 20px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    flex: 1; overflow-y: auto;
+    padding: 18px 24px 10px;
+    display: flex; flex-direction: column; gap: 0;
     scroll-behavior: smooth;
   }
 
-  /* Message bubbles */
-  .msg-cluster { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-  .msg-row { display: flex; }
+  /* Message clusters */
+  .msg-cluster {
+    display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px;
+  }
+  .msg-row { display: flex; align-items: flex-end; gap: 8px; }
   .msg-row.mine { justify-content: flex-end; }
   .msg-row.theirs { justify-content: flex-start; }
 
   .bubble {
-    padding: 9px 14px;
-    font-size: 13.5px;
-    line-height: 1.45;
-    max-width: 66%;
-    word-break: break-word;
-    border-radius: 22px;
+    padding: 9px 14px; font-size: 13.5px; line-height: 1.48;
+    max-width: 62%; word-break: break-word; border-radius: 18px;
   }
-  /* Positional classes set by JS */
-  .msg-row.mine.pos-first .bubble   { border-top-right-radius: 22px; border-bottom-right-radius: 6px; }
-  .msg-row.theirs.pos-first .bubble { border-top-left-radius: 22px;  border-bottom-left-radius: 6px; }
-  .msg-row.mine.pos-mid .bubble     { border-radius: 6px 22px 22px 6px; }
-  .msg-row.theirs.pos-mid .bubble   { border-radius: 22px 6px 6px 22px; }
-  .msg-row.mine.pos-last .bubble    { border-top-right-radius: 6px; border-bottom-right-radius: 22px; }
-  .msg-row.theirs.pos-last .bubble  { border-top-left-radius: 6px;  border-bottom-left-radius: 22px; }
-  .msg-row.mine.pos-only .bubble    { border-radius: 22px 22px 6px 22px; }
-  .msg-row.theirs.pos-only .bubble  { border-radius: 22px 22px 22px 6px; }
+  .msg-row.mine.pos-first .bubble   { border-radius: 18px 18px 6px 18px; }
+  .msg-row.theirs.pos-first .bubble { border-radius: 18px 18px 18px 6px; }
+  .msg-row.mine.pos-mid .bubble     { border-radius: 18px 6px 6px 18px; }
+  .msg-row.theirs.pos-mid .bubble   { border-radius: 6px 18px 18px 6px; }
+  .msg-row.mine.pos-last .bubble    { border-radius: 18px 6px 18px 18px; }
+  .msg-row.theirs.pos-last .bubble  { border-radius: 6px 18px 18px 18px; }
+  .msg-row.mine.pos-only .bubble    { border-radius: 18px 18px 6px 18px; }
+  .msg-row.theirs.pos-only .bubble  { border-radius: 18px 18px 18px 6px; }
 
-  .bubble.mine   { background: #3D5096; color: #fff; }
-  .bubble.theirs { background: #f0f0f0; color: #111; }
+  .bubble.mine   { background: #1e1e1e; color: #fff; }
+  .bubble.theirs { background: #f0f2f5; color: #111; }
 
-  .cluster-time {
-    font-size: 10.5px;
-    color: #bbb;
-    margin-top: 4px;
+  .thread-av {
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 9.5px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
-  .cluster-time.mine   { text-align: right; padding-right: 2px; }
-  .cluster-time.theirs { text-align: left;  padding-left: 2px; }
+  .thread-av.me-av { background: #444; }
+  .thread-av-spacer { width: 26px; flex-shrink: 0; }
+
+  .cluster-meta {
+    font-size: 10.5px; color: #aab4c4; margin-top: 4px;
+  }
+  .cluster-meta.mine   { text-align: right; padding-right: 2px; }
+  .cluster-meta.theirs { text-align: left; padding-left: 34px; }
 
   .thread-empty {
-    margin: auto;
-    font-size: 13px;
-    color: #c8c8c8;
-    text-align: center;
+    margin: auto; font-size: 13px; color: #c8c8c8; text-align: center;
   }
 
   /* Input bar */
   #dm-input-area {
-    padding: 10px 16px 14px;
-    border-top: 1px solid #efefef;
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    flex-shrink: 0;
-    background: #fff;
+    padding: 10px 18px 14px; border-top: 1px solid #f0f2f5;
+    display: flex; align-items: flex-end; gap: 10px;
+    flex-shrink: 0; background: #fff;
   }
   #dm-input {
-    flex: 1;
-    border: 1.5px solid #efefef;
-    border-radius: 24px;
-    padding: 9px 16px;
-    font-size: 13.5px;
-    background: #fafafa;
-    outline: none;
-    resize: none;
-    min-height: 40px;
-    max-height: 120px;
-    overflow-y: auto;
-    line-height: 1.45;
-    transition: border-color 0.15s, background 0.15s;
-    font-family: inherit;
+    flex: 1; background: #f0f2f5; border: none;
+    border-radius: 22px; padding: 10px 16px;
+    font-size: 13.5px; color: #1a1a1a; outline: none;
+    resize: none; min-height: 40px; max-height: 120px;
+    overflow-y: auto; line-height: 1.45; font-family: inherit;
+    transition: background .12s;
   }
-  #dm-input:focus { border-color: #3D5096; background: #fff; }
-  #dm-input.locked {
-    background: #f3f4f6;
-    color: #9ca3af;
-    cursor: not-allowed;
-    border-color: #e5e7eb;
-  }
+  #dm-input:focus { background: #e8eaed; }
+  #dm-input::placeholder { color: #9aa3b3; }
+  #dm-input.locked { color: #9ca3af; cursor: not-allowed; }
   #dm-send {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
-    background: #3D5096;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s, transform 0.1s;
+    width: 38px; height: 38px; border-radius: 50%; border: none;
+    background: #1e1e1e; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: background .12s, transform .1s;
   }
-  #dm-send:hover:not(:disabled) { background: #263f74; transform: scale(1.05); }
+  #dm-send:hover:not(:disabled) { background: #333; transform: scale(1.05); }
   #dm-send:disabled { background: #d0d3de; cursor: default; transform: none; }
-
-  /* Status indicators */
-  .status-pip {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  .pending-badge {
-    background: #fff8e1;
-    color: #b45309;
-    border: 1px solid #fde68a;
-    border-radius: 20px;
-    padding: 1px 7px;
-    font-size: 9.5px;
-    font-weight: 600;
-  }
 
   /* Toast */
   #dm-toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
+    position: fixed; bottom: 24px; left: 50%;
     transform: translateX(-50%);
-    background: #111;
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 24px;
-    font-size: 13px;
-    font-weight: 500;
-    z-index: 9999;
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
-    white-space: nowrap;
+    background: #1e1e1e; color: #fff;
+    padding: 10px 20px; border-radius: 24px;
+    font-size: 13px; font-weight: 500; z-index: 9999;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
   }
   #dm-toast.show { opacity: 1; }
 </style>
 
 <div id="dm-shell">
 
-  <!-- ══════ SIDEBAR ══════ -->
+  <!-- ═══ LEFT PANEL ═══ -->
   <div id="dm-sidebar">
-    <div class="dm-sidebar-title">Messages</div>
+    <div class="dm-sidebar-hd">
+      <span class="dm-sidebar-hd-title">Partnerships</span>
+      <button class="dm-compose-btn" title="New message"><i class="bi bi-pencil-square"></i></button>
+    </div>
 
-    {% if pending_rows %}
-    <div class="dm-section-label">
-      Pending Reply <span class="dm-section-count">{{ pending_rows|length }}</span>
+    <div id="dm-tabs">
+      <button class="dm-tab dm-tab-active" data-tab="active">Active</button>
+      <button class="dm-tab" data-tab="requests">Requests</button>
+      <button class="dm-tab" data-tab="archived">Archived</button>
     </div>
-    {% for row in pending_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-creator="{{ row.creator_name }}"
-      data-handle="{{ row.creator_handle }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-deal-type="{{ row.deal_type }}"
-      data-creator-has-replied="{{ row.creator_has_replied|yesno:'true,false' }}"
-      data-request-status="{{ row.request_status|default:'' }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name">{{ row.creator_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
-      </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-        <span class="pending-badge">Pending</span>
-      </div>
-    </div>
-    {% endfor %}
-    {% endif %}
 
-    <div class="dm-section-label">
-      Active <span class="dm-section-count">{{ active_rows|length }}</span>
+    <div id="dm-search-wrap">
+      <input id="dm-search" type="text" placeholder="Search...">
     </div>
-    {% for row in active_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-creator="{{ row.creator_name }}"
-      data-handle="{{ row.creator_handle }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-deal-type="{{ row.deal_type }}"
-      data-creator-has-replied="true"
-      data-request-status="{{ row.request_status|default:'' }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name">{{ row.creator_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
-      </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-        <span class="status-pip" style="background:#22c55e;"></span>
-      </div>
-    </div>
-    {% endfor %}
-    {% if not active_rows %}
-    <div class="dm-empty-section">No active partnerships yet</div>
-    {% endif %}
 
-    {% if archived_rows %}
-    <div class="dm-section-label" style="margin-top:6px;">
-      Archived <span class="dm-section-count">{{ archived_rows|length }}</span>
-    </div>
-    {% for row in archived_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-creator="{{ row.creator_name }}"
-      data-handle="{{ row.creator_handle }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-deal-type="{{ row.deal_type }}"
-      data-creator-has-replied="true"
-      data-request-status="{{ row.request_status|default:'' }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};opacity:0.65;">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name" style="color:#888;">{{ row.creator_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
+    <!-- Active tab -->
+    <div class="dm-tab-panel" data-panel="active">
+      {% for row in active_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-creator="{{ row.creator_name }}"
+        data-handle="{{ row.creator_handle }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-deal-type="{{ row.deal_type }}"
+        data-creator-has-replied="true"
+        data-request-status="{{ row.request_status|default:'' }}">
+        <div class="dm-av">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name">{{ row.creator_name }}</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+          <span class="dm-green-dot"></span>
+        </div>
       </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+      {% empty %}
+      {% if not pending_rows %}
+      <div class="dm-empty-list">
+        <i class="bi bi-people"></i>
+        No active partnerships yet
+      </div>
+      {% endif %}
+      {% endfor %}
+
+      {% if pending_rows %}
+      <div class="dm-section-lbl pending-lbl">Pending Reply</div>
+      {% for row in pending_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-creator="{{ row.creator_name }}"
+        data-handle="{{ row.creator_handle }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-deal-type="{{ row.deal_type }}"
+        data-creator-has-replied="{{ row.creator_has_replied|yesno:'true,false' }}"
+        data-request-status="{{ row.request_status|default:'' }}">
+        <div class="dm-av">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name">{{ row.creator_name }}</div>
+          <div class="dm-row-preview">Waiting for response…</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+          <span class="dm-sent-badge">sent</span>
+        </div>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Requests tab -->
+    <div class="dm-tab-panel dm-hidden" data-panel="requests">
+      <div class="dm-empty-list">
+        <i class="bi bi-inbox"></i>
+        No incoming requests
       </div>
     </div>
-    {% endfor %}
-    {% endif %}
+
+    <!-- Archived tab -->
+    <div class="dm-tab-panel dm-hidden" data-panel="archived">
+      {% for row in archived_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-creator="{{ row.creator_name }}"
+        data-handle="{{ row.creator_handle }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-deal-type="{{ row.deal_type }}"
+        data-creator-has-replied="true"
+        data-request-status="{{ row.request_status|default:'' }}">
+        <div class="dm-av" style="opacity:.55;">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name" style="color:#3d4d68;">{{ row.creator_name }}</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="dm-empty-list">
+        <i class="bi bi-archive"></i>
+        No archived partnerships
+      </div>
+      {% endfor %}
+    </div>
   </div>
 
-  <!-- ══════ MAIN PANEL ══════ -->
+  <!-- ═══ RIGHT PANEL ═══ -->
   <div id="dm-panel">
     <div id="dm-empty">
       <div class="dm-empty-icon"><i class="bi bi-chat"></i></div>
       <div style="font-size:15px;font-weight:600;color:#888;">Your messages</div>
-      <div style="font-size:13px;color:#c0c0c0;">Select a conversation to start chatting</div>
+      <div style="font-size:13px;color:#bbb;">Select a conversation to start chatting</div>
     </div>
   </div>
 </div>
 
 <div id="dm-toast"></div>
-
 {{ request.user.id|json_script:"me-id" }}
 <script>
-(function () {
+(function() {
   const ME   = JSON.parse(document.getElementById('me-id').textContent);
   const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
   const MSGS_URL = id => `/merchants/partnerships/messages/${id}/`;
   const ACT_URL  = id => `/merchants/requests/${id}/update/`;
 
-  let active = null;
-  let pollTimer = null;
-  let currentCreatorHasReplied = true;
-  let currentCreatorName = '';
+  let activeRow = null, pollTimer = null;
+  let currentCreatorHasReplied = true, currentCreatorName = '';
 
-  // ── Time formatter ────────────────────────────────────────
   function fmt(iso) {
     if (!iso) return '';
     const d = new Date(iso), now = new Date();
-    const sameDayMs = 86400000;
-    if (now - d < sameDayMs && d.getDate() === now.getDate())
+    if (now - d < 86400000 && d.getDate() === now.getDate())
       return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (now - d < sameDayMs * 2) return 'Yesterday';
+    if (now - d < 172800000) return 'Yesterday';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
-
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch(e) { return iso; }
+  }
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
-
   function showToast(msg) {
     const t = document.getElementById('dm-toast');
-    t.textContent = msg;
-    t.classList.add('show');
+    t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 4000);
   }
 
-  // ── Wire sidebar rows ─────────────────────────────────────
-  document.querySelectorAll('.dm-row').forEach(r => r.addEventListener('click', () => open(r)));
+  // ── Tabs ──────────────────────────────────────────────────
+  document.querySelectorAll('.dm-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dm-tab').forEach(b => b.classList.remove('dm-tab-active'));
+      document.querySelectorAll('.dm-tab-panel').forEach(p => p.classList.add('dm-hidden'));
+      btn.classList.add('dm-tab-active');
+      const panel = document.querySelector(`.dm-tab-panel[data-panel="${btn.dataset.tab}"]`);
+      if (panel) panel.classList.remove('dm-hidden');
+    });
+  });
 
-  // Auto-open first pending row, then first active, then any
+  // ── Search ────────────────────────────────────────────────
+  document.getElementById('dm-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.dm-row').forEach(r => {
+      r.style.display = (!q || (r.dataset.creator||'').toLowerCase().includes(q)) ? '' : 'none';
+    });
+  });
+
+  // ── Wire rows ─────────────────────────────────────────────
+  document.querySelectorAll('.dm-row').forEach(r => {
+    r.addEventListener('click', () => openConvo(r));
+    const av = r.querySelector('.dm-av');
+    if (av) av.style.background = r.dataset.avatarColor || '#4f46e5';
+  });
+
+  // Auto-open
   const firstPending = document.querySelector('.dm-row[data-status="requested"]');
   const firstActive  = document.querySelector('.dm-row[data-status="active"]');
-  if (firstPending) open(firstPending);
-  else if (firstActive) open(firstActive);
-  else { const any = document.querySelector('.dm-row'); if (any) open(any); }
+  if (firstPending) openConvo(firstPending);
+  else if (firstActive) openConvo(firstActive);
+  else { const any = document.querySelector('.dm-row'); if (any) openConvo(any); }
 
-  // ── Open a conversation ───────────────────────────────────
-  async function open(row) {
+  // ── Open conversation ─────────────────────────────────────
+  async function openConvo(row) {
     document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
     row.classList.add('active');
-    active = row;
-
-    // Clear any existing poll
+    activeRow = row;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
-    const d  = row.dataset;
+    const d = row.dataset;
     const isArc = d.status === 'inactive';
-
-    // Fetch messages
     let msgHtml = '<div class="thread-empty">No messages yet</div>';
     let creatorHasReplied = d.creatorHasReplied !== 'false';
     try {
@@ -542,58 +519,43 @@
       const data = await res.json();
       creatorHasReplied = data.creator_has_replied !== false;
       const msgs = data.messages || [];
-      if (msgs.length) msgHtml = buildThread(msgs);
+      if (msgs.length) msgHtml = buildThread(msgs, d);
     } catch(e) { console.error(e); }
 
     currentCreatorHasReplied = creatorHasReplied;
     currentCreatorName = d.creator;
 
-    const statusMeta = {
+    const statusMap = {
       active:    { color: '#22c55e', label: 'Active' },
       requested: { color: '#f59e0b', label: 'Pending' },
       inactive:  { color: '#9ca3af', label: 'Archived' },
-    }[d.status] || { color: '#9ca3af', label: d.status };
+    };
+    const sm = statusMap[d.status] || { color: '#9ca3af', label: d.status };
 
-    const matchPct = parseFloat(d.matchScore || 0);
-    const matchDisplay = matchPct > 0 ? Math.round(matchPct * 100) + '%' : '—';
-
-    // Waiting notice when creator hasn't replied yet
     const waitingNotice = (!creatorHasReplied && !isArc) ? `
       <div id="dm-waiting-notice">
         <div style="display:flex;align-items:flex-start;gap:10px;">
           <i class="bi bi-hourglass-split" style="color:#9ca3af;font-size:14px;margin-top:2px;flex-shrink:0;"></i>
           <div>
-            <div style="font-size:12.5px;font-weight:600;color:#374151;margin-bottom:3px;">
-              Waiting for ${esc(d.creator)} to reply
-            </div>
-            <div style="font-size:11.5px;color:#6b7280;line-height:1.5;">
-              You can continue the conversation once they respond. This prevents creators from being overwhelmed with follow-up messages.
-            </div>
+            <div style="font-size:12.5px;font-weight:600;color:#374151;margin-bottom:2px;">Waiting for ${esc(d.creator)} to reply</div>
+            <div style="font-size:11.5px;color:#6b7280;line-height:1.5;">You can continue the conversation once they respond.</div>
           </div>
         </div>
       </div>` : '';
 
-    // Input bar: locked or active
     let inputBar = '';
     if (!isArc) {
       if (creatorHasReplied) {
-        inputBar = `
-        <div id="dm-input-area">
+        inputBar = `<div id="dm-input-area">
           <textarea id="dm-input" rows="1" placeholder="Message ${esc(d.creator)}…"></textarea>
-          <button id="dm-send" title="Send">
-            <i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>
-          </button>
+          <button id="dm-send"><i class="bi bi-send-fill" style="font-size:13px;margin-left:1px;"></i></button>
         </div>`;
       } else {
-        inputBar = `
-        <div id="dm-input-area">
+        inputBar = `<div id="dm-input-area">
           <textarea id="dm-input" class="locked" rows="1"
             placeholder="Waiting for ${esc(d.creator)} to reply…"
-            readonly title="You can send another message once ${esc(d.creator)} replies"
-            style="cursor:not-allowed;"></textarea>
-          <button id="dm-send" disabled title="Waiting for creator reply">
-            <i class="bi bi-lock-fill" style="font-size:13px;"></i>
-          </button>
+            readonly style="cursor:not-allowed;"></textarea>
+          <button id="dm-send" disabled><i class="bi bi-lock-fill" style="font-size:13px;"></i></button>
         </div>`;
       }
     }
@@ -603,45 +565,45 @@
         <div id="dm-header-av" style="background:${esc(d.avatarColor)};">${esc(d.initials)}</div>
         <div style="flex:1;min-width:0;">
           <div id="dm-header-name">${esc(d.creator)}</div>
-          <div id="dm-header-sub">${esc(d.email)}</div>
+          <div id="dm-header-sub">
+            ${esc(d.email)}
+            ${d.handle ? `<span class="hdr-dot">·</span><span>${esc(d.handle)}</span>` : ''}
+            ${d.dealType && d.dealType !== 'Flexible' ? `<span class="hdr-chip">${esc(d.dealType)}</span>` : ''}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:7px;">
-          <span class="status-pip" style="background:${statusMeta.color};"></span>
-          <span style="font-size:12px;color:#777;font-weight:500;">${statusMeta.label}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${sm.color};display:inline-block;"></span>
+          <span style="font-size:12px;color:#777;font-weight:500;">${sm.label}</span>
         </div>
       </div>
 
       <div id="dm-infobar">
-        <div class="info-pill">
-          <div class="info-pill-label">Campaign</div>
-          <div class="info-pill-val">${esc(d.campaignType || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Campaign</div>
+          <div class="info-val">${esc(d.campaignType || '—')}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Deal</div>
-          <div class="info-pill-val">${esc(d.dealType || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Deal Type</div>
+          <div class="info-val">${esc(d.dealType || '—')}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Match</div>
-          <div class="info-pill-val">${matchDisplay}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Status</div>
+          <div class="info-val ${d.status === 'active' ? 'info-val-active' : ''}">${sm.label}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Since</div>
-          <div class="info-pill-val">${esc(d.partnerSince || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Since</div>
+          <div class="info-val">${fmtDate(d.partnerSince)}</div>
         </div>
       </div>
 
       ${waitingNotice}
-
       <div id="dm-thread">${msgHtml}</div>
-
       ${inputBar}
     `;
 
-    // Scroll to bottom
     const thr = document.getElementById('dm-thread');
     if (thr) thr.scrollTop = thr.scrollHeight;
 
-    // Input events
     const inp = document.getElementById('dm-input');
     const btn = document.getElementById('dm-send');
     if (inp && btn && creatorHasReplied) {
@@ -654,15 +616,13 @@
         inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
       });
     }
-
-    // Start polling if creator hasn't replied yet
     if (!creatorHasReplied && !isArc) {
       pollTimer = setInterval(() => poll(d.linkId), 30000);
     }
   }
 
-  // ── Build message thread ───────────────────────────────────
-  function buildThread(msgs) {
+  // ── Build thread ───────────────────────────────────────────
+  function buildThread(msgs, d) {
     const clusters = [];
     for (const m of msgs) {
       const mine = m.sender_id === ME;
@@ -673,30 +633,39 @@
     return clusters.map(c => {
       const side = c.mine ? 'mine' : 'theirs';
       const n = c.msgs.length;
-      return `
-      <div class="msg-cluster">
+      const avColor = d ? d.avatarColor : '#4f46e5';
+      const initials = d ? d.initials : '??';
+      const senderName = c.mine ? 'You' : (d ? d.creator : '');
+      return `<div class="msg-cluster">
         ${c.msgs.map((m, i) => {
-          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n - 1 ? 'last' : 'mid';
+          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n-1 ? 'last' : 'mid';
+          const isLast = i === n - 1;
+          const theirAv = !c.mine && isLast
+            ? `<div class="thread-av" style="background:${avColor};">${esc(initials)}</div>`
+            : `<div class="thread-av-spacer"></div>`;
+          const meAv = c.mine && isLast
+            ? `<div class="thread-av me-av">Me</div>`
+            : `<div class="thread-av-spacer"></div>`;
           return `<div class="msg-row ${side} pos-${pos}">
+            ${!c.mine ? theirAv : ''}
             <div class="bubble ${side}">${esc(m.content)}</div>
+            ${c.mine ? meAv : ''}
           </div>`;
         }).join('')}
-        <div class="cluster-time ${side}">${fmt(c.msgs.at(-1).created_at)}</div>
+        <div class="cluster-meta ${side}">${esc(senderName)} · ${fmt(c.msgs.at(-1).created_at)}</div>
       </div>`;
     }).join('');
   }
 
-  // ── Send a message ─────────────────────────────────────────
+  // ── Send ───────────────────────────────────────────────────
   async function send(linkId) {
     const inp = document.getElementById('dm-input');
     const btn = document.getElementById('dm-send');
     if (!inp) return;
     const content = inp.value.trim();
     if (!content) return;
-
     if (btn) btn.disabled = true;
     inp.value = ''; inp.style.height = 'auto';
-
     try {
       const res  = await fetch(MSGS_URL(linkId), {
         method: 'POST',
@@ -708,28 +677,28 @@
         const thr = document.getElementById('dm-thread');
         if (thr) {
           thr.querySelector('.thread-empty')?.remove();
-          const cluster = document.createElement('div');
-          cluster.className = 'msg-cluster';
-          cluster.innerHTML = `
+          const cl = document.createElement('div');
+          cl.className = 'msg-cluster';
+          cl.innerHTML = `
             <div class="msg-row mine pos-only">
               <div class="bubble mine">${esc(content)}</div>
+              <div class="thread-av me-av">Me</div>
             </div>
-            <div class="cluster-time mine">${fmt(data.message.created_at)}</div>`;
-          thr.appendChild(cluster);
+            <div class="cluster-meta mine">You · ${fmt(data.message.created_at)}</div>`;
+          thr.appendChild(cl);
           thr.scrollTop = thr.scrollHeight;
         }
-        // Update sidebar preview
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
         if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0, 60);
       } else if (res.status === 403) {
-        showToast(data.error || 'Cannot send message yet — waiting for creator reply.');
-        inp.value = content; // restore content
+        showToast(data.error || 'Waiting for creator reply first.');
+        inp.value = content;
       }
     } catch(e) { console.error(e); }
     finally { if (btn) btn.disabled = false; inp.focus(); }
   }
 
-  // ── Poll for creator reply ─────────────────────────────────
+  // ── Poll ───────────────────────────────────────────────────
   async function poll(linkId) {
     if (currentCreatorHasReplied) { clearInterval(pollTimer); pollTimer = null; return; }
     try {
@@ -738,8 +707,6 @@
       if (data.creator_has_replied) {
         clearInterval(pollTimer); pollTimer = null;
         currentCreatorHasReplied = true;
-
-        // Unlock UI
         const inp = document.getElementById('dm-input');
         const btn = document.getElementById('dm-send');
         if (inp) {
@@ -757,31 +724,25 @@
         }
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>';
-          btn.title = 'Send';
+          btn.innerHTML = '<i class="bi bi-send-fill" style="font-size:13px;margin-left:1px;"></i>';
           btn.addEventListener('click', () => send(linkId));
         }
-
-        // Remove waiting notice
         document.getElementById('dm-waiting-notice')?.remove();
-
-        // Refresh messages
         const msgs = data.messages || [];
         if (msgs.length) {
           const thr = document.getElementById('dm-thread');
-          if (thr) { thr.innerHTML = buildThread(msgs); thr.scrollTop = thr.scrollHeight; }
+          if (thr) {
+            thr.innerHTML = buildThread(msgs, activeRow ? activeRow.dataset : null);
+            thr.scrollTop = thr.scrollHeight;
+          }
         }
-
-        // Update row data attribute
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
         if (row) row.dataset.creatorHasReplied = 'true';
-
         showToast(`${currentCreatorName} replied — you can now continue the conversation`);
       }
     } catch(e) { console.error(e); }
   }
 
-  // ── Accept / Decline (for creator-initiated requests) ─────
   window.act = async function(action, requestId) {
     if (!requestId) return;
     const fd = new FormData();

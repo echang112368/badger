@@ -1,481 +1,492 @@
 {% extends 'creators/base.html' %}
 {% block title %}Partnerships{% endblock %}
+{% block content_class %}{% endblock %}
 {% block content %}
 <style>
-  /* ── Full-height shell ── */
+  /* ── Shell ── */
   #dm-shell {
     display: grid;
     grid-template-columns: 300px 1fr;
-    height: calc(100vh - 56px);
+    height: 100vh;
     overflow: hidden;
-    background: #fff;
   }
 
-  /* ══════════ SIDEBAR ══════════ */
+  /* ══════ LEFT PANEL (white) ══════ */
   #dm-sidebar {
-    border-right: 1px solid #dbdbdb;
+    background: #fff;
+    border-right: 1px solid #e8eaed;
     display: flex;
     flex-direction: column;
-    background: #fff;
-    overflow-y: auto;
+    overflow: hidden;
   }
-  .dm-sidebar-title {
-    padding: 18px 16px 6px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #111;
-    letter-spacing: -0.2px;
-  }
-  .dm-section-label {
-    padding: 10px 16px 4px;
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: #c0c0c0;
+  .dm-sidebar-hd {
+    padding: 20px 18px 0;
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-  }
-  .dm-section-count {
-    background: #f0f0f0;
-    color: #888;
-    border-radius: 20px;
-    padding: 1px 7px;
-    font-size: 10px;
-    font-weight: 600;
-  }
-  .dm-row {
-    display: flex;
-    align-items: center;
-    padding: 10px 16px;
-    cursor: pointer;
-    gap: 12px;
-    border-left: 3px solid transparent;
-    transition: background 0.1s;
-    user-select: none;
-  }
-  .dm-row:hover { background: #fafafa; }
-  .dm-row.active {
-    background: #f0f2ff;
-    border-left-color: #3D5096;
-  }
-  .dm-avatar {
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: #3D5096;
     flex-shrink: 0;
-    letter-spacing: 0.5px;
+  }
+  .dm-sidebar-hd-title { font-size: 17px; font-weight: 700; color: #111; }
+
+  /* Tabs */
+  #dm-tabs {
+    display: flex;
+    padding: 10px 14px 0;
+    border-bottom: 1px solid #e8eaed;
+    flex-shrink: 0;
+  }
+  .dm-tab {
+    background: none; border: none;
+    padding: 8px 14px;
+    font-size: 13px; font-weight: 500;
+    color: #aaa; cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .12s;
+    font-family: inherit;
+  }
+  .dm-tab:hover { color: #555; }
+  .dm-tab.dm-tab-active { color: #111; border-bottom-color: #111; }
+
+  /* Search */
+  #dm-search-wrap { padding: 10px 14px 4px; flex-shrink: 0; }
+  #dm-search {
+    width: 100%;
+    background: #f4f5f7;
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+    padding: 7px 12px 7px 32px;
+    font-size: 12.5px; color: #111;
+    outline: none; font-family: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%23aaa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+    transition: border-color .12s;
+  }
+  #dm-search::placeholder { color: #bbb; }
+  #dm-search:focus { border-color: #bbb; background: #fff; }
+
+  /* Tab panels */
+  .dm-tab-panel {
+    flex: 1; overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .dm-tab-panel.dm-hidden { display: none !important; }
+
+  /* Section label */
+  .dm-section-lbl {
+    padding: 10px 16px 4px;
+    font-size: 9.5px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: #bbb;
+  }
+
+  /* Rows */
+  .dm-row {
+    display: flex; align-items: center;
+    padding: 10px 16px; cursor: pointer; gap: 12px;
+    transition: background .1s; user-select: none; flex-shrink: 0;
+  }
+  .dm-row:hover { background: #f5f6fa; }
+  .dm-row.active { background: #eef0f8; }
+
+  .dm-av {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff;
+    flex-shrink: 0; letter-spacing: .4px;
   }
   .dm-row-body { flex: 1; min-width: 0; }
   .dm-row-name {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: #111;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 13.5px; font-weight: 600; color: #111;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .dm-row-preview {
-    font-size: 12px;
-    color: #999;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 12px; color: #999;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-top: 2px;
   }
   .dm-row-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 5px;
-    flex-shrink: 0;
+    display: flex; flex-direction: column;
+    align-items: flex-end; gap: 5px; flex-shrink: 0;
   }
-  .dm-row-time { font-size: 10.5px; color: #c0c0c0; }
-  .dm-empty-section {
-    padding: 4px 16px 10px;
-    font-size: 12px;
-    color: #ccc;
-    font-style: italic;
+  .dm-row-time { font-size: 10.5px; color: #bbb; }
+  .dm-invite-badge {
+    background: #fff8e1;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    border-radius: 10px; padding: 1px 7px;
+    font-size: 9.5px; font-weight: 600;
   }
+  .dm-green-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%; background: #22c55e;
+  }
+  .dm-empty-list {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px; color: #ccc; font-size: 13px; padding: 24px;
+  }
+  .dm-empty-list i { font-size: 24px; opacity: .5; }
 
-  /* ══════════ MAIN PANEL ══════════ */
+  /* ══════ RIGHT PANEL (white) ══════ */
   #dm-panel {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #fff;
+    display: flex; flex-direction: column;
+    overflow: hidden; background: #fff;
   }
-
-  /* Empty state */
   #dm-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    color: #c8c8c8;
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px; color: #c8c8c8;
   }
   .dm-empty-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 2px solid #e0e0e0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: #d0d0d0;
+    width: 72px; height: 72px; border-radius: 50%;
+    border: 2px solid #ebebeb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #d4d4d4;
   }
 
   /* Panel header */
   #dm-header {
-    padding: 12px 20px;
-    border-bottom: 1px solid #efefef;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-shrink: 0;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid #f0f2f5;
+    display: flex; align-items: flex-start; gap: 14px; flex-shrink: 0;
   }
   #dm-header-av {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    font-weight: 700;
-    color: #3D5096;
-    flex-shrink: 0;
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
   }
-  #dm-header-name {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: #111;
+  #dm-header-name { font-size: 14.5px; font-weight: 700; color: #111; }
+  #dm-header-sub {
+    font-size: 12px; color: #9aa3b3; margin-top: 3px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0;
   }
-  #dm-header-sub { font-size: 12px; color: #999; margin-top: 1px; }
+  .hdr-dot { margin: 0 5px; color: #ccc; }
+  .hdr-chip {
+    font-size: 11.5px; color: #6b7a94; background: #f4f5f8;
+    padding: 1px 8px; border-radius: 10px; margin-left: 4px;
+  }
 
-  /* Info bar (slim pills row) */
+  /* Info bar */
   #dm-infobar {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    border-bottom: 1px solid #efefef;
-    background: #fafafa;
-    flex-shrink: 0;
-    overflow: hidden;
+    display: flex; border-bottom: 1px solid #f0f2f5;
+    background: #f8f9fa; flex-shrink: 0;
   }
-  .info-pill {
-    flex: 1;
-    padding: 7px 14px;
-    border-right: 1px solid #efefef;
-    font-size: 11.5px;
+  .info-cell {
+    flex: 1; padding: 8px 16px;
+    border-right: 1px solid #f0f2f5;
   }
-  .info-pill:last-child { border-right: none; }
-  .info-pill-label {
-    font-size: 9.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #bbb;
-    margin-bottom: 1px;
+  .info-cell:last-child { border-right: none; }
+  .info-lbl {
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em; color: #bbb;
+    margin-bottom: 2px;
   }
-  .info-pill-val { font-weight: 700; color: #111; font-size: 12px; }
+  .info-val { font-size: 12px; font-weight: 700; color: #111; }
+  .info-val-active { color: #16a34a; }
 
   /* Request banner */
   #dm-banner {
-    margin: 14px 20px 0;
-    padding: 14px 16px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 14px;
-    flex-shrink: 0;
+    margin: 12px 18px 0; padding: 14px 16px;
+    background: #fffbeb; border: 1px solid #fde68a;
+    border-radius: 12px; flex-shrink: 0;
   }
   .banner-tag {
     display: inline-block;
-    background: #fef3c7;
-    color: #92400e;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    margin-right: 4px;
-    margin-bottom: 4px;
+    background: #fef3c7; color: #92400e;
+    padding: 2px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 500;
+    margin: 0 3px 4px 0;
   }
 
   /* Thread */
   #dm-thread {
-    flex: 1;
-    overflow-y: auto;
-    padding: 18px 20px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    flex: 1; overflow-y: auto;
+    padding: 18px 24px 10px;
+    display: flex; flex-direction: column; gap: 0;
     scroll-behavior: smooth;
   }
 
-  /* Message bubbles */
-  .msg-cluster { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-  .msg-row { display: flex; }
+  /* Message clusters */
+  .msg-cluster {
+    display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px;
+  }
+  .msg-row { display: flex; align-items: flex-end; gap: 8px; }
   .msg-row.mine { justify-content: flex-end; }
   .msg-row.theirs { justify-content: flex-start; }
 
   .bubble {
-    padding: 9px 14px;
-    font-size: 13.5px;
-    line-height: 1.45;
-    max-width: 66%;
-    word-break: break-word;
-    border-radius: 22px;
+    padding: 9px 14px; font-size: 13.5px; line-height: 1.48;
+    max-width: 62%; word-break: break-word; border-radius: 18px;
   }
-  /* Positional classes set by JS (first/mid/last/only within cluster) */
-  .msg-row.mine.pos-first .bubble   { border-top-right-radius: 22px; border-bottom-right-radius: 6px; }
-  .msg-row.theirs.pos-first .bubble { border-top-left-radius: 22px;  border-bottom-left-radius: 6px; }
-  .msg-row.mine.pos-mid .bubble     { border-radius: 6px 22px 22px 6px; }
-  .msg-row.theirs.pos-mid .bubble   { border-radius: 22px 6px 6px 22px; }
-  .msg-row.mine.pos-last .bubble    { border-top-right-radius: 6px; border-bottom-right-radius: 22px; }
-  .msg-row.theirs.pos-last .bubble  { border-top-left-radius: 6px;  border-bottom-left-radius: 22px; }
-  .msg-row.mine.pos-only .bubble    { border-radius: 22px 22px 6px 22px; }
-  .msg-row.theirs.pos-only .bubble  { border-radius: 22px 22px 22px 6px; }
+  .msg-row.mine.pos-first .bubble   { border-radius: 18px 18px 6px 18px; }
+  .msg-row.theirs.pos-first .bubble { border-radius: 18px 18px 18px 6px; }
+  .msg-row.mine.pos-mid .bubble     { border-radius: 18px 6px 6px 18px; }
+  .msg-row.theirs.pos-mid .bubble   { border-radius: 6px 18px 18px 6px; }
+  .msg-row.mine.pos-last .bubble    { border-radius: 18px 6px 18px 18px; }
+  .msg-row.theirs.pos-last .bubble  { border-radius: 6px 18px 18px 18px; }
+  .msg-row.mine.pos-only .bubble    { border-radius: 18px 18px 6px 18px; }
+  .msg-row.theirs.pos-only .bubble  { border-radius: 18px 18px 18px 6px; }
 
-  .bubble.mine   { background: #3D5096; color: #fff; }
-  .bubble.theirs { background: #f0f0f0; color: #111; }
+  .bubble.mine   { background: #1e1e1e; color: #fff; }
+  .bubble.theirs { background: #f0f2f5; color: #111; }
 
-  .cluster-time {
-    font-size: 10.5px;
-    color: #bbb;
-    margin-top: 4px;
+  .thread-av {
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 9.5px; font-weight: 700; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
-  .cluster-time.mine   { text-align: right; padding-right: 2px; }
-  .cluster-time.theirs { text-align: left;  padding-left: 2px; }
+  .thread-av.me-av { background: #444; }
+  .thread-av-spacer { width: 26px; flex-shrink: 0; }
+
+  .cluster-meta {
+    font-size: 10.5px; color: #aab4c4; margin-top: 4px;
+  }
+  .cluster-meta.mine   { text-align: right; padding-right: 2px; }
+  .cluster-meta.theirs { text-align: left; padding-left: 34px; }
 
   .thread-empty {
-    margin: auto;
-    font-size: 13px;
-    color: #c8c8c8;
-    text-align: center;
+    margin: auto; font-size: 13px; color: #c8c8c8; text-align: center;
   }
 
   /* Input bar */
   #dm-input-area {
-    padding: 10px 16px 14px;
-    border-top: 1px solid #efefef;
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    flex-shrink: 0;
-    background: #fff;
+    padding: 10px 18px 14px; border-top: 1px solid #f0f2f5;
+    display: flex; align-items: flex-end; gap: 10px;
+    flex-shrink: 0; background: #fff;
   }
   #dm-input {
-    flex: 1;
-    border: 1.5px solid #efefef;
-    border-radius: 24px;
-    padding: 9px 16px;
-    font-size: 13.5px;
-    background: #fafafa;
-    outline: none;
-    resize: none;
-    min-height: 40px;
-    max-height: 120px;
-    overflow-y: auto;
-    line-height: 1.45;
-    transition: border-color 0.15s, background 0.15s;
-    font-family: inherit;
+    flex: 1; background: #f0f2f5; border: none;
+    border-radius: 22px; padding: 10px 16px;
+    font-size: 13.5px; color: #1a1a1a; outline: none;
+    resize: none; min-height: 40px; max-height: 120px;
+    overflow-y: auto; line-height: 1.45; font-family: inherit;
+    transition: background .12s;
   }
-  #dm-input:focus { border-color: #3D5096; background: #fff; }
+  #dm-input:focus { background: #e8eaed; }
+  #dm-input::placeholder { color: #9aa3b3; }
   #dm-send {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: none;
-    background: #3D5096;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.15s, transform 0.1s;
+    width: 38px; height: 38px; border-radius: 50%; border: none;
+    background: #1e1e1e; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: background .12s, transform .1s;
   }
-  #dm-send:hover:not(:disabled) { background: #263f74; transform: scale(1.05); }
+  #dm-send:hover:not(:disabled) { background: #333; transform: scale(1.05); }
   #dm-send:disabled { background: #d0d3de; cursor: default; transform: none; }
 
-  /* Status indicators */
-  .status-pip {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
+  /* Toast */
+  #dm-toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: #1e1e1e; color: #fff;
+    padding: 10px 20px; border-radius: 24px;
+    font-size: 13px; font-weight: 500; z-index: 9999;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
   }
-  .invite-badge {
-    background: #fff8e1;
-    color: #b45309;
-    border: 1px solid #fde68a;
-    border-radius: 20px;
-    padding: 1px 7px;
-    font-size: 9.5px;
-    font-weight: 600;
-  }
+  #dm-toast.show { opacity: 1; }
 </style>
 
 <div id="dm-shell">
 
-  <!-- ══════ SIDEBAR ══════ -->
+  <!-- ═══ LEFT PANEL ═══ -->
   <div id="dm-sidebar">
-    <div class="dm-sidebar-title">Messages</div>
+    <div class="dm-sidebar-hd">
+      <span class="dm-sidebar-hd-title">Partnerships</span>
+    </div>
 
-    {% if requests_rows %}
-    <div class="dm-section-label">
-      Requests <span class="dm-section-count">{{ requests_rows|length }}</span>
+    <div id="dm-tabs">
+      <button class="dm-tab{% if requests_rows %} dm-tab-active{% endif %}" data-tab="requests">
+        Requests{% if requests_rows %} <span style="background:#f5c518;color:#131720;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;margin-left:4px;">{{ requests_rows|length }}</span>{% endif %}
+      </button>
+      <button class="dm-tab{% if not requests_rows %} dm-tab-active{% endif %}" data-tab="active">Active</button>
+      <button class="dm-tab" data-tab="archived">Archived</button>
     </div>
-    {% for row in requests_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-company="{{ row.merchant_name }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-niche="{{ row.niche }}"
-      data-deal-type="{{ row.deal_type }}"
-      data-opening-message="{{ row.opening_message|default:'' }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name">{{ row.merchant_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
-      </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-        <span class="invite-badge">Invite</span>
-      </div>
-    </div>
-    {% endfor %}
-    {% endif %}
 
-    <div class="dm-section-label">
-      Active <span class="dm-section-count">{{ active_rows|length }}</span>
+    <div id="dm-search-wrap">
+      <input id="dm-search" type="text" placeholder="Search...">
     </div>
-    {% for row in active_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-company="{{ row.merchant_name }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-deal-type="{{ row.deal_type }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name">{{ row.merchant_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
-      </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-        <span class="status-pip" style="background:#22c55e;"></span>
-      </div>
-    </div>
-    {% endfor %}
-    {% if not active_rows %}
-    <div class="dm-empty-section">No active partnerships yet</div>
-    {% endif %}
 
-    {% if archived_rows %}
-    <div class="dm-section-label" style="margin-top:6px;">
-      Archived <span class="dm-section-count">{{ archived_rows|length }}</span>
-    </div>
-    {% for row in archived_rows %}
-    <div class="dm-row"
-      data-link-id="{{ row.link_id }}"
-      data-status="{{ row.status }}"
-      data-company="{{ row.merchant_name }}"
-      data-email="{{ row.email }}"
-      data-initials="{{ row.initials }}"
-      data-avatar-color="{{ row.avatar_color }}"
-      data-campaign-type="{{ row.campaign_type }}"
-      data-match-score="{{ row.match_score }}"
-      data-partner-since="{{ row.partner_since }}"
-      data-deal-type="{{ row.deal_type }}">
-      <div class="dm-avatar" style="background:{{ row.avatar_color }};opacity:0.65;">{{ row.initials }}</div>
-      <div class="dm-row-body">
-        <div class="dm-row-name" style="color:#888;">{{ row.merchant_name }}</div>
-        <div class="dm-row-preview">{{ row.preview }}</div>
+    <!-- Requests tab -->
+    <div class="dm-tab-panel{% if not requests_rows %} dm-hidden{% endif %}" data-panel="requests">
+      {% for row in requests_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-company="{{ row.merchant_name }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-niche="{{ row.niche }}"
+        data-deal-type="{{ row.deal_type }}"
+        data-opening-message="{{ row.opening_message|default:'' }}">
+        <div class="dm-av">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name">{{ row.merchant_name }}</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+          <span class="dm-invite-badge">Invite</span>
+        </div>
       </div>
-      <div class="dm-row-meta">
-        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+      {% empty %}
+      <div class="dm-empty-list">
+        <i class="bi bi-inbox"></i>
+        No pending requests
       </div>
+      {% endfor %}
     </div>
-    {% endfor %}
-    {% endif %}
+
+    <!-- Active tab -->
+    <div class="dm-tab-panel{% if requests_rows %} dm-hidden{% endif %}" data-panel="active">
+      {% for row in active_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-company="{{ row.merchant_name }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-deal-type="{{ row.deal_type }}">
+        <div class="dm-av">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name">{{ row.merchant_name }}</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+          <span class="dm-green-dot"></span>
+        </div>
+      </div>
+      {% empty %}
+      <div class="dm-empty-list">
+        <i class="bi bi-people"></i>
+        No active partnerships yet
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Archived tab -->
+    <div class="dm-tab-panel dm-hidden" data-panel="archived">
+      {% for row in archived_rows %}
+      <div class="dm-row"
+        data-link-id="{{ row.link_id }}"
+        data-status="{{ row.status }}"
+        data-company="{{ row.merchant_name }}"
+        data-email="{{ row.email }}"
+        data-initials="{{ row.initials }}"
+        data-avatar-color="{{ row.avatar_color }}"
+        data-campaign-type="{{ row.campaign_type }}"
+        data-match-score="{{ row.match_score }}"
+        data-partner-since="{{ row.partner_since }}"
+        data-deal-type="{{ row.deal_type }}">
+        <div class="dm-av" style="opacity:.55;">{{ row.initials }}</div>
+        <div class="dm-row-body">
+          <div class="dm-row-name" style="color:#3d4d68;">{{ row.merchant_name }}</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
+        </div>
+        <div class="dm-row-meta">
+          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="dm-empty-list">
+        <i class="bi bi-archive"></i>
+        No archived partnerships
+      </div>
+      {% endfor %}
+    </div>
   </div>
 
-  <!-- ══════ MAIN PANEL ══════ -->
+  <!-- ═══ RIGHT PANEL ═══ -->
   <div id="dm-panel">
     <div id="dm-empty">
       <div class="dm-empty-icon"><i class="bi bi-chat"></i></div>
       <div style="font-size:15px;font-weight:600;color:#888;">Your messages</div>
-      <div style="font-size:13px;color:#c0c0c0;">Select a conversation to start chatting</div>
+      <div style="font-size:13px;color:#bbb;">Select a conversation to start chatting</div>
     </div>
   </div>
 </div>
 
+<div id="dm-toast"></div>
 {{ request.user.id|json_script:"me-id" }}
 <script>
-(function () {
+(function() {
   const ME   = JSON.parse(document.getElementById('me-id').textContent);
   const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
   const MSGS_URL = id => `/creators/affiliate-companies/messages/${id}/`;
   const ACT_URL  = id => `/creators/respond-request/${id}/`;
 
-  let active = null;
+  let activeRow = null;
 
-  // ── Time formatter ────────────────────────────────────────
   function fmt(iso) {
     if (!iso) return '';
     const d = new Date(iso), now = new Date();
-    const sameDayMs = 86400000;
-    if (now - d < sameDayMs && d.getDate() === now.getDate())
+    if (now - d < 86400000 && d.getDate() === now.getDate())
       return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (now - d < sameDayMs * 2) return 'Yesterday';
+    if (now - d < 172800000) return 'Yesterday';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
-
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch(e) { return iso; }
+  }
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // ── Wire sidebar rows ─────────────────────────────────────
-  document.querySelectorAll('.dm-row').forEach(r => r.addEventListener('click', () => open(r)));
+  // ── Tabs ──────────────────────────────────────────────────
+  document.querySelectorAll('.dm-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.dm-tab').forEach(b => b.classList.remove('dm-tab-active'));
+      document.querySelectorAll('.dm-tab-panel').forEach(p => p.classList.add('dm-hidden'));
+      btn.classList.add('dm-tab-active');
+      const panel = document.querySelector(`.dm-tab-panel[data-panel="${btn.dataset.tab}"]`);
+      if (panel) panel.classList.remove('dm-hidden');
+    });
+  });
 
-  // Auto-open first active, then first of any
-  const firstActive = document.querySelector('.dm-row[data-status="active"]');
-  if (firstActive) open(firstActive);
-  else { const any = document.querySelector('.dm-row'); if (any) open(any); }
+  // ── Search ────────────────────────────────────────────────
+  document.getElementById('dm-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.dm-row').forEach(r => {
+      const name = (r.dataset.company || '').toLowerCase();
+      r.style.display = (!q || name.includes(q)) ? '' : 'none';
+    });
+  });
 
-  // ── Open a conversation ───────────────────────────────────
-  async function open(row) {
+  // ── Wire rows ─────────────────────────────────────────────
+  document.querySelectorAll('.dm-row').forEach(r => {
+    r.addEventListener('click', () => openConvo(r));
+    const av = r.querySelector('.dm-av');
+    if (av) av.style.background = r.dataset.avatarColor || '#4f46e5';
+  });
+
+  // Auto-open first request, then first active
+  const firstReq    = document.querySelector('.dm-tab-panel[data-panel="requests"] .dm-row');
+  const firstActive = document.querySelector('.dm-tab-panel[data-panel="active"] .dm-row');
+  if (firstReq) openConvo(firstReq);
+  else if (firstActive) openConvo(firstActive);
+  else { const any = document.querySelector('.dm-row'); if (any) openConvo(any); }
+
+  // ── Open conversation ─────────────────────────────────────
+  async function openConvo(row) {
     document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
     row.classList.add('active');
-    active = row;
+    activeRow = row;
 
-    const d  = row.dataset;
-    const isReq  = d.status === 'requested';
-    const isArc  = d.status === 'inactive';
+    const d = row.dataset;
+    const isReq = d.status === 'requested';
+    const isArc = d.status === 'inactive';
 
-    // Fetch messages
     let msgHtml = '<div class="thread-empty">No messages yet</div>';
     let creatorHasReplied = true;
     try {
@@ -483,46 +494,50 @@
       const data = await res.json();
       creatorHasReplied = data.creator_has_replied !== false;
       let msgs = data.messages || [];
-      // For pending (requested) rows, opening messages are shown in the banner, not the thread
       if (isReq) msgs = msgs.filter(m => !m.is_opening_message);
-      if (msgs.length) msgHtml = buildThread(msgs);
+      if (msgs.length) msgHtml = buildThread(msgs, d);
     } catch(e) { console.error(e); }
 
-    const statusMeta = {
+    const statusMap = {
       active:    { color: '#22c55e', label: 'Active' },
       requested: { color: '#f59e0b', label: 'Pending' },
       inactive:  { color: '#9ca3af', label: 'Archived' },
-    }[d.status] || { color: '#9ca3af', label: d.status };
+    };
+    const sm = statusMap[d.status] || { color: '#9ca3af', label: d.status };
 
     document.getElementById('dm-panel').innerHTML = `
       <div id="dm-header">
         <div id="dm-header-av" style="background:${esc(d.avatarColor)};">${esc(d.initials)}</div>
         <div style="flex:1;min-width:0;">
           <div id="dm-header-name">${esc(d.company)}</div>
-          <div id="dm-header-sub">${esc(d.email)}</div>
+          <div id="dm-header-sub">
+            ${esc(d.email)}
+            ${d.niche && d.niche !== 'General' ? `<span class="hdr-dot">·</span><span>${esc(d.niche)}</span>` : ''}
+            ${d.campaignType && d.campaignType !== 'General' ? `<span class="hdr-chip">${esc(d.campaignType)}</span>` : ''}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:7px;">
-          <span class="status-pip" style="background:${statusMeta.color};"></span>
-          <span style="font-size:12px;color:#777;font-weight:500;">${statusMeta.label}</span>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${sm.color};display:inline-block;"></span>
+          <span style="font-size:12px;color:#777;font-weight:500;">${sm.label}</span>
         </div>
       </div>
 
       <div id="dm-infobar">
-        <div class="info-pill">
-          <div class="info-pill-label">Campaign</div>
-          <div class="info-pill-val">${esc(d.campaignType || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Campaign</div>
+          <div class="info-val">${esc(d.campaignType || '—')}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Deal</div>
-          <div class="info-pill-val">${esc(d.dealType || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Deal Type</div>
+          <div class="info-val">${esc(d.dealType || '—')}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Match</div>
-          <div class="info-pill-val">${d.matchScore ? d.matchScore+'%' : '—'}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Status</div>
+          <div class="info-val ${d.status === 'active' ? 'info-val-active' : ''}">${sm.label}</div>
         </div>
-        <div class="info-pill">
-          <div class="info-pill-label">Since</div>
-          <div class="info-pill-val">${esc(d.partnerSince || '—')}</div>
+        <div class="info-cell">
+          <div class="info-lbl">Since</div>
+          <div class="info-val">${fmtDate(d.partnerSince)}</div>
         </div>
       </div>
 
@@ -531,19 +546,15 @@
       <div id="dm-thread">${msgHtml}</div>
 
       ${!isArc ? `
-      <div id="dm-input-area" ${isReq ? 'style="display:none;"' : ''}>
+      <div id="dm-input-area"${isReq ? ' style="display:none;"' : ''}>
         <textarea id="dm-input" rows="1" placeholder="Message ${esc(d.company)}…"></textarea>
-        <button id="dm-send" title="Send">
-          <i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>
-        </button>
+        <button id="dm-send"><i class="bi bi-send-fill" style="font-size:13px;margin-left:1px;"></i></button>
       </div>` : ''}
     `;
 
-    // Scroll to bottom
     const thr = document.getElementById('dm-thread');
     if (thr) thr.scrollTop = thr.scrollHeight;
 
-    // Input events
     const inp = document.getElementById('dm-input');
     const btn = document.getElementById('dm-send');
     if (inp && btn) {
@@ -557,19 +568,16 @@
       });
     }
 
-    // Reply toggle for requests
     if (isReq) {
-      const tog = document.getElementById('reply-tog');
-      if (tog) tog.addEventListener('click', () => {
+      document.getElementById('reply-tog')?.addEventListener('click', () => {
         const ia = document.getElementById('dm-input-area');
         if (ia) { ia.style.display = 'flex'; document.getElementById('dm-input')?.focus(); }
       });
     }
   }
 
-  // ── Build message thread ───────────────────────────────────
-  function buildThread(msgs) {
-    // Group consecutive messages by sender
+  // ── Build thread ───────────────────────────────────────────
+  function buildThread(msgs, d) {
     const clusters = [];
     for (const m of msgs) {
       const mine = m.sender_id === ME;
@@ -580,62 +588,58 @@
     return clusters.map(c => {
       const side = c.mine ? 'mine' : 'theirs';
       const n = c.msgs.length;
-      return `
-      <div class="msg-cluster">
+      const avColor = d ? d.avatarColor : '#4f46e5';
+      const initials = d ? d.initials : '??';
+      const senderName = c.mine ? 'You' : (d ? d.company : '');
+      return `<div class="msg-cluster">
         ${c.msgs.map((m, i) => {
-          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n - 1 ? 'last' : 'mid';
+          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n-1 ? 'last' : 'mid';
+          const isLast = i === n - 1;
+          const theirAv = !c.mine && isLast
+            ? `<div class="thread-av" style="background:${avColor};">${esc(initials)}</div>`
+            : `<div class="thread-av-spacer"></div>`;
+          const meAv = c.mine && isLast
+            ? `<div class="thread-av me-av">Me</div>`
+            : `<div class="thread-av-spacer"></div>`;
           return `<div class="msg-row ${side} pos-${pos}">
+            ${!c.mine ? theirAv : ''}
             <div class="bubble ${side}">${esc(m.content)}</div>
+            ${c.mine ? meAv : ''}
           </div>`;
         }).join('')}
-        <div class="cluster-time ${side}">${fmt(c.msgs.at(-1).created_at)}</div>
+        <div class="cluster-meta ${side}">${esc(senderName)} · ${fmt(c.msgs.at(-1).created_at)}</div>
       </div>`;
     }).join('');
   }
 
-  // ── Request banner ────────────────────────────────────────
+  // ── Request banner ─────────────────────────────────────────
   function buildBanner(d) {
     const tags = [d.niche, d.campaignType, d.dealType]
       .filter(v => v && !['—','General','Flexible'].includes(v))
       .map(v => `<span class="banner-tag">${esc(v)}</span>`)
       .join('');
-    return `
-      <div id="dm-banner">
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
-          <i class="bi bi-envelope-open-fill" style="color:#b45309;font-size:13px;"></i>
-          <span style="font-size:12px;font-weight:700;color:#b45309;">
-            Partnership invitation from ${esc(d.company)}
-          </span>
-        </div>
-        ${d.openingMessage
-          ? `<p style="font-size:13px;color:#78350f;margin:0 0 10px;line-height:1.55;">${esc(d.openingMessage)}</p>`
-          : ''}
-        ${tags ? `<div style="margin-bottom:10px;">${tags}</div>` : ''}
-        <div style="display:flex;gap:8px;">
-          <button onclick="act('decline')"
-            style="border:1.5px solid #ef4444;color:#ef4444;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
-            Decline
-          </button>
-          <button id="reply-tog"
-            style="border:1.5px solid #3D5096;color:#3D5096;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
-            Reply
-          </button>
-          <button onclick="act('accept')"
-            style="background:#22c55e;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">
-            Accept
-          </button>
-        </div>
-      </div>`;
+    return `<div id="dm-banner">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+        <i class="bi bi-envelope-open-fill" style="color:#b45309;font-size:13px;"></i>
+        <span style="font-size:12px;font-weight:700;color:#b45309;">Partnership invitation from ${esc(d.company)}</span>
+      </div>
+      ${d.openingMessage ? `<p style="font-size:13px;color:#78350f;margin:0 0 10px;line-height:1.55;">${esc(d.openingMessage)}</p>` : ''}
+      ${tags ? `<div style="margin-bottom:10px;">${tags}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="act('decline')" style="border:1.5px solid #ef4444;color:#ef4444;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Decline</button>
+        <button id="reply-tog" style="border:1.5px solid #374151;color:#374151;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Reply</button>
+        <button onclick="act('accept')" style="background:#22c55e;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Accept</button>
+      </div>
+    </div>`;
   }
 
-  // ── Send a message ─────────────────────────────────────────
+  // ── Send ───────────────────────────────────────────────────
   async function send(linkId) {
     const inp = document.getElementById('dm-input');
     const btn = document.getElementById('dm-send');
     if (!inp) return;
     const content = inp.value.trim();
     if (!content) return;
-
     if (btn) btn.disabled = true;
     inp.value = ''; inp.style.height = 'auto';
 
@@ -649,22 +653,20 @@
       if (data.status === 'ok') {
         const thr = document.getElementById('dm-thread');
         if (thr) {
-          // Remove empty-state placeholder
           thr.querySelector('.thread-empty')?.remove();
-          const cluster = document.createElement('div');
-          cluster.className = 'msg-cluster';
-          cluster.innerHTML = `
-            <div class="msg-row mine">
+          const cl = document.createElement('div');
+          cl.className = 'msg-cluster';
+          cl.innerHTML = `
+            <div class="msg-row mine pos-only">
               <div class="bubble mine">${esc(content)}</div>
+              <div class="thread-av me-av">Me</div>
             </div>
-            <div class="cluster-time mine">${fmt(data.message.created_at)}</div>`;
-          thr.appendChild(cluster);
+            <div class="cluster-meta mine">You · ${fmt(data.message.created_at)}</div>`;
+          thr.appendChild(cl);
           thr.scrollTop = thr.scrollHeight;
         }
-        // Update sidebar preview
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
-        row?.querySelector('.dm-row-preview')?.setAttribute('data-updated', content.slice(0,60));
-        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0,60);
+        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0, 60);
       }
     } catch(e) { console.error(e); }
     finally { if (btn) btn.disabled = false; inp.focus(); }
@@ -672,11 +674,11 @@
 
   // ── Accept / Decline ──────────────────────────────────────
   window.act = async function(action) {
-    if (!active) return;
+    if (!activeRow) return;
     const fd = new FormData();
     fd.append('csrfmiddlewaretoken', CSRF);
     fd.append('action', action);
-    const res = await fetch(ACT_URL(active.dataset.linkId), { method: 'POST', body: fd });
+    const res = await fetch(ACT_URL(activeRow.dataset.linkId), { method: 'POST', body: fd });
     if (res.ok) location.reload();
   };
 })();

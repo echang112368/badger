@@ -1233,7 +1233,7 @@ def merchant_requests(request):
         .select_related('creator', 'creator__creatormeta')
         .order_by('-id')
     )
-    palette = ['#DBEAFE', '#FEE2E2', '#DCFCE7', '#FEF3C7', '#EDE9FE', '#FCE7F3']
+    palette = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#7c3aed', '#be185d']
     pending_rows, active_rows, archived_rows = [], [], []
 
     for idx, link in enumerate(links):
