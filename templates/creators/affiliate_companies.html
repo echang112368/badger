@@ -167,37 +167,34 @@
     padding: 1px 8px; border-radius: 10px; margin-left: 4px;
   }
 
-  /* Info bar */
-  #dm-infobar {
-    display: flex; border-bottom: 1px solid #f0f2f5;
-    background: #f8f9fa; flex-shrink: 0;
+  /* Request accept bar */
+  #dm-request-bar {
+    border-top: 1px solid #f0f2f5;
+    padding: 14px 24px 18px;
+    background: #fff;
+    flex-shrink: 0;
+    text-align: center;
   }
-  .info-cell {
-    flex: 1; padding: 8px 16px;
-    border-right: 1px solid #f0f2f5;
+  #dm-request-bar p {
+    font-size: 13px; color: #666; margin: 0 0 12px; line-height: 1.5;
   }
-  .info-cell:last-child { border-right: none; }
-  .info-lbl {
-    font-size: 9.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .07em; color: #bbb;
-    margin-bottom: 2px;
+  .req-btns { display: flex; gap: 10px; justify-content: center; }
+  .req-decline {
+    flex: 1; max-width: 150px;
+    border: 1.5px solid #ef4444; color: #ef4444; background: none;
+    border-radius: 8px; padding: 9px 0;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: background .12s, color .12s;
   }
-  .info-val { font-size: 12px; font-weight: 700; color: #111; }
-  .info-val-active { color: #16a34a; }
-
-  /* Request banner */
-  #dm-banner {
-    margin: 12px 18px 0; padding: 14px 16px;
-    background: #fffbeb; border: 1px solid #fde68a;
-    border-radius: 12px; flex-shrink: 0;
+  .req-decline:hover { background: #fef2f2; }
+  .req-accept {
+    flex: 1; max-width: 150px;
+    background: #22c55e; color: #fff; border: none;
+    border-radius: 8px; padding: 9px 0;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: background .12s;
   }
-  .banner-tag {
-    display: inline-block;
-    background: #fef3c7; color: #92400e;
-    padding: 2px 10px; border-radius: 12px;
-    font-size: 11px; font-weight: 500;
-    margin: 0 3px 4px 0;
-  }
+  .req-accept:hover { background: #16a34a; }
 
   /* Thread */
   #dm-thread {
@@ -434,11 +431,6 @@
     if (now - d < 172800000) return 'Yesterday';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
-  function fmtDate(iso) {
-    if (!iso) return '—';
-    try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
-    catch(e) { return iso; }
-  }
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -493,8 +485,7 @@
       const res  = await fetch(MSGS_URL(d.linkId));
       const data = await res.json();
       creatorHasReplied = data.creator_has_replied !== false;
-      let msgs = data.messages || [];
-      if (isReq) msgs = msgs.filter(m => !m.is_opening_message);
+      const msgs = data.messages || [];
       if (msgs.length) msgHtml = buildThread(msgs, d);
     } catch(e) { console.error(e); }
 
@@ -522,34 +513,20 @@
         </div>
       </div>
 
-      <div id="dm-infobar">
-        <div class="info-cell">
-          <div class="info-lbl">Campaign</div>
-          <div class="info-val">${esc(d.campaignType || '—')}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Deal Type</div>
-          <div class="info-val">${esc(d.dealType || '—')}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Status</div>
-          <div class="info-val ${d.status === 'active' ? 'info-val-active' : ''}">${sm.label}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Since</div>
-          <div class="info-val">${fmtDate(d.partnerSince)}</div>
-        </div>
-      </div>
-
-      ${isReq ? buildBanner(d) : ''}
-
       <div id="dm-thread">${msgHtml}</div>
 
-      ${!isArc ? `
-      <div id="dm-input-area"${isReq ? ' style="display:none;"' : ''}>
+      ${isReq ? `
+      <div id="dm-request-bar">
+        <p>Accept partnership request from <strong>${esc(d.company)}</strong>?</p>
+        <div class="req-btns">
+          <button class="req-decline" onclick="act('decline')">Decline</button>
+          <button class="req-accept" onclick="act('accept')">Accept</button>
+        </div>
+      </div>` : (!isArc ? `
+      <div id="dm-input-area">
         <textarea id="dm-input" rows="1" placeholder="Message ${esc(d.company)}…"></textarea>
         <button id="dm-send"><i class="bi bi-send-fill" style="font-size:13px;margin-left:1px;"></i></button>
-      </div>` : ''}
+      </div>` : '')}
     `;
 
     const thr = document.getElementById('dm-thread');
@@ -568,12 +545,6 @@
       });
     }
 
-    if (isReq) {
-      document.getElementById('reply-tog')?.addEventListener('click', () => {
-        const ia = document.getElementById('dm-input-area');
-        if (ia) { ia.style.display = 'flex'; document.getElementById('dm-input')?.focus(); }
-      });
-    }
   }
 
   // ── Build thread ───────────────────────────────────────────
@@ -610,27 +581,6 @@
         <div class="cluster-meta ${side}">${esc(senderName)} · ${fmt(c.msgs.at(-1).created_at)}</div>
       </div>`;
     }).join('');
-  }
-
-  // ── Request banner ─────────────────────────────────────────
-  function buildBanner(d) {
-    const tags = [d.niche, d.campaignType, d.dealType]
-      .filter(v => v && !['—','General','Flexible'].includes(v))
-      .map(v => `<span class="banner-tag">${esc(v)}</span>`)
-      .join('');
-    return `<div id="dm-banner">
-      <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
-        <i class="bi bi-envelope-open-fill" style="color:#b45309;font-size:13px;"></i>
-        <span style="font-size:12px;font-weight:700;color:#b45309;">Partnership invitation from ${esc(d.company)}</span>
-      </div>
-      ${d.openingMessage ? `<p style="font-size:13px;color:#78350f;margin:0 0 10px;line-height:1.55;">${esc(d.openingMessage)}</p>` : ''}
-      ${tags ? `<div style="margin-bottom:10px;">${tags}</div>` : ''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="act('decline')" style="border:1.5px solid #ef4444;color:#ef4444;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Decline</button>
-        <button id="reply-tog" style="border:1.5px solid #374151;color:#374151;background:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Reply</button>
-        <button onclick="act('accept')" style="background:#22c55e;color:#fff;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;">Accept</button>
-      </div>
-    </div>`;
   }
 
   // ── Send ───────────────────────────────────────────────────

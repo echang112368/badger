@@ -183,24 +183,6 @@
     padding: 1px 8px; border-radius: 10px; margin-left: 4px;
   }
 
-  /* Info bar */
-  #dm-infobar {
-    display: flex; border-bottom: 1px solid #f0f2f5;
-    background: #f8f9fa; flex-shrink: 0;
-  }
-  .info-cell {
-    flex: 1; padding: 8px 16px;
-    border-right: 1px solid #f0f2f5;
-  }
-  .info-cell:last-child { border-right: none; }
-  .info-lbl {
-    font-size: 9.5px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .07em; color: #bbb;
-    margin-bottom: 2px;
-  }
-  .info-val { font-size: 12px; font-weight: 700; color: #111; }
-  .info-val-active { color: #16a34a; }
-
   /* Waiting notice */
   #dm-waiting-notice {
     margin: 12px 18px 0; padding: 11px 15px;
@@ -569,25 +551,6 @@
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
           <span style="width:8px;height:8px;border-radius:50%;background:${sm.color};display:inline-block;"></span>
           <span style="font-size:12px;color:#777;font-weight:500;">${sm.label}</span>
-        </div>
-      </div>
-
-      <div id="dm-infobar">
-        <div class="info-cell">
-          <div class="info-lbl">Campaign</div>
-          <div class="info-val">${esc(d.campaignType || '—')}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Deal Type</div>
-          <div class="info-val">${esc(d.dealType || '—')}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Status</div>
-          <div class="info-val ${d.status === 'active' ? 'info-val-active' : ''}">${sm.label}</div>
-        </div>
-        <div class="info-cell">
-          <div class="info-lbl">Since</div>
-          <div class="info-val">${fmtDate(d.partnerSince)}</div>
         </div>
       </div>
 
