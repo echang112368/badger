@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
+from urllib.parse import urlparse
 
 from django.db.models import Q
 from django.utils import timezone
@@ -16,6 +18,8 @@ from creatorMatch.services.matching.orchestrator import apply_matching_scores
 DISCOVERY_PLATFORM_OPTIONS = ["instagram", "tiktok", "youtube", "linkedin"]
 MATCH_STRONG_THRESHOLD = 80
 MATCH_POSSIBLE_THRESHOLD = 60
+INSTAGRAM_PROFILE_URL_BASE = "https://www.instagram.com/"
+INSTAGRAM_USERNAME_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 
 
 @dataclass
@@ -82,6 +86,79 @@ def build_discovery_filters(params) -> DiscoveryFilters:
         view=view,
         use_saved_preferences=use_saved_preferences,
     )
+
+
+def _normalize_instagram_username(value: Any) -> str:
+    username = str(value or "").strip()
+    if not username:
+        return ""
+
+    if username.startswith("@"):
+        username = username[1:]
+
+    if username.startswith(("http://", "https://")):
+        parsed = urlparse(username)
+        host = (parsed.netloc or "").lower()
+        if host in {"instagram.com", "www.instagram.com"}:
+            path_parts = [part for part in parsed.path.split("/") if part]
+            username = path_parts[0] if path_parts else ""
+
+    username = username.strip().strip("/")
+    if not username or not INSTAGRAM_USERNAME_RE.match(username):
+        return ""
+    return username
+
+
+def _instagram_profile_url(username: str) -> str:
+    return f"{INSTAGRAM_PROFILE_URL_BASE}{username}/"
+
+
+def _profile_value_for_platform(meta: CreatorMeta, platform: str, *keys: str) -> str:
+    profiles = meta.social_media_profiles or []
+    if not isinstance(profiles, list):
+        return ""
+
+    for profile in profiles:
+        if not isinstance(profile, dict):
+            continue
+        profile_platform = str(profile.get("platform") or "").strip().lower()
+        if profile_platform != platform:
+            continue
+        for key in keys:
+            value = str(profile.get(key) or "").strip()
+            if value:
+                return value
+    return ""
+
+
+def _build_social_links(
+    meta: CreatorMeta,
+    connection: InstagramConnection | None,
+    account: dict[str, Any],
+) -> list[dict[str, str]]:
+    # Instagram's API exposes the creator's username; Instagram profile URLs are
+    # canonical username-based URLs, so we build the account link from that value.
+    instagram_username = _normalize_instagram_username(
+        getattr(connection, "instagram_username", "")
+        or account.get("username")
+        or _profile_value_for_platform(
+            meta, "instagram", "username", "handle", "url", "profile_url"
+        )
+    )
+
+    social_links: list[dict[str, str]] = []
+    if instagram_username:
+        social_links.append(
+            {
+                "platform": "instagram",
+                "label": "Instagram",
+                "icon": "bi-instagram",
+                "url": _instagram_profile_url(instagram_username),
+                "handle": f"@{instagram_username}",
+            }
+        )
+
+    return social_links
 
 
 def _percentage(value: Any) -> float | None:
@@ -304,6 +381,7 @@ def _extract_creator_data(meta: CreatorMeta) -> dict[str, Any]:
         "top_city": top_city,
         "audience_location": audience_location,
         "avatar_url": avatar_url,
+        "social_links": _build_social_links(meta, connection, account),
         "synced_at": snapshot.synced_at if snapshot else None,
         "profile_views": performance.get("profile_visits"),
         "website_clicks": performance.get("website_clicks"),
