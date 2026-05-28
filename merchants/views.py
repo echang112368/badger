@@ -1106,8 +1106,8 @@ def merchant_send_partnership_request(request):
         merchant=request.user,
         creator=creator,
         message=opening_message,
-        campaign_type=campaign_type,
-        deal_type=deal_type,
+        campaign_type=campaign_type or "General",
+        deal_type=deal_type or "Flexible",
         merchant_initiated=True,
         status="pending",
     )
@@ -1231,13 +1231,13 @@ def merchant_requests(request):
             }
         )
         lines = (req.message or "").splitlines()
-        campaign_type = ""
-        deal_type = ""
+        campaign_type = req.campaign_type or ""
+        deal_type = req.deal_type or ""
         clean_lines = []
         for line in lines:
-            if line.startswith("Campaign type:"):
+            if line.startswith("Campaign type:") and not campaign_type:
                 campaign_type = line.replace("Campaign type:", "").strip()
-            elif line.startswith("Deal type:"):
+            elif line.startswith("Deal type:") and not deal_type:
                 deal_type = line.replace("Deal type:", "").strip()
             else:
                 clean_lines.append(line)
