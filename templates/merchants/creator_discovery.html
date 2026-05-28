@@ -289,7 +289,29 @@
   </div>
 </div>
 
-<!-- ── Success toast ── -->
+<!-- ── Withdraw confirm modal ── -->
+<div class="modal fade" id="withdrawModal" tabindex="-1" aria-labelledby="withdrawModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold mb-0" id="withdrawModalLabel">Withdraw request</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="mb-0 text-muted">Withdraw your partnership request to <strong id="withdrawCreatorName"></strong>? The creator will no longer see your message.</p>
+      </div>
+      <div class="modal-footer border-0 pt-1">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="withdrawConfirmBtn">
+          <span id="withdrawSpin" class="spinner-border spinner-border-sm d-none me-2"></span>
+          Withdraw
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1100;">
   <div id="contactToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="d-flex">
@@ -300,94 +322,59 @@
 </div>
 
 <script>
-// Bootstrap is loaded after this block; use window.load to ensure it's available.
 window.addEventListener('load', function () {
   const SEND_URL = "{% url 'merchant_send_partnership_request' %}";
   const CSRF = document.cookie.split(';').map(c => c.trim().split('=')).find(([k]) => k === 'csrftoken')?.[1] || '';
 
+  const contactModal  = new bootstrap.Modal(document.getElementById('contactModal'));
+  const withdrawModal = new bootstrap.Modal(document.getElementById('withdrawModal'));
+  const toast         = new bootstrap.Toast(document.getElementById('contactToast'), { delay: 3500 });
+
+  const sendBtn       = document.getElementById('contactSendBtn');
+  const spin          = document.getElementById('contactSendSpin');
+  const errBox        = document.getElementById('contactModalError');
+  const msgArea       = document.getElementById('contactMessage');
+  const toastMsg      = document.getElementById('contactToastMsg');
+  const wConfirmBtn   = document.getElementById('withdrawConfirmBtn');
+  const wSpin         = document.getElementById('withdrawSpin');
+
   let activeCreatorId = null;
-  let activeBtn = null;
+  let activeBtn       = null;
+  let withdrawBtn     = null;
 
-  const modal    = new bootstrap.Modal(document.getElementById('contactModal'));
-  const toast    = new bootstrap.Toast(document.getElementById('contactToast'), { delay: 3500 });
-  const sendBtn  = document.getElementById('contactSendBtn');
-  const spin     = document.getElementById('contactSendSpin');
-  const errBox   = document.getElementById('contactModalError');
-  const msgArea  = document.getElementById('contactMessage');
-  const toastMsg = document.getElementById('contactToastMsg');
+  // ── Delegated click handler — no stale listeners ───────────
+  document.addEventListener('click', function (e) {
+    const contact  = e.target.closest('.js-contact-btn');
+    const withdraw = e.target.closest('.js-withdraw-btn');
 
-  const openContactModal = (btn) => {
-    activeCreatorId = btn.dataset.creatorId;
-    activeBtn = btn;
-    const name   = btn.dataset.creatorName;
-    const handle = btn.dataset.creatorHandle;
-    const score  = btn.dataset.matchScore;
+    if (contact) {
+      activeCreatorId = contact.dataset.creatorId;
+      activeBtn = contact;
+      const name   = contact.dataset.creatorName  || '';
+      const handle = contact.dataset.creatorHandle || '';
+      const score  = contact.dataset.matchScore;
 
-    document.getElementById('contactModalLabel').textContent = `Message ${name}`;
-    document.getElementById('contactModalSub').innerHTML =
-      `<span class="me-2">${handle}</span>` +
-      (score ? `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${score}% match</span>` : '');
+      document.getElementById('contactModalLabel').textContent = `Message ${name}`;
+      document.getElementById('contactModalSub').innerHTML =
+        `<span class="me-2">${handle}</span>` +
+        (score ? `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${score}% match</span>` : '');
 
-    msgArea.value = '';
-    errBox.classList.add('d-none');
-    modal.show();
-    setTimeout(() => msgArea.focus(), 300);
-  };
+      msgArea.value = '';
+      errBox.classList.add('d-none');
+      contactModal.show();
+      setTimeout(() => msgArea.focus(), 300);
+    }
 
-  const bindContactButton = (btn) => {
-    if (btn.dataset.boundContact === '1') return;
-    btn.dataset.boundContact = '1';
-    btn.addEventListener('click', () => openContactModal(btn));
-  };
+    if (withdraw) {
+      withdrawBtn = withdraw;
+      document.getElementById('withdrawCreatorName').textContent = withdraw.dataset.creatorName || 'this creator';
+      withdrawModal.show();
+    }
+  });
 
-  const bindWithdrawButton = (btn) => {
-    if (btn.dataset.boundWithdraw === '1') return;
-    btn.dataset.boundWithdraw = '1';
-    btn.addEventListener('click', async () => {
-      const creatorId = (btn.dataset.creatorId || '').toString().trim();
-      if (!creatorId) return;
-      const creatorName = btn.dataset.creatorName || 'this creator';
-      if (!window.confirm(`Withdraw your request to ${creatorName}?`)) return;
-
-      const originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Withdrawing...';
-
-      try {
-        const res = await fetch(SEND_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-          body: JSON.stringify({ creator_id: creatorId, action: 'withdraw' }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          btn.textContent = 'Contact creator';
-          btn.classList.remove('btn-danger-subtle', 'js-withdraw-btn');
-          btn.classList.add('btn-contact-creator', 'js-contact-btn');
-          btn.dataset.creatorHandle = data.creator_handle || btn.dataset.creatorHandle || '';
-          btn.dataset.boundWithdraw = '0';
-          btn.disabled = false;
-          bindContactButton(btn);
-          toastMsg.textContent = data.message || 'Request withdrawn.';
-          toast.show();
-        } else {
-          btn.disabled = false;
-          btn.textContent = originalText;
-          alert(data.error || 'Unable to withdraw request.');
-        }
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = originalText;
-        alert('Network error — please try again.');
-      }
-    });
-  };
-
-  document.querySelectorAll('.js-contact-btn').forEach(bindContactButton);
-  document.querySelectorAll('.js-withdraw-btn').forEach(bindWithdrawButton);
-
+  // ── Send contact request ───────────────────────────────────
   sendBtn.addEventListener('click', async () => {
-    const message = msgArea.value.trim();
+    const message   = msgArea.value.trim();
     const creatorId = (activeCreatorId || '').toString().trim();
 
     if (!creatorId) {
@@ -395,12 +382,12 @@ window.addEventListener('load', function () {
       errBox.classList.remove('d-none');
       return;
     }
-
     if (!message) {
       errBox.textContent = 'Please write an opening message.';
       errBox.classList.remove('d-none');
       return;
     }
+
     errBox.classList.add('d-none');
     sendBtn.disabled = true;
     spin.classList.remove('d-none');
@@ -409,35 +396,74 @@ window.addEventListener('load', function () {
       const res  = await fetch(SEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({
-          creator_id: creatorId,
-          opening_message: message,
-        }),
+        body: JSON.stringify({ creator_id: creatorId, opening_message: message }),
       });
       const data = await res.json();
       if (data.success) {
-        modal.hide();
+        contactModal.hide();
         if (activeBtn) {
           activeBtn.textContent = 'Withdraw request';
           activeBtn.classList.remove('btn-contact-creator', 'btn-secondary', 'js-contact-btn');
           activeBtn.classList.add('btn-danger-subtle', 'js-withdraw-btn');
-          activeBtn.dataset.boundContact = '0';
-          bindWithdrawButton(activeBtn);
         }
         toastMsg.textContent = data.message || 'Request sent!';
         toast.show();
       } else {
         errBox.textContent = data.error || 'Unable to send request. Please try again.';
         errBox.classList.remove('d-none');
-        sendBtn.disabled = false;
-        spin.classList.add('d-none');
       }
     } catch (e) {
       errBox.textContent = 'Network error — please try again.';
       errBox.classList.remove('d-none');
+    } finally {
       sendBtn.disabled = false;
       spin.classList.add('d-none');
     }
+  });
+
+  // ── Confirm withdraw ───────────────────────────────────────
+  wConfirmBtn.addEventListener('click', async () => {
+    if (!withdrawBtn) return;
+    const creatorId = (withdrawBtn.dataset.creatorId || '').toString().trim();
+    if (!creatorId) return;
+
+    wConfirmBtn.disabled = true;
+    wSpin.classList.remove('d-none');
+
+    try {
+      const res  = await fetch(SEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ creator_id: creatorId, action: 'withdraw' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        withdrawModal.hide();
+        withdrawBtn.textContent = 'Contact creator';
+        withdrawBtn.classList.remove('btn-danger-subtle', 'js-withdraw-btn');
+        withdrawBtn.classList.add('btn-contact-creator', 'js-contact-btn');
+        withdrawBtn.dataset.creatorHandle = data.creator_handle || withdrawBtn.dataset.creatorHandle || '';
+        toastMsg.textContent = data.message || 'Request withdrawn.';
+        toast.show();
+      } else {
+        withdrawModal.hide();
+        toastMsg.textContent = data.error || 'Unable to withdraw request.';
+        toast.show();
+      }
+    } catch (e) {
+      withdrawModal.hide();
+      toastMsg.textContent = 'Network error — please try again.';
+      toast.show();
+    } finally {
+      wConfirmBtn.disabled = false;
+      wSpin.classList.add('d-none');
+      withdrawBtn = null;
+    }
+  });
+
+  document.getElementById('withdrawModal').addEventListener('hidden.bs.modal', () => {
+    wConfirmBtn.disabled = false;
+    wSpin.classList.add('d-none');
   });
 
   document.getElementById('contactModal').addEventListener('hidden.bs.modal', () => {
