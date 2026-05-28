@@ -83,6 +83,9 @@ class PartnershipRequest(models.Model):
         choices=REQUEST_STATUS_CHOICES,
         default=REQUEST_STATUS_PENDING,
     )
+    creator_has_replied = models.BooleanField(default=False)
+    thread_unlocked_at = models.DateTimeField(null=True, blank=True)
+    last_message_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

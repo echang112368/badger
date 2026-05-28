@@ -475,15 +475,18 @@
     const isReq  = d.status === 'requested';
     const isArc  = d.status === 'inactive';
 
-    // Fetch messages (not for request rows yet)
+    // Fetch messages
     let msgHtml = '<div class="thread-empty">No messages yet</div>';
-    if (!isReq) {
-      try {
-        const res  = await fetch(MSGS_URL(d.linkId));
-        const data = await res.json();
-        if (data.messages && data.messages.length) msgHtml = buildThread(data.messages);
-      } catch(e) { console.error(e); }
-    }
+    let creatorHasReplied = true;
+    try {
+      const res  = await fetch(MSGS_URL(d.linkId));
+      const data = await res.json();
+      creatorHasReplied = data.creator_has_replied !== false;
+      let msgs = data.messages || [];
+      // For pending (requested) rows, opening messages are shown in the banner, not the thread
+      if (isReq) msgs = msgs.filter(m => !m.is_opening_message);
+      if (msgs.length) msgHtml = buildThread(msgs);
+    } catch(e) { console.error(e); }
 
     const statusMeta = {
       active:    { color: '#22c55e', label: 'Active' },
