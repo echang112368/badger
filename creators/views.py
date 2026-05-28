@@ -929,7 +929,7 @@ def creator_affiliate_companies(request):
         .order_by("merchant__username")
     )
     requests_rows, active_rows, archived_rows = [], [], []
-    palette = ["#DBEAFE", "#FEE2E2", "#DCFCE7", "#FEF3C7", "#EDE9FE", "#FCE7F3"]
+    palette = ["#4f46e5", "#0891b2", "#059669", "#d97706", "#7c3aed", "#be185d"]
     for idx, link in enumerate(links):
         merchant = link.merchant
         name = _merchant_display_name(merchant)
@@ -962,7 +962,8 @@ def creator_affiliate_companies(request):
             "opening_message": req.message if req else "",
             "has_unread": False,
         }
-        if link.status == STATUS_REQUESTED:
+        has_pending_request = req and req.status == REQUEST_STATUS_PENDING and not req.creator_has_replied
+        if link.status == STATUS_REQUESTED or has_pending_request:
             requests_rows.append(row)
         elif link.status == STATUS_ACTIVE:
             active_rows.append(row)
