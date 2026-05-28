@@ -707,6 +707,28 @@ class CreatorDiscoveryTests(TestCase):
         )
         self.assertContains(response, "Ava Stone")
 
+    def test_instagram_icon_links_to_creator_account_when_username_available(self):
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_creator_discovery"))
+
+        self.assertEqual(response.status_code, 200)
+        cards = response.context["creator_cards"]
+        ava_card = next(card for card in cards if card["creator_id"] == self.creator.id)
+        self.assertEqual(
+            ava_card["social_links"],
+            [
+                {
+                    "platform": "instagram",
+                    "label": "Instagram",
+                    "icon": "bi-instagram",
+                    "url": "https://www.instagram.com/ava_beauty/",
+                    "handle": "@ava_beauty",
+                }
+            ],
+        )
+        self.assertContains(response, 'href="https://www.instagram.com/ava_beauty/"')
+        self.assertContains(response, "bi-instagram")
+
     def test_missing_analytics_does_not_crash(self):
         creator_without_snapshot = CustomUser.objects.create_user(
             username="creator_no_snapshot",
@@ -722,6 +744,11 @@ class CreatorDiscoveryTests(TestCase):
         response = self.client.get(reverse("merchant_creator_discovery"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "N/A")
+        cards = response.context["creator_cards"]
+        missing_card = next(
+            card for card in cards if card["creator_id"] == creator_without_snapshot.id
+        )
+        self.assertEqual(missing_card["social_links"], [])
 
     def test_non_merchant_cannot_access_discovery(self):
         creator_only = CustomUser.objects.create_user(

@@ -12,6 +12,11 @@
 .match-badge-low {background:#f5f5f5;color:#525252;}
 .stats-label {font-size:.75rem;color:#6c757d;text-transform:uppercase;letter-spacing:.04em;}
 .insight-box {background:#f8fafc;border:1px solid #e6ecf5;border-radius:.75rem;padding:.75rem .85rem;}
+.social-links {display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;}
+.social-link {width:2.25rem;height:2.25rem;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #e6ecf5;background:#fff;color:#3D5096;text-decoration:none;box-shadow:0 2px 8px rgba(15,34,66,.06);transition:background .15s ease,color .15s ease,transform .15s ease;}
+.social-link:hover,.social-link:focus {background:#3D5096;color:#fff;transform:translateY(-1px);}
+.social-link-instagram {color:#c13584;}
+.social-link-instagram:hover,.social-link-instagram:focus {background:#c13584;color:#fff;}
 .insight-title {font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#667085;}
 .insight-summary {font-size:.92rem;color:#1f2937;margin:.35rem 0 0 0;line-height:1.35;}
 .insight-details summary {cursor:pointer;list-style:none;display:flex;align-items:center;gap:.4rem;color:#344054;font-weight:600;font-size:.83rem;margin-top:.55rem;}
@@ -196,6 +201,22 @@
                                 Reach: {% if creator.average_reach %}{{ creator.average_reach }}{% else %}N/A{% endif %} ·
                                 Location: {{ creator.audience_location|default:'N/A' }}
                             </div>
+                            {% if creator.social_links %}
+                                <div class="social-links" aria-label="Creator social accounts">
+                                    {% for social in creator.social_links %}
+                                        <a
+                                            class="social-link social-link-{{ social.platform }}"
+                                            href="{{ social.url }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label="Open {{ creator.name }}'s {{ social.label }} account"
+                                            title="{{ social.label }} {{ social.handle }}"
+                                        >
+                                            <i class="bi {{ social.icon }}" aria-hidden="true"></i>
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                             <div class="insight-box mb-3">
                                 <div class="d-flex justify-content-between align-items-center gap-2">
                                     <div class="insight-title">Match insight</div>
