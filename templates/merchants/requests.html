@@ -344,16 +344,15 @@
         </div>
       </div>
       {% empty %}
-      {% if not pending_rows %}
       <div class="dm-empty-list">
         <i class="bi bi-people"></i>
         No active partnerships yet
       </div>
-      {% endif %}
       {% endfor %}
+    </div>
 
-      {% if pending_rows %}
-      <div class="dm-section-lbl pending-lbl">Pending Reply</div>
+    <!-- Requests tab -->
+    <div class="dm-tab-panel dm-hidden" data-panel="requests">
       {% for row in pending_rows %}
       <div class="dm-row"
         data-link-id="{{ row.link_id }}"
@@ -372,23 +371,19 @@
         <div class="dm-av">{{ row.initials }}</div>
         <div class="dm-row-body">
           <div class="dm-row-name">{{ row.creator_name }}</div>
-          <div class="dm-row-preview">Waiting for response…</div>
+          <div class="dm-row-preview">{{ row.preview }}</div>
         </div>
         <div class="dm-row-meta">
           {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
           <span class="dm-sent-badge">sent</span>
         </div>
       </div>
-      {% endfor %}
-      {% endif %}
-    </div>
-
-    <!-- Requests tab -->
-    <div class="dm-tab-panel dm-hidden" data-panel="requests">
+      {% empty %}
       <div class="dm-empty-list">
         <i class="bi bi-inbox"></i>
-        No incoming requests
+        No outgoing requests
       </div>
+      {% endfor %}
     </div>
 
     <!-- Archived tab -->

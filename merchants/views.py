@@ -1249,7 +1249,7 @@ def merchant_requests(request):
         initials = ''.join(p[0] for p in name.split() if p)[:2].upper() or 'CR'
         pr = PartnershipRequest.objects.filter(merchant=merchant_user, creator=creator).order_by('-created_at').first()
         last_message = link.messages.order_by('-created_at').first()
-        preview = (last_message.content if last_message else (pr.message if pr else 'No messages yet'))
+        preview = (last_message.content if last_message else (pr.message if pr and pr.message else 'No messages yet'))
         preview = preview[:80] + ('...' if len(preview) > 80 else '')
 
         row = {
@@ -1318,8 +1318,17 @@ def merchant_partner_messages(request, link_id):
 
     # GET
     msgs = list(link.messages.values('id', 'sender_id', 'content', 'created_at', 'is_opening_message'))
+    if not msgs and pr and (pr.message or '').strip():
+        msgs = [{
+            'id': f'pr-{pr.id}',
+            'sender_id': pr.merchant_id,
+            'content': pr.message.strip(),
+            'created_at': pr.created_at,
+            'is_opening_message': True,
+        }]
     for m in msgs:
-        m['created_at'] = m['created_at'].isoformat()
+        if hasattr(m['created_at'], 'isoformat'):
+            m['created_at'] = m['created_at'].isoformat()
     return JsonResponse({
         'status': 'ok',
         'creator_has_replied': pr.creator_has_replied if pr else True,
