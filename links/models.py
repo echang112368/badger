@@ -75,6 +75,9 @@ class PartnershipRequest(models.Model):
         related_name="partnership_requests",
     )
     message = models.TextField(blank=True)
+    campaign_type = models.CharField(max_length=120, default="General")
+    deal_type = models.CharField(max_length=120, default="Flexible")
+    merchant_initiated = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20,
         choices=REQUEST_STATUS_CHOICES,
