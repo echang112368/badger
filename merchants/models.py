@@ -50,7 +50,7 @@ class MerchantMeta(models.Model):
         BADGER_CREATOR = "badger_creator", "Badger Creator included ($30/mo)"
 
     user = models.OneToOneField('accounts.CustomUser', on_delete=models.CASCADE)
-    company_name = models.CharField(max_length=255, blank=True)
+    company_name = models.CharField(max_length=255)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     paypal_email = models.EmailField(blank=True)
     shopify_access_token = models.CharField(max_length=255, blank=True)
