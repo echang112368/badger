@@ -23,9 +23,26 @@ class MerchantSettingsFormTests(TestCase):
             is_merchant=True,
         )
 
+
+    def test_requires_business_name(self):
+        form = MerchantSettingsForm(
+            data={
+                "company_name": "",
+                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
+                "paypal_email": "merchant@example.com",
+                "shopify_store_domain": "",
+                "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
+            },
+            instance=self.user.merchantmeta,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("company_name", form.errors)
+
     def test_requires_paypal_for_independent(self):
         form = MerchantSettingsForm(
             data={
+                "company_name": "Merchant Form Co",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
                 "paypal_email": "",
                 "shopify_store_domain": "",
@@ -43,6 +60,7 @@ class MerchantSettingsFormTests(TestCase):
 
         form = MerchantSettingsForm(
             data={
+                "company_name": "Merchant Form Co",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
                 "shopify_store_domain": "",
@@ -60,6 +78,7 @@ class MerchantSettingsFormTests(TestCase):
 
         form = MerchantSettingsForm(
             data={
+                "company_name": "Merchant Form Co",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
                 "paypal_email": "",
                 "shopify_store_domain": "https://Example.myshopify.com/",
@@ -79,6 +98,7 @@ class MerchantSettingsFormTests(TestCase):
 
         form = MerchantSettingsForm(
             data={
+                "company_name": "Merchant Form Co",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
                 "paypal_email": "merchant@example.com",
                 "shopify_store_domain": "example.myshopify.com",
@@ -98,6 +118,7 @@ class MerchantSettingsFormTests(TestCase):
 
         form = MerchantSettingsForm(
             data={
+                "company_name": "Merchant Form Co",
                 "paypal_email": "merchant@example.com",
                 "shopify_store_domain": "example.myshopify.com",
                 "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
@@ -176,6 +197,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "merchant@example.com",
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
@@ -197,6 +219,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "merchant_invalid@example.com",
                 "shopify_store_domain": "shop.test",
                 "business_type": MerchantMeta.BusinessType.INDEPENDENT,
@@ -222,6 +245,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "merchant_locked@example.com",
                 "shopify_store_domain": "new-shop.myshopify.com",
                 "business_type": MerchantMeta.BusinessType.SHOPIFY,
@@ -241,6 +265,19 @@ class MerchantSettingsTests(TestCase):
         self.client.force_login(user)
         response = self.client.get(reverse("merchant_settings"))
         self.assertContains(response, user.email)
+
+
+    def test_settings_displays_username(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_visible_username",
+            password="pass",
+            email="merchant_visible_username@example.com",
+            is_merchant=True,
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+        self.assertContains(response, "Username")
+        self.assertContains(response, user.username)
 
     def test_settings_displays_password(self):
         user = CustomUser.objects.create_user(
@@ -271,6 +308,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
+                "company_name": "Settings Merchant Co",
                 "first_name": "New",
                 "last_name": "Name",
                 "paypal_email": "merchant4@example.com",
@@ -300,7 +338,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
-                "company_name": "",
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "",
                 "shopify_store_domain": "https://TabStore.myshopify.com/",
                 "first_name": "",
@@ -328,7 +366,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
-                "company_name": "",
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "",
                 "shopify_store_domain": "partial-store.myshopify.com",
                 "first_name": "A" * 200,
@@ -362,7 +400,7 @@ class MerchantSettingsTests(TestCase):
         response = self.client.post(
             reverse("merchant_settings"),
             {
-                "company_name": "",
+                "company_name": "Settings Merchant Co",
                 "paypal_email": "",
                 "shopify_store_domain": "https://Example.myshopify.com/",
                 "first_name": "",
