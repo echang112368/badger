@@ -190,6 +190,15 @@ def _get_merchant_meta(merchant_user: Optional[CustomUser]) -> Optional[Merchant
         return None
 
 
+def _merchant_business_name(merchant_user: Optional[CustomUser]) -> str:
+    meta = _get_merchant_meta(merchant_user)
+    if meta and meta.company_name:
+        return meta.company_name
+    if merchant_user is None:
+        return ""
+    return merchant_user.get_full_name() or merchant_user.username
+
+
 def _should_refresh_shopify_billing(request, meta: Optional[MerchantMeta]) -> bool:
     if not meta or meta.business_type != MerchantMeta.BusinessType.SHOPIFY:
         return False
@@ -819,6 +828,7 @@ def merchant_dashboard(request):
             )
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
+        'merchant_display_name': _merchant_business_name(merchant_user),
         'balance': balance,
         'ledger_entries': entries,
         'permissions': permissions,
