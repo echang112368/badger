@@ -953,6 +953,7 @@ def creator_affiliate_companies(request):
             "timestamp": (last_message.created_at if last_message else (req.updated_at if req else None)),
             "status": link.status,
             "request_status": req.status if req else None,
+            "creator_has_replied": req.creator_has_replied if req else True,
             "match_score": 86,
             "campaign_type": prefs.get_campaign_goal_display() if prefs and prefs.campaign_goal else "General",
             "partner_since": req.created_at.date().isoformat() if req else "",
@@ -997,6 +998,15 @@ def creator_partner_messages(request, link_id):
             sender=request.user,
             content=content,
         )
+        pr = PartnershipRequest.objects.filter(merchant=link.merchant, creator=request.user).order_by('-created_at').first()
+        if pr:
+            update_fields = ['last_message_at', 'updated_at']
+            pr.last_message_at = timezone.now()
+            if not pr.creator_has_replied:
+                pr.creator_has_replied = True
+                pr.thread_unlocked_at = timezone.now()
+                update_fields += ['creator_has_replied', 'thread_unlocked_at']
+            pr.save(update_fields=update_fields)
         return JsonResponse({
             "status": "ok",
             "message": {
@@ -1004,15 +1014,21 @@ def creator_partner_messages(request, link_id):
                 "content": message.content,
                 "sender_id": message.sender_id,
                 "created_at": message.created_at.isoformat(),
+                "is_opening_message": False,
             },
         })
 
     messages = list(
-        link.messages.select_related("sender").values("id", "sender_id", "content", "created_at")
+        link.messages.select_related("sender").values("id", "sender_id", "content", "created_at", "is_opening_message")
     )
     for message in messages:
         message["created_at"] = message["created_at"].isoformat()
-    return JsonResponse({"status": "ok", "messages": messages})
+    pr = PartnershipRequest.objects.filter(merchant=link.merchant, creator=request.user).order_by('-created_at').first()
+    return JsonResponse({
+        "status": "ok",
+        "creator_has_replied": pr.creator_has_replied if pr else True,
+        "messages": messages,
+    })
 
 
 @login_required
@@ -1372,7 +1388,16 @@ def respond_request(request, link_id):
         if action == "accept":
             link.status = STATUS_ACTIVE
             link.save()
+            pr = PartnershipRequest.objects.filter(merchant=link.merchant, creator=request.user).order_by('-created_at').first()
+            if pr:
+                pr.status = REQUEST_STATUS_ACCEPTED
+                pr.save(update_fields=['status', 'updated_at'])
         elif action == "decline":
-            link.delete()
+            link.status = STATUS_INACTIVE
+            link.save()
+            pr = PartnershipRequest.objects.filter(merchant=link.merchant, creator=request.user).order_by('-created_at').first()
+            if pr:
+                pr.status = REQUEST_STATUS_DECLINED
+                pr.save(update_fields=['status', 'updated_at'])
 
     return redirect("creator_affiliate_companies")

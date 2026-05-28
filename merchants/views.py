@@ -16,11 +16,12 @@ from links.models import (
     PartnershipRequest,
     REQUEST_STATUS_ACCEPTED,
     REQUEST_STATUS_DECLINED,
+    REQUEST_STATUS_PENDING,
     STATUS_REQUESTED,
     STATUS_ACTIVE,
     STATUS_INACTIVE,
 )
-from creators.models import CreatorMeta
+from creators.models import CreatorMeta, PartnerMessage
 from creators.services.social_dashboard import SocialDashboardService
 from .forms import (
     CompanyCreatorPreferencesForm,
@@ -1102,6 +1103,7 @@ def merchant_send_partnership_request(request):
             status=400,
         )
 
+    now = timezone.now()
     partnership_request = PartnershipRequest.objects.create(
         merchant=request.user,
         creator=creator,
@@ -1110,6 +1112,22 @@ def merchant_send_partnership_request(request):
         deal_type=deal_type or "Flexible",
         merchant_initiated=True,
         status="pending",
+        last_message_at=now,
+    )
+    link, _ = MerchantCreatorLink.objects.get_or_create(
+        merchant=request.user,
+        creator=creator,
+        defaults={'status': STATUS_REQUESTED},
+    )
+    if link.status == STATUS_INACTIVE:
+        link.status = STATUS_REQUESTED
+        link.save(update_fields=['status'])
+
+    PartnerMessage.objects.create(
+        partnership=link,
+        sender=request.user,
+        content=opening_message,
+        is_opening_message=True,
     )
     return JsonResponse(
         {
@@ -1205,78 +1223,109 @@ def merchant_creator_preferences(request):
 def merchant_requests(request):
     permissions = resolve_merchant_permissions(request.user)
     if not permissions.can_view_dashboard:
-        return redirect("login")
-
+        return redirect('login')
     merchant_user = permissions.merchant
     if not merchant_user:
-        return redirect("merchant_dashboard")
+        return redirect('merchant_dashboard')
 
-    request_qs = (
-        PartnershipRequest.objects.filter(merchant=merchant_user)
-        .select_related("creator", "creator__creatormeta", "item", "item_group")
-        .order_by("-created_at")
+    links = (
+        MerchantCreatorLink.objects.filter(merchant=merchant_user)
+        .select_related('creator', 'creator__creatormeta')
+        .order_by('-id')
     )
-    request_cards = []
-    for req in request_qs:
-        creator_meta = getattr(req.creator, "creatormeta", None)
+    palette = ['#DBEAFE', '#FEE2E2', '#DCFCE7', '#FEF3C7', '#EDE9FE', '#FCE7F3']
+    pending_rows, active_rows, archived_rows = [], [], []
+
+    for idx, link in enumerate(links):
+        creator = link.creator
+        creator_meta = getattr(creator, 'creatormeta', None)
         if not creator_meta:
-            creator_meta, _ = CreatorMeta.objects.get_or_create(user=req.creator)
-        request_cards.append(
-            {
-                "request": req,
-                "creator_card": _creator_card_payload(creator_meta),
-                "item_name": req.item.title if req.item else (req.item_group.name if req.item_group else None),
-                "campaign_type": "",
-                "deal_type": "",
-            }
-        )
-        lines = (req.message or "").splitlines()
-        campaign_type = req.campaign_type or ""
-        deal_type = req.deal_type or ""
-        clean_lines = []
-        for line in lines:
-            if line.startswith("Campaign type:") and not campaign_type:
-                campaign_type = line.replace("Campaign type:", "").strip()
-            elif line.startswith("Deal type:") and not deal_type:
-                deal_type = line.replace("Deal type:", "").strip()
-            else:
-                clean_lines.append(line)
-        request_cards[-1]["campaign_type"] = campaign_type or "General"
-        request_cards[-1]["deal_type"] = deal_type or "Flexible"
-        request_cards[-1]["clean_message"] = "\n".join(clean_lines).strip()
+            try:
+                creator_meta, _ = CreatorMeta.objects.get_or_create(user=creator)
+            except Exception:
+                creator_meta = None
 
-    selected_id = request.GET.get("request")
-    selected_request = request_cards[0] if request_cards else None
-    if selected_id:
-        for entry in request_cards:
-            if str(entry["request"].id) == str(selected_id):
-                selected_request = entry
-                break
+        name = (creator.get_full_name() or creator.username)
+        initials = ''.join(p[0] for p in name.split() if p)[:2].upper() or 'CR'
+        pr = PartnershipRequest.objects.filter(merchant=merchant_user, creator=creator).order_by('-created_at').first()
+        last_message = link.messages.order_by('-created_at').first()
+        preview = (last_message.content if last_message else (pr.message if pr else 'No messages yet'))
+        preview = preview[:80] + ('...' if len(preview) > 80 else '')
 
-    prefill_creator_id = request.GET.get("creator_id", "")
-    prefill_blocked = False
-    if prefill_creator_id:
-        prefill_blocked = PartnershipRequest.objects.filter(
-            merchant=merchant_user,
-            creator_id=prefill_creator_id,
-            status__in=["pending", "declined"],
-        ).exists()
+        row = {
+            'link_id': link.id,
+            'creator_name': name,
+            'creator_handle': '@' + creator.username,
+            'email': creator.email,
+            'initials': initials,
+            'avatar_color': palette[idx % len(palette)],
+            'preview': preview,
+            'timestamp': (pr.last_message_at or pr.created_at) if pr else None,
+            'status': link.status,
+            'creator_has_replied': pr.creator_has_replied if pr else True,
+            'request_status': pr.status if pr else None,
+            'match_score': creator_meta.profile_completeness_score if creator_meta else 0,
+            'campaign_type': (pr.campaign_type or 'General') if pr else 'General',
+            'deal_type': (pr.deal_type or 'Flexible') if pr else 'Flexible',
+            'partner_since': pr.created_at.date().isoformat() if pr else '',
+        }
+        if link.status == STATUS_REQUESTED:
+            pending_rows.append(row)
+        elif link.status == STATUS_ACTIVE:
+            active_rows.append(row)
+        else:
+            archived_rows.append(row)
 
-    return render(
-        request,
-        "merchants/requests.html",
-        {
-            "permissions": permissions,
-            "request_cards": request_cards,
-            "selected_request": selected_request,
-            "prefill_creator_id": prefill_creator_id,
-            "prefill_creator_name": request.GET.get("creator_name", ""),
-            "prefill_creator_handle": request.GET.get("creator_handle", ""),
-            "prefill_match_score": request.GET.get("match_score", ""),
-            "prefill_blocked": prefill_blocked,
-            "show_invoices_tab": _should_show_invoices_tab(_get_merchant_meta(merchant_user)),
-        },
-    )
+    return render(request, 'merchants/requests.html', {
+        'permissions': permissions,
+        'pending_rows': pending_rows,
+        'active_rows': active_rows,
+        'archived_rows': archived_rows,
+        'show_invoices_tab': _should_show_invoices_tab(_get_merchant_meta(merchant_user)),
+    })
+
+
+@login_required
+def merchant_partner_messages(request, link_id):
+    permissions = resolve_merchant_permissions(request.user)
+    if not permissions.can_view_dashboard:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    merchant_user = permissions.merchant
+    if not merchant_user:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    link = get_object_or_404(MerchantCreatorLink, id=link_id, merchant=merchant_user)
+    pr = PartnershipRequest.objects.filter(merchant=merchant_user, creator=link.creator).order_by('-created_at').first()
+
+    if request.method == 'POST':
+        if pr and not pr.creator_has_replied and pr.status == REQUEST_STATUS_PENDING:
+            return JsonResponse({'success': False, 'error': 'Waiting for creator to respond before you can send another message.'}, status=403)
+        try:
+            payload = json.loads(request.body or '{}')
+        except json.JSONDecodeError:
+            payload = {}
+        content = (payload.get('content') or '').strip()
+        if not content:
+            return JsonResponse({'success': False, 'error': 'Message cannot be empty.'}, status=400)
+        message = PartnerMessage.objects.create(partnership=link, sender=merchant_user, content=content)
+        if pr:
+            pr.last_message_at = timezone.now()
+            pr.save(update_fields=['last_message_at', 'updated_at'])
+        return JsonResponse({'status': 'ok', 'message': {
+            'id': message.id, 'content': message.content, 'sender_id': message.sender_id,
+            'created_at': message.created_at.isoformat(), 'is_opening_message': False,
+        }})
+
+    # GET
+    msgs = list(link.messages.values('id', 'sender_id', 'content', 'created_at', 'is_opening_message'))
+    for m in msgs:
+        m['created_at'] = m['created_at'].isoformat()
+    return JsonResponse({
+        'status': 'ok',
+        'creator_has_replied': pr.creator_has_replied if pr else True,
+        'link_status': link.status,
+        'messages': msgs,
+    })
 
 
 @login_required

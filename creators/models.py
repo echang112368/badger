@@ -11,6 +11,8 @@ class PartnerMessage(models.Model):
     sender = models.ForeignKey("accounts.CustomUser", on_delete=models.CASCADE)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    is_opening_message = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["created_at"]

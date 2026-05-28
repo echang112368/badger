@@ -16,6 +16,7 @@ urlpatterns = [
     path('requests/', views.merchant_requests, name='merchant_requests'),
     path('requests/<int:request_id>/update/', views.merchant_update_request, name='merchant_update_request'),
     path('partnerships/request/send/', views.merchant_send_partnership_request, name='merchant_send_partnership_request'),
+    path('partnerships/messages/<int:link_id>/', views.merchant_partner_messages, name='merchant_partner_messages'),
     path('marketplace/', views.merchant_marketplace, name='merchant_marketplace'),
     path('creator-discovery/', views.merchant_creator_discovery, name='merchant_creator_discovery'),
     path('creator-discovery/preferences/', views.merchant_creator_preferences, name='merchant_creator_preferences'),

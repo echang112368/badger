@@ -2,80 +2,794 @@
 {% block title %}Partnerships{% endblock %}
 {% block content %}
 <style>
-.partnership-shell{display:grid;grid-template-columns:430px 1fr;min-height:calc(100vh - 2rem);background:#fff;border:1px solid #e9ecef;border-radius:.75rem;overflow:hidden}
-.partnership-sidebar{border-right:1px solid #e9ecef;background:#fafafa}
-.partnership-chat-list .chat-item{display:block;padding:.9rem 1rem;border-left:4px solid transparent;text-decoration:none;color:inherit}
-.partnership-chat-list .chat-item.active{background:#eef1fb;border-left-color:#4052a0}
-.chat-header-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid #ececec;border-top:1px solid #ececec}
-.chat-header-grid > div{padding:.7rem 1rem;border-right:1px solid #ececec}.chat-header-grid > div:last-child{border-right:none}
-@media (max-width: 992px){.partnership-shell{grid-template-columns:1fr}.partnership-sidebar{border-right:none;border-bottom:1px solid #e9ecef}}
+  /* ── Full-height shell ── */
+  #dm-shell {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: calc(100vh - 56px);
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* ══════════ SIDEBAR ══════════ */
+  #dm-sidebar {
+    border-right: 1px solid #dbdbdb;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    overflow-y: auto;
+  }
+  .dm-sidebar-title {
+    padding: 18px 16px 6px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: -0.2px;
+  }
+  .dm-section-label {
+    padding: 10px 16px 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #c0c0c0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dm-section-count {
+    background: #f0f0f0;
+    color: #888;
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .dm-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    cursor: pointer;
+    gap: 12px;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .dm-row:hover { background: #fafafa; }
+  .dm-row.active {
+    background: #f0f2ff;
+    border-left-color: #3D5096;
+  }
+  .dm-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #3D5096;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+  }
+  .dm-row-body { flex: 1; min-width: 0; }
+  .dm-row-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dm-row-preview {
+    font-size: 12px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+  .dm-row-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .dm-row-time { font-size: 10.5px; color: #c0c0c0; }
+  .dm-empty-section {
+    padding: 4px 16px 10px;
+    font-size: 12px;
+    color: #ccc;
+    font-style: italic;
+  }
+
+  /* ══════════ MAIN PANEL ══════════ */
+  #dm-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  /* Empty state */
+  #dm-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #c8c8c8;
+  }
+  .dm-empty-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #d0d0d0;
+  }
+
+  /* Panel header */
+  #dm-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid #efefef;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  #dm-header-av {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #3D5096;
+    flex-shrink: 0;
+  }
+  #dm-header-name {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #111;
+  }
+  #dm-header-sub { font-size: 12px; color: #999; margin-top: 1px; }
+
+  /* Info bar (slim pills row) */
+  #dm-infobar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid #efefef;
+    background: #fafafa;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .info-pill {
+    flex: 1;
+    padding: 7px 14px;
+    border-right: 1px solid #efefef;
+    font-size: 11.5px;
+  }
+  .info-pill:last-child { border-right: none; }
+  .info-pill-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #bbb;
+    margin-bottom: 1px;
+  }
+  .info-pill-val { font-weight: 700; color: #111; font-size: 12px; }
+
+  /* Request banner */
+  #dm-banner {
+    margin: 14px 20px 0;
+    padding: 14px 16px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  .banner-tag {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
+
+  /* Waiting notice */
+  #dm-waiting-notice {
+    margin: 12px 20px 0;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+
+  /* Thread */
+  #dm-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 20px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    scroll-behavior: smooth;
+  }
+
+  /* Message bubbles */
+  .msg-cluster { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .msg-row { display: flex; }
+  .msg-row.mine { justify-content: flex-end; }
+  .msg-row.theirs { justify-content: flex-start; }
+
+  .bubble {
+    padding: 9px 14px;
+    font-size: 13.5px;
+    line-height: 1.45;
+    max-width: 66%;
+    word-break: break-word;
+    border-radius: 22px;
+  }
+  /* Positional classes set by JS */
+  .msg-row.mine.pos-first .bubble   { border-top-right-radius: 22px; border-bottom-right-radius: 6px; }
+  .msg-row.theirs.pos-first .bubble { border-top-left-radius: 22px;  border-bottom-left-radius: 6px; }
+  .msg-row.mine.pos-mid .bubble     { border-radius: 6px 22px 22px 6px; }
+  .msg-row.theirs.pos-mid .bubble   { border-radius: 22px 6px 6px 22px; }
+  .msg-row.mine.pos-last .bubble    { border-top-right-radius: 6px; border-bottom-right-radius: 22px; }
+  .msg-row.theirs.pos-last .bubble  { border-top-left-radius: 6px;  border-bottom-left-radius: 22px; }
+  .msg-row.mine.pos-only .bubble    { border-radius: 22px 22px 6px 22px; }
+  .msg-row.theirs.pos-only .bubble  { border-radius: 22px 22px 22px 6px; }
+
+  .bubble.mine   { background: #3D5096; color: #fff; }
+  .bubble.theirs { background: #f0f0f0; color: #111; }
+
+  .cluster-time {
+    font-size: 10.5px;
+    color: #bbb;
+    margin-top: 4px;
+  }
+  .cluster-time.mine   { text-align: right; padding-right: 2px; }
+  .cluster-time.theirs { text-align: left;  padding-left: 2px; }
+
+  .thread-empty {
+    margin: auto;
+    font-size: 13px;
+    color: #c8c8c8;
+    text-align: center;
+  }
+
+  /* Input bar */
+  #dm-input-area {
+    padding: 10px 16px 14px;
+    border-top: 1px solid #efefef;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+    background: #fff;
+  }
+  #dm-input {
+    flex: 1;
+    border: 1.5px solid #efefef;
+    border-radius: 24px;
+    padding: 9px 16px;
+    font-size: 13.5px;
+    background: #fafafa;
+    outline: none;
+    resize: none;
+    min-height: 40px;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.45;
+    transition: border-color 0.15s, background 0.15s;
+    font-family: inherit;
+  }
+  #dm-input:focus { border-color: #3D5096; background: #fff; }
+  #dm-input.locked {
+    background: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+  }
+  #dm-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: #3D5096;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+  #dm-send:hover:not(:disabled) { background: #263f74; transform: scale(1.05); }
+  #dm-send:disabled { background: #d0d3de; cursor: default; transform: none; }
+
+  /* Status indicators */
+  .status-pip {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .pending-badge {
+    background: #fff8e1;
+    color: #b45309;
+    border: 1px solid #fde68a;
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 9.5px;
+    font-weight: 600;
+  }
+
+  /* Toast */
+  #dm-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #dm-toast.show { opacity: 1; }
 </style>
-<div class="container-fluid py-4">
-<div class="partnership-shell">
-    <aside class="partnership-sidebar">
-        <div class="p-4 pb-2"><h2 class="h3 mb-0">Messages</h2></div>
-        <div class="px-4 text-uppercase text-muted small fw-semibold">Sent Requests</div>
-        <div class="partnership-chat-list">
-            {% for entry in request_cards %}
-                <a href="{% url 'merchant_requests' %}?request={{ entry.request.id }}" class="chat-item {% if selected_request and selected_request.request.id == entry.request.id %}active{% endif %}">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="fw-semibold">{{ entry.creator_card.name }}</div>
-                        <small class="text-muted"><time class="local-time" datetime="{{ entry.request.created_at|date:'c' }}">{{ entry.request.created_at|date:'M j' }}</time></small>
-                    </div>
-                    <div class="text-muted small text-truncate">{{ entry.clean_message|default:entry.request.message|default:'No message yet.' }}</div>
-                </a>
-            {% empty %}
-                <div class="p-4 text-muted">No requests yet.</div>
-            {% endfor %}
-        </div>
-    </aside>
-    <section>
-        {% if selected_request %}
-            <div class="p-4 d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="h4 mb-0">{{ selected_request.creator_card.name }}</div>
-                    <div class="text-muted">{{ selected_request.creator_card.email }}</div>
-                </div>
-                <div class="text-success"><i class="bi bi-circle-fill me-1" style="font-size:.6rem"></i>Active</div>
-            </div>
-            <div class="chat-header-grid">
-                <div><div class="text-muted text-uppercase small">Campaign</div><div class="fw-semibold">{{ selected_request.campaign_type }}</div></div>
-                <div><div class="text-muted text-uppercase small">Deal</div><div class="fw-semibold">{{ selected_request.deal_type }}</div></div>
-                <div><div class="text-muted text-uppercase small">Match</div><div class="fw-semibold">{{ selected_request.creator_card.profile_completeness_score }}%</div></div>
-                <div><div class="text-muted text-uppercase small">Since</div><div class="fw-semibold"><time class="local-time" datetime="{{ selected_request.request.created_at|date:'c' }}">{{ selected_request.request.created_at|date:'Y-m-d' }}</time></div></div>
-            </div>
-            <div class="p-4" style="min-height:380px;">{{ selected_request.clean_message|default:selected_request.request.message|linebreaksbr }}</div>
-        {% else %}
-            <div class="h-100 d-flex align-items-center justify-content-center text-muted">No messages yet</div>
-        {% endif %}
-        <div class="border-top p-3">
-            <div id="sendError" class="alert alert-danger d-none"></div>
-            <div class="row g-2">
-                <div class="col-md-3"><input id="newCreatorHandle" class="form-control" readonly value="{{ prefill_creator_handle }}"></div>
-                <div class="col-md-5"><input id="newMessage" class="form-control" value="Hi {{ prefill_creator_handle }}, we came across your profile on CreatorMatch and think you'd be a great fit for our brand awareness campaign. We'd love to discuss a collaboration."></div>
-                <div class="col-md-2"><select id="newCampaign" class="form-select"><option>Instagram Reel</option><option>TikTok video</option><option>YouTube review</option><option>Story</option><option>Static post</option><option>Other</option></select></div>
-                <div class="col-md-2"><select id="newDeal" class="form-select"><option>Paid</option><option>Affiliate</option><option>Gifted</option></select></div>
-            </div>
-            {% if prefill_blocked %}
-                <div class="small text-muted mt-2">Request already sent. You can send another message only after this creator accepts.</div>
-            {% endif %}
-            <div class="d-flex justify-content-end mt-2">
-                <button id="sendNewRequest" class="btn btn-primary" {% if not prefill_creator_id or prefill_blocked %}disabled{% endif %}><span id="sendSpin" class="spinner-border spinner-border-sm d-none me-2"></span>Send request</button>
-            </div>
-        </div>
-    </section>
+
+<div id="dm-shell">
+
+  <!-- ══════ SIDEBAR ══════ -->
+  <div id="dm-sidebar">
+    <div class="dm-sidebar-title">Messages</div>
+
+    {% if pending_rows %}
+    <div class="dm-section-label">
+      Pending Reply <span class="dm-section-count">{{ pending_rows|length }}</span>
+    </div>
+    {% for row in pending_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-creator="{{ row.creator_name }}"
+      data-handle="{{ row.creator_handle }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-deal-type="{{ row.deal_type }}"
+      data-creator-has-replied="{{ row.creator_has_replied|yesno:'true,false' }}"
+      data-request-status="{{ row.request_status|default:'' }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name">{{ row.creator_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        <span class="pending-badge">Pending</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="dm-section-label">
+      Active <span class="dm-section-count">{{ active_rows|length }}</span>
+    </div>
+    {% for row in active_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-creator="{{ row.creator_name }}"
+      data-handle="{{ row.creator_handle }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-deal-type="{{ row.deal_type }}"
+      data-creator-has-replied="true"
+      data-request-status="{{ row.request_status|default:'' }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name">{{ row.creator_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+        <span class="status-pip" style="background:#22c55e;"></span>
+      </div>
+    </div>
+    {% endfor %}
+    {% if not active_rows %}
+    <div class="dm-empty-section">No active partnerships yet</div>
+    {% endif %}
+
+    {% if archived_rows %}
+    <div class="dm-section-label" style="margin-top:6px;">
+      Archived <span class="dm-section-count">{{ archived_rows|length }}</span>
+    </div>
+    {% for row in archived_rows %}
+    <div class="dm-row"
+      data-link-id="{{ row.link_id }}"
+      data-status="{{ row.status }}"
+      data-creator="{{ row.creator_name }}"
+      data-handle="{{ row.creator_handle }}"
+      data-email="{{ row.email }}"
+      data-initials="{{ row.initials }}"
+      data-avatar-color="{{ row.avatar_color }}"
+      data-campaign-type="{{ row.campaign_type }}"
+      data-match-score="{{ row.match_score }}"
+      data-partner-since="{{ row.partner_since }}"
+      data-deal-type="{{ row.deal_type }}"
+      data-creator-has-replied="true"
+      data-request-status="{{ row.request_status|default:'' }}">
+      <div class="dm-avatar" style="background:{{ row.avatar_color }};opacity:0.65;">{{ row.initials }}</div>
+      <div class="dm-row-body">
+        <div class="dm-row-name" style="color:#888;">{{ row.creator_name }}</div>
+        <div class="dm-row-preview">{{ row.preview }}</div>
+      </div>
+      <div class="dm-row-meta">
+        {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+
+  <!-- ══════ MAIN PANEL ══════ -->
+  <div id="dm-panel">
+    <div id="dm-empty">
+      <div class="dm-empty-icon"><i class="bi bi-chat"></i></div>
+      <div style="font-size:15px;font-weight:600;color:#888;">Your messages</div>
+      <div style="font-size:13px;color:#c0c0c0;">Select a conversation to start chatting</div>
+    </div>
+  </div>
 </div>
-</div>
+
+<div id="dm-toast"></div>
+
+{{ request.user.id|json_script:"me-id" }}
 <script>
-document.getElementById('sendNewRequest')?.addEventListener('click', async function(){
-  const btn=this, spin=document.getElementById('sendSpin');
-  btn.disabled=true; spin.classList.remove('d-none');
-  const creatorId="{{ prefill_creator_id }}";
-  const res = await fetch("{% url 'merchant_send_partnership_request' %}",{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},body:JSON.stringify({creator_id:Number(creatorId),opening_message:document.getElementById('newMessage').value,campaign_type:document.getElementById('newCampaign').value,deal_type:document.getElementById('newDeal').value})});
-  const data = await res.json();
-  if(data.success){window.location.href="{% url 'merchant_requests' %}?request="+data.request_id;return;}
-  const err=document.getElementById('sendError'); err.textContent=data.error||'Unable to send request'; err.classList.remove('d-none');
-  btn.disabled=false; spin.classList.add('d-none');
-});
+(function () {
+  const ME   = JSON.parse(document.getElementById('me-id').textContent);
+  const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const MSGS_URL = id => `/merchants/partnerships/messages/${id}/`;
+  const ACT_URL  = id => `/merchants/requests/${id}/update/`;
+
+  let active = null;
+  let pollTimer = null;
+  let currentCreatorHasReplied = true;
+  let currentCreatorName = '';
+
+  // ── Time formatter ────────────────────────────────────────
+  function fmt(iso) {
+    if (!iso) return '';
+    const d = new Date(iso), now = new Date();
+    const sameDayMs = 86400000;
+    if (now - d < sameDayMs && d.getDate() === now.getDate())
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (now - d < sameDayMs * 2) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('dm-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 4000);
+  }
+
+  // ── Wire sidebar rows ─────────────────────────────────────
+  document.querySelectorAll('.dm-row').forEach(r => r.addEventListener('click', () => open(r)));
+
+  // Auto-open first pending row, then first active, then any
+  const firstPending = document.querySelector('.dm-row[data-status="requested"]');
+  const firstActive  = document.querySelector('.dm-row[data-status="active"]');
+  if (firstPending) open(firstPending);
+  else if (firstActive) open(firstActive);
+  else { const any = document.querySelector('.dm-row'); if (any) open(any); }
+
+  // ── Open a conversation ───────────────────────────────────
+  async function open(row) {
+    document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
+    row.classList.add('active');
+    active = row;
+
+    // Clear any existing poll
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+    const d  = row.dataset;
+    const isArc = d.status === 'inactive';
+
+    // Fetch messages
+    let msgHtml = '<div class="thread-empty">No messages yet</div>';
+    let creatorHasReplied = d.creatorHasReplied !== 'false';
+    try {
+      const res  = await fetch(MSGS_URL(d.linkId));
+      const data = await res.json();
+      creatorHasReplied = data.creator_has_replied !== false;
+      const msgs = data.messages || [];
+      if (msgs.length) msgHtml = buildThread(msgs);
+    } catch(e) { console.error(e); }
+
+    currentCreatorHasReplied = creatorHasReplied;
+    currentCreatorName = d.creator;
+
+    const statusMeta = {
+      active:    { color: '#22c55e', label: 'Active' },
+      requested: { color: '#f59e0b', label: 'Pending' },
+      inactive:  { color: '#9ca3af', label: 'Archived' },
+    }[d.status] || { color: '#9ca3af', label: d.status };
+
+    const matchPct = parseFloat(d.matchScore || 0);
+    const matchDisplay = matchPct > 0 ? Math.round(matchPct * 100) + '%' : '—';
+
+    // Waiting notice when creator hasn't replied yet
+    const waitingNotice = (!creatorHasReplied && !isArc) ? `
+      <div id="dm-waiting-notice">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <i class="bi bi-hourglass-split" style="color:#9ca3af;font-size:14px;margin-top:2px;flex-shrink:0;"></i>
+          <div>
+            <div style="font-size:12.5px;font-weight:600;color:#374151;margin-bottom:3px;">
+              Waiting for ${esc(d.creator)} to reply
+            </div>
+            <div style="font-size:11.5px;color:#6b7280;line-height:1.5;">
+              You can continue the conversation once they respond. This prevents creators from being overwhelmed with follow-up messages.
+            </div>
+          </div>
+        </div>
+      </div>` : '';
+
+    // Input bar: locked or active
+    let inputBar = '';
+    if (!isArc) {
+      if (creatorHasReplied) {
+        inputBar = `
+        <div id="dm-input-area">
+          <textarea id="dm-input" rows="1" placeholder="Message ${esc(d.creator)}…"></textarea>
+          <button id="dm-send" title="Send">
+            <i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>
+          </button>
+        </div>`;
+      } else {
+        inputBar = `
+        <div id="dm-input-area">
+          <textarea id="dm-input" class="locked" rows="1"
+            placeholder="Waiting for ${esc(d.creator)} to reply…"
+            readonly title="You can send another message once ${esc(d.creator)} replies"
+            style="cursor:not-allowed;"></textarea>
+          <button id="dm-send" disabled title="Waiting for creator reply">
+            <i class="bi bi-lock-fill" style="font-size:13px;"></i>
+          </button>
+        </div>`;
+      }
+    }
+
+    document.getElementById('dm-panel').innerHTML = `
+      <div id="dm-header">
+        <div id="dm-header-av" style="background:${esc(d.avatarColor)};">${esc(d.initials)}</div>
+        <div style="flex:1;min-width:0;">
+          <div id="dm-header-name">${esc(d.creator)}</div>
+          <div id="dm-header-sub">${esc(d.email)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;">
+          <span class="status-pip" style="background:${statusMeta.color};"></span>
+          <span style="font-size:12px;color:#777;font-weight:500;">${statusMeta.label}</span>
+        </div>
+      </div>
+
+      <div id="dm-infobar">
+        <div class="info-pill">
+          <div class="info-pill-label">Campaign</div>
+          <div class="info-pill-val">${esc(d.campaignType || '—')}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Deal</div>
+          <div class="info-pill-val">${esc(d.dealType || '—')}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Match</div>
+          <div class="info-pill-val">${matchDisplay}</div>
+        </div>
+        <div class="info-pill">
+          <div class="info-pill-label">Since</div>
+          <div class="info-pill-val">${esc(d.partnerSince || '—')}</div>
+        </div>
+      </div>
+
+      ${waitingNotice}
+
+      <div id="dm-thread">${msgHtml}</div>
+
+      ${inputBar}
+    `;
+
+    // Scroll to bottom
+    const thr = document.getElementById('dm-thread');
+    if (thr) thr.scrollTop = thr.scrollHeight;
+
+    // Input events
+    const inp = document.getElementById('dm-input');
+    const btn = document.getElementById('dm-send');
+    if (inp && btn && creatorHasReplied) {
+      btn.addEventListener('click', () => send(d.linkId));
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(d.linkId); }
+      });
+      inp.addEventListener('input', () => {
+        inp.style.height = 'auto';
+        inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+      });
+    }
+
+    // Start polling if creator hasn't replied yet
+    if (!creatorHasReplied && !isArc) {
+      pollTimer = setInterval(() => poll(d.linkId), 30000);
+    }
+  }
+
+  // ── Build message thread ───────────────────────────────────
+  function buildThread(msgs) {
+    const clusters = [];
+    for (const m of msgs) {
+      const mine = m.sender_id === ME;
+      if (!clusters.length || clusters.at(-1).mine !== mine)
+        clusters.push({ mine, msgs: [m] });
+      else clusters.at(-1).msgs.push(m);
+    }
+    return clusters.map(c => {
+      const side = c.mine ? 'mine' : 'theirs';
+      const n = c.msgs.length;
+      return `
+      <div class="msg-cluster">
+        ${c.msgs.map((m, i) => {
+          const pos = n === 1 ? 'only' : i === 0 ? 'first' : i === n - 1 ? 'last' : 'mid';
+          return `<div class="msg-row ${side} pos-${pos}">
+            <div class="bubble ${side}">${esc(m.content)}</div>
+          </div>`;
+        }).join('')}
+        <div class="cluster-time ${side}">${fmt(c.msgs.at(-1).created_at)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Send a message ─────────────────────────────────────────
+  async function send(linkId) {
+    const inp = document.getElementById('dm-input');
+    const btn = document.getElementById('dm-send');
+    if (!inp) return;
+    const content = inp.value.trim();
+    if (!content) return;
+
+    if (btn) btn.disabled = true;
+    inp.value = ''; inp.style.height = 'auto';
+
+    try {
+      const res  = await fetch(MSGS_URL(linkId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json();
+      if (data.status === 'ok') {
+        const thr = document.getElementById('dm-thread');
+        if (thr) {
+          thr.querySelector('.thread-empty')?.remove();
+          const cluster = document.createElement('div');
+          cluster.className = 'msg-cluster';
+          cluster.innerHTML = `
+            <div class="msg-row mine pos-only">
+              <div class="bubble mine">${esc(content)}</div>
+            </div>
+            <div class="cluster-time mine">${fmt(data.message.created_at)}</div>`;
+          thr.appendChild(cluster);
+          thr.scrollTop = thr.scrollHeight;
+        }
+        // Update sidebar preview
+        const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
+        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0, 60);
+      } else if (res.status === 403) {
+        showToast(data.error || 'Cannot send message yet — waiting for creator reply.');
+        inp.value = content; // restore content
+      }
+    } catch(e) { console.error(e); }
+    finally { if (btn) btn.disabled = false; inp.focus(); }
+  }
+
+  // ── Poll for creator reply ─────────────────────────────────
+  async function poll(linkId) {
+    if (currentCreatorHasReplied) { clearInterval(pollTimer); pollTimer = null; return; }
+    try {
+      const res  = await fetch(MSGS_URL(linkId));
+      const data = await res.json();
+      if (data.creator_has_replied) {
+        clearInterval(pollTimer); pollTimer = null;
+        currentCreatorHasReplied = true;
+
+        // Unlock UI
+        const inp = document.getElementById('dm-input');
+        const btn = document.getElementById('dm-send');
+        if (inp) {
+          inp.classList.remove('locked');
+          inp.removeAttribute('readonly');
+          inp.style.cursor = '';
+          inp.placeholder = `Message ${currentCreatorName}…`;
+          inp.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(linkId); }
+          });
+          inp.addEventListener('input', () => {
+            inp.style.height = 'auto';
+            inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
+          });
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-send-fill" style="font-size:13px;margin-left:2px;"></i>';
+          btn.title = 'Send';
+          btn.addEventListener('click', () => send(linkId));
+        }
+
+        // Remove waiting notice
+        document.getElementById('dm-waiting-notice')?.remove();
+
+        // Refresh messages
+        const msgs = data.messages || [];
+        if (msgs.length) {
+          const thr = document.getElementById('dm-thread');
+          if (thr) { thr.innerHTML = buildThread(msgs); thr.scrollTop = thr.scrollHeight; }
+        }
+
+        // Update row data attribute
+        const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
+        if (row) row.dataset.creatorHasReplied = 'true';
+
+        showToast(`${currentCreatorName} replied — you can now continue the conversation`);
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  // ── Accept / Decline (for creator-initiated requests) ─────
+  window.act = async function(action, requestId) {
+    if (!requestId) return;
+    const fd = new FormData();
+    fd.append('csrfmiddlewaretoken', CSRF);
+    fd.append('action', action);
+    const res = await fetch(ACT_URL(requestId), { method: 'POST', body: fd });
+    if (res.ok) location.reload();
+  };
+})();
 </script>
 {% endblock %}
