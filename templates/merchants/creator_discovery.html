@@ -230,7 +230,11 @@
                                 </div>
                                 <div class="d-flex gap-2">
                                     {% if creator.creator_id in pending_creator_request_ids %}
-                                        <span class="btn btn-sm btn-secondary disabled">Request sent</span>
+                                        <button class="btn btn-sm btn-danger-subtle js-withdraw-btn"
+                                            data-creator-id="{{ creator.creator_id }}"
+                                            data-creator-name="{{ creator.name }}">
+                                            Withdraw request
+                                        </button>
                                     {% else %}
                                         <button class="btn btn-sm btn-contact-creator js-contact-btn"
                                             data-creator-id="{{ creator.creator_id }}"
@@ -312,25 +316,75 @@ window.addEventListener('load', function () {
   const msgArea  = document.getElementById('contactMessage');
   const toastMsg = document.getElementById('contactToastMsg');
 
-  document.querySelectorAll('.js-contact-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeCreatorId = btn.dataset.creatorId;
-      activeBtn = btn;
-      const name   = btn.dataset.creatorName;
-      const handle = btn.dataset.creatorHandle;
-      const score  = btn.dataset.matchScore;
+  const openContactModal = (btn) => {
+    activeCreatorId = btn.dataset.creatorId;
+    activeBtn = btn;
+    const name   = btn.dataset.creatorName;
+    const handle = btn.dataset.creatorHandle;
+    const score  = btn.dataset.matchScore;
 
-      document.getElementById('contactModalLabel').textContent = `Message ${name}`;
-      document.getElementById('contactModalSub').innerHTML =
-        `<span class="me-2">${handle}</span>` +
-        (score ? `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${score}% match</span>` : '');
+    document.getElementById('contactModalLabel').textContent = `Message ${name}`;
+    document.getElementById('contactModalSub').innerHTML =
+      `<span class="me-2">${handle}</span>` +
+      (score ? `<span class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">${score}% match</span>` : '');
 
-      msgArea.value = '';
-      errBox.classList.add('d-none');
-      modal.show();
-      setTimeout(() => msgArea.focus(), 300);
+    msgArea.value = '';
+    errBox.classList.add('d-none');
+    modal.show();
+    setTimeout(() => msgArea.focus(), 300);
+  };
+
+  const bindContactButton = (btn) => {
+    if (btn.dataset.boundContact === '1') return;
+    btn.dataset.boundContact = '1';
+    btn.addEventListener('click', () => openContactModal(btn));
+  };
+
+  const bindWithdrawButton = (btn) => {
+    if (btn.dataset.boundWithdraw === '1') return;
+    btn.dataset.boundWithdraw = '1';
+    btn.addEventListener('click', async () => {
+      const creatorId = (btn.dataset.creatorId || '').toString().trim();
+      if (!creatorId) return;
+      const creatorName = btn.dataset.creatorName || 'this creator';
+      if (!window.confirm(`Withdraw your request to ${creatorName}?`)) return;
+
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Withdrawing...';
+
+      try {
+        const res = await fetch(SEND_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          body: JSON.stringify({ creator_id: creatorId, action: 'withdraw' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          btn.textContent = 'Contact creator';
+          btn.classList.remove('btn-danger-subtle', 'js-withdraw-btn');
+          btn.classList.add('btn-contact-creator', 'js-contact-btn');
+          btn.dataset.creatorHandle = data.creator_handle || btn.dataset.creatorHandle || '';
+          btn.dataset.boundWithdraw = '0';
+          btn.disabled = false;
+          bindContactButton(btn);
+          toastMsg.textContent = data.message || 'Request withdrawn.';
+          toast.show();
+        } else {
+          btn.disabled = false;
+          btn.textContent = originalText;
+          alert(data.error || 'Unable to withdraw request.');
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        alert('Network error — please try again.');
+      }
     });
-  });
+  };
+
+  document.querySelectorAll('.js-contact-btn').forEach(bindContactButton);
+  document.querySelectorAll('.js-withdraw-btn').forEach(bindWithdrawButton);
 
   sendBtn.addEventListener('click', async () => {
     const message = msgArea.value.trim();
@@ -364,11 +418,11 @@ window.addEventListener('load', function () {
       if (data.success) {
         modal.hide();
         if (activeBtn) {
-          const wrapper = document.createElement('span');
-          wrapper.className = 'btn btn-sm btn-secondary disabled';
-          wrapper.textContent = 'Request sent';
-          activeBtn.replaceWith(wrapper);
-          activeBtn = null;
+          activeBtn.textContent = 'Withdraw request';
+          activeBtn.classList.remove('btn-contact-creator', 'btn-secondary', 'js-contact-btn');
+          activeBtn.classList.add('btn-danger-subtle', 'js-withdraw-btn');
+          activeBtn.dataset.boundContact = '0';
+          bindWithdrawButton(activeBtn);
         }
         toastMsg.textContent = data.message || 'Request sent!';
         toast.show();

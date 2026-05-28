@@ -1082,10 +1082,11 @@ def merchant_send_partnership_request(request):
         return JsonResponse({"success": False, "error": "Invalid JSON payload"}, status=400)
 
     creator_id = payload.get("creator_id")
+    action = (payload.get("action") or "").strip().lower()
     opening_message = (payload.get("opening_message") or "").strip()
     campaign_type = (payload.get("campaign_type") or "").strip()
     deal_type = (payload.get("deal_type") or "").strip()
-    if not creator_id or not opening_message:
+    if not creator_id or (action != "withdraw" and not opening_message):
         return JsonResponse({"success": False, "error": "Missing required fields"}, status=400)
 
     creator = get_object_or_404(CustomUser, id=creator_id, is_creator=True)
@@ -1094,26 +1095,52 @@ def merchant_send_partnership_request(request):
         creator=creator,
         status__in=["pending", "declined"],
     ).first()
-    if existing_pending:
+
+    if action == "withdraw":
+        if not existing_pending:
+            return JsonResponse({"success": False, "error": "No active request to withdraw."}, status=400)
+        existing_pending.delete()
+        MerchantCreatorLink.objects.filter(
+            merchant=request.user,
+            creator=creator,
+            status=STATUS_REQUESTED,
+        ).update(status=STATUS_INACTIVE)
         return JsonResponse(
             {
-                "success": False,
-                "error": "You can only send one message until this creator accepts your request",
-            },
-            status=400,
+                "success": True,
+                "message": f"Request withdrawn for @{creator.username}",
+                "creator_handle": f"@{creator.username}",
+            }
         )
 
     now = timezone.now()
-    partnership_request = PartnershipRequest.objects.create(
-        merchant=request.user,
-        creator=creator,
-        message=opening_message,
-        campaign_type=campaign_type or "General",
-        deal_type=deal_type or "Flexible",
-        merchant_initiated=True,
-        status="pending",
-        last_message_at=now,
-    )
+    if existing_pending:
+        existing_pending.message = opening_message
+        existing_pending.campaign_type = campaign_type or existing_pending.campaign_type or "General"
+        existing_pending.deal_type = deal_type or existing_pending.deal_type or "Flexible"
+        existing_pending.status = "pending"
+        existing_pending.last_message_at = now
+        existing_pending.save(
+            update_fields=[
+                "message",
+                "campaign_type",
+                "deal_type",
+                "status",
+                "last_message_at",
+            ]
+        )
+        partnership_request = existing_pending
+    else:
+        partnership_request = PartnershipRequest.objects.create(
+            merchant=request.user,
+            creator=creator,
+            message=opening_message,
+            campaign_type=campaign_type or "General",
+            deal_type=deal_type or "Flexible",
+            merchant_initiated=True,
+            status="pending",
+            last_message_at=now,
+        )
     link, _ = MerchantCreatorLink.objects.get_or_create(
         merchant=request.user,
         creator=creator,
