@@ -664,13 +664,13 @@ def creator_requests(request):
     for req in requests:
         meta = getattr(req.merchant, "merchantmeta", None)
         lines = (req.message or "").splitlines()
-        campaign_type = ""
-        deal_type = ""
+        campaign_type = req.campaign_type or ""
+        deal_type = req.deal_type or ""
         clean_message_lines = []
         for line in lines:
-            if line.startswith("Campaign type:"):
+            if line.startswith("Campaign type:") and not campaign_type:
                 campaign_type = line.replace("Campaign type:", "").strip()
-            elif line.startswith("Deal type:"):
+            elif line.startswith("Deal type:") and not deal_type:
                 deal_type = line.replace("Deal type:", "").strip()
             else:
                 clean_message_lines.append(line)
