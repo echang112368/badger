@@ -142,15 +142,15 @@
 <body>
 
 <nav id="sb">
-  <a href="{% url 'creator_earnings' %}" class="sb-logo">
+  <a href="{% url 'creator_dashboard' %}" class="sb-logo">
     <img src="{% static 'img/transparent-logo2.png' %}" alt="Badger" style="height:28px;filter:brightness(0) invert(1);max-width:160px;object-fit:contain;">
   </a>
   <div class="sb-section">Creator</div>
 
   {% with request.resolver_match.url_name as cur %}
   <ul class="sb-nav">
-    <li><a href="{% url 'creator_earnings' %}"
-        class="{% if cur == 'creator_earnings' %}sb-active{% endif %}">
+    <li><a href="{% url 'creator_dashboard' %}"
+        class="{% if cur == 'creator_dashboard' %}sb-active{% endif %}">
       <i class="bi bi-speedometer2"></i> Dashboard
     </a></li>
     <li><a href="{% url 'creator_social_media' %}"
@@ -160,6 +160,10 @@
     <li><a href="{% url 'creator_affiliate_companies' %}"
         class="{% if cur == 'creator_affiliate_companies' %}sb-active{% endif %}">
       <i class="bi bi-people"></i> Partnerships
+    </a></li>
+    <li><a href="{% url 'creator_marketplace' %}"
+        class="{% if cur == 'creator_marketplace' %}sb-active{% endif %}">
+      <i class="bi bi-shop"></i> Marketplace
     </a></li>
     <li><a href="{% url 'creator_profile' %}"
         class="{% if cur == 'creator_profile' %}sb-active{% endif %}">
