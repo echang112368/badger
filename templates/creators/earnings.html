@@ -1,5 +1,5 @@
 {% extends 'creators/base.html' %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Earnings{% endblock %}
 {% block content %}
 <section class="my-4">
     <style>
@@ -18,7 +18,7 @@
             }
         }
     </style>
-    <h1 class="fw-bold fs-3 mb-4">Dashboard</h1>
+    <h1 class="fw-bold fs-3 mb-4">Earnings</h1>
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm rounded h-100">
@@ -93,16 +93,16 @@
                     </div>
                     <div class="row text-center text-md-start">
                         <div class="col-md-4 metric-divider">
-                            <p class="fs-3 fw-semibold mb-0">0</p>
+                            <p class="fs-3 fw-semibold mb-0">{{ performance.clicks }}</p>
                             <p class="text-muted mb-0">Links Clicked</p>
                         </div>
                         <div class="col-md-4 metric-divider">
-                            <p class="fs-3 fw-semibold mb-0">0</p>
+                            <p class="fs-3 fw-semibold mb-0">{{ performance.conversions }}</p>
                             <p class="text-muted mb-0">Conversions</p>
                         </div>
                         <div class="col-md-4">
-                            <p class="fs-3 fw-semibold mb-0">$0.00</p>
-                            <p class="text-muted mb-0">0% conversion rate</p>
+                            <p class="fs-3 fw-semibold mb-0">{{ performance.conversion_rate|floatformat:2 }}%</p>
+                            <p class="text-muted mb-0">Conversion rate</p>
                         </div>
                     </div>
                 </div>
@@ -117,12 +117,12 @@
                     </div>
                     <div class="row text-center text-md-start">
                         <div class="col-md-6 metric-divider">
-                            <p class="fs-3 fw-semibold mb-0">0</p>
-                            <p class="text-muted mb-0">Links Clicked</p>
+                            <p class="fs-3 fw-semibold mb-0">{{ performance.active_links }}</p>
+                            <p class="text-muted mb-0">Active Links</p>
                         </div>
                         <div class="col-md-6">
-                            <p class="fs-3 fw-semibold mb-0">$0.00</p>
-                            <p class="text-muted mb-0">0% from last 30 days</p>
+                            <p class="fs-3 fw-semibold mb-0">${{ last_30_days_earnings|floatformat:2 }}</p>
+                            <p class="text-muted mb-0">Last 30 days</p>
                         </div>
                     </div>
                 </div>
