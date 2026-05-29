@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import requests
@@ -30,6 +31,8 @@ REQUEST_TIMEOUT_SECONDS = 15
 GRAPH_BASE_URL = get_instagram_api_base()
 INSTAGRAM_LOGIN_INSIGHTS_BASE_URL = "https://graph.instagram.com/v25.0"
 INSTAGRAM_DEBUG_LOGGING = getattr(settings, "INSTAGRAM_DEBUG_LOGGING", False)
+SOCIAL_ANALYTICS_RESYNC_INTERVAL = timedelta(hours=24)
+logger = logging.getLogger(__name__)
 
 ACCOUNT_INSIGHT_METRICS = [
     "reach",
@@ -193,9 +196,29 @@ class InstagramAnalyticsService:
             snapshot.payload = payload
             snapshot.save(update_fields=["payload", "synced_at"])
 
+        account = payload.get("account") if isinstance(payload, dict) else {}
+        update_fields = ["last_synced_at", "instagram_user_id"]
         connection.last_synced_at = now
         connection.instagram_user_id = ig_user_id
-        connection.save(update_fields=["last_synced_at", "instagram_user_id"])
+
+        if isinstance(account, dict):
+            username = account.get("username")
+            if username:
+                connection.instagram_username = username
+                update_fields.append("instagram_username")
+
+            if account.get("followers_count") is not None:
+                connection.followers_count = int(account.get("followers_count") or 0)
+                update_fields.append("followers_count")
+
+            if account.get("media_count") is not None:
+                connection.media_count = int(account.get("media_count") or 0)
+                update_fields.append("media_count")
+
+            connection.raw_profile_data = account
+            update_fields.append("raw_profile_data")
+
+        connection.save(update_fields=update_fields)
         return payload
 
     def fetch_account(self, connection: InstagramConnection, ig_user_id: str) -> dict[str, Any]:
@@ -943,9 +966,30 @@ class SocialDashboardService:
     def build_dashboard(self, refresh_platform: str | None = None, force_reanalyze: bool = False) -> dict[str, Any]:
         platforms: list[PlatformDashboardData] = []
         for slug, service in self.registry.items():
-            should_refresh = refresh_platform == slug
-            should_reanalyze = force_reanalyze and should_refresh
-            platforms.append(service.build_platform_data(refresh=should_refresh, force_reanalyze=should_reanalyze))
+            manual_refresh = refresh_platform == slug
+            should_refresh = manual_refresh or self._platform_needs_resync(slug)
+            should_reanalyze = force_reanalyze and manual_refresh
+            try:
+                platforms.append(
+                    service.build_platform_data(
+                        refresh=should_refresh,
+                        force_reanalyze=should_reanalyze,
+                    )
+                )
+            except Exception:
+                if manual_refresh:
+                    raise
+                logger.warning(
+                    "Unable to auto-resync stale social analytics",
+                    exc_info=True,
+                    extra={"user_id": self.user.id, "platform": slug},
+                )
+                platforms.append(
+                    service.build_platform_data(
+                        refresh=False,
+                        force_reanalyze=should_reanalyze,
+                    )
+                )
 
         placeholders = [
             PlatformDashboardData(
@@ -975,6 +1019,38 @@ class SocialDashboardService:
             "overall": overall,
             "platforms": platforms + placeholders,
         }
+
+    def refresh_stale_platforms(self) -> list[PlatformDashboardData]:
+        refreshed_platforms: list[PlatformDashboardData] = []
+        for slug, service in self.registry.items():
+            if self._platform_needs_resync(slug):
+                refreshed_platforms.append(service.build_platform_data(refresh=True))
+        return refreshed_platforms
+
+    def _platform_needs_resync(self, platform: str) -> bool:
+        last_synced_at = self._platform_last_synced_at(platform)
+        return (
+            last_synced_at is None
+            or last_synced_at <= timezone.now() - SOCIAL_ANALYTICS_RESYNC_INTERVAL
+        )
+
+    def _platform_last_synced_at(self, platform: str) -> datetime | None:
+        if platform == SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM:
+            connection = getattr(self.user, "instagram_connection", None)
+            if connection is None:
+                connection = InstagramConnection.objects.filter(user=self.user).first()
+            if not connection:
+                return None
+            if connection.last_synced_at:
+                return connection.last_synced_at
+
+        snapshot = SocialAnalyticsSnapshot.objects.filter(
+            user=self.user,
+            platform=platform,
+        ).first()
+        if snapshot:
+            return snapshot.synced_at
+        return None
 
     def _build_overall_summary(self, platforms: list[PlatformDashboardData]) -> dict[str, Any]:
         connected = [platform for platform in platforms if platform.connected]

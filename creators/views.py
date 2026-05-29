@@ -1239,6 +1239,16 @@ def creator_settings(request):
         creator_meta.save()
         return redirect("creator_settings")
 
+    if request.method == "GET":
+        try:
+            SocialDashboardService(request.user).refresh_stale_platforms()
+        except Exception:
+            logger.warning(
+                "Unable to auto-resync social analytics for settings page",
+                exc_info=True,
+                extra={"user_id": request.user.id},
+            )
+
     instagram_connection = getattr(request.user, "instagram_connection", None)
 
     return render(
