@@ -9,8 +9,49 @@
       border: 0;
       overflow: hidden;
     }
-    .hero-card .progress { height: 10px; background: rgba(255,255,255,.18); }
-    .hero-card .progress-bar { background: #f5c518; }
+    .hero-card .progress { height: 12px; background: rgba(255,255,255,.18); }
+    .hero-card .progress-bar { background: linear-gradient(90deg, #f5c518, #ffe08a); }
+    .setup-panel {
+      background: rgba(255,255,255,.11);
+      border: 1px solid rgba(255,255,255,.14);
+      backdrop-filter: blur(8px);
+    }
+    .setup-step {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 0;
+      border-top: 1px solid rgba(255,255,255,.12);
+    }
+    .setup-step:first-of-type { border-top: 0; }
+    .setup-step-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      background: rgba(255,255,255,.14);
+      color: #fff;
+    }
+    .setup-step.complete .setup-step-icon {
+      background: rgba(25,135,84,.95);
+    }
+    .setup-step.current .setup-step-icon {
+      background: #f5c518;
+      color: #131720;
+      box-shadow: 0 0 0 5px rgba(245,197,24,.18);
+    }
+    .setup-step-action {
+      color: #f5c518;
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .setup-step-action:hover { color: #ffe08a; }
     .dashboard-card {
       border: 0;
       border-radius: 18px;
@@ -78,19 +119,48 @@
           <a class="btn btn-warning fw-semibold" href="{% url next_action.url_name %}">{{ next_action.cta }}</a>
         </div>
         <div class="col-lg-5">
-          <div class="bg-white bg-opacity-10 rounded-4 p-4">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <span class="fw-semibold">Creator setup</span>
-              <span class="fw-bold">{{ profile.completeness_pct }}%</span>
+          <div class="setup-panel rounded-4 p-4">
+            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+              <div>
+                <p class="text-uppercase small fw-bold text-white-50 mb-1">Launch plan</p>
+                <h3 class="fs-4 fw-bold mb-1">Creator setup</h3>
+                <p class="small text-white-50 mb-0">{{ setup.complete_count }} of {{ setup.total_count }} steps complete</p>
+              </div>
+              <span class="display-6 fw-bold lh-1">{{ profile.completeness_pct }}%</span>
             </div>
-            <div class="progress mb-3" role="progressbar" aria-label="Creator profile completeness" aria-valuenow="{{ profile.completeness_pct }}" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress mb-3" role="progressbar" aria-label="Creator setup progress" aria-valuenow="{{ profile.completeness_pct }}" aria-valuemin="0" aria-valuemax="100">
               <div class="progress-bar" style="width: {{ profile.completeness_pct }}%"></div>
             </div>
-            {% if profile.missing_items %}
-              <p class="small mb-0 text-white-50">Missing: {% for item in profile.missing_items|slice:':3' %}{{ item.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            {% if setup.current_step %}
+              <div class="bg-dark bg-opacity-25 rounded-3 p-3 mb-2">
+                <p class="small text-white-50 mb-1">Next setup step</p>
+                <div class="d-flex align-items-center justify-content-between gap-3">
+                  <strong>{{ setup.current_step.title }}</strong>
+                  <a class="btn btn-sm btn-warning fw-semibold" href="{% url setup.current_step.url_name %}">{{ setup.current_step.cta }}</a>
+                </div>
+              </div>
             {% else %}
-              <p class="small mb-0 text-white-50">Your core creator profile is complete.</p>
+              <div class="bg-success bg-opacity-25 rounded-3 p-3 mb-2">
+                <strong>Setup complete.</strong>
+                <span class="small text-white-50 d-block">You are ready to focus on partnerships and earnings.</span>
+              </div>
             {% endif %}
+            <div aria-label="Creator setup checklist">
+              {% for step in setup.steps %}
+                <div class="setup-step {{ step.state }}">
+                  <span class="setup-step-icon">
+                    {% if step.complete %}<i class="bi bi-check-lg"></i>{% else %}{{ step.number }}{% endif %}
+                  </span>
+                  <span>
+                    <span class="d-block fw-semibold">{{ step.title }}</span>
+                    <span class="d-block small text-white-50">{{ step.helper }}</span>
+                  </span>
+                  {% if not step.complete %}
+                    <a class="setup-step-action" href="{% url step.url_name %}">{{ step.cta }}</a>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
           </div>
         </div>
       </div>
@@ -146,8 +216,8 @@
       <div class="card dashboard-card h-100">
         <div class="card-body p-4">
           <div class="d-flex align-items-center justify-content-between mb-3">
-            <h2 class="fs-4 fw-bold mb-0">What to do next</h2>
-            <span class="small-pill">{{ checklist|length }} open</span>
+            <h2 class="fs-4 fw-bold mb-0">Action queue</h2>
+            <span class="small-pill">{{ checklist|length }} recommended</span>
           </div>
           <div class="d-grid gap-3">
             {% for item in checklist %}
