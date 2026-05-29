@@ -141,7 +141,7 @@ class MerchantSettingsTests(TestCase):
 
     @patch("merchants.views._attempt_shopify_webhook_registration")
     @patch("merchants.views.shopify_billing.refresh_active_subscriptions")
-    def test_billing_tab_eager_loads_shopify_network_calls(
+    def test_removed_billing_tab_falls_back_without_shopify_network_calls(
         self,
         mock_refresh_active_subscriptions,
         mock_attempt_shopify_webhook_registration,
@@ -165,10 +165,28 @@ class MerchantSettingsTests(TestCase):
         response = self.client.get(reverse("merchant_settings"), {"tab": "billing"})
 
         self.assertEqual(response.status_code, 200)
-        mock_refresh_active_subscriptions.assert_called_once()
-        mock_attempt_shopify_webhook_registration.assert_called_once()
+        self.assertEqual(response.context["active_tab"], "profile")
+        mock_refresh_active_subscriptions.assert_not_called()
+        mock_attempt_shopify_webhook_registration.assert_not_called()
 
-    def test_updates_shopify_store_domain(self):
+    def test_removed_settings_tabs_are_not_displayed(self):
+        user = CustomUser.objects.create_user(
+            username="merchant_removed_tabs",
+            password="pass",
+            email="merchant_removed_tabs@example.com",
+            is_merchant=True,
+        )
+        self.client.force_login(user)
+        response = self.client.get(reverse("merchant_settings"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-tab="profile"')
+        self.assertNotContains(response, 'data-tab="billing"')
+        self.assertNotContains(response, 'data-tab="notifications"')
+        self.assertNotContains(response, 'data-tab="integrations"')
+        self.assertNotContains(response, 'data-tab="api"')
+
+    def test_settings_ignores_removed_shopify_store_domain_field(self):
         user = CustomUser.objects.create_user(
             username="merchant", password="pass", email="merchant1@example.com", is_merchant=True
         )
@@ -186,10 +204,10 @@ class MerchantSettingsTests(TestCase):
         self.assertRedirects(response, reverse("merchant_settings"))
 
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.shopify_store_domain, "example.myshopify.com")
+        self.assertEqual(meta.shopify_store_domain, "")
 
 
-    def test_rejects_invalid_shopify_store_domain(self):
+    def test_settings_ignores_invalid_removed_shopify_store_domain_field(self):
         user = CustomUser.objects.create_user(
             username="merchant_invalid", password="pass", email="merchant_invalid@example.com", is_merchant=True
         )
@@ -204,9 +222,9 @@ class MerchantSettingsTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        form = response.context["settings_form"]
-        self.assertIn("shopify_store_domain", form.errors)
+        self.assertRedirects(response, reverse("merchant_settings"))
+        meta = MerchantMeta.objects.get(user=user)
+        self.assertEqual(meta.shopify_store_domain, "")
 
     def test_shopify_store_domain_locked_for_shopify_merchants(self):
         user = CustomUser.objects.create_user(
@@ -310,9 +328,7 @@ class MerchantSettingsTests(TestCase):
                 "billing_plan": MerchantMeta.BillingPlan.BADGER_CREATOR,
             },
         )
-        self.assertRedirects(
-            response, f"{reverse('merchant_settings')}?tab=api"
-        )
+        self.assertRedirects(response, reverse("merchant_settings"))
         meta = MerchantMeta.objects.get(user=user)
         self.assertEqual(meta.shopify_store_domain, "tabstore.myshopify.com")
 
@@ -340,12 +356,10 @@ class MerchantSettingsTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(
-            response.context["active_tab"], "api"
-        )
+        self.assertEqual(response.context["active_tab"], "profile")
         self.assertIn("first_name", response.context["user_form"].errors)
 
-    def test_enabling_shopify_without_token_redirects_to_oauth(self):
+    def test_settings_ignores_removed_business_type_field(self):
         user = CustomUser.objects.create_user(
             username="merchant_shopify",
             password="pass123",
@@ -372,8 +386,9 @@ class MerchantSettingsTests(TestCase):
             },
         )
         meta.refresh_from_db()
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse("merchant_settings"))
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.INDEPENDENT)
+        self.assertEqual(meta.shopify_store_domain, "")
 
     @patch("merchants.views.register_orders_create_webhook")
     @patch("merchants.views.shopify_billing.create_or_update_recurring_charge")
