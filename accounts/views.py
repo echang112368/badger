@@ -115,6 +115,28 @@ def business_signup_view(request):
         form = BusinessSignUpForm()
     return render(request, 'accounts/business_signup.html', {'form': form})
 
+def _parse_niches_simple(raw, max_niches=20, max_len=50):
+    import json
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    seen, result = set(), []
+    for item in payload:
+        if not isinstance(item, str):
+            continue
+        tag = " ".join(item.strip().split())[:max_len]
+        if not tag or tag.lower() in seen or len(result) >= max_niches:
+            continue
+        seen.add(tag.lower())
+        result.append(tag)
+    return result
+
+
 def creator_signup_view(request):
     if request.method == 'POST':
         form = CreatorSignUpForm(request.POST)
@@ -123,6 +145,10 @@ def creator_signup_view(request):
             user.is_creator = True
             user.is_active = True
             user.save()
+            niches = _parse_niches_simple(request.POST.get("niches"))
+            if niches:
+                from creators.models import CreatorMeta
+                CreatorMeta.objects.update_or_create(user=user, defaults={"niches": niches})
             send_user_verification_email(user)
             _remember_verification_user(request, user)
             messages.success(
