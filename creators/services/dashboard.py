@@ -110,6 +110,97 @@ def _profile_missing_items(creator_meta: CreatorMeta) -> list[dict[str, str]]:
     ]
 
 
+def _build_setup_steps(
+    creator_meta: CreatorMeta,
+    missing_items: list[dict[str, str]],
+    social: dict[str, Any],
+    performance: dict[str, Any],
+) -> list[dict[str, Any]]:
+    profile_complete = not missing_items
+    social_connected = bool(social["connected"])
+    analyzer_complete = social_connected and social.get("ai_score") is not None
+    marketplace_visible = bool(creator_meta.marketplace_enabled)
+    first_link_created = performance["active_links"] > 0
+
+    raw_steps = [
+        {
+            "title": "Profile basics",
+            "description": "Tell brands what you create, where you are based, and who you reach.",
+            "url_name": "creator_profile",
+            "cta": "Finish profile",
+            "complete": profile_complete,
+            "icon": "bi-person-lines-fill",
+            "helper": (
+                "Ready for merchant review"
+                if profile_complete
+                else f"{len(missing_items)} detail{'s' if len(missing_items) != 1 else ''} left"
+            ),
+        },
+        {
+            "title": "Connect socials",
+            "description": "Link Instagram so Badger can verify audience signals and content fit.",
+            "url_name": "creator_social_media",
+            "cta": "Connect Instagram",
+            "complete": social_connected,
+            "icon": "bi-instagram",
+            "helper": (
+                f"@{social['username']} connected"
+                if social_connected and social.get("username")
+                else "Not connected"
+            ),
+        },
+        {
+            "title": "Get AI readiness tips",
+            "description": "Review analyzer feedback before you pitch or respond to brand requests.",
+            "url_name": "creator_social_media",
+            "cta": "Run analyzer",
+            "complete": analyzer_complete,
+            "icon": "bi-stars",
+            "helper": (
+                f"Score {social['ai_score']}/100"
+                if analyzer_complete
+                else "Analyzer waiting on social data"
+            ),
+        },
+        {
+            "title": "Publish to marketplace",
+            "description": "Turn on discoverability so brands can invite you into partnerships.",
+            "url_name": "creator_marketplace",
+            "cta": "Publish profile",
+            "complete": marketplace_visible,
+            "icon": "bi-shop-window",
+            "helper": (
+                "Visible to merchants"
+                if marketplace_visible
+                else "Hidden from marketplace"
+            ),
+        },
+        {
+            "title": "Create first link",
+            "description": "Choose an offer and generate a trackable link to start earning.",
+            "url_name": "creator_marketplace",
+            "cta": "Find an offer",
+            "complete": first_link_created,
+            "icon": "bi-link-45deg",
+            "helper": (
+                f"{performance['active_links']} active link{'s' if performance['active_links'] != 1 else ''}"
+                if first_link_created
+                else "No active links yet"
+            ),
+        },
+    ]
+
+    for index, step in enumerate(raw_steps, start=1):
+        step["number"] = index
+        step["state"] = "complete" if step["complete"] else "upcoming"
+
+    current_step = next((step for step in raw_steps if not step["complete"]), None)
+    if current_step:
+        current_step["state"] = "current"
+
+    return raw_steps
+
+
 def _social_summary(user) -> dict[str, Any]:
     connection = getattr(user, "instagram_connection", None)
     if connection is None:
@@ -340,7 +431,10 @@ def build_creator_dashboard_context(user) -> dict[str, Any]:
         partnerships,
         performance,
     )
-    completeness_pct = round(creator_meta.profile_completeness_score * 100)
+    setup_steps = _build_setup_steps(creator_meta, missing_items, social, performance)
+    setup_complete_count = sum(1 for step in setup_steps if step["complete"])
+    current_setup_step = next((step for step in setup_steps if not step["complete"]), None)
+    completeness_pct = round((setup_complete_count / len(setup_steps)) * 100) if setup_steps else 100
     next_action = checklist[0] if checklist else {
         "title": "Keep growing your partnerships",
         "description": "Your creator setup looks ready. Monitor requests, links, and social insights to optimize earnings.",
@@ -355,6 +449,13 @@ def build_creator_dashboard_context(user) -> dict[str, Any]:
             "marketplace_enabled": creator_meta.marketplace_enabled,
             "skills_count": len([skill for skill in (creator_meta.content_skills or []) if skill]),
             "social_profiles_count": len(creator_meta.social_media_profiles or []),
+        },
+        "setup": {
+            "steps": setup_steps,
+            "complete_count": setup_complete_count,
+            "total_count": len(setup_steps),
+            "current_step": current_setup_step,
+            "is_complete": current_setup_step is None,
         },
         "social": social,
         "partnerships": partnerships,

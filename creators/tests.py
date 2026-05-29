@@ -701,3 +701,32 @@ class InstagramMetricsModuleTests(SimpleTestCase):
         self.assertTrue(cards)
         self.assertIn("title", cards[0])
         self.assertIn("metric_name", cards[0])
+
+
+class CreatorDashboardSetupTests(TestCase):
+    def test_dashboard_setup_guides_creator_through_next_incomplete_step(self):
+        user = CustomUser.objects.create_user(
+            username="creator_setup",
+            password="pass",
+            email="creator_setup@example.com",
+            is_creator=True,
+        )
+        meta = CreatorMeta.objects.get(user=user)
+        meta.social_media_platform = "Instagram"
+        meta.follower_range = "10K-25K"
+        meta.country = "United States"
+        meta.content_languages = "English"
+        meta.content_skills = ["Reels", "UGC"]
+        meta.save()
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("creator_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Launch plan")
+        self.assertContains(response, "1 of 5 steps complete")
+        self.assertContains(response, "Next setup step")
+        self.assertContains(response, "Connect socials")
+        self.assertContains(response, "Ready for merchant review")
+        self.assertContains(response, "Not connected")
+        self.assertContains(response, "Action queue")
