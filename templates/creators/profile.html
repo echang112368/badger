@@ -85,6 +85,26 @@
       </div>
     </div>
     <div class="bg-white shadow-sm rounded-lg p-6">
+      <h2 class="text-lg font-semibold text-gray-900">Content Niches</h2>
+      <p class="text-sm text-gray-500 mb-4">Add the content categories you create in. These are used by the AI analyzer to score your profile fit for brand partnerships.</p>
+
+      <div id="niche-tags-wrap"
+           class="flex flex-wrap gap-2 items-center min-h-[44px] px-3 py-2 rounded-md border border-gray-300 cursor-text focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500 bg-white"
+           onclick="document.getElementById('niche-text-input').focus()">
+        <div id="niche-chips" class="flex flex-wrap gap-2"></div>
+        <input
+          id="niche-text-input"
+          type="text"
+          placeholder="e.g. Fashion, Beauty, Fitness…"
+          autocomplete="off"
+          class="flex-1 min-w-[160px] border-none outline-none text-sm text-gray-800 bg-transparent placeholder-gray-400"
+        />
+      </div>
+      <p class="mt-1 text-xs text-gray-400">Press <kbd class="px-1 py-0.5 bg-gray-100 rounded text-gray-500">Enter</kbd> or <kbd class="px-1 py-0.5 bg-gray-100 rounded text-gray-500">,</kbd> to add a niche. Up to 20 tags, 50 characters each.</p>
+      <input type="hidden" name="niches" id="nichesHidden" value="{{ niches_json|escapejs }}">
+    </div>
+
+    <div class="bg-white shadow-sm rounded-lg p-6">
       <h2 class="text-lg font-semibold text-gray-900">Brand Partnership History</h2>
       <p class="text-sm text-gray-500">Share past deal data so monetization scoring can evaluate proven conversion performance.</p>
       <div class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -117,15 +137,79 @@
 </div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
+    // ── Short pitch counter ──
     const pitchField = document.getElementById('shortPitch');
     const pitchCount = document.getElementById('shortPitchCount');
-
     function updatePitchCount() {
       pitchCount.textContent = `${pitchField.value.length}/240`;
     }
-
     pitchField.addEventListener('input', updatePitchCount);
     updatePitchCount();
+
+    // ── Niche tag input ──
+    const MAX_NICHES = 20;
+    const MAX_TAG_LEN = 50;
+    const hiddenInput = document.getElementById('nichesHidden');
+    const chipsWrap   = document.getElementById('niche-chips');
+    const textInput   = document.getElementById('niche-text-input');
+
+    let niches = [];
+    try { niches = JSON.parse(hiddenInput.value || '[]'); } catch(e) {}
+    if (!Array.isArray(niches)) niches = [];
+
+    function sync() {
+      hiddenInput.value = JSON.stringify(niches);
+    }
+
+    function renderChips() {
+      chipsWrap.innerHTML = '';
+      niches.forEach(function(tag, i) {
+        const chip = document.createElement('span');
+        chip.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200';
+        chip.innerHTML = `${tag.replace(/</g,'&lt;')} <button type="button" data-i="${i}" aria-label="Remove ${tag}" class="ml-0.5 text-indigo-400 hover:text-indigo-600 font-bold leading-none">×</button>`;
+        chipsWrap.appendChild(chip);
+      });
+    }
+
+    chipsWrap.addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-i]');
+      if (!btn) return;
+      niches.splice(parseInt(btn.dataset.i, 10), 1);
+      renderChips();
+      sync();
+    });
+
+    function addTag(raw) {
+      const tag = raw.trim().slice(0, MAX_TAG_LEN);
+      if (!tag) return;
+      if (niches.length >= MAX_NICHES) return;
+      const lower = tag.toLowerCase();
+      if (niches.some(n => n.toLowerCase() === lower)) return;
+      niches.push(tag);
+      renderChips();
+      sync();
+    }
+
+    textInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        addTag(textInput.value.replace(/,/g, ''));
+        textInput.value = '';
+      } else if (e.key === 'Backspace' && textInput.value === '' && niches.length > 0) {
+        niches.pop();
+        renderChips();
+        sync();
+      }
+    });
+
+    textInput.addEventListener('blur', function() {
+      if (textInput.value.trim()) {
+        addTag(textInput.value);
+        textInput.value = '';
+      }
+    });
+
+    renderChips();
   });
 </script>
 {% endblock %}

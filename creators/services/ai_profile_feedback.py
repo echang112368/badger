@@ -65,7 +65,7 @@ def build_ai_profile_feedback(
     profile_payload = {
         "inputs": {
             "platform": platform,
-            "niche": (creator_meta.short_pitch if creator_meta else "") or "general",
+            "niche": ", ".join(getattr(creator_meta, "niches", None) or []) or "general",
             "follower_count": _safe_int(account.get("followers_count")),
             "engagement_rate_pct": _safe_float(summary_metrics.get("average_engagement_rate")),
             "posting_frequency": _safe_float(summary_metrics.get("post_frequency_weekly")),

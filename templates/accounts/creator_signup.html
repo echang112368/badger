@@ -21,9 +21,78 @@
   <p class="auth-subtext">Tell us about your craft so brands can discover and collaborate with you.</p>
 {% endblock %}
 
+{% block form_fields %}
+  {{ block.super }}
+  <div class="form-field">
+    <label for="niche-text-input-signup">Content Niches <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+    <div id="niche-wrap-signup"
+         style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 13px;border:1px solid rgba(203,213,225,0.9);border-radius:14px;background:rgba(255,255,255,0.9);min-height:46px;cursor:text;"
+         onclick="document.getElementById('niche-text-input-signup').focus()">
+      <div id="niche-chips-signup" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <input id="niche-text-input-signup" type="text" placeholder="e.g. Fashion, Beauty…"
+             autocomplete="off"
+             style="border:none;outline:none;background:transparent;font-size:14px;flex:1;min-width:120px;padding:2px 0;color:#111827;">
+    </div>
+    <div class="helptext">Press Enter or comma to add. You can edit these later in your profile.</div>
+    <input type="hidden" name="niches" id="nichesHiddenSignup" value="[]">
+  </div>
+{% endblock %}
+
 {% block submit_label %}Create creator account{% endblock %}
 
 {% block footer %}
   Already have an account?
   <a href="{% url 'login' %}">Log in</a>
+{% endblock %}
+
+{% block form_actions %}
+  {{ block.super }}
+  <script>
+    (function() {
+      const MAX = 20, MAX_LEN = 50;
+      const hidden  = document.getElementById('nichesHiddenSignup');
+      const chips   = document.getElementById('niche-chips-signup');
+      const inp     = document.getElementById('niche-text-input-signup');
+      let tags = [];
+
+      function chipStyle(tag, i) {
+        return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500;background:rgba(252,217,101,0.25);color:#5b4100;border:1px solid rgba(252,217,101,0.5);">${tag.replace(/</g,'&lt;')} <button type="button" data-i="${i}" style="border:none;background:none;cursor:pointer;font-size:14px;color:#a07000;line-height:1;padding:0;">×</button></span>`;
+      }
+
+      function render() {
+        chips.innerHTML = tags.map(chipStyle).join('');
+        hidden.value = JSON.stringify(tags);
+      }
+
+      chips.addEventListener('click', function(e) {
+        const btn = e.target.closest('button[data-i]');
+        if (!btn) return;
+        tags.splice(parseInt(btn.dataset.i, 10), 1);
+        render();
+      });
+
+      function addTag(raw) {
+        const tag = raw.trim().replace(/,+$/, '').trim().slice(0, MAX_LEN);
+        if (!tag || tags.length >= MAX) return;
+        if (tags.some(t => t.toLowerCase() === tag.toLowerCase())) return;
+        tags.push(tag);
+        render();
+      }
+
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          addTag(inp.value.replace(/,/g, ''));
+          inp.value = '';
+        } else if (e.key === 'Backspace' && inp.value === '' && tags.length > 0) {
+          tags.pop();
+          render();
+        }
+      });
+
+      inp.addEventListener('blur', function() {
+        if (inp.value.trim()) { addTag(inp.value); inp.value = ''; }
+      });
+    })();
+  </script>
 {% endblock %}

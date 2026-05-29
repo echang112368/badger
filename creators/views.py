@@ -772,6 +772,33 @@ def _parse_content_skills(raw_value, max_skills=20):
     return skills
 
 
+def _parse_niches(raw_value, max_niches=20, max_tag_length=50):
+    if not raw_value:
+        return []
+    try:
+        payload = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+    niches = []
+    seen = set()
+    for item in payload:
+        if not isinstance(item, str):
+            continue
+        cleaned = " ".join(item.strip().split())
+        if not cleaned or len(cleaned) > max_tag_length:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        niches.append(cleaned)
+        seen.add(key)
+        if len(niches) >= max_niches:
+            break
+    return niches
+
+
 def _parse_social_media_profiles(post_data):
     platforms = post_data.getlist("platform")
     follower_ranges = post_data.getlist("platform_follower_range")
@@ -1290,6 +1317,7 @@ def creator_profile(request):
         content_languages = request.POST.get("content_languages", "").strip()
         social_media_profiles = _parse_social_media_profiles(request.POST)
         content_skills = _parse_content_skills(request.POST.get("content_skills"))
+        niches = _parse_niches(request.POST.get("niches"))
         paid_brand_deals_count = _safe_non_negative_int(request.POST.get("paid_brand_deals_count", "0"))
         gifted_brand_deals_count = _safe_non_negative_int(request.POST.get("gifted_brand_deals_count", "0"))
         affiliate_brand_deals_count = _safe_non_negative_int(request.POST.get("affiliate_brand_deals_count", "0"))
@@ -1305,6 +1333,7 @@ def creator_profile(request):
             creator_meta.content_languages = content_languages
             creator_meta.social_media_profiles = social_media_profiles
             creator_meta.content_skills = content_skills
+            creator_meta.niches = niches
             creator_meta.paid_brand_deals_count = paid_brand_deals_count
             creator_meta.gifted_brand_deals_count = gifted_brand_deals_count
             creator_meta.affiliate_brand_deals_count = affiliate_brand_deals_count
@@ -1336,6 +1365,8 @@ def creator_profile(request):
                 creator_meta.social_media_profiles
             ),
             "content_skills": creator_meta.content_skills or [],
+            "niches": creator_meta.niches or [],
+            "niches_json": json.dumps(creator_meta.niches or []),
             "social_platform_options": SOCIAL_PLATFORM_OPTIONS,
             "follower_range_options": FOLLOWER_RANGE_OPTIONS,
         },
