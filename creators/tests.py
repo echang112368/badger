@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -5,8 +6,10 @@ from urllib.parse import urlparse
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import CustomUser
+from instagram_connect.models import InstagramConnection
 from .models import CreatorMeta
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
@@ -30,7 +33,7 @@ from .services.instagram_metrics import (
     safe_divide,
     standard_deviation,
 )
-from .services.social_dashboard import InstagramAnalyticsService
+from .services.social_dashboard import InstagramAnalyticsService, SocialDashboardService
 
 
 class CreatorProfileTests(TestCase):
@@ -701,6 +704,69 @@ class InstagramMetricsModuleTests(SimpleTestCase):
         self.assertTrue(cards)
         self.assertIn("title", cards[0])
         self.assertIn("metric_name", cards[0])
+
+
+class SocialDashboardAutoResyncTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="auto_resync_creator",
+            email="auto_resync_creator@example.com",
+            password="pass123",
+            is_creator=True,
+        )
+        self.connection = InstagramConnection.objects.create(
+            user=self.user,
+            instagram_user_id="178900000000001",
+            instagram_username="creator",
+            instagram_access_token="token",
+            access_token="token",
+            followers_count=10,
+            media_count=2,
+            last_synced_at=timezone.now(),
+        )
+
+    def _payload(self):
+        payload = InstagramAnalyticsService(self.user).empty_metrics()
+        payload["account"] = {
+            "id": self.connection.instagram_user_id,
+            "username": self.connection.instagram_username,
+            "followers_count": self.connection.followers_count,
+            "media_count": self.connection.media_count,
+        }
+        return payload
+
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_dashboard_auto_resyncs_connected_platform_after_24_hours(self, mock_fetch_and_cache):
+        self.connection.last_synced_at = timezone.now() - timedelta(hours=25)
+        self.connection.save(update_fields=["last_synced_at"])
+        mock_fetch_and_cache.return_value = self._payload()
+
+        dashboard = SocialDashboardService(self.user).build_dashboard()
+
+        self.assertTrue(dashboard["platforms"][0].refreshed)
+        mock_fetch_and_cache.assert_called_once()
+
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_dashboard_keeps_fresh_platform_cached_until_24_hours(self, mock_fetch_and_cache):
+        self.connection.last_synced_at = timezone.now() - timedelta(hours=23, minutes=59)
+        self.connection.save(update_fields=["last_synced_at"])
+
+        dashboard = SocialDashboardService(self.user).build_dashboard()
+
+        self.assertFalse(dashboard["platforms"][0].refreshed)
+        mock_fetch_and_cache.assert_not_called()
+
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_settings_page_triggers_stale_social_resync(self, mock_fetch_and_cache):
+        self.connection.last_synced_at = timezone.now() - timedelta(days=2)
+        self.connection.save(update_fields=["last_synced_at"])
+        mock_fetch_and_cache.return_value = self._payload()
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("creator_settings"))
+
+        self.assertEqual(response.status_code, 200)
+        mock_fetch_and_cache.assert_called_once()
 
 
 class CreatorDashboardSetupTests(TestCase):
