@@ -202,25 +202,7 @@
   </div>
 
   <div class="row g-4">
-    <div class="col-lg-7">
-      <div class="card dashboard-card h-100">
-        <div class="card-body p-4">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h2 class="fs-4 fw-bold mb-0">Performance snapshot</h2>
-            <a href="{% url 'creator_earnings' %}" class="small fw-semibold">Detailed earnings</a>
-          </div>
-          <div class="row g-3 text-center text-md-start">
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.total|floatformat:2 }}</p><p class="small text-muted mb-0">Total earnings</p></div>
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.pending|floatformat:2 }}</p><p class="small text-muted mb-0">Pending</p></div>
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.last_30_days|floatformat:2 }}</p><p class="small text-muted mb-0">Last 30 days</p></div>
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.clicks }}</p><p class="small text-muted mb-0">Clicks</p></div>
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.conversions }}</p><p class="small text-muted mb-0">Conversions</p></div>
-            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.conversion_rate|floatformat:2 }}%</p><p class="small text-muted mb-0">Conversion rate</p></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-5">
+    <div class="col-12">
       <div class="card dashboard-card h-100">
         <div class="card-body p-4">
           <h2 class="fs-4 fw-bold mb-3">Recent activity</h2>
