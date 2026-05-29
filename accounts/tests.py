@@ -32,7 +32,6 @@ class BusinessSignupTests(TestCase):
         response = self.client.post(
             reverse("business_signup"),
             {
-                "business_name": "Merchant Signup Co",
                 "username": "merchant_signup",
                 "first_name": "Merchant",
                 "last_name": "User",
@@ -52,37 +51,13 @@ class BusinessSignupTests(TestCase):
 
         user = CustomUser.objects.get(username="merchant_signup")
         meta = MerchantMeta.objects.get(user=user)
-        self.assertEqual(meta.company_name, "Merchant Signup Co")
         self.assertEqual(meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
         self.assertEqual(meta.shopify_store_domain, "merchant-shop.myshopify.com")
-
-
-    def test_business_signup_requires_business_name(self):
-        response = self.client.post(
-            reverse("business_signup"),
-            {
-                "business_name": "",
-                "username": "missing_business_name",
-                "first_name": "Merchant",
-                "last_name": "User",
-                "email": "missing_business_name@example.com",
-                "password1": "strongpass123",
-                "password2": "strongpass123",
-                "business_type": MerchantMeta.BusinessType.INDEPENDENT,
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        form = response.context["form"]
-        self.assertFalse(form.is_valid())
-        self.assertIn("business_name", form.errors)
-        self.assertFalse(CustomUser.objects.filter(username="missing_business_name").exists())
 
     def test_shopify_business_signup_requires_store_url(self):
         response = self.client.post(
             reverse("business_signup"),
             {
-                "business_name": "Missing URL Co",
                 "username": "shopify_missing_url",
                 "first_name": "Shop",
                 "last_name": "Owner",
@@ -106,7 +81,6 @@ class BusinessSignupTests(TestCase):
         response = self.client.post(
             reverse("business_signup"),
             {
-                "business_name": "Shopify Signup Co",
                 "username": "shopify_signup",
                 "first_name": "Shopify",
                 "last_name": "Owner",
@@ -132,7 +106,6 @@ class BusinessSignupTests(TestCase):
         response = self.client.post(
             reverse("business_signup"),
             {
-                "business_name": "Weak Password Co",
                 "username": "weakpassmerchant",
                 "first_name": "Weak",
                 "last_name": "Password",
@@ -153,7 +126,6 @@ class BusinessSignupTests(TestCase):
         response = self.client.post(
             reverse("business_signup"),
             {
-                "business_name": "Mismatch Merchant Co",
                 "username": "mismatchmerchant",
                 "first_name": "Mismatch",
                 "last_name": "Password",
