@@ -30,8 +30,21 @@ from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 from .services.social_dashboard import SocialDashboardService
 from .services.dashboard import build_creator_dashboard_context
+from .services.ai_profile_feedback import refresh_ai_score_if_stale
+
+import threading
 
 logger = logging.getLogger(__name__)
+
+
+def _trigger_ai_refresh(user_id: int) -> None:
+    """Fire-and-forget: refresh the AI score in a background thread."""
+    t = threading.Thread(
+        target=refresh_ai_score_if_stale,
+        args=(user_id,),
+        daemon=True,
+    )
+    t.start()
 
 def disp(message: str) -> None:
     print(message, flush=True)
@@ -1298,6 +1311,7 @@ def creator_profile(request):
             creator_meta.avg_sponsored_conversion_rate_pct = avg_sponsored_conversion_rate_pct
             creator_meta.partnership_history_notes = partnership_history_notes
             creator_meta.save()
+            _trigger_ai_refresh(request.user.pk)
             return redirect("creator_profile")
     else:
         user_form = UserNameForm(instance=request.user)
