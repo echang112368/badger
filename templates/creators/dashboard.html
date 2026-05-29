@@ -3,55 +3,6 @@
 {% block content %}
 <section class="creator-dashboard my-4">
   <style>
-    .hero-card {
-      background: linear-gradient(135deg, #131720 0%, #24345d 58%, #304f91 100%);
-      color: #fff;
-      border: 0;
-      overflow: hidden;
-    }
-    .hero-card .progress { height: 12px; background: rgba(255,255,255,.18); }
-    .hero-card .progress-bar { background: linear-gradient(90deg, #f5c518, #ffe08a); }
-    .setup-panel {
-      background: rgba(255,255,255,.11);
-      border: 1px solid rgba(255,255,255,.14);
-      backdrop-filter: blur(8px);
-    }
-    .setup-step {
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      gap: 12px;
-      align-items: start;
-      padding: 12px 0;
-      border-top: 1px solid rgba(255,255,255,.12);
-    }
-    .setup-step:first-of-type { border-top: 0; }
-    .setup-step-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      background: rgba(255,255,255,.14);
-      color: #fff;
-    }
-    .setup-step.complete .setup-step-icon {
-      background: rgba(25,135,84,.95);
-    }
-    .setup-step.current .setup-step-icon {
-      background: #f5c518;
-      color: #131720;
-      box-shadow: 0 0 0 5px rgba(245,197,24,.18);
-    }
-    .setup-step-action {
-      color: #f5c518;
-      font-size: 12px;
-      font-weight: 800;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .setup-step-action:hover { color: #ffe08a; }
     .dashboard-card {
       border: 0;
       border-radius: 18px;
@@ -105,65 +56,6 @@
     </div>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-primary" href="{% url 'creator_earnings' %}"><i class="bi bi-cash-coin me-1"></i>Earnings detail</a>
-      <a class="btn btn-primary" href="{% url next_action.url_name %}">{{ next_action.cta }}</a>
-    </div>
-  </div>
-
-  <div class="card dashboard-card hero-card mb-4">
-    <div class="card-body p-4 p-lg-5">
-      <div class="row g-4 align-items-center">
-        <div class="col-lg-7">
-          <span class="small-pill bg-warning text-dark mb-3"><i class="bi bi-lightning-charge-fill"></i> Next best action</span>
-          <h2 class="fw-bold mb-2">{{ next_action.title }}</h2>
-          <p class="mb-4 text-white-50">{{ next_action.description }}</p>
-          <a class="btn btn-warning fw-semibold" href="{% url next_action.url_name %}">{{ next_action.cta }}</a>
-        </div>
-        <div class="col-lg-5">
-          <div class="setup-panel rounded-4 p-4">
-            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-              <div>
-                <p class="text-uppercase small fw-bold text-white-50 mb-1">Launch plan</p>
-                <h3 class="fs-4 fw-bold mb-1">Creator setup</h3>
-                <p class="small text-white-50 mb-0">{{ setup.complete_count }} of {{ setup.total_count }} steps complete</p>
-              </div>
-              <span class="display-6 fw-bold lh-1">{{ profile.completeness_pct }}%</span>
-            </div>
-            <div class="progress mb-3" role="progressbar" aria-label="Creator setup progress" aria-valuenow="{{ profile.completeness_pct }}" aria-valuemin="0" aria-valuemax="100">
-              <div class="progress-bar" style="width: {{ profile.completeness_pct }}%"></div>
-            </div>
-            {% if setup.current_step %}
-              <div class="bg-dark bg-opacity-25 rounded-3 p-3 mb-2">
-                <p class="small text-white-50 mb-1">Next setup step</p>
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                  <strong>{{ setup.current_step.title }}</strong>
-                  <a class="btn btn-sm btn-warning fw-semibold" href="{% url setup.current_step.url_name %}">{{ setup.current_step.cta }}</a>
-                </div>
-              </div>
-            {% else %}
-              <div class="bg-success bg-opacity-25 rounded-3 p-3 mb-2">
-                <strong>Setup complete.</strong>
-                <span class="small text-white-50 d-block">You are ready to focus on partnerships and earnings.</span>
-              </div>
-            {% endif %}
-            <div aria-label="Creator setup checklist">
-              {% for step in setup.steps %}
-                <div class="setup-step {{ step.state }}">
-                  <span class="setup-step-icon">
-                    {% if step.complete %}<i class="bi bi-check-lg"></i>{% else %}{{ step.number }}{% endif %}
-                  </span>
-                  <span>
-                    <span class="d-block fw-semibold">{{ step.title }}</span>
-                    <span class="d-block small text-white-50">{{ step.helper }}</span>
-                  </span>
-                  {% if not step.complete %}
-                    <a class="setup-step-action" href="{% url step.url_name %}">{{ step.cta }}</a>
-                  {% endif %}
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -216,25 +108,39 @@
       <div class="card dashboard-card h-100">
         <div class="card-body p-4">
           <div class="d-flex align-items-center justify-content-between mb-3">
-            <h2 class="fs-4 fw-bold mb-0">Action queue</h2>
-            <span class="small-pill">{{ checklist|length }} recommended</span>
+            <h2 class="fs-4 fw-bold mb-0">Tasks</h2>
+            {% with pending_count=tasks|length %}
+              {% if pending_count %}
+                <span class="small-pill">{{ pending_count }} item{{ pending_count|pluralize }}</span>
+              {% endif %}
+            {% endwith %}
           </div>
-          <div class="d-grid gap-3">
-            {% for item in checklist %}
-              <div class="checklist-item d-flex align-items-start gap-3">
-                <i class="bi bi-circle text-primary mt-1"></i>
-                <div class="flex-grow-1">
-                  <h3 class="fs-6 fw-semibold mb-1">{{ item.title }}</h3>
-                  <p class="small text-muted mb-2">{{ item.description }}</p>
-                  <a href="{% url item.url_name %}" class="small fw-semibold">{{ item.cta }}</a>
+          <div class="d-grid gap-2">
+            {% for task in tasks %}
+              {% if task.complete %}
+                <div class="checklist-item d-flex align-items-start gap-3" style="background:#f8faf8;border-color:rgba(25,135,84,.15);">
+                  <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+                  <div class="flex-grow-1">
+                    <h3 class="fs-6 fw-semibold mb-0 text-muted" style="text-decoration:line-through;">{{ task.title }}</h3>
+                    <p class="small text-muted mb-0">Completed {{ task.completed_at|timesince }} ago</p>
+                  </div>
                 </div>
-              </div>
+              {% else %}
+                <div class="checklist-item d-flex align-items-start gap-3">
+                  <i class="bi {{ task.icon }} text-primary mt-1 flex-shrink-0"></i>
+                  <div class="flex-grow-1">
+                    <h3 class="fs-6 fw-semibold mb-1">{{ task.title }}</h3>
+                    <p class="small text-muted mb-1">{{ task.description }}</p>
+                    <a href="{% url task.url_name %}" class="small fw-semibold">{{ task.cta }}</a>
+                  </div>
+                </div>
+              {% endif %}
             {% empty %}
-              <div class="checklist-item d-flex align-items-start gap-3">
+              <div class="checklist-item d-flex align-items-start gap-3" style="background:#f8faf8;">
                 <i class="bi bi-check-circle-fill text-success mt-1"></i>
                 <div>
-                  <h3 class="fs-6 fw-semibold mb-1">Setup complete</h3>
-                  <p class="small text-muted mb-0">You are ready to focus on partnerships, content, and earnings growth.</p>
+                  <h3 class="fs-6 fw-semibold mb-1">All caught up!</h3>
+                  <p class="small text-muted mb-0">No pending tasks. Keep growing your partnerships and earnings.</p>
                 </div>
               </div>
             {% endfor %}
