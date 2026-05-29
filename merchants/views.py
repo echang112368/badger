@@ -134,8 +134,7 @@ def _creator_card_payload(meta: CreatorMeta) -> dict:
     }
 
 
-_SETTINGS_TABS = {"profile", "billing", "notifications", "integrations", "api", "team"}
-_SHOPIFY_EAGER_SETTINGS_TABS = {"billing"}
+_SETTINGS_TABS = {"profile", "team"}
 SHOPIFY_BILLING_STATUS_TTL = timedelta(minutes=5)
 SHOPIFY_PENDING_STATUS_REFRESH_WINDOW = timedelta(minutes=10)
 
@@ -2159,9 +2158,13 @@ def merchant_settings(request):
             if not permissions.can_edit_settings:
                 return HttpResponseForbidden()
             post_data = request.POST.copy()
-            if not permissions.can_manage_api:
-                post_data["shopify_store_domain"] = merchant_meta.shopify_store_domain
-            form = MerchantSettingsForm(post_data, instance=merchant_meta)
+            post_data["paypal_email"] = merchant_meta.paypal_email
+            post_data["billing_plan"] = merchant_meta.billing_plan
+            post_data["business_type"] = merchant_meta.business_type
+            post_data["shopify_store_domain"] = merchant_meta.shopify_store_domain
+            form = MerchantSettingsForm(
+                post_data, instance=merchant_meta, require_billing_details=False
+            )
             user_form = UserNameForm(post_data, instance=merchant_user)
             form_valid = form.is_valid()
             user_form_valid = user_form.is_valid()
@@ -2200,21 +2203,6 @@ def merchant_settings(request):
     shopify_plan_price = getattr(merchant_meta, "monthly_fee", None)
     if not shopify_plan_price or Decimal(shopify_plan_price) <= 0:
         shopify_plan_price = Decimal("30.00")
-    should_eager_load_shopify_state = active_tab in _SHOPIFY_EAGER_SETTINGS_TABS
-    if should_eager_load_shopify_state and _should_refresh_shopify_billing(request, merchant_meta):
-        try:
-            shopify_billing.refresh_active_subscriptions(
-                merchant_meta,
-                expected_plan_name=shopify_billing.expected_shopify_plan_name(merchant_meta),
-            )
-        except shopify_billing.ShopifyReauthorizationRequired:
-            logger.warning(
-                "Shopify billing refresh requires reauthorization for %s.",
-                merchant_meta.shopify_store_domain,
-            )
-        except shopify_billing.ShopifyBillingError:
-            logger.exception("Failed to refresh Shopify billing status for settings view.")
-
     shopify_plan_active = (
         merchant_meta.shopify_billing_status == "ACTIVE"
         and merchant_meta.shopify_billing_plan == merchant_meta.billing_plan
@@ -2225,9 +2213,6 @@ def merchant_settings(request):
         shop_domain = normalise_shop_domain(merchant_meta.shopify_store_domain)
         if shop_domain:
             shopify_cancel_url = f"https://{shop_domain}/admin/settings/billing"
-    if should_eager_load_shopify_state and shopify_plan_active and shop_domain:
-        _attempt_shopify_webhook_registration(request, merchant_meta, shop_domain)
-
     return render(request, 'merchants/settings.html', {
         'merchant': merchant_user,
         'merchant_meta': merchant_meta,
