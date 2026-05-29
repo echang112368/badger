@@ -1,0 +1,245 @@
+{% extends 'creators/base.html' %}
+{% block title %}Creator Dashboard{% endblock %}
+{% block content %}
+<section class="creator-dashboard my-4">
+  <style>
+    .hero-card {
+      background: linear-gradient(135deg, #131720 0%, #24345d 58%, #304f91 100%);
+      color: #fff;
+      border: 0;
+      overflow: hidden;
+    }
+    .hero-card .progress { height: 10px; background: rgba(255,255,255,.18); }
+    .hero-card .progress-bar { background: #f5c518; }
+    .dashboard-card {
+      border: 0;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(19, 23, 32, .08);
+    }
+    .stat-icon {
+      width: 42px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 14px;
+      background: rgba(48,79,145,.1);
+      color: #304f91;
+      font-size: 20px;
+    }
+    .checklist-item {
+      border: 1px solid rgba(19,23,32,.08);
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+    .small-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(48,79,145,.1);
+      color: #304f91;
+    }
+    .activity-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f6fb;
+      color: #304f91;
+      flex: 0 0 auto;
+    }
+  </style>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <p class="text-muted fw-semibold mb-1">Creator command center</p>
+      <h1 class="fw-bold fs-3 mb-0">Welcome back, {{ request.user.first_name|default:request.user.username }}</h1>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-primary" href="{% url 'creator_earnings' %}"><i class="bi bi-cash-coin me-1"></i>Earnings detail</a>
+      <a class="btn btn-primary" href="{% url next_action.url_name %}">{{ next_action.cta }}</a>
+    </div>
+  </div>
+
+  <div class="card dashboard-card hero-card mb-4">
+    <div class="card-body p-4 p-lg-5">
+      <div class="row g-4 align-items-center">
+        <div class="col-lg-7">
+          <span class="small-pill bg-warning text-dark mb-3"><i class="bi bi-lightning-charge-fill"></i> Next best action</span>
+          <h2 class="fw-bold mb-2">{{ next_action.title }}</h2>
+          <p class="mb-4 text-white-50">{{ next_action.description }}</p>
+          <a class="btn btn-warning fw-semibold" href="{% url next_action.url_name %}">{{ next_action.cta }}</a>
+        </div>
+        <div class="col-lg-5">
+          <div class="bg-white bg-opacity-10 rounded-4 p-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="fw-semibold">Creator setup</span>
+              <span class="fw-bold">{{ profile.completeness_pct }}%</span>
+            </div>
+            <div class="progress mb-3" role="progressbar" aria-label="Creator profile completeness" aria-valuenow="{{ profile.completeness_pct }}" aria-valuemin="0" aria-valuemax="100">
+              <div class="progress-bar" style="width: {{ profile.completeness_pct }}%"></div>
+            </div>
+            {% if profile.missing_items %}
+              <p class="small mb-0 text-white-50">Missing: {% for item in profile.missing_items|slice:':3' %}{{ item.label }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            {% else %}
+              <p class="small mb-0 text-white-50">Your core creator profile is complete.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-card h-100"><div class="card-body">
+        <div class="stat-icon mb-3"><i class="bi bi-person-badge"></i></div>
+        <h3 class="fs-6 text-muted">Profile Health</h3>
+        <p class="fs-3 fw-bold mb-1">{{ profile.completeness_pct }}%</p>
+        <p class="small text-muted mb-3">{{ profile.skills_count }} skills · {{ profile.social_profiles_count }} social profiles</p>
+        <a href="{% url 'creator_profile' %}" class="small fw-semibold">Improve profile</a>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-card h-100"><div class="card-body">
+        <div class="stat-icon mb-3"><i class="bi bi-instagram"></i></div>
+        <h3 class="fs-6 text-muted">Instagram / AI</h3>
+        {% if social.connected %}
+          <p class="fs-5 fw-bold mb-1">@{{ social.username|default:'connected' }}</p>
+          <p class="small text-muted mb-3">{% if social.ai_score %}AI score {{ social.ai_score }}/100{% else %}Analyzer ready{% endif %}</p>
+        {% else %}
+          <p class="fs-5 fw-bold mb-1">Not connected</p>
+          <p class="small text-muted mb-3">Connect to unlock insights.</p>
+        {% endif %}
+        <a href="{% url 'creator_social_media' %}" class="small fw-semibold">View social media</a>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-card h-100"><div class="card-body">
+        <div class="stat-icon mb-3"><i class="bi bi-handshake"></i></div>
+        <h3 class="fs-6 text-muted">Partnerships</h3>
+        <p class="fs-3 fw-bold mb-1">{{ partnerships.pending_count }}</p>
+        <p class="small text-muted mb-3">pending · {{ partnerships.active_count }} active</p>
+        <a href="{% url 'creator_requests' %}" class="small fw-semibold">Review requests</a>
+      </div></div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+      <div class="card dashboard-card h-100"><div class="card-body">
+        <div class="stat-icon mb-3"><i class="bi bi-shop"></i></div>
+        <h3 class="fs-6 text-muted">Marketplace</h3>
+        <p class="fs-5 fw-bold mb-1">{% if profile.marketplace_enabled %}Visible{% else %}Hidden{% endif %}</p>
+        <p class="small text-muted mb-3">{{ performance.active_links }} active affiliate links</p>
+        <a href="{% url 'creator_marketplace' %}" class="small fw-semibold">Open marketplace</a>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-7">
+      <div class="card dashboard-card h-100">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="fs-4 fw-bold mb-0">What to do next</h2>
+            <span class="small-pill">{{ checklist|length }} open</span>
+          </div>
+          <div class="d-grid gap-3">
+            {% for item in checklist %}
+              <div class="checklist-item d-flex align-items-start gap-3">
+                <i class="bi bi-circle text-primary mt-1"></i>
+                <div class="flex-grow-1">
+                  <h3 class="fs-6 fw-semibold mb-1">{{ item.title }}</h3>
+                  <p class="small text-muted mb-2">{{ item.description }}</p>
+                  <a href="{% url item.url_name %}" class="small fw-semibold">{{ item.cta }}</a>
+                </div>
+              </div>
+            {% empty %}
+              <div class="checklist-item d-flex align-items-start gap-3">
+                <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                <div>
+                  <h3 class="fs-6 fw-semibold mb-1">Setup complete</h3>
+                  <p class="small text-muted mb-0">You are ready to focus on partnerships, content, and earnings growth.</p>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card dashboard-card h-100">
+        <div class="card-body p-4">
+          <h2 class="fs-4 fw-bold mb-3">Social insight</h2>
+          {% if social.connected %}
+            <p class="text-muted mb-2">Instagram connected{% if social.last_synced_at %} · synced {{ social.last_synced_at|timesince }} ago{% endif %}</p>
+            {% if social.ai_score %}
+              <div class="d-flex align-items-end gap-2 mb-2"><span class="display-6 fw-bold">{{ social.ai_score }}</span><span class="text-muted mb-2">/100</span></div>
+              <p class="fw-semibold mb-1">{{ social.ai_verdict|default:'AI profile feedback available' }}</p>
+              <p class="small text-muted">{{ social.ai_summary|default:'Open Social Media to review the full analyzer.' }}</p>
+              {% if social.top_actions %}
+                <ul class="small text-muted ps-3 mb-0">
+                  {% for action in social.top_actions|slice:':2' %}
+                    <li>{{ action.title|default:action }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            {% else %}
+              <p class="text-muted">Run the analyzer from the Social Media page to bring your latest AI score here.</p>
+            {% endif %}
+          {% else %}
+            <p class="text-muted">Connect Instagram to show follower count, synced status, AI score, and top recommendations here.</p>
+            <a class="btn btn-outline-primary" href="{% url 'creator_social_media' %}">Connect Instagram</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card dashboard-card h-100">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="fs-4 fw-bold mb-0">Performance snapshot</h2>
+            <a href="{% url 'creator_earnings' %}" class="small fw-semibold">Detailed earnings</a>
+          </div>
+          <div class="row g-3 text-center text-md-start">
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.total|floatformat:2 }}</p><p class="small text-muted mb-0">Total earnings</p></div>
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.pending|floatformat:2 }}</p><p class="small text-muted mb-0">Pending</p></div>
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">${{ earnings.last_30_days|floatformat:2 }}</p><p class="small text-muted mb-0">Last 30 days</p></div>
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.clicks }}</p><p class="small text-muted mb-0">Clicks</p></div>
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.conversions }}</p><p class="small text-muted mb-0">Conversions</p></div>
+            <div class="col-6 col-md-4"><p class="fs-4 fw-bold mb-0">{{ performance.conversion_rate|floatformat:2 }}%</p><p class="small text-muted mb-0">Conversion rate</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card dashboard-card h-100">
+        <div class="card-body p-4">
+          <h2 class="fs-4 fw-bold mb-3">Recent activity</h2>
+          <div class="d-grid gap-3">
+            {% for activity in recent_activity %}
+              <a href="{% url activity.url_name %}" class="text-decoration-none text-reset d-flex gap-3">
+                <span class="activity-icon"><i class="bi {{ activity.icon }}"></i></span>
+                <span>
+                  <span class="d-block fw-semibold">{{ activity.title }}</span>
+                  <span class="d-block small text-muted">{{ activity.description }} · {{ activity.timestamp|timesince }} ago</span>
+                </span>
+              </a>
+            {% empty %}
+              <p class="text-muted mb-0">Partnership requests, conversions, and payout updates will appear here.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

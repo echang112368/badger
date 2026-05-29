@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import logging
 import json
 import re
@@ -9,15 +9,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
-from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
-
 from .models import CreatorMeta
 from .models import PartnerMessage
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
-from collect.utils import compute_commission_schedule
-
 from links.models import (
     MerchantCreatorLink,
     PartnershipRequest,
@@ -33,8 +28,8 @@ from shopify_app.shopify_client import ShopifyClient
 from shopify_app.token_management import refresh_shopify_token
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
-from instagram_connect.models import InstagramConnection
 from .services.social_dashboard import SocialDashboardService
+from .services.dashboard import build_creator_dashboard_context
 
 logger = logging.getLogger(__name__)
 
@@ -42,64 +37,27 @@ def disp(message: str) -> None:
     print(message, flush=True)
 
 @login_required
+def creator_dashboard(request):
+    context = build_creator_dashboard_context(request.user)
+    return render(request, "creators/dashboard.html", context)
+
+
+@login_required
 def creator_earnings(request):
     entries = LedgerEntry.objects.filter(creator=request.user).order_by("-timestamp")
-    conversions = ReferralConversion.objects.filter(creator=request.user).select_related(
-        "merchant"
-    )
-    now = timezone.now()
-    pending_earnings = Decimal("0")
-    available_earnings = Decimal("0")
-    last_30_days_start = now - timedelta(days=30)
-    last_30_days_earnings = Decimal("0")
-    monthly_totals = {}
-
-    for conversion in conversions:
-        breakdown = compute_commission_schedule(conversion, conversion.merchant)
-        for commission, return_days in breakdown:
-            if commission <= 0:
-                continue
-            release_date = conversion.created_at + timedelta(days=return_days)
-            if now >= release_date:
-                available_earnings += commission
-                month_bucket = conversion.created_at.date().replace(day=1)
-                monthly_totals[month_bucket] = (
-                    monthly_totals.get(month_bucket, Decimal("0")) + commission
-                )
-                if conversion.created_at >= last_30_days_start:
-                    last_30_days_earnings += commission
-            else:
-                pending_earnings += commission
-
-    balance = pending_earnings.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    now = timezone.now()
-    year = now.year
-    month = now.month
-    months = []
-    for _ in range(12):
-        months.append(date(year, month, 1))
-        if month == 1:
-            month = 12
-            year -= 1
-        else:
-            month -= 1
-    months.reverse()
-    earnings_labels = [m.strftime("%b %Y") for m in months]
-    earnings_totals = [float(monthly_totals.get(m, Decimal("0"))) for m in months]
-    total_earnings = available_earnings.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    last_30_days_earnings = last_30_days_earnings.quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
+    dashboard_context = build_creator_dashboard_context(request.user)
+    earnings = dashboard_context["earnings"]
     return render(
         request,
         "creators/earnings.html",
         {
-            "balance": balance,
+            "balance": earnings.pending,
             "ledger_entries": entries,
-            "earnings_labels": earnings_labels,
-            "earnings_totals": earnings_totals,
-            "total_earnings": float(total_earnings),
-            "last_30_days_earnings": float(last_30_days_earnings),
+            "earnings_labels": earnings.labels,
+            "earnings_totals": earnings.totals,
+            "total_earnings": float(earnings.total),
+            "last_30_days_earnings": float(earnings.last_30_days),
+            "performance": dashboard_context["performance"],
         },
     )
 
