@@ -126,9 +126,6 @@ class MerchantSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        company_name_field = self.fields.get("company_name")
-        if company_name_field:
-            company_name_field.required = True
         if self.instance and self.instance.pk:
             business_type_field = self.fields.get("business_type")
             if business_type_field:
@@ -148,12 +145,6 @@ class MerchantSettingsForm(forms.ModelForm):
             if shopify_field:
                 shopify_field.disabled = True
                 shopify_field.help_text = "Your Shopify store URL is locked after it is linked."
-
-    def clean_company_name(self):
-        company_name = (self.cleaned_data.get("company_name") or "").strip()
-        if not company_name:
-            raise forms.ValidationError("Business name is required.")
-        return company_name
 
     def clean_shopify_store_domain(self):
         """Normalize the Shopify domain to its hostname."""

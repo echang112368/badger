@@ -140,23 +140,6 @@
     {{ hidden }}
   {% endfor %}
 
-  {% with field=form.business_name %}
-    <div class="form-field{% if field.errors %} has-error{% endif %}">
-      <label for="{{ field.id_for_label }}">{{ field.label }} <span aria-hidden="true">*</span></label>
-      {{ field }}
-      {% if field.help_text %}
-        <div class="helptext">{{ field.help_text|safe }}</div>
-      {% endif %}
-      {% if field.errors %}
-        <ul class="errorlist">
-          {% for error in field.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
-  {% endwith %}
-
   {% with field=form.username %}
     <div class="form-field{% if field.errors %} has-error{% endif %}">
       <label for="{{ field.id_for_label }}">{{ field.label }}</label>

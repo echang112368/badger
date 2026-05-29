@@ -100,7 +100,6 @@ def business_signup_view(request):
             MerchantMeta.objects.update_or_create(
                 user=user,
                 defaults={
-                    "company_name": form.cleaned_data["business_name"],
                     "business_type": form.cleaned_data["business_type"],
                     "shopify_store_domain": shopify_domain,
                 },
