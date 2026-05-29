@@ -17,6 +17,7 @@ from links.models import (
     MerchantCreatorLink,
     PartnershipRequest,
     REQUEST_STATUS_ACCEPTED,
+    REQUEST_STATUS_DECLINED,
     REQUEST_STATUS_PENDING,
     STATUS_ACTIVE,
     STATUS_REQUESTED,
@@ -297,87 +298,122 @@ def _performance_summary(user, creator_meta: CreatorMeta) -> dict[str, Any]:
     }
 
 
-def _build_checklist(
+def _build_tasks(
     creator_meta: CreatorMeta,
     missing_items: list[dict[str, str]],
     social: dict[str, Any],
-    partnerships: dict[str, Any],
     performance: dict[str, Any],
+    user,
 ) -> list[dict[str, Any]]:
-    checklist = []
-    if missing_items:
-        remaining_count = len(missing_items) - 1
-        detail_copy = missing_items[0]["label"].lower()
-        if remaining_count:
-            detail_copy = f"{detail_copy} and {remaining_count} more profile details"
-        checklist.append(
-            {
-                "title": "Complete your creator profile",
-                "description": f"Add {detail_copy} so merchants can evaluate you faster.",
-                "url_name": "creator_profile",
-                "cta": "Improve profile",
-                "complete": False,
-                "priority": 10,
-            }
-        )
-    if not social["connected"]:
-        checklist.append(
-            {
-                "title": "Connect Instagram",
-                "description": "Unlock social insights, profile health signals, and AI recommendations for brand readiness.",
-                "url_name": "creator_social_media",
-                "cta": "Connect social",
-                "complete": False,
-                "priority": 20,
-            }
-        )
-    elif social.get("ai_score") is None:
-        checklist.append(
-            {
-                "title": "Run your social profile analyzer",
-                "description": "Refresh the Social Media page to generate AI feedback from your connected Instagram data.",
-                "url_name": "creator_social_media",
-                "cta": "View analyzer",
-                "complete": False,
-                "priority": 30,
-            }
-        )
-    if not creator_meta.marketplace_enabled:
-        checklist.append(
-            {
-                "title": "Enable marketplace visibility",
-                "description": "Make your profile discoverable to merchants looking for creator partners.",
-                "url_name": "creator_marketplace",
-                "cta": "Open marketplace",
-                "complete": False,
-                "priority": 40,
-            }
-        )
-    if partnerships["pending_count"]:
-        checklist.append(
-            {
-                "title": "Review pending partnership requests",
-                "description": f"You have {partnerships['pending_count']} request(s) waiting for a response.",
-                "url_name": "creator_requests",
-                "cta": "Review requests",
-                "complete": False,
-                "priority": 5,
-            }
-        )
-    if performance["active_links"] == 0:
-        checklist.append(
-            {
-                "title": "Create your first affiliate link",
-                "description": "Browse marketplace opportunities or accept a partnership to start sharing products.",
-                "url_name": "creator_marketplace",
-                "cta": "Find merchants",
-                "complete": False,
-                "priority": 50,
-            }
-        )
+    now = timezone.now()
+    cutoff_24h = now - timedelta(hours=24)
+    tasks: list[dict[str, Any]] = []
 
-    checklist.sort(key=lambda item: item["priority"])
-    return checklist[:5]
+    # ── Setup milestone tasks (only incomplete) ──
+    if missing_items:
+        remaining = len(missing_items) - 1
+        detail = missing_items[0]["label"].lower()
+        if remaining:
+            detail = f"{detail} and {remaining} more detail{'s' if remaining != 1 else ''}"
+        tasks.append({
+            "type": "setup",
+            "icon": "bi-person-lines-fill",
+            "title": "Complete your creator profile",
+            "description": f"Add {detail} so merchants can evaluate you faster.",
+            "url_name": "creator_profile",
+            "cta": "Finish profile",
+            "complete": False,
+            "priority": 10,
+        })
+
+    if not social["connected"]:
+        tasks.append({
+            "type": "setup",
+            "icon": "bi-instagram",
+            "title": "Connect Instagram",
+            "description": "Unlock AI insights and social signals for brand readiness.",
+            "url_name": "creator_social_media",
+            "cta": "Connect now",
+            "complete": False,
+            "priority": 20,
+        })
+    elif social.get("ai_score") is None:
+        tasks.append({
+            "type": "setup",
+            "icon": "bi-stars",
+            "title": "Run your AI analyzer",
+            "description": "Generate AI feedback from your connected Instagram data.",
+            "url_name": "creator_social_media",
+            "cta": "Run analyzer",
+            "complete": False,
+            "priority": 30,
+        })
+
+    if not creator_meta.marketplace_enabled:
+        tasks.append({
+            "type": "setup",
+            "icon": "bi-shop-window",
+            "title": "Publish to marketplace",
+            "description": "Make your profile discoverable to merchants looking for creator partners.",
+            "url_name": "creator_marketplace",
+            "cta": "Publish profile",
+            "complete": False,
+            "priority": 40,
+        })
+
+    if performance["active_links"] == 0:
+        tasks.append({
+            "type": "setup",
+            "icon": "bi-link-45deg",
+            "title": "Create your first affiliate link",
+            "description": "Browse marketplace opportunities or accept a partnership to start sharing products.",
+            "url_name": "creator_marketplace",
+            "cta": "Find offers",
+            "complete": False,
+            "priority": 50,
+        })
+
+    # ── Partnership request tasks (one task per request) ──
+    for req in PartnershipRequest.objects.filter(
+        creator=user,
+        status=REQUEST_STATUS_PENDING,
+    ).select_related("merchant", "merchant__merchantmeta").order_by("-created_at"):
+        meta = getattr(req.merchant, "merchantmeta", None)
+        company = (meta and getattr(meta, "company_name", None)) or req.merchant.username
+        tasks.append({
+            "type": "partnership_request",
+            "icon": "bi-envelope-paper",
+            "title": f"Partnership request from {company}",
+            "description": "Review and accept or decline this partnership request.",
+            "url_name": "creator_requests",
+            "cta": "Review request",
+            "complete": False,
+            "priority": 5,
+        })
+
+    # ── Recently actioned requests (completed within 24h) ──
+    for req in PartnershipRequest.objects.filter(
+        creator=user,
+        status__in=[REQUEST_STATUS_ACCEPTED, REQUEST_STATUS_DECLINED],
+        updated_at__gte=cutoff_24h,
+    ).select_related("merchant", "merchant__merchantmeta").order_by("-updated_at"):
+        meta = getattr(req.merchant, "merchantmeta", None)
+        company = (meta and getattr(meta, "company_name", None)) or req.merchant.username
+        verb = "Accepted" if req.status == REQUEST_STATUS_ACCEPTED else "Declined"
+        tasks.append({
+            "type": "partnership_request_done",
+            "icon": "bi-check-circle",
+            "title": f"{verb} request from {company}",
+            "description": f"Partnership request {req.status}.",
+            "url_name": "creator_requests",
+            "cta": "View",
+            "complete": True,
+            "completed_at": req.updated_at,
+            "priority": 200,
+        })
+
+    tasks.sort(key=lambda t: t["priority"])
+    return tasks
 
 
 def _recent_activity(user) -> list[dict[str, Any]]:
@@ -424,18 +460,13 @@ def build_creator_dashboard_context(user) -> dict[str, Any]:
     social = _social_summary(user)
     partnerships = _partnership_summary(user)
     performance = _performance_summary(user, creator_meta)
-    checklist = _build_checklist(
-        creator_meta,
-        missing_items,
-        social,
-        partnerships,
-        performance,
-    )
+    tasks = _build_tasks(creator_meta, missing_items, social, performance, user)
     setup_steps = _build_setup_steps(creator_meta, missing_items, social, performance)
     setup_complete_count = sum(1 for step in setup_steps if step["complete"])
     current_setup_step = next((step for step in setup_steps if not step["complete"]), None)
     completeness_pct = round((setup_complete_count / len(setup_steps)) * 100) if setup_steps else 100
-    next_action = checklist[0] if checklist else {
+    first_pending = next((t for t in tasks if not t["complete"]), None)
+    next_action = first_pending if first_pending else {
         "title": "Keep growing your partnerships",
         "description": "Your creator setup looks ready. Monitor requests, links, and social insights to optimize earnings.",
         "url_name": "creator_marketplace",
@@ -461,7 +492,7 @@ def build_creator_dashboard_context(user) -> dict[str, Any]:
         "partnerships": partnerships,
         "performance": performance,
         "earnings": earnings,
-        "checklist": checklist,
+        "tasks": tasks,
         "next_action": next_action,
         "recent_activity": _recent_activity(user),
     }
