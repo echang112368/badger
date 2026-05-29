@@ -50,13 +50,6 @@ class CustomLoginForm(AuthenticationForm):
         return self.cleaned_data
 
 class BusinessSignUpForm(UserCreationForm):
-    business_name = forms.CharField(
-        label="Business name",
-        max_length=255,
-        required=True,
-        help_text="Creators will see this name when you contact them.",
-        widget=forms.TextInput(attrs={"autocomplete": "organization"}),
-    )
     business_type = forms.ChoiceField(
         label="Business Type",
         choices=MerchantMeta.BusinessType.choices,
@@ -76,7 +69,6 @@ class BusinessSignUpForm(UserCreationForm):
     class Meta:
         model = User
         fields = (
-            "business_name",
             "username",
             "first_name",
             "last_name",
@@ -88,16 +80,7 @@ class BusinessSignUpForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if "username" in self.fields:
-            self.fields["username"].label = "Username"
-            self.fields["username"].help_text = (
-                "Used for account sign-in and internal account identification."
-            )
-
-    def clean_business_name(self):
-        business_name = (self.cleaned_data.get("business_name") or "").strip()
-        if not business_name:
-            raise forms.ValidationError("Business name is required.")
-        return business_name
+            self.fields["username"].label = "Business name"
 
     def clean(self):
         cleaned = super().clean()
