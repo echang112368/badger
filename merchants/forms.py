@@ -124,7 +124,8 @@ class MerchantSettingsForm(forms.ModelForm):
             "business_type": "Business Type",
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, require_billing_details=True, **kwargs):
+        self.require_billing_details = require_billing_details
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             business_type_field = self.fields.get("business_type")
@@ -165,20 +166,21 @@ class MerchantSettingsForm(forms.ModelForm):
         paypal_email = (cleaned.get("paypal_email") or "").strip()
         shopify_domain = cleaned.get("shopify_store_domain") or ""
 
-        if business_type == MerchantMeta.BusinessType.INDEPENDENT and not paypal_email:
-            self.add_error(
-                "paypal_email",
-                "PayPal email is required for independent merchants.",
-            )
+        if self.require_billing_details:
+            if business_type == MerchantMeta.BusinessType.INDEPENDENT and not paypal_email:
+                self.add_error(
+                    "paypal_email",
+                    "PayPal email is required for independent merchants.",
+                )
 
-        if (
-            business_type == MerchantMeta.BusinessType.SHOPIFY
-            and not (self.instance.shopify_store_domain or shopify_domain)
-        ):
-            self.add_error(
-                "shopify_store_domain",
-                "Shopify store URL is required for Shopify businesses.",
-            )
+            if (
+                business_type == MerchantMeta.BusinessType.SHOPIFY
+                and not (self.instance.shopify_store_domain or shopify_domain)
+            ):
+                self.add_error(
+                    "shopify_store_domain",
+                    "Shopify store URL is required for Shopify businesses.",
+                )
 
         return cleaned
 
