@@ -8,6 +8,8 @@ from typing import Any
 import requests
 import os
 
+from django.contrib.auth import get_user_model
+
 logger = logging.getLogger(__name__)
 
 
@@ -167,3 +169,59 @@ def build_ai_profile_feedback(
     except Exception as exc:
         logger.exception("Unexpected AI feedback error for user_id=%s platform=%s", user.id, platform)
         return _error_feedback(profile_payload, f"Unexpected AI evaluation error: {exc}", error_code="unexpected_error")
+
+
+def refresh_ai_score_if_stale(user_id: int) -> bool:
+    """
+    Re-run the AI analyzer using the stored Instagram snapshot data plus
+    fresh creator_meta values. Called in a background thread after profile
+    saves so the score stays in sync without blocking the response.
+
+    Returns True if the snapshot was updated with a new score.
+    """
+    from creators.models import SocialAnalyticsSnapshot
+
+    User = get_user_model()
+    try:
+        user = User.objects.select_related("creatormeta").get(pk=user_id)
+    except User.DoesNotExist:
+        return False
+
+    snapshot = SocialAnalyticsSnapshot.objects.filter(
+        user=user,
+        platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+    ).first()
+    if snapshot is None or not snapshot.payload:
+        return False
+
+    payload = snapshot.payload
+    ai_cache = payload.get("_ai_cache") or {}
+    account = payload.get("profile") or {}
+    summary_metrics = payload.get("summary_metrics") or {}
+    audience = payload.get("audience") or {}
+    account_metrics = payload.get("account_metrics") or {}
+
+    feedback = build_ai_profile_feedback(
+        user=user,
+        platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+        account=account,
+        summary_metrics=summary_metrics,
+        audience=audience,
+        performance={
+            "reach": int(account_metrics.get("reach_1d") or 0),
+            "profile_visits": int(account_metrics.get("profile_views") or 0),
+            "website_clicks": int(account_metrics.get("website_clicks") or 0),
+        },
+        cached_hash=ai_cache.get("hash"),
+        cached_feedback=ai_cache.get("feedback"),
+    )
+
+    new_hash = feedback.get("_input_hash")
+    if new_hash and new_hash != ai_cache.get("hash") and not feedback.get("error"):
+        payload["_ai_cache"] = {"hash": new_hash, "feedback": feedback}
+        snapshot.payload = payload
+        snapshot.save(update_fields=["payload"])
+        logger.info("AI score refreshed for user_id=%s after profile change", user_id)
+        return True
+
+    return False
