@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from creators.models import SocialAnalyticsSnapshot
 from instagram_connect.models import InstagramConnection
@@ -24,7 +26,11 @@ from .instagram_metrics import (
     normalize_demographics,
     normalize_media_posts,
 )
-from .ai_profile_feedback import build_ai_profile_feedback
+from .ai_profile_feedback import (
+    build_ai_profile_feedback,
+    build_ai_profile_payload,
+    build_pending_ai_profile_feedback,
+)
 
 
 REQUEST_TIMEOUT_SECONDS = 15
@@ -577,10 +583,9 @@ class InstagramAnalyticsService:
             insight_cards,
             data_quality,
         )
-        ai_cache = payload.get("_ai_cache") or {}
-        ai_profile_feedback = build_ai_profile_feedback(
-            user=self.user,
-            platform=self.platform,
+        ai_profile_feedback = self._get_or_queue_ai_profile_feedback(
+            payload=payload,
+            snapshot=snapshot,
             account={
                 "username": account.get("username") or connection.instagram_username,
                 "biography": account.get("biography") or "",
@@ -593,20 +598,7 @@ class InstagramAnalyticsService:
                 "profile_visits": profile_visits,
                 "website_clicks": website_clicks,
             },
-            cached_hash=ai_cache.get("hash"),
-            cached_feedback=ai_cache.get("feedback"),
         )
-        # Persist cache when inputs produced a fresh score (no error, hash changed).
-        new_hash = ai_profile_feedback.get("_input_hash")
-        if (
-            new_hash
-            and new_hash != ai_cache.get("hash")
-            and not ai_profile_feedback.get("error")
-            and snapshot is not None
-        ):
-            payload["_ai_cache"] = {"hash": new_hash, "feedback": ai_profile_feedback}
-            snapshot.payload = payload
-            snapshot.save(update_fields=["payload"])
 
         return {
             "account": {
@@ -648,6 +640,130 @@ class InstagramAnalyticsService:
             "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
         }
+
+    def _get_or_queue_ai_profile_feedback(
+        self,
+        *,
+        payload: dict[str, Any],
+        snapshot: SocialAnalyticsSnapshot | None,
+        account: dict[str, Any],
+        summary_metrics: dict[str, Any],
+        audience: dict[str, Any],
+        performance: dict[str, Any],
+    ) -> dict[str, Any]:
+        profile_payload, input_hash = build_ai_profile_payload(
+            user=self.user,
+            platform=self.platform,
+            account=account,
+            summary_metrics=summary_metrics,
+            audience=audience,
+            performance=performance,
+        )
+        ai_cache = payload.get("_ai_cache") or {}
+        cached_feedback = ai_cache.get("feedback")
+
+        if ai_cache.get("hash") == input_hash and cached_feedback:
+            result = dict(cached_feedback)
+            result["_input_hash"] = input_hash
+            result["status"] = "failed" if cached_feedback.get("error") else "ready"
+            return result
+
+        if snapshot is None:
+            return build_ai_profile_feedback(
+                user=self.user,
+                platform=self.platform,
+                account=account,
+                summary_metrics=summary_metrics,
+                audience=audience,
+                performance=performance,
+                cached_hash=ai_cache.get("hash"),
+                cached_feedback=cached_feedback,
+            )
+
+        pending_started_at = parse_datetime(str(ai_cache.get("started_at") or ""))
+        if pending_started_at and timezone.is_naive(pending_started_at):
+            pending_started_at = timezone.make_aware(pending_started_at, timezone.get_current_timezone())
+        pending_is_fresh = (
+            pending_started_at is not None
+            and pending_started_at > timezone.now() - timedelta(minutes=5)
+        )
+        should_queue = not (
+            ai_cache.get("hash") == input_hash
+            and ai_cache.get("status") == "pending"
+            and pending_is_fresh
+        )
+        if should_queue:
+            payload["_ai_cache"] = {
+                "hash": input_hash,
+                "status": "pending",
+                "started_at": timezone.now().isoformat(),
+            }
+            snapshot.payload = payload
+            snapshot.save(update_fields=["payload"])
+            self._queue_ai_profile_feedback_refresh(
+                snapshot_id=snapshot.id,
+                account=account,
+                summary_metrics=summary_metrics,
+                audience=audience,
+                performance=performance,
+            )
+
+        return build_pending_ai_profile_feedback(profile_payload, input_hash)
+
+    def _queue_ai_profile_feedback_refresh(
+        self,
+        *,
+        snapshot_id: int,
+        account: dict[str, Any],
+        summary_metrics: dict[str, Any],
+        audience: dict[str, Any],
+        performance: dict[str, Any],
+    ) -> None:
+        thread = threading.Thread(
+            target=self._refresh_ai_profile_feedback_cache,
+            kwargs={
+                "snapshot_id": snapshot_id,
+                "account": account,
+                "summary_metrics": summary_metrics,
+                "audience": audience,
+                "performance": performance,
+            },
+            daemon=True,
+        )
+        thread.start()
+
+    def _refresh_ai_profile_feedback_cache(
+        self,
+        *,
+        snapshot_id: int,
+        account: dict[str, Any],
+        summary_metrics: dict[str, Any],
+        audience: dict[str, Any],
+        performance: dict[str, Any],
+    ) -> None:
+        feedback = build_ai_profile_feedback(
+            user=self.user,
+            platform=self.platform,
+            account=account,
+            summary_metrics=summary_metrics,
+            audience=audience,
+            performance=performance,
+        )
+        new_hash = feedback.get("_input_hash")
+        if not new_hash:
+            return
+        snapshot = SocialAnalyticsSnapshot.objects.filter(pk=snapshot_id).first()
+        if snapshot is None:
+            return
+        payload = snapshot.payload or {}
+        payload["_ai_cache"] = {
+            "hash": new_hash,
+            "feedback": feedback,
+            "status": "failed" if feedback.get("error") else "ready",
+            "finished_at": timezone.now().isoformat(),
+        }
+        snapshot.payload = payload
+        snapshot.save(update_fields=["payload"])
 
     @staticmethod
     def _build_content_performance_rows(media_insights: list[dict[str, Any]]) -> list[dict[str, Any]]:
