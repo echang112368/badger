@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
 from .models import CreatorMeta
-from .models import PartnerMessage
+from .models import PartnerMessage, SocialAnalyticsSnapshot
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 from links.models import (
@@ -1378,6 +1378,28 @@ def creator_social_media(request):
         },
     )
 
+
+
+@login_required
+def creator_social_media_ai_status(request):
+    platform = request.GET.get("platform") or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
+    snapshot = SocialAnalyticsSnapshot.objects.filter(
+        user=request.user,
+        platform=platform,
+    ).first()
+    ai_cache = (snapshot.payload or {}).get("_ai_cache") if snapshot else {}
+    feedback = (ai_cache or {}).get("feedback")
+    if feedback:
+        status = "failed" if feedback.get("error") else "ready"
+    else:
+        status = (ai_cache or {}).get("status") or "pending"
+    return JsonResponse({
+        "status": status,
+        "platform": platform,
+        "started_at": (ai_cache or {}).get("started_at"),
+        "updated_at": snapshot.synced_at.isoformat() if snapshot else None,
+        "has_feedback": bool(feedback),
+    })
 
 @login_required
 def delete_affiliate_merchants(request):
