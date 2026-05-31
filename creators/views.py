@@ -4,13 +4,16 @@ import json
 import re
 
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET, require_POST
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.db import close_old_connections
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
 from .models import CreatorMeta
 from .models import PartnerMessage
+from .models import SocialAnalyticsSnapshot
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 from links.models import (
@@ -29,12 +32,175 @@ from shopify_app.token_management import refresh_shopify_token
 from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 from .services.social_dashboard import SocialDashboardService
+from instagram_connect.models import InstagramConnection
 from .services.dashboard import build_creator_dashboard_context
 from .services.ai_profile_feedback import refresh_ai_score_if_stale
 
 import threading
+import uuid
 
 logger = logging.getLogger(__name__)
+
+_SOCIAL_REFRESH_JOBS: dict[str, dict] = {}
+_SOCIAL_REFRESH_JOBS_LOCK = threading.Lock()
+_SOCIAL_REFRESH_PLATFORM_LABELS = {
+    SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM: "Instagram",
+}
+
+
+def _set_social_refresh_job(job_id: str, **updates) -> dict:
+    with _SOCIAL_REFRESH_JOBS_LOCK:
+        job = _SOCIAL_REFRESH_JOBS.get(job_id, {})
+        job.update(updates)
+        _SOCIAL_REFRESH_JOBS[job_id] = job
+        return dict(job)
+
+
+def _get_social_refresh_job(job_id: str, user_id: int | None = None) -> dict | None:
+    with _SOCIAL_REFRESH_JOBS_LOCK:
+        job = _SOCIAL_REFRESH_JOBS.get(job_id)
+        if not job:
+            return None
+        if user_id is not None and job.get("user_id") != user_id:
+            return None
+        return dict(job)
+
+
+def _run_social_refresh_job(job_id: str, user_id: int, platform: str, reanalyze: bool) -> None:
+    platform_label = _SOCIAL_REFRESH_PLATFORM_LABELS.get(platform, platform.title())
+    _set_social_refresh_job(
+        job_id,
+        status="running",
+        step="fetching_instagram",
+        message=f"Fetching latest {platform_label} profile, audience, and post insights...",
+        started_at=timezone.now().isoformat(),
+    )
+    try:
+        close_old_connections()
+        user = CustomUser.objects.get(pk=user_id)
+        service = SocialDashboardService(user)
+        _set_social_refresh_job(
+            job_id,
+            status="running",
+            step="refreshing_metrics",
+            message="Crunching engagement, audience, and content performance metrics...",
+        )
+        service.build_dashboard(
+            refresh_platform=platform,
+            force_reanalyze=reanalyze,
+            allow_auto_refresh=True,
+            allow_ai_refresh=True,
+        )
+        _set_social_refresh_job(
+            job_id,
+            status="complete",
+            step="complete",
+            message="Social analytics are ready.",
+            finished_at=timezone.now().isoformat(),
+        )
+    except Exception as exc:
+        logger.exception(
+            "Social media refresh failed",
+            extra={"user_id": user_id, "platform": platform, "job_id": job_id},
+        )
+        _set_social_refresh_job(
+            job_id,
+            status="failed",
+            step="failed",
+            message="We could not refresh social analytics right now. Cached data is still available.",
+            error=str(exc),
+            finished_at=timezone.now().isoformat(),
+        )
+    finally:
+        close_old_connections()
+
+
+def _start_social_refresh_job(user, platform: str, reanalyze: bool = False) -> str:
+    with _SOCIAL_REFRESH_JOBS_LOCK:
+        for existing_job_id, existing_job in _SOCIAL_REFRESH_JOBS.items():
+            if (
+                existing_job.get("user_id") == user.id
+                and existing_job.get("platform") == platform
+                and existing_job.get("status") in {"queued", "running"}
+                and (not reanalyze or existing_job.get("reanalyze"))
+            ):
+                return existing_job_id
+
+        job_id = uuid.uuid4().hex
+        _SOCIAL_REFRESH_JOBS[job_id] = {
+            "job_id": job_id,
+            "user_id": user.id,
+            "platform": platform,
+            "reanalyze": reanalyze,
+            "status": "queued",
+            "step": "queued",
+            "message": "Preparing social analytics refresh...",
+            "requested_at": timezone.now().isoformat(),
+        }
+
+    thread = threading.Thread(
+        target=_run_social_refresh_job,
+        args=(job_id, user.id, platform, reanalyze),
+        daemon=True,
+    )
+    thread.start()
+    return job_id
+
+
+def _build_loading_social_dashboard(user, platform: str | None = None) -> dict:
+    connection = getattr(user, "instagram_connection", None)
+    if connection is None:
+        connection = InstagramConnection.objects.filter(user=user).first()
+
+    instagram_connected = bool(connection)
+    platforms = [
+        {
+            "slug": SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            "name": "Instagram",
+            "connected": instagram_connected,
+            "can_connect": True,
+            "connect_url": "/instagram/connect/",
+            "refreshed": False,
+            "last_synced_at": getattr(connection, "last_synced_at", None),
+            "metrics": {
+                "account": {
+                    "username": getattr(connection, "instagram_username", "") or "connected",
+                    "followers_count": getattr(connection, "followers_count", 0) or 0,
+                    "media_count": getattr(connection, "media_count", 0) or 0,
+                }
+            },
+        },
+        {
+            "slug": "tiktok",
+            "name": "TikTok",
+            "connected": False,
+            "can_connect": False,
+            "connect_url": "#",
+            "refreshed": False,
+            "last_synced_at": None,
+            "metrics": {},
+        },
+        {
+            "slug": "youtube",
+            "name": "YouTube",
+            "connected": False,
+            "can_connect": False,
+            "connect_url": "#",
+            "refreshed": False,
+            "last_synced_at": None,
+            "metrics": {},
+        },
+    ]
+    return {
+        "overall": {
+            "connected_platforms": 1 if instagram_connected else 0,
+            "total_followers": getattr(connection, "followers_count", 0) or 0,
+            "total_reach": 0,
+            "average_engagement_rate": 0,
+            "top_platform": "Instagram" if instagram_connected else "None",
+        },
+        "platforms": platforms,
+    }
 
 
 def _trigger_ai_refresh(user_id: int) -> None:
@@ -1363,10 +1529,39 @@ def creator_support(request):
 @login_required
 def creator_social_media(request):
     refresh_platform = request.GET.get("refresh")
+    if refresh_platform and refresh_platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM}:
+        refresh_platform = None
     force_reanalyze = bool(request.GET.get("reanalyze"))
-    dashboard = SocialDashboardService(request.user).build_dashboard(
-        refresh_platform=refresh_platform,
-        force_reanalyze=force_reanalyze,
+    service = SocialDashboardService(request.user)
+    should_show_loading = bool(refresh_platform) or service.needs_refresh()
+
+    if should_show_loading:
+        platform = refresh_platform or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
+        job_id = _start_social_refresh_job(
+            request.user,
+            platform=platform,
+            reanalyze=force_reanalyze,
+        )
+        dashboard = _build_loading_social_dashboard(request.user, platform=platform)
+        return render(
+            request,
+            "creators/social_media.html",
+            {
+                "social_overall": dashboard["overall"],
+                "social_platforms": dashboard["platforms"],
+                "refreshed_platform": refresh_platform,
+                "social_loading": True,
+                "social_refresh_job_id": job_id,
+                "social_refresh_status_url": reverse("creator_social_media_refresh_status"),
+                "social_refresh_start_url": reverse("creator_social_media_refresh_start"),
+            },
+        )
+
+    dashboard = service.build_dashboard(
+        refresh_platform=None,
+        force_reanalyze=False,
+        allow_auto_refresh=False,
+        allow_ai_refresh=False,
     )
     return render(
         request,
@@ -1375,7 +1570,49 @@ def creator_social_media(request):
             "social_overall": dashboard["overall"],
             "social_platforms": dashboard["platforms"],
             "refreshed_platform": refresh_platform,
+            "social_loading": False,
+            "social_refresh_status_url": reverse("creator_social_media_refresh_status"),
+            "social_refresh_start_url": reverse("creator_social_media_refresh_start"),
         },
+    )
+
+
+@login_required
+@require_POST
+def creator_social_media_refresh_start(request):
+    platform = (request.POST.get("platform") or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM).strip()
+    if platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM}:
+        return JsonResponse({"error": "Unsupported platform."}, status=400)
+
+    reanalyze = request.POST.get("reanalyze") in {"1", "true", "True", "yes", "on"}
+    job_id = _start_social_refresh_job(request.user, platform=platform, reanalyze=reanalyze)
+    job = _get_social_refresh_job(job_id, request.user.id) or {}
+    return JsonResponse(
+        {
+            "job_id": job_id,
+            "status": job.get("status", "queued"),
+            "step": job.get("step", "queued"),
+            "message": job.get("message", "Preparing social analytics refresh..."),
+        }
+    )
+
+
+@login_required
+@require_GET
+def creator_social_media_refresh_status(request):
+    job_id = (request.GET.get("job_id") or "").strip()
+    job = _get_social_refresh_job(job_id, request.user.id)
+    if not job:
+        return JsonResponse({"status": "missing", "message": "Refresh job was not found."}, status=404)
+
+    return JsonResponse(
+        {
+            "job_id": job_id,
+            "status": job.get("status", "queued"),
+            "step": job.get("step", "queued"),
+            "message": job.get("message", "Preparing social analytics refresh..."),
+            "error": job.get("error", ""),
+        }
     )
 
 

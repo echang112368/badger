@@ -122,7 +122,7 @@ class InstagramAnalyticsService:
         self.user = user
         self.failed_requests: list[dict[str, Any]] = []
 
-    def build_platform_data(self, refresh: bool = False, force_reanalyze: bool = False) -> PlatformDashboardData:
+    def build_platform_data(self, refresh: bool = False, force_reanalyze: bool = False, allow_ai_refresh: bool = True) -> PlatformDashboardData:
         connection = getattr(self.user, "instagram_connection", None)
         if not connection:
             return PlatformDashboardData(
@@ -152,7 +152,7 @@ class InstagramAnalyticsService:
         if force_reanalyze:
             payload.pop("_ai_cache", None)
 
-        metrics = self.normalize_payload(connection, payload, snapshot=snapshot)
+        metrics = self.normalize_payload(connection, payload, snapshot=snapshot, allow_ai_refresh=allow_ai_refresh)
         return PlatformDashboardData(
             slug=self.platform,
             name="Instagram",
@@ -492,6 +492,7 @@ class InstagramAnalyticsService:
         connection: InstagramConnection,
         payload: dict[str, Any],
         snapshot: SocialAnalyticsSnapshot | None = None,
+        allow_ai_refresh: bool = True,
     ) -> dict[str, Any]:
         account = payload.get("account", {})
         performance = payload.get("performance", {})
@@ -595,6 +596,7 @@ class InstagramAnalyticsService:
             },
             cached_hash=ai_cache.get("hash"),
             cached_feedback=ai_cache.get("feedback"),
+            allow_api_request=allow_ai_refresh,
         )
         # Persist cache when inputs produced a fresh score (no error, hash changed).
         new_hash = ai_profile_feedback.get("_input_hash")
@@ -963,17 +965,24 @@ class SocialDashboardService:
             SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM: InstagramAnalyticsService(user),
         }
 
-    def build_dashboard(self, refresh_platform: str | None = None, force_reanalyze: bool = False) -> dict[str, Any]:
+    def build_dashboard(
+        self,
+        refresh_platform: str | None = None,
+        force_reanalyze: bool = False,
+        allow_auto_refresh: bool = True,
+        allow_ai_refresh: bool = True,
+    ) -> dict[str, Any]:
         platforms: list[PlatformDashboardData] = []
         for slug, service in self.registry.items():
             manual_refresh = refresh_platform == slug
-            should_refresh = manual_refresh or self._platform_needs_resync(slug)
+            should_refresh = manual_refresh or (allow_auto_refresh and self._platform_needs_resync(slug))
             should_reanalyze = force_reanalyze and manual_refresh
             try:
                 platforms.append(
                     service.build_platform_data(
                         refresh=should_refresh,
                         force_reanalyze=should_reanalyze,
+                        allow_ai_refresh=allow_ai_refresh,
                     )
                 )
             except Exception:
@@ -988,6 +997,7 @@ class SocialDashboardService:
                     service.build_platform_data(
                         refresh=False,
                         force_reanalyze=should_reanalyze,
+                        allow_ai_refresh=allow_ai_refresh,
                     )
                 )
 
@@ -1027,7 +1037,19 @@ class SocialDashboardService:
                 refreshed_platforms.append(service.build_platform_data(refresh=True))
         return refreshed_platforms
 
+    def needs_refresh(self, platform: str | None = None) -> bool:
+        if platform:
+            return self._platform_needs_resync(platform)
+        return any(self._platform_needs_resync(slug) for slug in self.registry)
+
     def _platform_needs_resync(self, platform: str) -> bool:
+        if platform == SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM:
+            connection = getattr(self.user, "instagram_connection", None)
+            if connection is None:
+                connection = InstagramConnection.objects.filter(user=self.user).first()
+            if not connection:
+                return False
+
         last_synced_at = self._platform_last_synced_at(platform)
         return (
             last_synced_at is None

@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
-from .models import CreatorMeta
+from .models import CreatorMeta, SocialAnalyticsSnapshot
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
 from links.models import (
@@ -767,6 +767,62 @@ class SocialDashboardAutoResyncTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         mock_fetch_and_cache.assert_called_once()
+
+
+class SocialMediaPageLoadingTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="social_loading_creator",
+            email="social_loading_creator@example.com",
+            password="pass123",
+            is_creator=True,
+        )
+        self.connection = InstagramConnection.objects.create(
+            user=self.user,
+            instagram_user_id="178900000000099",
+            instagram_username="loadingcreator",
+            instagram_access_token="token",
+            access_token="token",
+            followers_count=1234,
+            media_count=12,
+            last_synced_at=timezone.now() - timedelta(days=2),
+        )
+        self.client.force_login(self.user)
+
+    @patch("creators.views._start_social_refresh_job", return_value="job-123")
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_stale_social_media_page_opens_with_loading_skeletons(self, mock_fetch_and_cache, mock_start_job):
+        response = self.client.get(reverse("creator_social_media"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Thinking &amp; buffering")
+        self.assertContains(response, "Loading your social analytics")
+        self.assertContains(response, "data-social-refresh-banner")
+        mock_start_job.assert_called_once()
+        mock_fetch_and_cache.assert_not_called()
+
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_fresh_social_media_page_uses_cached_dashboard_without_auto_refresh(self, mock_fetch_and_cache):
+        self.connection.last_synced_at = timezone.now()
+        self.connection.save(update_fields=["last_synced_at"])
+        snapshot = SocialAnalyticsSnapshot.objects.create(
+            user=self.user,
+            platform=SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
+            payload=InstagramAnalyticsService(self.user).empty_metrics(),
+        )
+        snapshot.payload["account"] = {
+            "id": self.connection.instagram_user_id,
+            "username": self.connection.instagram_username,
+            "followers_count": self.connection.followers_count,
+            "media_count": self.connection.media_count,
+        }
+        snapshot.save(update_fields=["payload"])
+
+        response = self.client.get(reverse("creator_social_media"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Thinking &amp; buffering")
+        mock_fetch_and_cache.assert_not_called()
 
 
 class CreatorDashboardSetupTests(TestCase):
