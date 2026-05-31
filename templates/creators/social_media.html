@@ -138,49 +138,6 @@
       padding-top: 1rem;
       border-top: 1px solid #e4ebf8;
     }
-
-    .social-media-page .ai-loading-shell {
-      border: 1px solid #dbe7ff;
-      border-radius: .85rem;
-      background: linear-gradient(135deg, #f7faff 0%, #ffffff 60%, #fff9e8 100%);
-      padding: 1rem;
-      color: #334060;
-    }
-    .social-media-page .ai-thinking-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: .45rem;
-      border-radius: 999px;
-      padding: .42rem .72rem;
-      background: #eef3ff;
-      color: #1f3767;
-      font-weight: 700;
-    }
-    .social-media-page .ai-thinking-dot {
-      width: .45rem;
-      height: .45rem;
-      border-radius: 999px;
-      background: #f5cf32;
-      animation: aiPulse 1s ease-in-out infinite;
-    }
-    .social-media-page .ai-thinking-dot:nth-child(2) { animation-delay: .15s; }
-    .social-media-page .ai-thinking-dot:nth-child(3) { animation-delay: .3s; }
-    .social-media-page .ai-placeholder-line {
-      height: .7rem;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #edf2fb 25%, #f8fbff 50%, #edf2fb 75%);
-      background-size: 200% 100%;
-      animation: aiShimmer 1.4s ease-in-out infinite;
-    }
-    @keyframes aiPulse {
-      0%, 80%, 100% { opacity: .35; transform: translateY(0); }
-      40% { opacity: 1; transform: translateY(-2px); }
-    }
-    @keyframes aiShimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
     @media (max-width: 991.98px) {
       .social-media-page .analyzer-top {
         grid-template-columns: 1fr;
@@ -279,32 +236,18 @@
             {% elif platform.slug == 'instagram' %}
 
               {# ── Profile Analyzer ── #}
-              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3"{% if platform.metrics.ai_profile_feedback.status == 'pending' %} data-ai-feedback-panel data-ai-platform="{{ platform.slug }}" data-ai-status-url="{% url 'creator_social_media_ai_status' %}?platform={{ platform.slug }}"{% endif %}>
+              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                   <div>
                     <h3 class="h5 mb-1">Profile analyzer</h3>
                     <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
                   </div>
-                  <a href="?refresh={{ platform.slug }}&reanalyze=1" class="btn btn-sm btn-outline-secondary fw-semibold" data-ai-refresh-trigger data-ai-platform="{{ platform.slug }}" data-ai-refresh-url="{% url 'creator_social_media_refresh' %}" data-ai-status-url="{% url 'creator_social_media_ai_status' %}?platform={{ platform.slug }}">
+                  <a href="?refresh={{ platform.slug }}&reanalyze=1" class="btn btn-sm btn-outline-secondary fw-semibold">
                     <i class="bi bi-arrow-repeat me-1"></i>Refresh &amp; Re-analyze
                   </a>
                 </div>
 
-                {% if platform.metrics.ai_profile_feedback.status == 'pending' %}
-                  <div class="ai-loading-shell mb-3" aria-live="polite">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                      <span class="ai-thinking-pill">
-                        <span data-ai-loading-word>Calculating</span>
-                        <span class="d-inline-flex gap-1" aria-hidden="true"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span></span>
-                      </span>
-                      <span class="small text-muted">The Social Media tab is ready — OpenAI is finishing the generated figures in the background.</span>
-                    </div>
-                    <div class="ai-placeholder-line mb-2" style="width: 92%;"></div>
-                    <div class="ai-placeholder-line mb-2" style="width: 76%;"></div>
-                    <div class="ai-placeholder-line" style="width: 84%;"></div>
-                  </div>
-                {% else %}
-                <div class="analyzer-top" data-ai-ready-summary>
+                <div class="analyzer-top">
                   {% with score=platform.metrics.ai_profile_feedback.overall_score %}
                   <div class="analyzer-score-ring d-flex align-items-center justify-content-center{% if score %}{% if score < 40 %} analyzer-score-ring--poor{% elif score < 70 %} analyzer-score-ring--fair{% else %} analyzer-score-ring--good{% endif %}{% endif %}">
                     <div class="text-center">
@@ -320,7 +263,6 @@
                     <p class="analyzer-summary">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</p>
                   </div>
                 </div>
-                {% endif %}
                 <div class="analyzer-overview">
                     <div class="analyzer-metrics-grid small mb-3">
                       <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
@@ -345,9 +287,6 @@
 
               <div class="metric-card p-3 mb-3">
                 <h3 class="h6 mb-2">AI Feedback</h3>
-                {% if platform.metrics.ai_profile_feedback.status == 'pending' %}
-                  <p class="small text-muted mb-0">Thinking through engagement, audience quality, growth activity, and monetization recommendations. This section will update automatically when the generated feedback is ready.</p>
-                {% else %}
                 <div class="row g-2 mb-2">
                   <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|percent_sigfigs:4 }}</div></div>
                   <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|percent_sigfigs:4 }}</div></div>
@@ -400,7 +339,6 @@
                     <div class="col-12 text-muted small">No AI feedback available yet.</div>
                   {% endfor %}
                 </div>
-                {% endif %}
               </div>
 
               <div class="metric-card p-3 mb-3">
@@ -557,137 +495,5 @@
       });
     });
   });
-
-  (function(){
-    var words = ['Calculating', 'Thinking', 'Writing'];
-    var wordIndex = 0;
-    window.setInterval(function(){
-      wordIndex = (wordIndex + 1) % words.length;
-      document.querySelectorAll('[data-ai-loading-word]').forEach(function(node){
-        node.textContent = words[wordIndex];
-      });
-    }, 1300);
-
-    function getCookie(name) {
-      var cookies = document.cookie ? document.cookie.split(';') : [];
-      for (var i = 0; i < cookies.length; i += 1) {
-        var cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          return decodeURIComponent(cookie.substring(name.length + 1));
-        }
-      }
-      return '';
-    }
-
-    function refreshSocialPage() {
-      var url = new URL(window.location.href);
-      url.searchParams.delete('refresh');
-      url.searchParams.delete('reanalyze');
-      window.location.replace(url.toString());
-    }
-
-    function showLoading(panel, message) {
-      var readySummary = panel.querySelector('[data-ai-ready-summary]');
-      if (readySummary) {
-        readySummary.classList.add('d-none');
-      }
-      if (panel.querySelector('.ai-loading-shell')) {
-        return;
-      }
-      var loading = document.createElement('div');
-      loading.className = 'ai-loading-shell mb-3';
-      loading.setAttribute('aria-live', 'polite');
-      loading.innerHTML = [
-        '<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">',
-        '  <span class="ai-thinking-pill">',
-        '    <span data-ai-loading-word>Calculating</span>',
-        '    <span class="d-inline-flex gap-1" aria-hidden="true"><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span><span class="ai-thinking-dot"></span></span>',
-        '  </span>',
-        '  <span class="small text-muted">' + message + '</span>',
-        '</div>',
-        '<div class="ai-placeholder-line mb-2" style="width: 92%;"></div>',
-        '<div class="ai-placeholder-line mb-2" style="width: 76%;"></div>',
-        '<div class="ai-placeholder-line" style="width: 84%;"></div>'
-      ].join('');
-      var overview = panel.querySelector('.analyzer-overview');
-      panel.insertBefore(loading, overview || null);
-    }
-
-    function pollPanel(panel) {
-      var statusUrl = panel.getAttribute('data-ai-status-url');
-      if (!statusUrl || panel.getAttribute('data-ai-polling') === 'true') { return; }
-      panel.setAttribute('data-ai-polling', 'true');
-      var attempts = 0;
-      var maxAttempts = 80;
-      var poll = function(){
-        attempts += 1;
-        fetch(statusUrl, {headers: {'Accept': 'application/json'}})
-          .then(function(response){ return response.ok ? response.json() : null; })
-          .then(function(data){
-            if (data && data.sync_status !== 'pending' && (
-              ((data.status === 'ready' || data.status === 'failed') && data.has_feedback) ||
-              data.sync_status === 'failed'
-            )) {
-              refreshSocialPage();
-              return;
-            }
-            if (attempts < maxAttempts) {
-              window.setTimeout(poll, 2500);
-            }
-          })
-          .catch(function(){
-            if (attempts < maxAttempts) {
-              window.setTimeout(poll, 3500);
-            }
-          });
-      };
-      window.setTimeout(poll, 1200);
-    }
-
-    document.querySelectorAll('[data-ai-feedback-panel]').forEach(function(panel){
-      pollPanel(panel);
-    });
-
-    document.querySelectorAll('[data-ai-refresh-trigger]').forEach(function(button){
-      button.addEventListener('click', function(event){
-        event.preventDefault();
-        var panel = button.closest('.analyzer-card');
-        if (!panel) { return; }
-        var platform = button.getAttribute('data-ai-platform');
-        var refreshUrl = button.getAttribute('data-ai-refresh-url');
-        var statusUrl = button.getAttribute('data-ai-status-url');
-        panel.setAttribute('data-ai-feedback-panel', '');
-        panel.setAttribute('data-ai-platform', platform);
-        panel.setAttribute('data-ai-status-url', statusUrl);
-        showLoading(panel, 'Syncing the latest platform data, then OpenAI will analyze the updated figures.');
-        button.classList.add('disabled');
-        button.setAttribute('aria-disabled', 'true');
-
-        var body = new URLSearchParams();
-        body.append('platform', platform);
-        fetch(refreshUrl, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'X-CSRFToken': getCookie('csrftoken')
-          },
-          body: body.toString()
-        })
-          .then(function(response){
-            if (!response.ok) { throw new Error('Refresh failed'); }
-            return response.json();
-          })
-          .then(function(){
-            pollPanel(panel);
-          })
-          .catch(function(){
-            button.classList.remove('disabled');
-            button.removeAttribute('aria-disabled');
-            refreshSocialPage();
-          });
-      });
-    });
-  })();
 </script>
 {% endblock %}
