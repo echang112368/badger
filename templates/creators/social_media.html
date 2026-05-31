@@ -138,6 +138,65 @@
       padding-top: 1rem;
       border-top: 1px solid #e4ebf8;
     }
+
+    .social-media-page .loading-banner {
+      border: 1px solid #d8e4ff;
+      border-radius: .9rem;
+      background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+      box-shadow: 0 8px 22px rgba(48, 79, 145, .08);
+    }
+    .social-media-page .loading-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      border-radius: 999px;
+      padding: .35rem .7rem;
+      background: #fff;
+      color: #304f91;
+      font-size: .82rem;
+      font-weight: 700;
+      border: 1px solid #dbe6fb;
+    }
+    .social-media-page .skeleton-line,
+    .social-media-page .skeleton-block,
+    .social-media-page .skeleton-circle {
+      position: relative;
+      overflow: hidden;
+      background: #e8eef8;
+    }
+    .social-media-page .skeleton-line::after,
+    .social-media-page .skeleton-block::after,
+    .social-media-page .skeleton-circle::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+      animation: socialSkeleton 1.2s infinite;
+    }
+    .social-media-page .skeleton-line {
+      height: .8rem;
+      border-radius: 999px;
+    }
+    .social-media-page .skeleton-block {
+      min-height: 4.5rem;
+      border-radius: .8rem;
+    }
+    .social-media-page .skeleton-circle {
+      border-radius: 999px;
+    }
+    .social-media-page .refresh-step {
+      color: #5c6a80;
+      font-size: .88rem;
+    }
+    .social-media-page .refresh-step.is-active {
+      color: #304f91;
+      font-weight: 700;
+    }
+    @keyframes socialSkeleton {
+      100% { transform: translateX(100%); }
+    }
+
     @media (max-width: 991.98px) {
       .social-media-page .analyzer-top {
         grid-template-columns: 1fr;
@@ -155,7 +214,27 @@
     </div>
   </div>
 
-  {% if refreshed_platform %}
+  {% if social_loading %}
+    <div class="loading-banner p-3 p-lg-4 mb-4" data-social-refresh-banner data-job-id="{{ social_refresh_job_id }}" data-status-url="{{ social_refresh_status_url }}">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+          <span class="loading-pill mb-2"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Thinking &amp; buffering</span>
+          <h2 class="h5 mb-1" style="color:#152647;">Loading your social analytics</h2>
+          <p class="mb-0 text-muted" data-social-refresh-message>We opened the page right away. Instagram insights and AI summaries are filling in now.</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-social-refresh-reload hidden>Show updated dashboard</button>
+      </div>
+      <div class="progress mt-3" role="progressbar" aria-label="Social analytics loading">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" data-social-refresh-progress style="width: 25%"></div>
+      </div>
+      <div class="d-flex flex-wrap gap-3 mt-3">
+        <span class="refresh-step is-active" data-refresh-step="queued"><i class="bi bi-hourglass-split me-1"></i>Preparing</span>
+        <span class="refresh-step" data-refresh-step="fetching_instagram"><i class="bi bi-instagram me-1"></i>Fetching Instagram</span>
+        <span class="refresh-step" data-refresh-step="refreshing_metrics"><i class="bi bi-bar-chart me-1"></i>Building metrics</span>
+        <span class="refresh-step" data-refresh-step="complete"><i class="bi bi-check-circle me-1"></i>Ready</span>
+      </div>
+    </div>
+  {% elif refreshed_platform %}
     <div class="alert alert-info">Data refresh requested for <strong>{{ refreshed_platform|title }}</strong>.</div>
   {% endif %}
 
@@ -233,6 +312,110 @@
               {% else %}
                 <button class="btn btn-outline-secondary" disabled>Coming Soon</button>
               {% endif %}
+            {% elif social_loading and platform.slug == 'instagram' %}
+              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3" aria-busy="true">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <h3 class="h5 mb-1">Profile analyzer</h3>
+                    <div class="small text-muted">Thinking through your account health and recommendations...</div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" disabled>
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Refreshing
+                  </button>
+                </div>
+                <div class="analyzer-top">
+                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center">
+                    <div class="skeleton-circle" style="height:72px;width:72px;"></div>
+                  </div>
+                  <div class="analyzer-body">
+                    <div class="skeleton-line mb-3" style="width: 28%;"></div>
+                    <div class="skeleton-line mb-2" style="width: 96%;"></div>
+                    <div class="skeleton-line mb-2" style="width: 88%;"></div>
+                    <div class="skeleton-line" style="width: 64%;"></div>
+                  </div>
+                </div>
+                <div class="analyzer-overview">
+                  <div class="analyzer-metrics-grid small mb-3">
+                    <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><div class="skeleton-line mt-2" style="width: 70%;"></div></div>
+                    <div class="analyzer-metric"><span class="text-muted d-block">Avg Engagement Rate</span><div class="skeleton-line mt-2" style="width: 55%;"></div></div>
+                    <div class="analyzer-metric"><span class="text-muted d-block">Avg Reach</span><div class="skeleton-line mt-2" style="width: 60%;"></div></div>
+                    <div class="analyzer-metric"><span class="text-muted d-block">Audience Match</span><div class="skeleton-line mt-2" style="width: 50%;"></div></div>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="label-chip">Fetching audience</span>
+                    <span class="label-chip">Analyzing content</span>
+                    <span class="label-chip">Preparing AI summary</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3" aria-busy="true">
+                <h3 class="h6 mb-3">AI Feedback</h3>
+                <div class="row g-2 mb-2">
+                  {% for label in '1234' %}
+                    <div class="col-md-3"><div class="skeleton-line mb-2" style="width: 55%;"></div><div class="skeleton-line" style="width: 76%;"></div></div>
+                  {% endfor %}
+                </div>
+                <div class="skeleton-block mt-3"></div>
+              </div>
+
+              <div class="row g-3 mb-3" aria-busy="true">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Account Overview</h3>
+                    {% for label in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '88' '72' '64' '78' '55' %}%;"></div>{% endfor %}
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Audience Demographics</h3>
+                    <div class="row g-3">
+                      <div class="col-6"><div class="skeleton-block"></div></div>
+                      <div class="col-6"><div class="skeleton-block"></div></div>
+                      <div class="col-6"><div class="skeleton-block"></div></div>
+                      <div class="col-6"><div class="skeleton-block"></div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3" aria-busy="true">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                  <h3 class="h6 mb-0">Post Performance Explorer</h3>
+                  <span class="small text-muted"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading post insights</span>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Preview</th><th>Media ID</th><th>Type</th><th>Post Date</th><th>Views</th><th>Reach</th><th>Engagement Rate</th></tr></thead>
+                    <tbody>
+                      {% for row in '12345' %}
+                        <tr>
+                          <td><div class="skeleton-block" style="width:52px;height:52px;min-height:52px;"></div></td>
+                          <td><div class="skeleton-line" style="width:110px;"></div></td>
+                          <td><div class="skeleton-line" style="width:65px;"></div></td>
+                          <td><div class="skeleton-line" style="width:105px;"></div></td>
+                          <td><div class="skeleton-line" style="width:42px;"></div></td>
+                          <td><div class="skeleton-line" style="width:42px;"></div></td>
+                          <td><div class="skeleton-line" style="width:58px;"></div></td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="metric-card p-3 mb-3" aria-busy="true">
+                <h3 class="h6 mb-3">Audience</h3>
+                <div class="row g-3 small">
+                  {% for label in '12345' %}
+                    <div class="col-md-4"><div class="skeleton-line mb-2" style="width: 55%;"></div><div class="skeleton-line" style="width: 80%;"></div></div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="text-muted small mt-3">
+                Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Syncing for the first time{% endif %}
+              </div>
             {% elif platform.slug == 'instagram' %}
 
               {# ── Profile Analyzer ── #}
@@ -495,5 +678,66 @@
       });
     });
   });
+
+  (function(){
+    var banner = document.querySelector('[data-social-refresh-banner]');
+    if (!banner) return;
+
+    var jobId = banner.getAttribute('data-job-id');
+    var statusUrl = banner.getAttribute('data-status-url');
+    var messageEl = banner.querySelector('[data-social-refresh-message]');
+    var progressEl = banner.querySelector('[data-social-refresh-progress]');
+    var reloadButton = banner.querySelector('[data-social-refresh-reload]');
+    var progressByStep = {
+      queued: 25,
+      fetching_instagram: 45,
+      refreshing_metrics: 72,
+      complete: 100,
+      failed: 100
+    };
+
+    function setActiveStep(step) {
+      var seenActive = true;
+      document.querySelectorAll('[data-refresh-step]').forEach(function(el){
+        var stepName = el.getAttribute('data-refresh-step');
+        if (stepName === step) seenActive = false;
+        el.classList.toggle('is-active', stepName === step || (seenActive && step !== 'failed'));
+      });
+    }
+
+    function scheduleReload() {
+      if (reloadButton) {
+        reloadButton.hidden = false;
+        reloadButton.addEventListener('click', function(){ window.location.href = window.location.pathname; }, { once: true });
+      }
+      window.setTimeout(function(){ window.location.href = window.location.pathname; }, 1200);
+    }
+
+    async function poll() {
+      try {
+        var response = await fetch(statusUrl + '?job_id=' + encodeURIComponent(jobId), { headers: { 'Accept': 'application/json' }});
+        var data = await response.json();
+        if (messageEl && data.message) messageEl.textContent = data.message;
+        if (progressEl) progressEl.style.width = (progressByStep[data.step] || progressByStep[data.status] || 55) + '%';
+        setActiveStep(data.step || data.status);
+
+        if (data.status === 'complete') {
+          if (messageEl) messageEl.textContent = 'Social analytics are ready. Loading the updated dashboard...';
+          scheduleReload();
+          return;
+        }
+        if (data.status === 'failed') {
+          banner.classList.add('border-danger');
+          if (progressEl) progressEl.classList.remove('progress-bar-animated');
+          return;
+        }
+      } catch (error) {
+        if (messageEl) messageEl.textContent = 'Still working on your analytics. We will keep checking...';
+      }
+      window.setTimeout(poll, 1800);
+    }
+
+    poll();
+  })();
 </script>
 {% endblock %}
