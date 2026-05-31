@@ -327,3 +327,48 @@ class PasswordResetFlowTests(TestCase):
         joined = "\n".join(log_output.output)
         self.assertIn("DEV password reset skipped for inactive_reset@example.com", joined)
         self.assertIn("is_active=False", joined)
+
+
+class CustomUserAdminTests(TestCase):
+    def setUp(self):
+        self.admin_user = CustomUser.objects.create_superuser(
+            username="adminuser",
+            email="admin@example.com",
+            password="adminpass123",
+        )
+        self.target_user = CustomUser.objects.create_user(
+            username="targetuser",
+            email="target@example.com",
+            password="pass12345",
+            is_active=True,
+        )
+        self.client.force_login(self.admin_user)
+
+    def test_admin_changelist_shows_active_column(self):
+        response = self.client.get(reverse("admin:accounts_customuser_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Active")
+
+    def test_admin_changelist_can_toggle_is_active(self):
+        changelist_url = reverse("admin:accounts_customuser_changelist")
+
+        response = self.client.post(
+            changelist_url,
+            {
+                "form-TOTAL_FORMS": "2",
+                "form-INITIAL_FORMS": "2",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+                "form-0-id": str(self.admin_user.pk),
+                "form-0-is_active": "on",
+                "form-1-id": str(self.target_user.pk),
+                "form-1-is_active": "",  # unchecked in changelist editable form
+                "_save": "Save",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.target_user.refresh_from_db()
+        self.assertFalse(self.target_user.is_active)
