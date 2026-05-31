@@ -594,10 +594,6 @@
                         <th>Save Rate</th>
                         <th>Share Rate</th>
                         <th>Profile Visit Rate</th>
-                        <th>
-                          Standardized Score
-                          <span class="ms-1 text-muted" title="Score is a 0-100 standardized performance index blended from engagement rate, save rate, share rate, profile visit rate, and view efficiency." aria-label="Score explanation">ⓘ</span>
-                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -627,14 +623,13 @@
                           </td>
                           <td>{{ row.views }}</td>
                           <td>{{ row.reach }}</td>
-                          <td>{{ row.engagement_rate|percent_sigfigs:4 }}</td>
-                          <td>{{ row.save_rate|percent_sigfigs:4 }}</td>
-                          <td>{{ row.share_rate|percent_sigfigs:4 }}</td>
-                          <td>{{ row.profile_visit_rate|percent_sigfigs:4 }}</td>
-                          <td><strong>{{ row.standardized_performance_score|default:row.raw_activity_score }}</strong></td>
+                          <td style="white-space:nowrap">{{ row.engagement_rate|percent_sigfigs:4 }}</td>
+                          <td style="white-space:nowrap">{{ row.save_rate|percent_sigfigs:4 }}</td>
+                          <td style="white-space:nowrap">{{ row.share_rate|percent_sigfigs:4 }}</td>
+                          <td style="white-space:nowrap">{{ row.profile_visit_rate|percent_sigfigs:4 }}</td>
                         </tr>
                       {% empty %}
-                        <tr><td colspan="10" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
+                        <tr><td colspan="9" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
                       {% endfor %}
                     </tbody>
                   </table>
