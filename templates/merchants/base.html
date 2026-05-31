@@ -149,10 +149,6 @@
 
   {% with request.resolver_match.url_name as cur %}
   <ul class="sb-nav">
-    <li><a href="{% url 'merchant_dashboard' %}"
-        class="{% if cur == 'merchant_dashboard' and request.GET.view != 'analytics' %}sb-active{% endif %}">
-      <i class="bi bi-speedometer2"></i> Dashboard
-    </a></li>
     <li><a href="{% url 'merchant_marketplace' %}"
         class="{% if cur == 'merchant_marketplace' %}sb-active{% endif %}">
       <i class="bi bi-shop"></i> Marketplace
@@ -161,17 +157,9 @@
         class="{% if cur == 'merchant_creator_discovery' %}sb-active{% endif %}">
       <i class="bi bi-compass"></i> Creator Discovery
     </a></li>
-    <li><a href="{% url 'merchant_items' %}"
-        class="{% if cur == 'merchant_items' %}sb-active{% endif %}">
-      <i class="bi bi-megaphone"></i> Campaigns
-    </a></li>
     <li><a href="{% url 'merchant_requests' %}"
         class="{% if cur == 'merchant_requests' %}sb-active{% endif %}">
       <i class="bi bi-people"></i> Partnerships
-    </a></li>
-    <li><a href="{% url 'merchant_dashboard' %}?view=analytics"
-        class="{% if cur == 'merchant_dashboard' and request.GET.view == 'analytics' %}sb-active{% endif %}">
-      <i class="bi bi-graph-up"></i> Analytics
     </a></li>
     {% if show_invoices_tab %}
     <li data-nav-invoices><a href="{% url 'merchant_invoices' %}"

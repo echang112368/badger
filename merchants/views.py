@@ -398,6 +398,164 @@ def _enforce_tab_permissions(tab: str, permissions) -> str:
     return tab
 
 
+def _build_merchant_tasks(merchant_user, merchant_meta, active_creators_count, groups_count, items_count):
+    from creators.models import PartnerMessage
+    now = timezone.now()
+    twenty_four_h_ago = now - timedelta(hours=24)
+    tasks = []
+
+    unread_count = PartnerMessage.objects.filter(
+        partnership__merchant=merchant_user,
+        read_at__isnull=True,
+    ).exclude(sender=merchant_user).count()
+    if unread_count:
+        tasks.append({
+            'icon': 'bi-chat-dots',
+            'title': f'{unread_count} unopened message{" " if unread_count == 1 else "s "}from creator{"" if unread_count == 1 else "s"}',
+            'description': 'Creators are waiting for your reply.',
+            'url_name': 'merchant_requests',
+            'cta': 'View messages',
+            'complete': False,
+            'completed_at': None,
+            'priority': 3,
+        })
+
+    is_shopify = merchant_meta and merchant_meta.business_type == MerchantMeta.BusinessType.SHOPIFY
+    shopify_connected = is_shopify and bool(merchant_meta and merchant_meta.shopify_access_token)
+    paypal_connected = bool(merchant_meta and merchant_meta.paypal_email)
+    if not shopify_connected and not paypal_connected:
+        tasks.append({
+            'icon': 'bi-plug',
+            'title': 'Connect your store',
+            'description': 'Link your Shopify store or add a PayPal email to enable payouts.',
+            'url_name': 'merchant_settings',
+            'cta': 'Go to settings',
+            'complete': False,
+            'completed_at': None,
+            'priority': 10,
+        })
+
+    if merchant_meta and not merchant_meta.marketplace_enabled:
+        tasks.append({
+            'icon': 'bi-shop',
+            'title': 'Enable marketplace visibility',
+            'description': 'Let creators find your brand in the Badger marketplace.',
+            'url_name': 'merchant_marketplace',
+            'cta': 'Open marketplace',
+            'complete': False,
+            'completed_at': None,
+            'priority': 40,
+        })
+
+    has_sent_request = PartnershipRequest.objects.filter(
+        merchant=merchant_user, merchant_initiated=True
+    ).exists()
+    if not has_sent_request and active_creators_count == 0:
+        tasks.append({
+            'icon': 'bi-send',
+            'title': 'Reach out to your first creator',
+            'description': 'Discover creators who match your brand and send a partnership request.',
+            'url_name': 'merchant_creator_discovery',
+            'cta': 'Discover creators',
+            'complete': False,
+            'completed_at': None,
+            'priority': 50,
+        })
+
+    incoming_pending = (
+        PartnershipRequest.objects.filter(
+            merchant=merchant_user,
+            merchant_initiated=False,
+            status=REQUEST_STATUS_PENDING,
+        )
+        .select_related('creator')
+        .order_by('created_at')
+    )
+    for req in incoming_pending:
+        creator_name = req.creator.get_full_name() or req.creator.username
+        tasks.append({
+            'icon': 'bi-person-plus',
+            'title': f'Review request from {creator_name}',
+            'description': f'@{req.creator.username} wants to partner with you.',
+            'url_name': 'merchant_requests',
+            'cta': 'Review request',
+            'complete': False,
+            'completed_at': None,
+            'priority': 5,
+        })
+
+    recently_responded = (
+        PartnershipRequest.objects.filter(
+            merchant=merchant_user,
+            status__in=[REQUEST_STATUS_ACCEPTED, REQUEST_STATUS_DECLINED],
+            updated_at__gte=twenty_four_h_ago,
+        )
+        .select_related('creator')
+        .order_by('-updated_at')
+    )
+    for req in recently_responded:
+        creator_name = req.creator.get_full_name() or req.creator.username
+        action = 'Accepted' if req.status == REQUEST_STATUS_ACCEPTED else 'Declined'
+        tasks.append({
+            'icon': 'bi-person-check',
+            'title': f'{action} partnership with {creator_name}',
+            'description': '',
+            'url_name': 'merchant_requests',
+            'cta': '',
+            'complete': True,
+            'completed_at': req.updated_at,
+            'priority': 200,
+        })
+
+    tasks.sort(key=lambda t: (1 if t['complete'] else 0, t['priority']))
+    return tasks
+
+
+def _build_merchant_recent_activity(merchant_user):
+    activity = []
+    recent_requests = (
+        PartnershipRequest.objects.filter(merchant=merchant_user)
+        .select_related('creator')
+        .order_by('-updated_at')[:12]
+    )
+    for req in recent_requests:
+        creator_name = req.creator.get_full_name() or req.creator.username
+        if req.status == REQUEST_STATUS_ACCEPTED:
+            activity.append({
+                'icon': 'bi-person-check-fill',
+                'title': f'Partnership accepted with {creator_name}',
+                'description': f'@{req.creator.username}',
+                'url_name': 'merchant_requests',
+                'timestamp': req.updated_at,
+            })
+        elif req.status == REQUEST_STATUS_DECLINED:
+            activity.append({
+                'icon': 'bi-person-x-fill',
+                'title': f'Partnership declined with {creator_name}',
+                'description': f'@{req.creator.username}',
+                'url_name': 'merchant_requests',
+                'timestamp': req.updated_at,
+            })
+        elif req.merchant_initiated:
+            activity.append({
+                'icon': 'bi-send-fill',
+                'title': f'Partnership request sent to {creator_name}',
+                'description': f'@{req.creator.username} · Awaiting response',
+                'url_name': 'merchant_requests',
+                'timestamp': req.created_at,
+            })
+        else:
+            activity.append({
+                'icon': 'bi-envelope-fill',
+                'title': f'New request from {creator_name}',
+                'description': f'@{req.creator.username} · Awaiting your review',
+                'url_name': 'merchant_requests',
+                'timestamp': req.created_at,
+            })
+    activity.sort(key=lambda a: a['timestamp'], reverse=True)
+    return activity[:8]
+
+
 @csrf_exempt
 @require_GET
 def store_id_lookup(request):
@@ -432,206 +590,43 @@ def merchant_dashboard(request):
             )
             return redirect(authorize_url)
 
-    balance = LedgerEntry.merchant_balance(merchant_user)
-    entries = (
-        LedgerEntry.objects.filter(merchant=merchant_user)
-        .exclude(entry_type=LedgerEntry.EntryType.COMMISSION)
-        .order_by('-timestamp')
-    )
-    conversions = ReferralConversion.objects.filter(
-        merchant=merchant_user
-    ).select_related("merchant")
-    now = timezone.now()
-    holding_period_total = Decimal("0")
-    affiliate_total = Decimal("0")
-    for conversion in conversions:
-        breakdown = compute_commission_schedule(conversion, merchant_user)
-        for commission, return_days in breakdown:
-            if commission <= 0:
-                continue
-            release_date = conversion.created_at + timedelta(days=return_days)
-            if now >= release_date:
-                affiliate_total += commission
-            else:
-                holding_period_total += commission
-    holding_period_total = holding_period_total.quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    affiliate_total = affiliate_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    active_creators_count = MerchantCreatorLink.objects.filter(
+        merchant=merchant_user, status=STATUS_ACTIVE
+    ).count()
+    pending_outgoing_count = PartnershipRequest.objects.filter(
+        merchant=merchant_user,
+        merchant_initiated=True,
+        status=REQUEST_STATUS_PENDING,
+    ).count()
+    pending_incoming_count = PartnershipRequest.objects.filter(
+        merchant=merchant_user,
+        merchant_initiated=False,
+        status=REQUEST_STATUS_PENDING,
+    ).count()
+    accepted_count = PartnershipRequest.objects.filter(
+        merchant=merchant_user,
+        status=REQUEST_STATUS_ACCEPTED,
+    ).count()
+    groups_count = ItemGroup.objects.filter(merchant=merchant_user).count()
+    items_count = MerchantItem.objects.filter(merchant=merchant_user).count()
+    marketplace_enabled = merchant_meta.marketplace_enabled if merchant_meta else False
+    marketplace_creator_count = CreatorMeta.objects.filter(marketplace_enabled=True).count()
 
-    affiliate_entries = (
-        LedgerEntry.objects.filter(
-            merchant=merchant_user,
-            entry_type=LedgerEntry.EntryType.AFFILIATE_PAYOUT,
-        )
-        .select_related("invoice")
-        .only("amount", "invoice__status")
+    recent_active_links = (
+        MerchantCreatorLink.objects.filter(merchant=merchant_user, status=STATUS_ACTIVE)
+        .select_related('creator')
+        .order_by('-id')[:5]
     )
-    canceled_statuses = {"CANCELLED", "CANCELED", "VOIDED"}
-    canceled_total = Decimal("0")
-    for entry in affiliate_entries:
-        amount = -entry.amount if entry.amount < 0 else entry.amount
-        status = entry.invoice.status.upper() if entry.invoice else ""
-        if status in canceled_statuses:
-            canceled_total += amount
-    canceled_total = canceled_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    earnings_window_start = timezone.now() - timedelta(days=30)
-    earnings_total = (
-        ReferralConversion.objects.filter(
-            merchant=merchant_user, created_at__gte=earnings_window_start
-        ).aggregate(total=Sum("order_amount"))
-    ).get("total") or Decimal("0")
-    earnings_total = earnings_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    chart_window_start = timezone.now() - timedelta(days=29)
-    chart_dates = [
-        timezone.localdate(timezone.now() - timedelta(days=offset))
-        for offset in range(29, -1, -1)
-    ]
-    earnings_by_day = {date: Decimal("0") for date in chart_dates}
-
-    dashboard_conversions = (
-        ReferralConversion.objects.filter(
-            merchant=merchant_user, created_at__gte=chart_window_start
-        )
-        .select_related("creator")
-        .order_by("created_at")
-    )
-    missing_creator_uuids = {
-        str(conversion.creator_uuid)
-        for conversion in dashboard_conversions
-        if not conversion.creator and conversion.creator_uuid
-    }
-    creator_lookup = {}
-    if missing_creator_uuids:
-        creator_lookup = {
-            str(meta.uuid): meta
-            for meta in CreatorMeta.objects.select_related("user").filter(
-                uuid__in=missing_creator_uuids
-            )
+    recent_creators = [
+        {
+            'name': link.creator.get_full_name() or link.creator.username,
+            'username': link.creator.username,
         }
-    product_name_lookup = {}
-    merchant_items = (
-        MerchantItem.objects.filter(merchant=merchant_user)
-        .exclude(shopify_product_id__isnull=True)
-        .exclude(shopify_product_id="")
-        .only("title", "shopify_product_id")
-    )
-    for item in merchant_items:
-        raw_product_id = str(item.shopify_product_id)
-        product_name_lookup[raw_product_id] = item.title
-        normalised_product_id = _normalise_shopify_product_id(raw_product_id)
-        if normalised_product_id:
-            product_name_lookup[normalised_product_id] = item.title
-    for conversion in dashboard_conversions:
-        conversion_date = timezone.localdate(conversion.created_at)
-        if conversion_date in earnings_by_day:
-            earnings_by_day[conversion_date] += conversion.order_amount
+        for link in recent_active_links
+    ]
+    tasks = _build_merchant_tasks(merchant_user, merchant_meta, active_creators_count, groups_count, items_count)
+    recent_activity = _build_merchant_recent_activity(merchant_user)
 
-    earnings_chart_labels = [date.strftime("%b %d") for date in chart_dates]
-    earnings_chart_values = [float(earnings_by_day[date]) for date in chart_dates]
-
-    top_creators_map = {}
-    top_products_map = {}
-    for conversion in dashboard_conversions:
-        creator_key = str(conversion.creator_id or conversion.creator_uuid or "unknown")
-        if creator_key not in top_creators_map:
-            creator_name = "Unknown creator"
-            if conversion.creator:
-                creator_name = conversion.creator.username
-            elif conversion.creator_uuid:
-                creator_meta = creator_lookup.get(str(conversion.creator_uuid))
-                if creator_meta and creator_meta.user:
-                    creator_name = creator_meta.user.username
-            top_creators_map[creator_key] = {
-                "name": creator_name,
-                "earnings": Decimal("0"),
-                "orders": 0,
-            }
-        top_creators_map[creator_key]["earnings"] += conversion.order_amount
-        top_creators_map[creator_key]["orders"] += 1
-
-        metadata = conversion.metadata if isinstance(conversion.metadata, dict) else {}
-        line_items = metadata.get("line_items") if isinstance(metadata, dict) else []
-        line_items = line_items or []
-        creator_reference = conversion.creator_id or conversion.creator_uuid
-        if line_items:
-            per_item_fallback = (
-                conversion.order_amount / max(len(line_items), 1)
-                if conversion.order_amount
-                else Decimal("0")
-            )
-            for item in line_items:
-                product_id = item.get("product_id")
-                normalised_product_id = _normalise_shopify_product_id(product_id)
-                title = (
-                    product_name_lookup.get(str(product_id)) if product_id else None
-                ) or (
-                    product_name_lookup.get(normalised_product_id)
-                    if normalised_product_id
-                    else None
-                )
-                title = (
-                    title
-                    or item.get("title")
-                    or item.get("name")
-                    or item.get("product_title")
-                    or "Product"
-                )
-                quantity = item.get("quantity") or 1
-                price_raw = item.get("price") or item.get("price_amount") or item.get(
-                    "amount"
-                )
-                revenue = None
-                if price_raw is not None:
-                    try:
-                        revenue = Decimal(str(price_raw)) * Decimal(str(quantity))
-                    except (InvalidOperation, TypeError):
-                        revenue = None
-                if revenue is None:
-                    revenue = per_item_fallback
-                product_entry = top_products_map.setdefault(
-                    title,
-                    {
-                        "name": title,
-                        "revenue": Decimal("0"),
-                        "orders": 0,
-                        "creators": set(),
-                    },
-                )
-                product_entry["revenue"] += revenue
-                product_entry["orders"] += 1
-                if creator_reference:
-                    product_entry["creators"].add(str(creator_reference))
-        else:
-            title = (
-                f"Order {conversion.order_id}" if conversion.order_id else "Misc sales"
-            )
-            product_entry = top_products_map.setdefault(
-                title,
-                {
-                    "name": title,
-                    "revenue": Decimal("0"),
-                    "orders": 0,
-                    "creators": set(),
-                },
-            )
-            product_entry["revenue"] += conversion.order_amount
-            product_entry["orders"] += 1
-            if creator_reference:
-                product_entry["creators"].add(str(creator_reference))
-
-    top_creators = sorted(
-        top_creators_map.values(),
-        key=lambda entry: entry["earnings"],
-        reverse=True,
-    )[:5]
-    top_products = sorted(
-        top_products_map.values(),
-        key=lambda entry: entry["revenue"],
-        reverse=True,
-    )[:5]
-    for entry in top_products:
-        entry["creators_count"] = len(entry.get("creators", []))
     analytics_items = []
     if request.GET.get("view") == "analytics":
         groups = (
@@ -818,19 +813,21 @@ def merchant_dashboard(request):
             )
     return render(request, 'merchants/dashboard.html', {
         'merchant': merchant_user,
-        'balance': balance,
-        'ledger_entries': entries,
+        'merchant_meta': merchant_meta,
         'permissions': permissions,
-        'affiliate_total': affiliate_total,
-        'holding_period_total': holding_period_total,
-        'canceled_total': canceled_total,
-        'earnings_total': earnings_total,
         'show_invoices_tab': _should_show_invoices_tab(merchant_meta),
         'analytics_items': analytics_items,
-        'earnings_chart_labels': earnings_chart_labels,
-        'earnings_chart_values': earnings_chart_values,
-        'top_creators': top_creators,
-        'top_products': top_products,
+        'active_creators_count': active_creators_count,
+        'pending_outgoing_count': pending_outgoing_count,
+        'pending_incoming_count': pending_incoming_count,
+        'accepted_count': accepted_count,
+        'groups_count': groups_count,
+        'items_count': items_count,
+        'marketplace_enabled': marketplace_enabled,
+        'marketplace_creator_count': marketplace_creator_count,
+        'recent_creators': recent_creators,
+        'tasks': tasks,
+        'recent_activity': recent_activity,
     })
 
 
