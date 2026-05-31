@@ -46,6 +46,20 @@ def _error_feedback(payload: dict[str, Any], message: str, *, error_code: str = 
     }
 
 
+def _pending_feedback(payload: dict[str, Any], input_hash: str) -> dict[str, Any]:
+    return {
+        "overall_score": None,
+        "verdict": "Analysis Pending",
+        "summary": "AI profile feedback is being refreshed in the background.",
+        "dimension_scores": {},
+        "top_priority_actions": [],
+        "benchmark_comparison": {},
+        "inputs": payload["inputs"],
+        "_input_hash": input_hash,
+        "pending": True,
+    }
+
+
 def build_ai_profile_feedback(
     *,
     user,
@@ -56,6 +70,7 @@ def build_ai_profile_feedback(
     performance: dict[str, Any],
     cached_hash: str | None = None,
     cached_feedback: dict[str, Any] | None = None,
+    allow_api_request: bool = True,
 ) -> dict[str, Any]:
     creator_meta = getattr(user, "creatormeta", None)
     paid_deals = _safe_int(getattr(creator_meta, "paid_brand_deals_count", 0))
@@ -97,6 +112,14 @@ def build_ai_profile_feedback(
         result = dict(cached_feedback)
         result["_input_hash"] = input_hash
         return result
+
+    if not allow_api_request:
+        if cached_feedback and not cached_feedback.get("error"):
+            result = dict(cached_feedback)
+            result["_input_hash"] = cached_hash or input_hash
+            result["stale"] = True
+            return result
+        return _pending_feedback(profile_payload, input_hash)
 
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
