@@ -46,7 +46,7 @@ def _error_feedback(payload: dict[str, Any], message: str, *, error_code: str = 
     }
 
 
-def build_ai_profile_payload(
+def build_ai_profile_feedback(
     *,
     user,
     platform: str,
@@ -54,7 +54,9 @@ def build_ai_profile_payload(
     summary_metrics: dict[str, Any],
     audience: dict[str, Any],
     performance: dict[str, Any],
-) -> tuple[dict[str, Any], str]:
+    cached_hash: str | None = None,
+    cached_feedback: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     creator_meta = getattr(user, "creatormeta", None)
     paid_deals = _safe_int(getattr(creator_meta, "paid_brand_deals_count", 0))
     gifted_deals = _safe_int(getattr(creator_meta, "gifted_brand_deals_count", 0))
@@ -83,42 +85,8 @@ def build_ai_profile_payload(
             "reach": _safe_int(performance.get("reach")),
         }
     }
-    return profile_payload, _inputs_fingerprint(profile_payload["inputs"])
 
-
-def build_pending_ai_profile_feedback(profile_payload: dict[str, Any], input_hash: str) -> dict[str, Any]:
-    return {
-        "overall_score": None,
-        "verdict": "Analysis in progress",
-        "summary": "Calculating the latest AI-powered account health score.",
-        "dimension_scores": {},
-        "top_priority_actions": [],
-        "benchmark_comparison": {},
-        "inputs": profile_payload["inputs"],
-        "status": "pending",
-        "_input_hash": input_hash,
-    }
-
-
-def build_ai_profile_feedback(
-    *,
-    user,
-    platform: str,
-    account: dict[str, Any],
-    summary_metrics: dict[str, Any],
-    audience: dict[str, Any],
-    performance: dict[str, Any],
-    cached_hash: str | None = None,
-    cached_feedback: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    profile_payload, input_hash = build_ai_profile_payload(
-        user=user,
-        platform=platform,
-        account=account,
-        summary_metrics=summary_metrics,
-        audience=audience,
-        performance=performance,
-    )
+    input_hash = _inputs_fingerprint(profile_payload["inputs"])
 
     # Return the cached score when nothing in the inputs has changed.
     if cached_hash == input_hash and cached_feedback and not cached_feedback.get("error"):
@@ -249,15 +217,11 @@ def refresh_ai_score_if_stale(user_id: int) -> bool:
     )
 
     new_hash = feedback.get("_input_hash")
-    if new_hash and (new_hash != ai_cache.get("hash") or ai_cache.get("status") == "pending"):
-        payload["_ai_cache"] = {
-            "hash": new_hash,
-            "feedback": feedback,
-            "status": "failed" if feedback.get("error") else "ready",
-        }
+    if new_hash and new_hash != ai_cache.get("hash") and not feedback.get("error"):
+        payload["_ai_cache"] = {"hash": new_hash, "feedback": feedback}
         snapshot.payload = payload
         snapshot.save(update_fields=["payload"])
         logger.info("AI score refreshed for user_id=%s after profile change", user_id)
-        return not bool(feedback.get("error"))
+        return True
 
     return False

@@ -9,9 +9,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
-from django.views.decorators.http import require_POST
 from .models import CreatorMeta
-from .models import PartnerMessage, SocialAnalyticsSnapshot
+from .models import PartnerMessage
 from accounts.forms import UserNameForm
 from collect.models import AffiliateClick, ReferralVisit, ReferralConversion
 from links.models import (
@@ -1361,79 +1360,12 @@ def creator_support(request):
     return render(request, "creators/support.html")
 
 
-def _mark_social_sync_status(user, platform: str, status: str, **extra) -> None:
-    snapshot, _ = SocialAnalyticsSnapshot.objects.get_or_create(
-        user=user,
-        platform=platform,
-        defaults={"payload": {}},
-    )
-    payload = snapshot.payload or {}
-    payload["_sync_status"] = {
-        "status": status,
-        **extra,
-    }
-    snapshot.payload = payload
-    snapshot.save(update_fields=["payload"])
-
-
-def _run_social_media_refresh(user_id: int, platform: str) -> None:
-    try:
-        user = CustomUser.objects.get(pk=user_id)
-    except CustomUser.DoesNotExist:
-        return
-
-    try:
-        SocialDashboardService(user).build_dashboard(
-            refresh_platform=platform,
-            force_reanalyze=True,
-        )
-    except Exception as exc:
-        logger.exception(
-            "Async social media refresh failed",
-            extra={"user_id": user_id, "platform": platform},
-        )
-        _mark_social_sync_status(
-            user,
-            platform,
-            "failed",
-            finished_at=timezone.now().isoformat(),
-            message=str(exc),
-        )
-        return
-
-    _mark_social_sync_status(
-        user,
-        platform,
-        "ready",
-        finished_at=timezone.now().isoformat(),
-    )
-
-
-def _trigger_social_media_refresh(user_id: int, platform: str) -> None:
-    thread = threading.Thread(
-        target=_run_social_media_refresh,
-        args=(user_id, platform),
-        daemon=True,
-    )
-    thread.start()
-
-
 @login_required
 def creator_social_media(request):
     refresh_platform = request.GET.get("refresh")
     force_reanalyze = bool(request.GET.get("reanalyze"))
-    if refresh_platform:
-        _mark_social_sync_status(
-            request.user,
-            refresh_platform,
-            "pending",
-            started_at=timezone.now().isoformat(),
-        )
-        _trigger_social_media_refresh(request.user.id, refresh_platform)
-        return redirect("creator_social_media")
-
     dashboard = SocialDashboardService(request.user).build_dashboard(
-        refresh_platform=None,
+        refresh_platform=refresh_platform,
         force_reanalyze=force_reanalyze,
     )
     return render(
@@ -1446,50 +1378,6 @@ def creator_social_media(request):
         },
     )
 
-
-
-@login_required
-@require_POST
-def creator_social_media_refresh(request):
-    platform = request.POST.get("platform") or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
-    if platform != SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM:
-        return JsonResponse({"error": "Unsupported platform."}, status=400)
-
-    _mark_social_sync_status(
-        request.user,
-        platform,
-        "pending",
-        started_at=timezone.now().isoformat(),
-    )
-    _trigger_social_media_refresh(request.user.id, platform)
-    return JsonResponse({"status": "pending", "platform": platform})
-
-
-@login_required
-def creator_social_media_ai_status(request):
-    platform = request.GET.get("platform") or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
-    snapshot = SocialAnalyticsSnapshot.objects.filter(
-        user=request.user,
-        platform=platform,
-    ).first()
-    payload = (snapshot.payload or {}) if snapshot else {}
-    ai_cache = payload.get("_ai_cache") or {}
-    sync_status = payload.get("_sync_status") or {}
-    feedback = ai_cache.get("feedback")
-    if sync_status.get("status") == "pending":
-        status = "syncing"
-    elif feedback:
-        status = "failed" if feedback.get("error") else "ready"
-    else:
-        status = ai_cache.get("status") or "pending"
-    return JsonResponse({
-        "status": status,
-        "sync_status": sync_status.get("status"),
-        "platform": platform,
-        "started_at": ai_cache.get("started_at") or sync_status.get("started_at"),
-        "updated_at": snapshot.synced_at.isoformat() if snapshot else None,
-        "has_feedback": bool(feedback),
-    })
 
 @login_required
 def delete_affiliate_merchants(request):
