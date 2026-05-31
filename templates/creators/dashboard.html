@@ -54,9 +54,6 @@
       <p class="text-muted fw-semibold mb-1">Creator command center</p>
       <h1 class="fw-bold fs-3 mb-0">Welcome back, {{ request.user.first_name|default:request.user.username }}</h1>
     </div>
-    <div class="d-flex gap-2">
-      <a class="btn btn-outline-primary" href="{% url 'creator_earnings' %}"><i class="bi bi-cash-coin me-1"></i>Earnings detail</a>
-    </div>
   </div>
 
   <div class="row g-3 mb-4">
@@ -85,7 +82,7 @@
     </div>
     <div class="col-md-6 col-xl-3">
       <div class="card dashboard-card h-100"><div class="card-body">
-        <div class="stat-icon mb-3"><i class="bi bi-handshake"></i></div>
+        <div class="stat-icon mb-3"><i class="bi bi-people-fill"></i></div>
         <h3 class="fs-6 text-muted">Partnerships</h3>
         <p class="fs-3 fw-bold mb-1">{{ partnerships.pending_count }}</p>
         <p class="small text-muted mb-3">pending · {{ partnerships.active_count }} active</p>
