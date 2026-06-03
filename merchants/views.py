@@ -1251,6 +1251,7 @@ def merchant_requests(request):
     if not merchant_user:
         return redirect('merchant_dashboard')
 
+    from datetime import datetime, timezone as dt_tz
     links = (
         MerchantCreatorLink.objects.filter(merchant=merchant_user)
         .select_related('creator', 'creator__creatormeta')
@@ -1258,6 +1259,16 @@ def merchant_requests(request):
     )
     palette = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#7c3aed', '#be185d']
     pending_rows, active_rows, archived_rows = [], [], []
+
+    unread_by_link = dict(
+        PartnerMessage.objects.filter(
+            partnership__merchant=merchant_user,
+            read_at__isnull=True,
+        ).exclude(sender=merchant_user)
+        .values('partnership_id')
+        .annotate(n=Count('id'))
+        .values_list('partnership_id', 'n')
+    )
 
     for idx, link in enumerate(links):
         creator = link.creator
@@ -1274,6 +1285,7 @@ def merchant_requests(request):
         last_message = link.messages.order_by('-created_at').first()
         preview = (last_message.content if last_message else (pr.message if pr and pr.message else 'No messages yet'))
         preview = preview[:80] + ('...' if len(preview) > 80 else '')
+        timestamp = last_message.created_at if last_message else ((pr.last_message_at or pr.created_at) if pr else None)
 
         row = {
             'link_id': link.id,
@@ -1283,7 +1295,8 @@ def merchant_requests(request):
             'initials': initials,
             'avatar_color': palette[idx % len(palette)],
             'preview': preview,
-            'timestamp': (pr.last_message_at or pr.created_at) if pr else None,
+            'timestamp': timestamp,
+            'unread_count': unread_by_link.get(link.id, 0),
             'status': link.status,
             'creator_has_replied': pr.creator_has_replied if pr else True,
             'request_status': pr.status if pr else None,
@@ -1299,8 +1312,16 @@ def merchant_requests(request):
         else:
             archived_rows.append(row)
 
+    _epoch = datetime(1970, 1, 1, tzinfo=dt_tz.utc)
+    all_rows = sorted(
+        active_rows + pending_rows,
+        key=lambda r: r['timestamp'] or _epoch,
+        reverse=True,
+    )
+
     return render(request, 'merchants/requests.html', {
         'permissions': permissions,
+        'all_rows': all_rows,
         'pending_rows': pending_rows,
         'active_rows': active_rows,
         'archived_rows': archived_rows,
@@ -1339,7 +1360,12 @@ def merchant_partner_messages(request, link_id):
             'created_at': message.created_at.isoformat(), 'is_opening_message': False,
         }})
 
-    # GET
+    # GET — mark unread creator messages as read
+    PartnerMessage.objects.filter(
+        partnership=link,
+        read_at__isnull=True,
+    ).exclude(sender=merchant_user).update(read_at=timezone.now())
+
     msgs = list(link.messages.values('id', 'sender_id', 'content', 'created_at', 'is_opening_message'))
     if not msgs and pr and (pr.message or '').strip():
         msgs = [{

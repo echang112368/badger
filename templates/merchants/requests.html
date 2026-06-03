@@ -289,8 +289,7 @@
     </div>
 
     <div id="dm-tabs">
-      <button class="dm-tab dm-tab-active" data-tab="active">Active</button>
-      <button class="dm-tab" data-tab="requests">Requests</button>
+      <button class="dm-tab dm-tab-active" data-tab="all">All</button>
       <button class="dm-tab" data-tab="archived">Archived</button>
     </div>
 
@@ -298,44 +297,9 @@
       <input id="dm-search" type="text" placeholder="Search...">
     </div>
 
-    <!-- Active tab -->
-    <div class="dm-tab-panel" data-panel="active">
-      {% for row in active_rows %}
-      <div class="dm-row"
-        data-link-id="{{ row.link_id }}"
-        data-status="{{ row.status }}"
-        data-creator="{{ row.creator_name }}"
-        data-handle="{{ row.creator_handle }}"
-        data-email="{{ row.email }}"
-        data-initials="{{ row.initials }}"
-        data-avatar-color="{{ row.avatar_color }}"
-        data-campaign-type="{{ row.campaign_type }}"
-        data-match-score="{{ row.match_score }}"
-        data-partner-since="{{ row.partner_since }}"
-        data-deal-type="{{ row.deal_type }}"
-        data-creator-has-replied="true"
-        data-request-status="{{ row.request_status|default:'' }}">
-        <div class="dm-av">{{ row.initials }}</div>
-        <div class="dm-row-body">
-          <div class="dm-row-name">{{ row.creator_name }}</div>
-          <div class="dm-row-preview">{{ row.preview }}</div>
-        </div>
-        <div class="dm-row-meta">
-          {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-          <span class="dm-green-dot"></span>
-        </div>
-      </div>
-      {% empty %}
-      <div class="dm-empty-list">
-        <i class="bi bi-people"></i>
-        No active partnerships yet
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Requests tab -->
-    <div class="dm-tab-panel dm-hidden" data-panel="requests">
-      {% for row in pending_rows %}
+    <!-- All tab (active + pending, sorted by most recent) -->
+    <div class="dm-tab-panel" data-panel="all">
+      {% for row in all_rows %}
       <div class="dm-row"
         data-link-id="{{ row.link_id }}"
         data-status="{{ row.status }}"
@@ -349,7 +313,8 @@
         data-partner-since="{{ row.partner_since }}"
         data-deal-type="{{ row.deal_type }}"
         data-creator-has-replied="{{ row.creator_has_replied|yesno:'true,false' }}"
-        data-request-status="{{ row.request_status|default:'' }}">
+        data-request-status="{{ row.request_status|default:'' }}"
+        data-unread="{{ row.unread_count|default:0 }}">
         <div class="dm-av">{{ row.initials }}</div>
         <div class="dm-row-body">
           <div class="dm-row-name">{{ row.creator_name }}</div>
@@ -357,13 +322,19 @@
         </div>
         <div class="dm-row-meta">
           {% if row.timestamp %}<span class="dm-row-time">{{ row.timestamp|date:'M j' }}</span>{% endif %}
-          <span class="dm-sent-badge">sent</span>
+          {% if row.unread_count %}
+            <span class="dm-unread-badge">{{ row.unread_count }}</span>
+          {% elif row.status == 'requested' %}
+            <span class="dm-sent-badge">sent</span>
+          {% else %}
+            <span class="dm-green-dot"></span>
+          {% endif %}
         </div>
       </div>
       {% empty %}
       <div class="dm-empty-list">
-        <i class="bi bi-inbox"></i>
-        No outgoing requests
+        <i class="bi bi-people"></i>
+        No partnerships yet
       </div>
       {% endfor %}
     </div>
@@ -473,12 +444,9 @@
     if (av) av.style.background = r.dataset.avatarColor || '#4f46e5';
   });
 
-  // Auto-open
-  const firstPending = document.querySelector('.dm-row[data-status="requested"]');
-  const firstActive  = document.querySelector('.dm-row[data-status="active"]');
-  if (firstPending) openConvo(firstPending);
-  else if (firstActive) openConvo(firstActive);
-  else { const any = document.querySelector('.dm-row'); if (any) openConvo(any); }
+  // Auto-open first row in the All panel
+  const firstRow = document.querySelector('.dm-tab-panel[data-panel="all"] .dm-row');
+  if (firstRow) openConvo(firstRow);
 
   // ── Open conversation ─────────────────────────────────────
   async function openConvo(row) {
@@ -486,6 +454,17 @@
     row.classList.add('active');
     activeRow = row;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+    // Clear unread badge on this row (messages will be marked read server-side via GET)
+    const badge = row.querySelector('.dm-unread-badge');
+    if (badge) {
+      const isActive = row.dataset.status === 'active';
+      badge.replaceWith(Object.assign(document.createElement('span'), {
+        className: isActive ? 'dm-green-dot' : 'dm-sent-badge',
+        textContent: isActive ? '' : 'sent',
+      }));
+      row.dataset.unread = '0';
+    }
 
     const d = row.dataset;
     const isArc = d.status === 'inactive';

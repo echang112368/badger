@@ -50,6 +50,11 @@ class CustomLoginForm(AuthenticationForm):
         return self.cleaned_data
 
 class BusinessSignUpForm(UserCreationForm):
+    company_name = forms.CharField(
+        max_length=255,
+        required=True,
+        label="Business Name",
+    )
     business_type = forms.ChoiceField(
         label="Business Type",
         choices=MerchantMeta.BusinessType.choices,
@@ -69,7 +74,6 @@ class BusinessSignUpForm(UserCreationForm):
     class Meta:
         model = User
         fields = (
-            "username",
             "first_name",
             "last_name",
             "email",
@@ -77,10 +81,19 @@ class BusinessSignUpForm(UserCreationForm):
             "password2",
         )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if "username" in self.fields:
-            self.fields["username"].label = "Business name"
+    def clean_email(self):
+        email = self.cleaned_data.get("email", "").strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("An account with this email already exists.")
+        return email
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        email = self.cleaned_data.get("email", "").strip()
+        user.username = email
+        if commit:
+            user.save()
+        return user
 
     def clean(self):
         cleaned = super().clean()
