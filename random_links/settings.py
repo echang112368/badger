@@ -70,7 +70,6 @@ INSTALLED_APPS = [
     'accounts',
     'merchants',
     'creators',
-    'agent',
     'customer',
     'links',
     'ledger',
