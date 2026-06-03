@@ -150,7 +150,7 @@
   {% with request.resolver_match.url_name as cur %}
   <ul class="sb-nav">
     <li><a href="{% url 'creator_dashboard' %}"
-        class="{% if cur == 'creator_dashboard' and request.GET.tab != 'agent' %}sb-active{% endif %}">
+        class="{% if cur == 'creator_dashboard' %}sb-active{% endif %}">
       <i class="bi bi-speedometer2"></i> Dashboard
     </a></li>
     <li><a href="{% url 'creator_social_media' %}"
@@ -165,9 +165,9 @@
         class="{% if cur == 'creator_marketplace' %}sb-active{% endif %}">
       <i class="bi bi-shop"></i> Marketplace
     </a></li>
-    <li><a href="{% url 'creator_dashboard' %}?tab=agent"
-        class="{% if cur == 'creator_dashboard' and request.GET.tab == 'agent' %}sb-active{% endif %}">
-      <i class="bi bi-chat-dots"></i> Agent
+    <li><a href="{% url 'creator_agent' %}"
+        class="{% if cur == 'creator_agent' %}sb-active{% endif %}">
+      <i class="bi bi-stars"></i> Agent
     </a></li>
     <li><a href="{% url 'creator_profile' %}"
         class="{% if cur == 'creator_profile' %}sb-active{% endif %}">

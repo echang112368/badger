@@ -219,10 +219,17 @@ def disp(message: str) -> None:
 @login_required
 def creator_dashboard(request):
     context = build_creator_dashboard_context(request.user)
-    agent_conversation, _ = Conversation.objects.get_or_create(creator=request.user)
-    context["agent_conversation"] = agent_conversation
-    context["agent_connected_accounts"] = InstagramConnection.objects.filter(user=request.user)
     return render(request, "creators/dashboard.html", context)
+
+
+@login_required
+def creator_agent(request):
+    agent_conversation, _ = Conversation.objects.get_or_create(creator=request.user)
+    connected_accounts = InstagramConnection.objects.filter(user=request.user)
+    return render(request, "creators/agent.html", {
+        "agent_conversation": agent_conversation,
+        "agent_connected_accounts": connected_accounts,
+    })
 
 
 @login_required
