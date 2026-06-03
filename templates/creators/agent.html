@@ -1,0 +1,420 @@
+{% extends 'creators/base.html' %}
+{% block title %}Agent{% endblock %}
+{% block content_class %}{% endblock %}
+{% block content %}
+<style>
+  /* ── Layout ── */
+  #agent-shell {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ══════ LEFT PANEL ══════ */
+  #agent-sidebar {
+    background: #fff;
+    border-right: 1px solid #e8eaed;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .agent-sb-hd {
+    padding: 20px 18px 14px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #f0f2f5;
+  }
+  .agent-sb-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .agent-sb-title i { color: #304f91; font-size: 18px; }
+  .agent-sb-sub { font-size: 12px; color: #9aa3b3; margin-top: 3px; }
+
+  .agent-sb-section {
+    padding: 14px 18px 6px;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: #bbb;
+    flex-shrink: 0;
+  }
+  .agent-sb-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 12px 16px;
+  }
+
+  .agent-quick-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 1px solid #e8eaed;
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    cursor: pointer;
+    transition: background .1s, border-color .1s;
+    font-family: inherit;
+  }
+  .agent-quick-btn:hover { background: #f4f6fb; border-color: #d0d5dd; }
+  .agent-quick-btn i { color: #304f91; font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+
+  .agent-account-card {
+    border: 1px solid #e8eaed;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .agent-account-card .ac-name { font-weight: 600; color: #111; display: flex; align-items: center; gap: 6px; }
+  .agent-account-card .ac-detail { color: #9aa3b3; font-size: 11.5px; margin-top: 4px; }
+
+  /* ══════ RIGHT PANEL ══════ */
+  #agent-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #f8f9fc;
+    position: relative;
+  }
+
+  /* Welcome state */
+  #agent-welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    padding: 24px;
+  }
+  .agent-welcome-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #304f91 0%, #4f6fcf 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #fff;
+    margin-bottom: 8px;
+    box-shadow: 0 8px 24px rgba(48,79,145,.25);
+  }
+  #agent-welcome h2 { font-size: 22px; font-weight: 700; color: #111; margin: 0; }
+  #agent-welcome p { font-size: 14px; color: #9aa3b3; max-width: 380px; margin: 0; }
+
+  /* Thread */
+  #agent-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 10% 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    scroll-behavior: smooth;
+  }
+
+  .msg-row { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 18px; }
+  .msg-row.user-row { justify-content: flex-end; }
+  .msg-row.ai-row   { justify-content: flex-start; }
+
+  .msg-av {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .msg-av.ai-av {
+    background: linear-gradient(135deg, #304f91 0%, #4f6fcf 100%);
+    color: #fff;
+  }
+  .msg-av.user-av { background: #e8eaed; color: #555; }
+
+  .msg-bubble {
+    max-width: 68%;
+    padding: 11px 16px;
+    font-size: 14px;
+    line-height: 1.55;
+    border-radius: 18px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .msg-row.user-row .msg-bubble {
+    background: #1e1e1e;
+    color: #fff;
+    border-radius: 18px 18px 4px 18px;
+  }
+  .msg-row.ai-row .msg-bubble {
+    background: #fff;
+    color: #111;
+    border: 1px solid #e8eaed;
+    border-radius: 18px 18px 18px 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+
+  .msg-row.ai-row.thinking .msg-bubble {
+    color: #9aa3b3;
+  }
+  .typing-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #9aa3b3;
+    margin: 0 2px;
+    animation: blink 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: .2s; }
+  .typing-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+  /* Composer */
+  #agent-composer-wrap {
+    padding: 12px 10% 20px;
+    flex-shrink: 0;
+    background: #f8f9fc;
+  }
+  #agent-composer {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 16px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.07);
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 10px 14px;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  #agent-composer:focus-within {
+    border-color: #304f91;
+    box-shadow: 0 4px 18px rgba(48,79,145,.12);
+  }
+  #agent-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: #111;
+    background: transparent;
+    resize: none;
+    min-height: 24px;
+    max-height: 180px;
+    overflow-y: auto;
+    line-height: 1.5;
+    font-family: inherit;
+  }
+  #agent-input::placeholder { color: #aab4c4; }
+  #agent-send {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    border: none;
+    background: #1e1e1e;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background .12s, transform .1s;
+  }
+  #agent-send:hover:not(:disabled) { background: #333; transform: scale(1.05); }
+  #agent-send:disabled { background: #d0d3de; cursor: default; transform: none; }
+  #agent-send i { font-size: 14px; margin-left: 1px; }
+  .composer-hint { text-align: center; font-size: 11px; color: #c8ccd4; margin-top: 8px; }
+</style>
+
+<div id="agent-shell">
+
+  <!-- ═══ LEFT PANEL ═══ -->
+  <div id="agent-sidebar">
+    <div class="agent-sb-hd">
+      <div class="agent-sb-title"><i class="bi bi-stars"></i> Badger Agent</div>
+      <div class="agent-sb-sub">Your creator-specific copilot</div>
+    </div>
+
+    <div class="agent-sb-body">
+      <div class="agent-sb-section">Quick prompts</div>
+      <button class="agent-quick-btn" data-prompt="Summarize my creator profile and give me the three highest-impact next steps to grow my partnerships.">
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span>Summarize my next steps</span>
+      </button>
+      <button class="agent-quick-btn" data-prompt="Draft a concise, professional partnership outreach message tailored to my creator profile.">
+        <i class="bi bi-pencil"></i>
+        <span>Draft brand outreach</span>
+      </button>
+      <button class="agent-quick-btn" data-prompt="Review my connected Instagram account and suggest 5 content ideas for affiliate partnerships.">
+        <i class="bi bi-lightbulb"></i>
+        <span>Suggest content ideas</span>
+      </button>
+      <button class="agent-quick-btn" data-prompt="Help me write a professional reply to a pending partnership request.">
+        <i class="bi bi-reply"></i>
+        <span>Reply to partnerships</span>
+      </button>
+      <button class="agent-quick-btn" data-prompt="What metrics should I focus on to increase my affiliate earnings?">
+        <i class="bi bi-bar-chart"></i>
+        <span>Improve my metrics</span>
+      </button>
+
+      <div class="agent-sb-section" style="margin-top:8px;">Connected accounts</div>
+      {% for account in agent_connected_accounts %}
+        <div class="agent-account-card">
+          <div class="ac-name"><i class="bi bi-instagram" style="color:#e1306c;"></i> Instagram</div>
+          <div class="ac-detail">@{{ account.instagram_username|default:'connected' }} · {{ account.followers_count }} followers</div>
+        </div>
+      {% empty %}
+        <div class="agent-account-card">
+          <div class="ac-name" style="color:#9aa3b3;">No accounts connected</div>
+          <div class="ac-detail"><a href="{% url 'creator_social_media' %}" style="color:#304f91;font-weight:600;">Connect Instagram</a> for tailored advice</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT PANEL ═══ -->
+  <div id="agent-main">
+
+    <div id="agent-welcome">
+      <div class="agent-welcome-icon"><i class="bi bi-stars"></i></div>
+      <h2>What's on the agenda today?</h2>
+      <p>Ask me anything about growing your creator business — outreach, content ideas, partnership strategies, and more.</p>
+    </div>
+
+    <div id="agent-thread" style="display:none;"></div>
+
+    <div id="agent-composer-wrap">
+      <div id="agent-composer">
+        <textarea id="agent-input" rows="1" placeholder="Ask Badger Agent anything…"></textarea>
+        <button id="agent-send"><i class="bi bi-send-fill"></i></button>
+      </div>
+      <div class="composer-hint">Badger Agent · Conversation #{{ agent_conversation.id }}</div>
+    </div>
+  </div>
+</div>
+
+{% csrf_token %}
+<script>
+(function () {
+  const CSRF      = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const HISTORY_URL = '{% url "agent:history" %}';
+  const CHAT_URL    = '{% url "agent:chat" %}';
+
+  const welcome = document.getElementById('agent-welcome');
+  const thread  = document.getElementById('agent-thread');
+  const input   = document.getElementById('agent-input');
+  const sendBtn = document.getElementById('agent-send');
+
+  let hasMessages = false;
+
+  function showThread() {
+    if (!hasMessages) {
+      welcome.style.display = 'none';
+      thread.style.display  = 'flex';
+      thread.style.flexDirection = 'column';
+      hasMessages = true;
+    }
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function appendMsg(role, content) {
+    showThread();
+    const isUser = role === 'user';
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + (isUser ? 'user-row' : 'ai-row');
+
+    const initials = isUser ? 'Me' : 'AI';
+    const avClass  = isUser ? 'user-av' : 'ai-av';
+    const av = `<div class="msg-av ${avClass}">${initials}</div>`;
+    const bubble = `<div class="msg-bubble">${esc(content)}</div>`;
+
+    row.innerHTML = isUser ? bubble + av : av + bubble;
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+    return row;
+  }
+
+  function appendThinking() {
+    showThread();
+    const row = document.createElement('div');
+    row.className = 'msg-row ai-row thinking';
+    row.innerHTML = `
+      <div class="msg-av ai-av">AI</div>
+      <div class="msg-bubble"><span class="typing-dots"><span></span><span></span><span></span></span></div>`;
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+    return row;
+  }
+
+  // ── Load history ─────────────────────────────────────────────
+  (async () => {
+    try {
+      const res  = await fetch(HISTORY_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      (data.messages || []).forEach(m => appendMsg(m.role, m.content));
+    } catch (e) { /* silently skip if agent not set up */ }
+  })();
+
+  // ── Quick prompt buttons ──────────────────────────────────────
+  document.querySelectorAll('[data-prompt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      input.value = btn.dataset.prompt;
+      input.dispatchEvent(new Event('input'));
+      input.focus();
+    });
+  });
+
+  // ── Auto-resize textarea ──────────────────────────────────────
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+  });
+
+  // ── Send ──────────────────────────────────────────────────────
+  async function send() {
+    const content = input.value.trim();
+    if (!content) return;
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    appendMsg('user', content);
+    const thinking = appendThinking();
+
+    try {
+      const res  = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ message: content }),
+      });
+      const data = await res.json();
+      thinking.remove();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+      (data.messages || []).filter(m => m.role !== 'user').forEach(m => appendMsg(m.role, m.content));
+    } catch (err) {
+      thinking.remove();
+      appendMsg('assistant', err.message);
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>
+{% endblock %}
