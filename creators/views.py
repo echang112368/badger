@@ -33,6 +33,7 @@ from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 from .services.social_dashboard import SocialDashboardService
 from instagram_connect.models import InstagramConnection
+from agent.models import Conversation
 from .services.dashboard import build_creator_dashboard_context
 from .services.ai_profile_feedback import refresh_ai_score_if_stale
 
@@ -218,6 +219,9 @@ def disp(message: str) -> None:
 @login_required
 def creator_dashboard(request):
     context = build_creator_dashboard_context(request.user)
+    agent_conversation, _ = Conversation.objects.get_or_create(creator=request.user)
+    context["agent_conversation"] = agent_conversation
+    context["agent_connected_accounts"] = InstagramConnection.objects.filter(user=request.user)
     return render(request, "creators/dashboard.html", context)
 
 
