@@ -22,7 +22,6 @@ migrations/
 !accounts/migrations/
 !creators/migrations/
 !instagram_connect/migrations/
-!agent/migrations/
 
 # Environment
 .env
