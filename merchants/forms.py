@@ -127,6 +127,7 @@ class MerchantSettingsForm(forms.ModelForm):
     def __init__(self, *args, require_billing_details=True, **kwargs):
         self.require_billing_details = require_billing_details
         super().__init__(*args, **kwargs)
+        self.fields['company_name'].required = True
         if self.instance and self.instance.pk:
             business_type_field = self.fields.get("business_type")
             if business_type_field:

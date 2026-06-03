@@ -140,13 +140,10 @@
     {{ hidden }}
   {% endfor %}
 
-  {% with field=form.username %}
+  {% with field=form.company_name %}
     <div class="form-field{% if field.errors %} has-error{% endif %}">
       <label for="{{ field.id_for_label }}">{{ field.label }}</label>
       {{ field }}
-      {% if field.help_text %}
-        <div class="helptext">{{ field.help_text|safe }}</div>
-      {% endif %}
       {% if field.errors %}
         <ul class="errorlist">
           {% for error in field.errors %}

@@ -180,8 +180,10 @@
   {% endwith %}
 
   <div class="sb-user">
-    <div class="sb-user-av">{% if request.user.first_name %}{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}{% else %}{{ request.user.username|slice:":2"|upper }}{% endif %}</div>
-    <span class="sb-user-name">{{ request.user.username }}</span>
+    {% with cname=request.user.merchantmeta.company_name %}
+    <div class="sb-user-av">{% if cname %}{{ cname|slice:":2"|upper }}{% elif request.user.first_name %}{{ request.user.first_name|first|upper }}{{ request.user.last_name|first|upper }}{% else %}{{ request.user.username|slice:":2"|upper }}{% endif %}</div>
+    <span class="sb-user-name">{{ cname|default:request.user.username }}</span>
+    {% endwith %}
   </div>
 </nav>
 
