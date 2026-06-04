@@ -276,9 +276,9 @@
     border-radius: 16px;
     box-shadow: 0 2px 12px rgba(0,0,0,.07);
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 8px 8px 8px 16px;
     transition: border-color .12s, box-shadow .12s;
   }
   #ag-composer:focus-within {
@@ -291,15 +291,17 @@
     font-size: 14px; color: #111;
     background: transparent;
     resize: none;
-    min-height: 24px; max-height: 180px;
-    overflow-y: auto;
-    line-height: 1.5;
+    height: 22px; max-height: 180px;
+    overflow-y: hidden;
+    line-height: 22px;
+    padding: 0;
     font-family: inherit;
+    display: block;
   }
   #ag-input::placeholder { color: #aab4c4; }
   #ag-send {
-    width: 34px; height: 34px;
-    border-radius: 10px; border: none;
+    width: 30px; height: 30px;
+    border-radius: 8px; border: none;
     background: #111;
     color: #fff;
     display: flex; align-items: center; justify-content: center;
@@ -308,7 +310,7 @@
   }
   #ag-send:hover:not(:disabled) { background: #333; transform: scale(1.05); }
   #ag-send:disabled { background: #d0d3de; cursor: default; transform: none; }
-  #ag-send i { font-size: 13px; margin-left: 1px; }
+  #ag-send i { font-size: 12px; }
   .ag-composer-hint {
     text-align: center;
     font-size: 11px;
@@ -584,8 +586,10 @@
 
   /* ── Input auto-resize + send enable ──────────────── */
   input.addEventListener('input', () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 180) + 'px';
+    input.style.height = '22px';
+    const newH = Math.min(input.scrollHeight, 180);
+    input.style.height = newH + 'px';
+    input.style.overflowY = newH >= 180 ? 'auto' : 'hidden';
     sendBtn.disabled = !input.value.trim();
   });
 
