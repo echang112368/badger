@@ -242,9 +242,40 @@
     font-size: 14px;
     line-height: 1.65;
     color: #1a1a1a;
-    white-space: pre-wrap;
     word-break: break-word;
+    min-width: 0;
   }
+  /* Plain-text while streaming (pre-wrap for newlines) */
+  .msg-ai-body.streaming { white-space: pre-wrap; }
+
+  /* Rendered markdown */
+  .msg-ai-body p { margin: 0 0 10px; }
+  .msg-ai-body p:last-child { margin-bottom: 0; }
+  .msg-ai-body strong { font-weight: 650; color: #111; }
+  .msg-ai-body em { font-style: italic; }
+  .msg-ai-body ul { list-style: disc; padding-left: 22px; margin: 4px 0 10px; }
+  .msg-ai-body ol { list-style: decimal; padding-left: 22px; margin: 4px 0 10px; }
+  .msg-ai-body li { margin: 4px 0; line-height: 1.6; }
+  .msg-ai-body li + li { margin-top: 3px; }
+  .msg-ai-body h1, .msg-ai-body h2, .msg-ai-body h3 { font-weight: 700; color: #111; margin: 14px 0 5px; }
+  .msg-ai-body h1 { font-size: 16px; }
+  .msg-ai-body h2 { font-size: 15px; }
+  .msg-ai-body h3 { font-size: 14px; }
+  .msg-ai-body h1:first-child, .msg-ai-body h2:first-child, .msg-ai-body h3:first-child { margin-top: 0; }
+  .msg-ai-body code {
+    background: #f0f2f8; border-radius: 4px;
+    padding: 1px 6px; font-size: 12.5px; font-family: monospace;
+  }
+  .msg-ai-body pre {
+    background: #f0f2f8; border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; margin: 8px 0;
+  }
+  .msg-ai-body pre code { background: none; padding: 0; }
+  .msg-ai-body blockquote {
+    border-left: 3px solid #d1d5db; margin: 8px 0;
+    padding: 4px 0 4px 14px; color: #6b7280;
+  }
+  .msg-ai-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 12px 0; }
 
   /* Typing indicator */
   .msg-ai.thinking .msg-ai-body { color: #9aa3b3; }
@@ -392,8 +423,13 @@
 </div>
 
 {% csrf_token %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 (function () {
+  /* configure marked once */
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({ gfm: true, breaks: false });
+  }
   const CSRF       = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
   const LIST_URL   = '{% url "agent:list_conversations" %}';
   const NEW_URL    = '{% url "agent:new_conversation" %}';
@@ -413,6 +449,13 @@
   /* ── helpers ───────────────────────────────────────── */
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function renderMarkdown(text) {
+    if (typeof marked === 'undefined') {
+      return esc(text).replace(/\n/g, '<br>');
+    }
+    return marked.parse(String(text ?? ''));
   }
 
   function showThread() {
@@ -442,8 +485,9 @@
     block.innerHTML = `
       <div class="msg-ai">
         <div class="msg-ai-av">AI</div>
-        <div class="msg-ai-body">${esc(content)}</div>
+        <div class="msg-ai-body"></div>
       </div>`;
+    block.querySelector('.msg-ai-body').innerHTML = renderMarkdown(content);
     thread.appendChild(block);
     thread.scrollTop = thread.scrollHeight;
     return block;
@@ -685,12 +729,17 @@
             if (!streaming) {
               aiRow.classList.remove('thinking');
               aiBody.innerHTML = '';
+              aiBody.classList.add('streaming');
               streaming = true;
             }
             streamedText += evt.text;
             aiBody.textContent = streamedText;
             thread.scrollTop = thread.scrollHeight;
           } else if (evt.type === 'done') {
+            // Swap plain-text stream for rendered markdown
+            aiBody.classList.remove('streaming');
+            aiBody.innerHTML = renderMarkdown(streamedText);
+            thread.scrollTop = thread.scrollHeight;
             updateItemTitle(activeConvId, evt.title || 'New chat');
             await loadConvList();
             setActiveItem(activeConvId);
@@ -700,11 +749,12 @@
 
       if (!streaming) {
         aiRow.classList.remove('thinking');
-        aiBody.textContent = streamedText || 'No response received.';
+        aiBody.innerHTML = renderMarkdown(streamedText || 'No response received.');
       }
 
     } catch (err) {
       aiRow.classList.remove('thinking');
+      aiBody.classList.remove('streaming');
       aiBody.textContent = err.message;
     } finally {
       sendBtn.disabled = !input.value.trim();
