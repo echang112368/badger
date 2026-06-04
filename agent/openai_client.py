@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Generator
 
 import requests
 from django.conf import settings
@@ -139,3 +139,61 @@ def generate_creator_agent_reply(user, conversation, message: str, timeout_secon
 
     logger.warning("Creator agent OpenAI response returned no output text for user_id=%s", user.id)
     return "OpenAI returned an empty response. Please try again."
+
+
+def stream_creator_agent_reply(
+    user, conversation, message: str, timeout_seconds: int | None = None
+) -> Generator[str, None, None]:
+    """Yields text delta chunks as they stream from the OpenAI Responses API."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("Creator agent streaming skipped: OPENAI_API_KEY is missing.")
+        yield (
+            "I'm ready to help, but the OpenAI API key is not configured on the server. "
+            "Set OPENAI_API_KEY to enable live creator-agent responses."
+        )
+        return
+
+    model = os.environ.get(
+        "OPENAI_CREATOR_AGENT_MODEL",
+        getattr(settings, "OPENAI_CREATOR_AGENT_MODEL", DEFAULT_CREATOR_AGENT_MODEL),
+    ).strip() or DEFAULT_CREATOR_AGENT_MODEL
+    if timeout_seconds is None:
+        timeout_seconds = int(os.environ.get("OPENAI_CREATOR_AGENT_TIMEOUT", "60"))
+
+    body = {
+        "model": model,
+        "input": build_creator_agent_input(user, conversation, message),
+        "temperature": 0.4,
+        "stream": True,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    try:
+        with requests.post(
+            OPENAI_RESPONSES_URL, headers=headers, json=body, stream=True, timeout=timeout_seconds
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line:
+                    continue
+                line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                if not line_str.startswith("data: "):
+                    continue
+                data_str = line_str[6:]
+                if data_str == "[DONE]":
+                    break
+                try:
+                    event_data = json.loads(data_str)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if event_data.get("type") == "response.output_text.delta":
+                    delta = event_data.get("delta", "")
+                    if delta:
+                        yield delta
+    except requests.Timeout:
+        logger.exception("Creator agent streaming timed out for user_id=%s", user.id)
+        yield "\n\n[Response timed out. Please try again.]"
+    except requests.RequestException as exc:
+        logger.exception("Creator agent streaming failed for user_id=%s", user.id)
+        yield f"\n\n[Error connecting to AI service: {exc}]"
