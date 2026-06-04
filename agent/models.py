@@ -3,12 +3,12 @@ from django.db import models
 
 
 class Conversation(models.Model):
-    creator = models.OneToOneField(
+    creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="agent_conversation",
+        related_name="agent_conversations",
     )
-    title = models.CharField(max_length=120, default="Creator Agent")
+    title = models.CharField(max_length=120, default="New chat")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

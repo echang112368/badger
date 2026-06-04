@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import Conversation, Message
@@ -17,17 +18,57 @@ def _serialize_message(message: Message) -> dict:
     }
 
 
+def _serialize_conversation(conv: Conversation) -> dict:
+    return {
+        "id": conv.id,
+        "title": conv.title,
+        "updated_at": conv.updated_at.isoformat(),
+    }
+
+
+def _get_or_create_active(user):
+    conv = Conversation.objects.filter(creator=user).order_by("-updated_at").first()
+    if not conv:
+        conv = Conversation.objects.create(creator=user)
+    return conv
+
+
+@login_required
+@require_GET
+def list_conversations(request):
+    convs = Conversation.objects.filter(creator=request.user).order_by("-updated_at")
+    return JsonResponse({"conversations": [_serialize_conversation(c) for c in convs]})
+
+
+@login_required
+@require_POST
+def new_conversation(request):
+    conv = Conversation.objects.create(creator=request.user)
+    return JsonResponse(_serialize_conversation(conv), status=201)
+
+
+@login_required
+@require_POST
+def delete_conversation(request, conversation_id):
+    conv = get_object_or_404(Conversation, id=conversation_id, creator=request.user)
+    conv.delete()
+    return JsonResponse({"status": "ok"})
+
+
 @login_required
 @require_GET
 def conversation_history(request):
-    conversation, _ = Conversation.objects.get_or_create(creator=request.user)
-    messages = conversation.messages.all()
-    return JsonResponse(
-        {
-            "conversation_id": conversation.id,
-            "messages": [_serialize_message(message) for message in messages],
-        }
-    )
+    conversation_id = request.GET.get("conversation_id")
+    if conversation_id:
+        conv = get_object_or_404(Conversation, id=conversation_id, creator=request.user)
+    else:
+        conv = _get_or_create_active(request.user)
+    return JsonResponse({
+        "conversation_id": conv.id,
+        "title": conv.title,
+        "messages": [_serialize_message(m) for m in conv.messages.all()],
+    })
+
 
 @login_required
 @require_POST
@@ -41,24 +82,29 @@ def chat(request):
     if not content:
         return JsonResponse({"error": "Message is required."}, status=400)
 
-    conversation, _ = Conversation.objects.get_or_create(creator=request.user)
+    conversation_id = payload.get("conversation_id")
+    if conversation_id:
+        conv = get_object_or_404(Conversation, id=conversation_id, creator=request.user)
+    else:
+        conv = _get_or_create_active(request.user)
+
+    # Auto-title from first user message
+    if conv.title == "New chat" and not conv.messages.exists():
+        conv.title = content[:60]
+        conv.save(update_fields=["title", "updated_at"])
+
     user_message = Message.objects.create(
-        conversation=conversation,
-        role=Message.ROLE_USER,
-        content=content,
+        conversation=conv, role=Message.ROLE_USER, content=content
     )
+    assistant_content = generate_creator_agent_reply(request.user, conv, content)
     assistant_message = Message.objects.create(
-        conversation=conversation,
-        role=Message.ROLE_ASSISTANT,
-        content=generate_creator_agent_reply(request.user, conversation, content),
+        conversation=conv, role=Message.ROLE_ASSISTANT, content=assistant_content
     )
     return JsonResponse(
         {
-            "conversation_id": conversation.id,
-            "messages": [
-                _serialize_message(user_message),
-                _serialize_message(assistant_message),
-            ],
+            "conversation_id": conv.id,
+            "title": conv.title,
+            "messages": [_serialize_message(user_message), _serialize_message(assistant_message)],
         },
         status=201,
     )
