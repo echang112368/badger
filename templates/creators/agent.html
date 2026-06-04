@@ -248,16 +248,24 @@
 
   /* Typing indicator */
   .msg-ai.thinking .msg-ai-body { color: #9aa3b3; }
-  .typing-dots span {
-    display: inline-block;
-    width: 6px; height: 6px;
-    border-radius: 50%; background: #9aa3b3;
-    margin: 0 2px;
-    animation: tdot 1.2s infinite;
+
+  /* Streaming status (spinner + text before first chunk) */
+  .ag-status-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #9aa3b3;
+    font-size: 13px;
   }
-  .typing-dots span:nth-child(2) { animation-delay: .2s; }
-  .typing-dots span:nth-child(3) { animation-delay: .4s; }
-  @keyframes tdot { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+  .ag-status-spinner {
+    width: 13px; height: 13px;
+    border: 2px solid rgba(154,163,179,.25);
+    border-top-color: #9aa3b3;
+    border-radius: 50%;
+    animation: ag-spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes ag-spin { to { transform: rotate(360deg); } }
 
   /* ── Composer ── */
   #ag-composer-wrap {
@@ -386,12 +394,12 @@
 {% csrf_token %}
 <script>
 (function () {
-  const CSRF     = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
-  const LIST_URL = '{% url "agent:list_conversations" %}';
-  const NEW_URL  = '{% url "agent:new_conversation" %}';
-  const HIST_URL = id => `{% url "agent:history" %}?conversation_id=${id}`;
-  const CHAT_URL = '{% url "agent:chat" %}';
-  const DEL_URL  = id => `/creators/agent/conversations/${id}/delete/`;
+  const CSRF       = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const LIST_URL   = '{% url "agent:list_conversations" %}';
+  const NEW_URL    = '{% url "agent:new_conversation" %}';
+  const HIST_URL   = id => `{% url "agent:history" %}?conversation_id=${id}`;
+  const STREAM_URL = '{% url "agent:chat_stream" %}';
+  const DEL_URL    = id => `/creators/agent/conversations/${id}/delete/`;
 
   const sidebar  = document.getElementById('ag-conv-list');
   const emptyMsg = document.getElementById('ag-conv-empty');
@@ -593,12 +601,11 @@
     sendBtn.disabled = !input.value.trim();
   });
 
-  /* ── Send ──────────────────────────────────────────── */
+  /* ── Send (streaming) ──────────────────────────────── */
   async function send() {
     const content = input.value.trim();
     if (!content || sendBtn.disabled) return;
 
-    // Ensure there's an active conversation
     if (!activeConvId) {
       try {
         const res  = await fetch(NEW_URL, {
@@ -615,10 +622,31 @@
     sendBtn.disabled = true;
 
     appendUser(content);
-    const thinking = appendThinking();
+
+    // Build AI block we'll stream into
+    const aiBlock = document.createElement('div');
+    aiBlock.className = 'msg-block';
+    aiBlock.innerHTML = `
+      <div class="msg-ai thinking">
+        <div class="msg-ai-av">AI</div>
+        <div class="msg-ai-body">
+          <div class="ag-status-text">
+            <div class="ag-status-spinner"></div>
+            <span>Thinking…</span>
+          </div>
+        </div>
+      </div>`;
+    thread.appendChild(aiBlock);
+    showThread();
+    thread.scrollTop = thread.scrollHeight;
+
+    const aiRow  = aiBlock.querySelector('.msg-ai');
+    const aiBody = aiBlock.querySelector('.msg-ai-body');
+    let streamedText = '';
+    let streaming    = false;
 
     try {
-      const res  = await fetch(CHAT_URL, {
+      const res = await fetch(STREAM_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -627,18 +655,57 @@
         },
         body: JSON.stringify({ message: content, conversation_id: activeConvId }),
       });
-      const data = await res.json();
-      thinking.remove();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-      (data.messages || []).filter(m => m.role !== 'user').forEach(m => appendAI(m.content));
-      // Update sidebar title if it changed from the first message
-      updateItemTitle(activeConvId, data.title || 'New chat');
-      // Refresh list to reorder by recency
-      await loadConvList();
-      setActiveItem(activeConvId);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Something went wrong.');
+      }
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        let eol;
+        while ((eol = buf.indexOf('\n\n')) !== -1) {
+          const raw = buf.slice(0, eol);
+          buf = buf.slice(eol + 2);
+          if (!raw.startsWith('data: ')) continue;
+          let evt;
+          try { evt = JSON.parse(raw.slice(6)); } catch { continue; }
+
+          if (evt.type === 'status') {
+            const span = aiBody.querySelector('span');
+            if (span) span.textContent = evt.text;
+          } else if (evt.type === 'chunk') {
+            if (!streaming) {
+              aiRow.classList.remove('thinking');
+              aiBody.innerHTML = '';
+              streaming = true;
+            }
+            streamedText += evt.text;
+            aiBody.textContent = streamedText;
+            thread.scrollTop = thread.scrollHeight;
+          } else if (evt.type === 'done') {
+            updateItemTitle(activeConvId, evt.title || 'New chat');
+            await loadConvList();
+            setActiveItem(activeConvId);
+          }
+        }
+      }
+
+      if (!streaming) {
+        aiRow.classList.remove('thinking');
+        aiBody.textContent = streamedText || 'No response received.';
+      }
+
     } catch (err) {
-      thinking.remove();
-      appendAI(err.message);
+      aiRow.classList.remove('thinking');
+      aiBody.textContent = err.message;
     } finally {
       sendBtn.disabled = !input.value.trim();
       input.focus();
