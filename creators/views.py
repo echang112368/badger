@@ -224,10 +224,8 @@ def creator_dashboard(request):
 
 @login_required
 def creator_agent(request):
-    agent_conversation, _ = Conversation.objects.get_or_create(creator=request.user)
     connected_accounts = InstagramConnection.objects.filter(user=request.user)
     return render(request, "creators/agent.html", {
-        "agent_conversation": agent_conversation,
         "agent_connected_accounts": connected_accounts,
     })
 
