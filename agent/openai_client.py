@@ -10,6 +10,7 @@ from django.conf import settings
 
 from creators.models import CreatorMeta
 from creators.services.dashboard import build_creator_dashboard_context
+from creators.services.gmail_oauth import get_gmail_connection_status
 from instagram_connect.models import InstagramConnection
 
 from .prompts import CREATOR_AGENT_SYSTEM_PROMPT
@@ -80,12 +81,21 @@ def _recent_history(conversation, limit: int = 12) -> list[dict[str, str]]:
     ]
 
 
+def _gmail_summary(user) -> dict[str, Any]:
+    try:
+        status = get_gmail_connection_status(user)
+        return {"connected": status["connected"], "email": status.get("gmail_email", "")}
+    except Exception:
+        return {"connected": False, "email": ""}
+
+
 def build_creator_agent_input(user, conversation, message: str) -> str:
     dashboard_context = build_creator_dashboard_context(user)
     agent_context = {
         "creator_profile": _creator_profile_summary(user),
         "dashboard": dashboard_context,
         "connected_accounts": _connected_accounts_summary(user),
+        "gmail_connection": _gmail_summary(user),
         "recent_conversation": _recent_history(conversation),
         "current_message": message,
     }
