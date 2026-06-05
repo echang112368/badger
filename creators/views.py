@@ -3,6 +3,7 @@ import logging
 import json
 import re
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET, require_POST
 from django.http import JsonResponse
@@ -36,6 +37,13 @@ from instagram_connect.models import InstagramConnection
 from agent.models import Conversation
 from .services.dashboard import build_creator_dashboard_context
 from .services.ai_profile_feedback import refresh_ai_score_if_stale
+from .services.gmail_oauth import (
+    GmailOAuthError,
+    build_gmail_authorization_url,
+    exchange_gmail_callback,
+    get_gmail_connection_status,
+    revoke_gmail_connection,
+)
 
 import threading
 import uuid
@@ -228,6 +236,47 @@ def creator_agent(request):
     return render(request, "creators/agent.html", {
         "agent_connected_accounts": connected_accounts,
     })
+
+
+@login_required
+def gmail_connect(request):
+    try:
+        authorization_url = build_gmail_authorization_url(request)
+    except GmailOAuthError as exc:
+        messages.error(request, exc.user_message)
+        return redirect("creator_settings")
+    return redirect(authorization_url)
+
+
+@login_required
+def gmail_callback(request):
+    try:
+        credential = exchange_gmail_callback(request)
+    except GmailOAuthError as exc:
+        messages.error(request, exc.user_message)
+    else:
+        if credential.gmail_email:
+            messages.success(request, f"Gmail connected for {credential.gmail_email}.")
+        else:
+            messages.success(request, "Gmail connected. Badger could not confirm the Gmail address yet.")
+    return redirect("creator_settings")
+
+
+@login_required
+@require_POST
+def gmail_disconnect(request):
+    revoke_gmail_connection(request.user)
+    status_payload = get_gmail_connection_status(request.user)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JsonResponse(status_payload)
+    messages.success(request, "Gmail disconnected.")
+    return redirect("creator_settings")
+
+
+@login_required
+@require_GET
+def gmail_status(request):
+    return JsonResponse(get_gmail_connection_status(request.user))
 
 
 @login_required
@@ -1446,6 +1495,7 @@ def creator_settings(request):
             "creator_meta": creator_meta,
             "creator": request.user,
             "instagram_connection": instagram_connection,
+            "gmail_status": get_gmail_connection_status(request.user),
         },
     )
 
