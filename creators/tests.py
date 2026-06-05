@@ -2,15 +2,15 @@ from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
-from .models import CreatorMeta, SocialAnalyticsSnapshot
+from .models import CreatorMeta, GmailOAuthCredential, SocialAnalyticsSnapshot
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
 from links.models import (
@@ -852,3 +852,186 @@ class CreatorDashboardSetupTests(TestCase):
         self.assertContains(response, "Ready for merchant review")
         self.assertContains(response, "Not connected")
         self.assertContains(response, "Action queue")
+
+
+class _MockGoogleResponse:
+    def __init__(self, payload=None, status_code=200):
+        self.payload = payload or {}
+        self.status_code = status_code
+
+    def json(self):
+        return self.payload
+
+
+@override_settings(
+    GOOGLE_CLIENT_ID="client-id",
+    GOOGLE_CLIENT_SECRET="client-secret",
+    GOOGLE_REDIRECT_URI="http://testserver/creators/gmail/callback/",
+)
+class GmailOAuthTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="gmail_creator",
+            password="pass123",
+            email="gmail_creator@example.com",
+            is_creator=True,
+            email_verified=True,
+        )
+        self.other_user = CustomUser.objects.create_user(
+            username="other_gmail_creator",
+            password="pass123",
+            email="other_gmail_creator@example.com",
+            is_creator=True,
+            email_verified=True,
+        )
+
+    def test_connect_route_requires_login(self):
+        response = self.client.get(reverse("creator_gmail_connect"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response["Location"])
+
+    def test_connect_route_stores_state_and_redirects_to_google(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("creator_gmail_connect"))
+
+        self.assertEqual(response.status_code, 302)
+        parsed = urlparse(response["Location"])
+        query = parse_qs(parsed.query)
+        self.assertEqual(parsed.scheme, "https")
+        self.assertEqual(parsed.netloc, "accounts.google.com")
+        self.assertEqual(query["client_id"], ["client-id"])
+        self.assertEqual(query["access_type"], ["offline"])
+        self.assertIn("gmail.readonly", query["scope"][0])
+        self.assertEqual(self.client.session["gmail_oauth_state"], query["state"][0])
+
+    def test_callback_rejects_invalid_state(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["gmail_oauth_state"] = "expected"
+        session.save()
+
+        response = self.client.get(reverse("creator_gmail_callback"), {"state": "bad", "code": "code"})
+
+        self.assertRedirects(response, reverse("creator_settings"))
+        self.assertFalse(GmailOAuthCredential.objects.filter(user=self.user).exists())
+
+    def test_callback_handles_google_error_parameter(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["gmail_oauth_state"] = "expected"
+        session.save()
+
+        response = self.client.get(reverse("creator_gmail_callback"), {"state": "expected", "error": "access_denied"})
+
+        self.assertRedirects(response, reverse("creator_settings"))
+        self.assertFalse(GmailOAuthCredential.objects.filter(user=self.user).exists())
+
+    @patch("creators.services.gmail_oauth.requests.get")
+    @patch("creators.services.gmail_oauth.requests.post")
+    def test_callback_stores_credential_for_request_user(self, mock_post, mock_get):
+        mock_post.return_value = _MockGoogleResponse(
+            {
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "expires_in": 3600,
+                "scope": "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose",
+            }
+        )
+        mock_get.return_value = _MockGoogleResponse({"emailAddress": "creator@gmail.com"})
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["gmail_oauth_state"] = "expected"
+        session.save()
+
+        response = self.client.get(reverse("creator_gmail_callback"), {"state": "expected", "code": "code"})
+
+        self.assertRedirects(response, reverse("creator_settings"))
+        credential = GmailOAuthCredential.objects.get(user=self.user)
+        self.assertEqual(credential.gmail_email, "creator@gmail.com")
+        self.assertEqual(credential.status, GmailOAuthCredential.STATUS_CONNECTED)
+        self.assertNotEqual(credential.access_token, "access-token")
+        self.assertNotEqual(credential.refresh_token, "refresh-token")
+
+    def test_status_endpoint_never_returns_tokens(self):
+        from creators.services.gmail_oauth import encode_token
+
+        GmailOAuthCredential.objects.create(
+            user=self.user,
+            gmail_email="creator@gmail.com",
+            access_token=encode_token("access-token"),
+            refresh_token=encode_token("refresh-token"),
+            expires_at=timezone.now() + timedelta(hours=1),
+            status=GmailOAuthCredential.STATUS_CONNECTED,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("creator_gmail_status"))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["connected"])
+        self.assertEqual(payload["gmail_email"], "creator@gmail.com")
+        self.assertNotIn("access_token", payload)
+        self.assertNotIn("refresh_token", payload)
+
+    def test_disconnect_requires_post(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("creator_gmail_disconnect"))
+        self.assertEqual(response.status_code, 405)
+
+    @patch("creators.services.gmail_oauth.requests.post")
+    def test_disconnect_only_affects_request_users_credential(self, mock_post):
+        from creators.services.gmail_oauth import encode_token
+
+        credential = GmailOAuthCredential.objects.create(
+            user=self.user,
+            gmail_email="creator@gmail.com",
+            access_token=encode_token("access-token"),
+            refresh_token=encode_token("refresh-token"),
+            status=GmailOAuthCredential.STATUS_CONNECTED,
+        )
+        other = GmailOAuthCredential.objects.create(
+            user=self.other_user,
+            gmail_email="other@gmail.com",
+            access_token=encode_token("other-access"),
+            refresh_token=encode_token("other-refresh"),
+            status=GmailOAuthCredential.STATUS_CONNECTED,
+        )
+        mock_post.return_value = _MockGoogleResponse({})
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("creator_gmail_disconnect"))
+
+        self.assertRedirects(response, reverse("creator_settings"))
+        credential.refresh_from_db()
+        other.refresh_from_db()
+        self.assertEqual(credential.status, GmailOAuthCredential.STATUS_REVOKED)
+        self.assertEqual(credential.access_token, "")
+        self.assertEqual(other.status, GmailOAuthCredential.STATUS_CONNECTED)
+        self.assertEqual(other.gmail_email, "other@gmail.com")
+
+    @patch("creators.services.gmail_oauth.requests.post")
+    def test_token_refresh_updates_access_token_and_expires_at(self, mock_post):
+        from creators.services.gmail_oauth import decode_token, encode_token, refresh_gmail_token_if_needed
+
+        credential = GmailOAuthCredential.objects.create(
+            user=self.user,
+            access_token=encode_token("old-access"),
+            refresh_token=encode_token("refresh-token"),
+            expires_at=timezone.now() - timedelta(minutes=1),
+            status=GmailOAuthCredential.STATUS_CONNECTED,
+        )
+        mock_post.return_value = _MockGoogleResponse({"access_token": "new-access", "expires_in": 3600})
+
+        refreshed = refresh_gmail_token_if_needed(credential)
+
+        self.assertEqual(refreshed.status, GmailOAuthCredential.STATUS_CONNECTED)
+        self.assertEqual(decode_token(refreshed.access_token), "new-access")
+        self.assertGreater(refreshed.expires_at, timezone.now())
+
+    @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_REDIRECT_URI="")
+    def test_missing_google_settings_produces_friendly_redirect(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("creator_gmail_connect"))
+        self.assertRedirects(response, reverse("creator_settings"))
