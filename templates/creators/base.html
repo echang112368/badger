@@ -190,6 +190,16 @@
 </nav>
 
 <div id="main-wrap">
+  {% if messages %}
+  <div style="position:fixed;top:16px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:360px;">
+    {% for message in messages %}
+    <div style="background:{% if message.tags == 'error' %}#fef2f2{% elif message.tags == 'success' %}#f0fdf4{% else %}#eff6ff{% endif %};border:1px solid {% if message.tags == 'error' %}#fecaca{% elif message.tags == 'success' %}#bbf7d0{% else %}#bfdbfe{% endif %};color:{% if message.tags == 'error' %}#b91c1c{% elif message.tags == 'success' %}#15803d{% else %}#1d4ed8{% endif %};padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:flex;align-items:flex-start;gap:10px;">
+      <span style="flex:1;">{{ message }}</span>
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;color:inherit;opacity:.6;padding:0;flex-shrink:0;">&times;</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
   <main id="content" class="{% block content_class %}content-padded fade-in{% endblock %}">
     {% block content %}{% endblock %}
   </main>

@@ -232,9 +232,12 @@ def creator_dashboard(request):
 
 @login_required
 def creator_agent(request):
+    from .services.gmail_oauth import get_gmail_connection_status
     connected_accounts = InstagramConnection.objects.filter(user=request.user)
+    gmail_status = get_gmail_connection_status(request.user)
     return render(request, "creators/agent.html", {
         "agent_connected_accounts": connected_accounts,
+        "gmail_status": gmail_status,
     })
 
 

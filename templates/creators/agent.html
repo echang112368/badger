@@ -317,7 +317,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 6px 5px 14px;
+    padding: 5px 6px 5px 8px;
     transition: border-color .12s, box-shadow .12s;
   }
   #ag-composer:focus-within {
@@ -356,6 +356,92 @@
     color: #c8ccd4;
     margin-top: 8px;
   }
+
+  /* ── Connectors + button ── */
+  #ag-plus-wrap { position: relative; flex-shrink: 0; }
+  #ag-plus-btn {
+    width: 26px; height: 26px;
+    border-radius: 7px;
+    border: 1px solid #e5e7eb;
+    background: #fafafa;
+    color: #6b7280;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  #ag-plus-btn:hover { background: #f3f4f6; border-color: #c7cbd3; color: #374151; }
+  #ag-plus-btn.open { background: #eef1fb; border-color: #304f91; color: #304f91; }
+
+  /* ── Connectors popover ── */
+  #ag-connectors-pop {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 0;
+    width: 268px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.11), 0 2px 8px rgba(0,0,0,.06);
+    z-index: 200;
+    overflow: hidden;
+  }
+  #ag-connectors-pop.open { display: block; }
+  .ag-pop-section {
+    padding: 10px 14px 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #9ca3af;
+  }
+  .ag-conn-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px 9px;
+    border-top: 1px solid #f3f4f6;
+    transition: background .1s;
+  }
+  .ag-conn-row:hover { background: #fafafa; }
+  .ag-conn-icon {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .ag-conn-icon.gmail    { background: #fef2f2; color: #dc2626; }
+  .ag-conn-icon.instagram { background: #fdf4ff; color: #9333ea; }
+  .ag-conn-info { flex: 1; min-width: 0; }
+  .ag-conn-name {
+    font-size: 13px; font-weight: 600; color: #111;
+  }
+  .ag-conn-detail {
+    font-size: 11px; color: #9ca3af;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+  .ag-conn-action {
+    font-size: 11px; font-weight: 500;
+    padding: 3px 10px; border-radius: 20px;
+    flex-shrink: 0; text-decoration: none;
+    border: none; cursor: pointer; font-family: inherit;
+    transition: background .1s;
+  }
+  .ag-conn-action.connected {
+    background: #dcfce7; color: #15803d;
+    pointer-events: none;
+  }
+  .ag-conn-action.connect {
+    background: #f0f4ff; color: #304f91; border: 1px solid #c7d2f0;
+  }
+  .ag-conn-action.connect:hover { background: #e0e9ff; }
+  .ag-conn-action.disconnect {
+    background: #fff0f0; color: #b91c1c; border: 1px solid #fecaca;
+  }
+  .ag-conn-action.disconnect:hover { background: #fee2e2; }
 </style>
 
 <div id="ag-shell">
@@ -412,6 +498,48 @@
     <div id="ag-composer-wrap">
       <div id="ag-composer-inner">
         <div id="ag-composer">
+          <!-- Connectors + button -->
+          <div id="ag-plus-wrap">
+            <button id="ag-plus-btn" title="Connectors"><i class="bi bi-plus-lg"></i></button>
+            <div id="ag-connectors-pop">
+              <div class="ag-pop-section">Connections</div>
+              <!-- Gmail -->
+              <div class="ag-conn-row">
+                <div class="ag-conn-icon gmail"><i class="bi bi-envelope-fill"></i></div>
+                <div class="ag-conn-info">
+                  <div class="ag-conn-name">Gmail</div>
+                  <div class="ag-conn-detail" id="ag-gmail-detail">
+                    {% if gmail_status.connected %}{{ gmail_status.gmail_email }}{% else %}Not connected{% endif %}
+                  </div>
+                </div>
+                {% if gmail_status.connected %}
+                  <form method="post" action="{% url 'creator_gmail_disconnect' %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="ag-conn-action disconnect">Disconnect</button>
+                  </form>
+                {% else %}
+                  <a href="{% url 'creator_gmail_connect' %}" class="ag-conn-action connect">Connect</a>
+                {% endif %}
+              </div>
+              <!-- Instagram -->
+              <div class="ag-conn-row">
+                <div class="ag-conn-icon instagram"><i class="bi bi-instagram"></i></div>
+                <div class="ag-conn-info">
+                  <div class="ag-conn-name">Instagram</div>
+                  <div class="ag-conn-detail">
+                    {% with acct=agent_connected_accounts.first %}
+                      {% if acct %}@{{ acct.instagram_username|default:'Connected' }}{% else %}Not connected{% endif %}
+                    {% endwith %}
+                  </div>
+                </div>
+                {% if agent_connected_accounts.exists %}
+                  <span class="ag-conn-action connected">Connected</span>
+                {% else %}
+                  <a href="{% url 'creator_social_media' %}" class="ag-conn-action connect">Connect</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
           <textarea id="ag-input" rows="1" placeholder="Ask Badger Agent anything…"></textarea>
           <button id="ag-send" disabled><i class="bi bi-send-fill"></i></button>
         </div>
@@ -765,6 +893,21 @@
   sendBtn.addEventListener('click', send);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  /* ── Connectors popover ─────────────────────────────── */
+  const plusBtn  = document.getElementById('ag-plus-btn');
+  const connPop  = document.getElementById('ag-connectors-pop');
+  plusBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = connPop.classList.toggle('open');
+    plusBtn.classList.toggle('open', isOpen);
+  });
+  document.addEventListener('click', (e) => {
+    if (!connPop.contains(e.target) && e.target !== plusBtn) {
+      connPop.classList.remove('open');
+      plusBtn.classList.remove('open');
+    }
   });
 
   /* ── Boot: load conversation list, open most recent ── */
