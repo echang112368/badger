@@ -107,3 +107,53 @@ class SocialAnalyticsSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.platform}"
+
+class GmailOAuthCredential(models.Model):
+    """Stores the creator's server-side Gmail OAuth connection state."""
+
+    STATUS_DISCONNECTED = "disconnected"
+    STATUS_CONNECTED = "connected"
+    STATUS_EXPIRED_REFRESHABLE = "expired_refreshable"
+    STATUS_NEEDS_REAUTH = "needs_reauth"
+    STATUS_REVOKED = "revoked"
+    STATUS_ERROR = "error"
+    STATUS_CHOICES = (
+        (STATUS_DISCONNECTED, "Disconnected"),
+        (STATUS_CONNECTED, "Connected"),
+        (STATUS_EXPIRED_REFRESHABLE, "Expired but refreshable"),
+        (STATUS_NEEDS_REAUTH, "Needs reauthorization"),
+        (STATUS_REVOKED, "Revoked"),
+        (STATUS_ERROR, "Error"),
+    )
+
+    user = models.OneToOneField(
+        "accounts.CustomUser",
+        on_delete=models.CASCADE,
+        related_name="gmail_oauth_credential",
+    )
+    gmail_email = models.EmailField(blank=True)
+    access_token = models.TextField(blank=True)
+    refresh_token = models.TextField(blank=True)
+    token_uri = models.CharField(
+        max_length=255,
+        default="https://oauth2.googleapis.com/token",
+    )
+    scopes = models.JSONField(default=list, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=32,
+        choices=STATUS_CHOICES,
+        default=STATUS_DISCONNECTED,
+    )
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Gmail OAuth credential"
+        verbose_name_plural = "Gmail OAuth credentials"
+
+    def __str__(self):
+        email = self.gmail_email or "unconfirmed Gmail account"
+        return f"{email} for {self.user}"
