@@ -1,0 +1,404 @@
+{% extends 'creators/base.html' %}
+{% block title %}Connectors{% endblock %}
+{% block content_class %}{% endblock %}
+{% block content %}
+<style>
+  #conn-shell {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Left pane ── */
+  #conn-left {
+    background: #111318;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,.07);
+    overflow-y: auto;
+  }
+  #conn-left-top {
+    padding: 18px 16px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+    flex-shrink: 0;
+  }
+  #conn-left-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e8eaed;
+  }
+  #conn-back {
+    display: flex; align-items: center; gap: 5px;
+    color: #5a6070; font-size: 12px; text-decoration: none;
+    transition: color .1s;
+  }
+  #conn-back:hover { color: #9aa3b3; }
+  .conn-group-label {
+    padding: 14px 16px 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: #3a4050;
+  }
+  .conn-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 16px;
+    cursor: pointer;
+    transition: background .1s;
+    border-radius: 0;
+    user-select: none;
+  }
+  .conn-item:hover { background: rgba(255,255,255,.05); }
+  .conn-item.active { background: rgba(255,255,255,.09); }
+  .conn-item-icon {
+    width: 32px; height: 32px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .ci-gmail     { background: #fef2f2; color: #dc2626; }
+  .ci-instagram { background: #fdf4ff; color: #9333ea; }
+  .conn-item-name {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #9aa3b3;
+  }
+  .conn-item.active .conn-item-name { color: #fff; }
+
+  /* ── Right pane ── */
+  #conn-right {
+    background: #181c28;
+    overflow-y: auto;
+    padding: 36px 44px;
+  }
+  .conn-panel { display: none; }
+  .conn-panel.active { display: block; }
+
+  /* Panel header */
+  .conn-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    gap: 16px;
+  }
+  .conn-panel-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .conn-panel-icon {
+    width: 48px; height: 48px;
+    border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+  }
+  .conn-panel-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+  }
+  .conn-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 11px;
+    border-radius: 20px;
+    margin-top: 5px;
+  }
+  .csp-connected    { background: rgba(34,197,94,.14); color: #4ade80; }
+  .csp-disconnected { background: rgba(255,255,255,.07); color: #6b7280; }
+
+  .conn-panel-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #304f91; color: #fff;
+    border: none; padding: 9px 20px;
+    border-radius: 8px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; font-family: inherit; text-decoration: none;
+    transition: background .12s;
+  }
+  .btn-primary:hover { background: #3d62b0; color: #fff; }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,.07); color: #c8d0de;
+    border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 18px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500;
+    cursor: pointer; font-family: inherit; text-decoration: none;
+    transition: background .12s;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,.12); color: #fff; }
+
+  .btn-danger {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,.07); color: #c8d0de;
+    border: 1px solid rgba(255,255,255,.12);
+    padding: 9px 18px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500;
+    cursor: pointer; font-family: inherit;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .btn-danger:hover { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.35); color: #fca5a5; }
+
+  /* Description */
+  .conn-description {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #7a8499;
+    margin-bottom: 32px;
+    max-width: 620px;
+  }
+
+  /* Permissions */
+  .conn-perms-title {
+    font-size: 14px; font-weight: 600; color: #e8eaed;
+    margin-bottom: 3px;
+  }
+  .conn-perms-sub {
+    font-size: 12.5px; color: #4a5060;
+    margin-bottom: 14px;
+  }
+  .perm-group {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .perm-group-header {
+    padding: 13px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .perm-group-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500; color: #c8d0de;
+  }
+  .perm-count {
+    background: rgba(255,255,255,.1);
+    color: #6b7280;
+    font-size: 11px; font-weight: 600;
+    padding: 1px 8px; border-radius: 20px;
+  }
+  .perm-item {
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,.05);
+    font-size: 13px;
+    color: #7a8499;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .perm-item i { color: #4a5060; font-size: 12px; flex-shrink: 0; }
+
+  /* Safety note */
+  .conn-safety {
+    margin-top: 24px;
+    padding: 14px 16px;
+    background: rgba(74,222,128,.06);
+    border: 1px solid rgba(74,222,128,.12);
+    border-radius: 10px;
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    font-size: 12.5px;
+    color: #5a6470;
+    max-width: 620px;
+  }
+  .conn-safety i { color: #4ade80; font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+  .conn-safety strong { color: #9aa3b3; }
+
+  /* Divider */
+  .conn-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,.06);
+    margin: 28px 0;
+  }
+</style>
+
+<div id="conn-shell">
+
+  <!-- ═══ LEFT PANE ═══ -->
+  <div id="conn-left">
+    <div id="conn-left-top">
+      <span id="conn-left-title">Connectors</span>
+      <a href="{% url 'creator_agent' %}" id="conn-back">
+        <i class="bi bi-arrow-left"></i> Back
+      </a>
+    </div>
+
+    <div class="conn-group-label">Apps</div>
+
+    <div class="conn-item active" onclick="showPanel('gmail', this)">
+      <div class="conn-item-icon ci-gmail"><i class="bi bi-envelope-fill"></i></div>
+      <span class="conn-item-name">Gmail</span>
+    </div>
+
+    <div class="conn-item" onclick="showPanel('instagram', this)">
+      <div class="conn-item-icon ci-instagram"><i class="bi bi-instagram"></i></div>
+      <span class="conn-item-name">Instagram</span>
+    </div>
+  </div>
+
+  <!-- ═══ RIGHT PANE ═══ -->
+  <div id="conn-right">
+
+    <!-- ── Gmail panel ── -->
+    <div id="panel-gmail" class="conn-panel active">
+      <div class="conn-panel-header">
+        <div class="conn-panel-id">
+          <div class="conn-panel-icon ci-gmail"><i class="bi bi-envelope-fill"></i></div>
+          <div>
+            <div class="conn-panel-title">Gmail</div>
+            {% if gmail_status.connected %}
+              <span class="conn-status-pill csp-connected">
+                <i class="bi bi-circle-fill" style="font-size:7px;"></i>
+                Connected{% if gmail_status.gmail_email %} · {{ gmail_status.gmail_email }}{% endif %}
+              </span>
+            {% else %}
+              <span class="conn-status-pill csp-disconnected">Not connected</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="conn-panel-actions">
+          {% if gmail_status.connected %}
+            <a href="{% url 'creator_gmail_connect' %}" class="btn-ghost">
+              <i class="bi bi-arrow-repeat"></i> Reconnect
+            </a>
+            <form method="post" action="{% url 'creator_gmail_disconnect' %}" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="btn-danger">Disconnect</button>
+            </form>
+          {% else %}
+            <a href="{% url 'creator_gmail_connect' %}" class="btn-primary">
+              <i class="bi bi-plug-fill"></i> Connect Gmail
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <p class="conn-description">
+        Connect Gmail so Badger Agent can help you draft and manage outreach emails. Badger can read your email threads for context, create and edit drafts, and help you reply to brand partnership requests — all without sending anything without your explicit approval.
+      </p>
+
+      <hr class="conn-divider">
+
+      <div class="conn-perms-title">Tool permissions</div>
+      <div class="conn-perms-sub">What Badger is allowed to access with your Gmail connection</div>
+
+      <div class="perm-group">
+        <div class="perm-group-header">
+          <span class="perm-group-label">
+            <i class="bi bi-eye"></i> Read-only tools
+            <span class="perm-count">2</span>
+          </span>
+        </div>
+        <div class="perm-item"><i class="bi bi-dot"></i> Search and read your email threads for context</div>
+        <div class="perm-item"><i class="bi bi-dot"></i> View your Gmail profile and email address</div>
+      </div>
+
+      <div class="perm-group">
+        <div class="perm-group-header">
+          <span class="perm-group-label">
+            <i class="bi bi-pencil"></i> Draft &amp; compose tools
+            <span class="perm-count">2</span>
+          </span>
+        </div>
+        <div class="perm-item"><i class="bi bi-dot"></i> Create and update email drafts on your behalf</div>
+        <div class="perm-item"><i class="bi bi-dot"></i> Send messages that were created as drafts (requires your confirmation)</div>
+      </div>
+
+      <div class="conn-safety">
+        <i class="bi bi-shield-check"></i>
+        <span>Badger will <strong>never send emails</strong> without your explicit confirmation. Every action that sends an email is shown to you for review first.</span>
+      </div>
+    </div>
+
+    <!-- ── Instagram panel ── -->
+    <div id="panel-instagram" class="conn-panel">
+      <div class="conn-panel-header">
+        <div class="conn-panel-id">
+          <div class="conn-panel-icon ci-instagram"><i class="bi bi-instagram"></i></div>
+          <div>
+            <div class="conn-panel-title">Instagram</div>
+            {% with acct=agent_connected_accounts.first %}
+              {% if acct %}
+                <span class="conn-status-pill csp-connected">
+                  <i class="bi bi-circle-fill" style="font-size:7px;"></i>
+                  Connected · @{{ acct.instagram_username }}
+                </span>
+              {% else %}
+                <span class="conn-status-pill csp-disconnected">Not connected</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+        </div>
+        <div class="conn-panel-actions">
+          {% if agent_connected_accounts.exists %}
+            <a href="{% url 'creator_social_media' %}" class="btn-ghost">
+              <i class="bi bi-arrow-repeat"></i> Manage
+            </a>
+          {% else %}
+            <a href="{% url 'creator_social_media' %}" class="btn-primary">
+              <i class="bi bi-plug-fill"></i> Connect Instagram
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <p class="conn-description">
+        Connect Instagram so Badger Agent can read your profile stats, follower counts, and recent media engagement to give you personalised growth advice, content ideas, and partnership recommendations based on your real data.
+      </p>
+
+      <hr class="conn-divider">
+
+      <div class="conn-perms-title">Tool permissions</div>
+      <div class="conn-perms-sub">What Badger is allowed to access with your Instagram connection</div>
+
+      <div class="perm-group">
+        <div class="perm-group-header">
+          <span class="perm-group-label">
+            <i class="bi bi-eye"></i> Read-only tools
+            <span class="perm-count">3</span>
+          </span>
+        </div>
+        <div class="perm-item"><i class="bi bi-dot"></i> View your profile, username, and follower count</div>
+        <div class="perm-item"><i class="bi bi-dot"></i> Read recent media posts and engagement statistics</div>
+        <div class="perm-item"><i class="bi bi-dot"></i> Access analytics snapshots for growth insights</div>
+      </div>
+
+      <div class="conn-safety">
+        <i class="bi bi-shield-check"></i>
+        <span>Badger has <strong>read-only access</strong> to your Instagram data. It cannot post, comment, or make any changes to your account.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% csrf_token %}
+<script>
+function showPanel(name, el) {
+  document.querySelectorAll('.conn-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.conn-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+</script>
+{% endblock %}
