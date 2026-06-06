@@ -12,7 +12,10 @@ from django.urls import reverse
 from django.db import close_old_connections
 from django.db.models import Sum, Q, Count
 from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from .models import CreatorMeta
+from .models import OutreachDraft, OutreachThreadSummary, OutreachAgentInteraction
 from .models import PartnerMessage
 from .models import SocialAnalyticsSnapshot
 from accounts.forms import UserNameForm
@@ -1714,3 +1717,407 @@ def respond_request(request, link_id):
                 pr.save(update_fields=['status', 'updated_at'])
 
     return redirect("creator_affiliate_companies")
+
+
+def _json_payload(request):
+    try:
+        return json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _json_error(message: str, status: int = 400):
+    return JsonResponse({"ok": False, "error": message}, status=status)
+
+
+def _validate_recipient_email(email: str) -> str:
+    candidate = (email or "").strip()
+    try:
+        validate_email(candidate)
+    except ValidationError:
+        raise ValueError("Enter a valid recipient email address.")
+    return candidate
+
+
+def _business_for_user(user, business_id):
+    if not business_id:
+        return None
+    merchant = get_object_or_404(CustomUser, pk=business_id, is_merchant=True)
+    return merchant
+
+
+def _business_email(merchant):
+    if not merchant:
+        return ""
+    meta = getattr(merchant, "merchantmeta", None)
+    if meta and getattr(meta, "outreach_email", ""):
+        return meta.outreach_email
+    return merchant.email or ""
+
+
+def _creator_context(user):
+    meta, _ = CreatorMeta.objects.get_or_create(user=user)
+    return {
+        "username": user.username,
+        "first_name": user.first_name,
+        "email": user.email,
+        "bio": meta.bio,
+        "short_pitch": meta.short_pitch,
+        "social_media_platform": meta.social_media_platform,
+        "follower_range": meta.follower_range,
+        "social_media_profiles": meta.social_media_profiles,
+        "content_skills": meta.content_skills,
+        "niches": meta.niches,
+        "country": meta.country,
+        "content_languages": meta.content_languages,
+        "paid_brand_deals_count": meta.paid_brand_deals_count,
+        "gifted_brand_deals_count": meta.gifted_brand_deals_count,
+        "affiliate_brand_deals_count": meta.affiliate_brand_deals_count,
+        "avg_sponsored_conversion_rate_pct": meta.avg_sponsored_conversion_rate_pct,
+        "partnership_history_notes": meta.partnership_history_notes,
+    }
+
+
+def _business_context(merchant):
+    if not merchant:
+        return {}
+    meta = getattr(merchant, "merchantmeta", None)
+    link = None
+    return {
+        "id": merchant.id,
+        "username": merchant.username,
+        "company_name": _merchant_display_name(merchant),
+        "email": _business_email(merchant),
+        "marketplace_enabled": bool(getattr(meta, "marketplace_enabled", False)) if meta else False,
+        "shopify_store_domain": getattr(meta, "shopify_store_domain", "") if meta else "",
+        "business_type": getattr(meta, "business_type", "") if meta else "",
+        "billing_plan": getattr(meta, "billing_plan", "") if meta else "",
+        "affiliate_relationship": link,
+    }
+
+
+def _agent_output_dict(output):
+    if hasattr(output, "model_dump"):
+        return output.model_dump()
+    if isinstance(output, dict):
+        return output
+    return {"type": "error", "summary": "Invalid agent output.", "email": {"to": "", "subject": "", "body": ""}, "items": [], "requires_user_approval": False, "followup": None}
+
+
+def _record_interaction(user, action_type, payload, output=None, error="", business=None):
+    safe_input = dict(payload or {})
+    for key in ["body", "existing_draft", "messages"]:
+        if key in safe_input:
+            safe_input[key] = "[redacted]"
+    return OutreachAgentInteraction.objects.create(
+        creator=user,
+        business=business,
+        action_type=action_type,
+        safe_input=safe_input,
+        structured_output=_agent_output_dict(output) if output else {},
+        error_message=error or "",
+    )
+
+
+@login_required
+def outreach_agent(request):
+    gmail_status_payload = get_gmail_connection_status(request.user)
+    return render(request, "creators/outreach_agent.html", {"gmail_status": gmail_status_payload})
+
+
+@login_required
+@require_POST
+def outreach_business_search(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    query = (payload.get("query") or "").strip()
+    merchants = CustomUser.objects.filter(is_merchant=True).select_related("merchantmeta")
+    if query:
+        merchants = merchants.filter(
+            Q(username__icontains=query)
+            | Q(email__icontains=query)
+            | Q(merchantmeta__company_name__icontains=query)
+            | Q(merchantmeta__shopify_store_domain__icontains=query)
+        )
+    results = []
+    for merchant in merchants.order_by("merchantmeta__company_name", "username")[:10]:
+        results.append({
+            "id": merchant.id,
+            "name": _merchant_display_name(merchant),
+            "username": merchant.username,
+            "email": _business_email(merchant),
+            "store_domain": getattr(getattr(merchant, "merchantmeta", None), "shopify_store_domain", ""),
+        })
+    return JsonResponse({"ok": True, "businesses": results})
+
+
+@login_required
+@require_POST
+def outreach_generate(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    business = _business_for_user(request.user, payload.get("business_id")) if payload.get("business_id") else None
+    recipient = (payload.get("recipient_email") or _business_email(business)).strip()
+    if not recipient:
+        return _json_error("Choose a business with an email or enter a recipient email.")
+    try:
+        recipient = _validate_recipient_email(recipient)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    agent_payload = {
+        "creator_profile": _creator_context(request.user),
+        "business_profile": _business_context(business),
+        "recipient_email": recipient,
+        "tone": payload.get("tone") or "professional",
+        "partnership_context": payload.get("partnership_context") or "",
+    }
+    from agent.services.outreach_agents import generate_outreach_email
+    output = generate_outreach_email(agent_payload)
+    output_dict = _agent_output_dict(output)
+    if output_dict.get("type") == "draft_email":
+        output_dict.setdefault("email", {})["to"] = recipient
+        output_dict["requires_user_approval"] = True
+        draft = OutreachDraft.objects.create(
+            creator=request.user,
+            business=business,
+            recipient_email=recipient,
+            subject=output_dict.get("email", {}).get("subject", "")[:255],
+            body=output_dict.get("email", {}).get("body", ""),
+            tone=agent_payload["tone"],
+            last_agent_response=output_dict,
+        )
+        output_dict["draft_id"] = draft.id
+    _record_interaction(request.user, OutreachAgentInteraction.ACTION_GENERATE, agent_payload, output, business=business)
+    return JsonResponse({"ok": True, "agent": output_dict})
+
+
+@login_required
+@require_POST
+def outreach_revise(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    try:
+        recipient = _validate_recipient_email(payload.get("recipient_email") or "")
+    except ValueError as exc:
+        return _json_error(str(exc))
+    business = _business_for_user(request.user, payload.get("business_id")) if payload.get("business_id") else None
+    agent_payload = {
+        "creator_profile": _creator_context(request.user),
+        "business_profile": _business_context(business),
+        "recipient_email": recipient,
+        "tone": payload.get("tone") or "professional",
+        "revision_request": payload.get("revision_request") or "Revise this email.",
+        "existing_draft": {"to": recipient, "subject": payload.get("subject") or "", "body": payload.get("body") or ""},
+    }
+    from agent.services.outreach_agents import revise_outreach_email
+    output = revise_outreach_email(agent_payload)
+    output_dict = _agent_output_dict(output)
+    if output_dict.get("type") in {"draft_email", "reply_suggestion"}:
+        output_dict.setdefault("email", {})["to"] = recipient
+        output_dict["requires_user_approval"] = True
+    _record_interaction(request.user, OutreachAgentInteraction.ACTION_REVISE, agent_payload, output, business=business)
+    return JsonResponse({"ok": True, "agent": output_dict})
+
+
+@login_required
+@require_POST
+def outreach_search_threads(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    from creators.services import gmail
+    try:
+        threads = gmail.search_threads(request.user, payload.get("query") or "", int(payload.get("max_results") or 10))
+    except GmailOAuthError as exc:
+        return _json_error(exc.user_message, 400)
+    return JsonResponse({"ok": True, "threads": threads})
+
+
+@login_required
+@require_POST
+def outreach_read_thread(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    from creators.services import gmail
+    try:
+        thread = gmail.read_thread(request.user, payload.get("thread_id") or "")
+    except GmailOAuthError as exc:
+        return _json_error(exc.user_message, 400)
+    return JsonResponse({"ok": True, "thread": thread})
+
+
+def _thread_agent_payload(request, payload):
+    business = _business_for_user(request.user, payload.get("business_id")) if payload.get("business_id") else None
+    messages = payload.get("messages") or []
+    return business, {
+        "creator_profile": _creator_context(request.user),
+        "business_profile": _business_context(business),
+        "thread_id": payload.get("thread_id") or "",
+        "messages": messages,
+        "tone": payload.get("tone") or "professional",
+    }
+
+
+@login_required
+@require_POST
+def outreach_summarize_thread(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    business, agent_payload = _thread_agent_payload(request, payload)
+    from agent.services.outreach_agents import summarize_thread
+    output = summarize_thread(agent_payload)
+    output_dict = _agent_output_dict(output)
+    if agent_payload.get("thread_id") and output_dict.get("type") in {"email_summary", "next_actions"}:
+        OutreachThreadSummary.objects.update_or_create(
+            creator=request.user,
+            gmail_thread_id=agent_payload["thread_id"],
+            defaults={"business": business, "summary": output_dict.get("summary", ""), "next_actions": output_dict.get("items", [])},
+        )
+    _record_interaction(request.user, OutreachAgentInteraction.ACTION_SUMMARIZE_THREAD, agent_payload, output, business=business)
+    return JsonResponse({"ok": True, "agent": output_dict})
+
+
+@login_required
+@require_POST
+def outreach_suggest_reply(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    business, agent_payload = _thread_agent_payload(request, payload)
+    agent_payload["recipient_email"] = payload.get("recipient_email") or _business_email(business)
+    from agent.services.outreach_agents import suggest_reply
+    output = suggest_reply(agent_payload)
+    output_dict = _agent_output_dict(output)
+    if output_dict.get("type") == "reply_suggestion":
+        output_dict["requires_user_approval"] = True
+    _record_interaction(request.user, OutreachAgentInteraction.ACTION_SUGGEST_REPLY, agent_payload, output, business=business)
+    return JsonResponse({"ok": True, "agent": output_dict})
+
+
+@login_required
+@require_POST
+def outreach_next_actions(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    business, agent_payload = _thread_agent_payload(request, payload)
+    from agent.services.outreach_agents import extract_next_actions
+    output = extract_next_actions(agent_payload)
+    output_dict = _agent_output_dict(output)
+    _record_interaction(request.user, OutreachAgentInteraction.ACTION_NEXT_ACTIONS, agent_payload, output, business=business)
+    return JsonResponse({"ok": True, "agent": output_dict})
+
+
+def _upsert_local_draft(user, payload, status=OutreachDraft.STATUS_EDITED):
+    recipient = _validate_recipient_email(payload.get("recipient_email") or "")
+    draft_id = payload.get("draft_id")
+    business = _business_for_user(user, payload.get("business_id")) if payload.get("business_id") else None
+    if draft_id:
+        draft = get_object_or_404(OutreachDraft, pk=draft_id, creator=user)
+        draft.recipient_email = recipient
+        draft.subject = (payload.get("subject") or "")[:255]
+        draft.body = payload.get("body") or ""
+        draft.tone = payload.get("tone") or draft.tone
+        draft.business = business or draft.business
+        draft.status = status
+        draft.save()
+    else:
+        draft = OutreachDraft.objects.create(
+            creator=user,
+            business=business,
+            recipient_email=recipient,
+            subject=(payload.get("subject") or "")[:255],
+            body=payload.get("body") or "",
+            tone=payload.get("tone") or "",
+            status=status,
+        )
+    return draft
+
+
+@login_required
+@require_POST
+def outreach_save_draft(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    try:
+        draft = _upsert_local_draft(request.user, payload)
+        from creators.services import gmail
+        gmail_payload = gmail.create_draft(request.user, draft.recipient_email, draft.subject, draft.body, payload.get("thread_id"), payload.get("in_reply_to_message_id"))
+    except (ValueError, GmailOAuthError) as exc:
+        return _json_error(getattr(exc, "user_message", str(exc)), 400)
+    draft.gmail_draft_id = gmail_payload.get("id", "")
+    message = gmail_payload.get("message") or {}
+    draft.gmail_thread_id = message.get("threadId") or payload.get("thread_id") or ""
+    draft.gmail_message_id = message.get("id", "")
+    draft.status = OutreachDraft.STATUS_GMAIL_DRAFTED
+    draft.save()
+    return JsonResponse({"ok": True, "draft": {"id": draft.id, "gmail_draft_id": draft.gmail_draft_id, "status": draft.status}})
+
+
+@login_required
+@require_POST
+def outreach_update_draft(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    try:
+        draft = _upsert_local_draft(request.user, payload)
+        gmail_draft_id = payload.get("gmail_draft_id") or draft.gmail_draft_id
+        if not gmail_draft_id:
+            return _json_error("Save this as a Gmail draft before updating it.")
+        from creators.services import gmail
+        gmail.update_draft(request.user, gmail_draft_id, draft.recipient_email, draft.subject, draft.body)
+    except (ValueError, GmailOAuthError) as exc:
+        return _json_error(getattr(exc, "user_message", str(exc)), 400)
+    draft.gmail_draft_id = gmail_draft_id
+    draft.status = OutreachDraft.STATUS_GMAIL_DRAFTED
+    draft.save()
+    return JsonResponse({"ok": True, "draft": {"id": draft.id, "gmail_draft_id": draft.gmail_draft_id, "status": draft.status}})
+
+
+@login_required
+@require_POST
+def outreach_send(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    if payload.get("confirm") is not True:
+        return _json_error("Explicit confirmation is required before sending.", 400)
+    try:
+        draft = _upsert_local_draft(request.user, payload)
+        from creators.services import gmail
+        if payload.get("gmail_draft_id") or draft.gmail_draft_id:
+            sent = gmail.send_draft(request.user, payload.get("gmail_draft_id") or draft.gmail_draft_id)
+        else:
+            sent = gmail.send_email(request.user, draft.recipient_email, draft.subject, draft.body)
+    except (ValueError, GmailOAuthError) as exc:
+        return _json_error(getattr(exc, "user_message", str(exc)), 400)
+    draft.gmail_message_id = sent.get("id", draft.gmail_message_id)
+    draft.gmail_thread_id = sent.get("threadId", draft.gmail_thread_id)
+    draft.status = OutreachDraft.STATUS_SENT
+    draft.sent_at = timezone.now()
+    draft.save()
+    return JsonResponse({"ok": True, "draft": {"id": draft.id, "status": draft.status, "gmail_message_id": draft.gmail_message_id, "gmail_thread_id": draft.gmail_thread_id}})
+
+
+@login_required
+@require_POST
+def outreach_reply(request):
+    payload = _json_payload(request)
+    if payload is None:
+        return _json_error("Invalid JSON payload.")
+    if payload.get("confirm") is not True:
+        return _json_error("Explicit confirmation is required before sending.", 400)
+    try:
+        recipient = _validate_recipient_email(payload.get("recipient_email") or "")
+        from creators.services import gmail
+        sent = gmail.reply_to_thread(request.user, payload.get("thread_id") or "", recipient, payload.get("subject") or "", payload.get("body") or "")
+    except (ValueError, GmailOAuthError) as exc:
+        return _json_error(getattr(exc, "user_message", str(exc)), 400)
+    return JsonResponse({"ok": True, "message": {"id": sent.get("id", ""), "thread_id": sent.get("threadId", "")}})

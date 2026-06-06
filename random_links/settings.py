@@ -244,6 +244,9 @@ SHOPIFY_REDIRECT_URI = os.environ.get(
     "SHOPIFY_REDIRECT_URI", _default_shopify_redirect_uri
 )
 
+OPENAI_CREATOR_AGENT_MODEL = os.environ.get("OPENAI_CREATOR_AGENT_MODEL", "gpt-4.1-mini")
+OUTREACH_AGENT_MODEL = os.environ.get("OUTREACH_AGENT_MODEL", OPENAI_CREATOR_AGENT_MODEL)
+
 # Google OAuth configuration for creator Gmail connections. Values are loaded
 # from the environment so OAuth client secrets are never hardcoded.
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
