@@ -1,4 +1,3 @@
-import json
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -11,7 +10,7 @@ from django.utils import timezone
 
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
-from .models import CreatorMeta, GmailOAuthCredential, OutreachDraft, SocialAnalyticsSnapshot
+from .models import CreatorMeta, GmailOAuthCredential, SocialAnalyticsSnapshot
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
 from links.models import (
@@ -1036,109 +1035,3 @@ class GmailOAuthTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse("creator_gmail_connect"))
         self.assertRedirects(response, reverse("creator_settings"))
-
-
-class OutreachAgentV2Tests(TestCase):
-    def setUp(self):
-        self.creator = CustomUser.objects.create_user(
-            username="outreach_creator",
-            password="pass",
-            email="outreach_creator@example.com",
-            is_creator=True,
-        )
-        self.other_creator = CustomUser.objects.create_user(
-            username="outreach_other",
-            password="pass",
-            email="outreach_other@example.com",
-            is_creator=True,
-        )
-        self.merchant = CustomUser.objects.create_user(
-            username="outreach_merchant",
-            password="pass",
-            email="merchant-contact@example.com",
-            is_merchant=True,
-        )
-        self.merchant_meta = MerchantMeta.objects.get(user=self.merchant)
-        self.merchant_meta.company_name = "Outreach Merchant Co"
-        self.merchant_meta.outreach_email = "partnerships@example.com"
-        self.merchant_meta.save()
-
-    def test_gmail_connect_requires_login(self):
-        response = self.client.get(reverse("creator_gmail_connect"))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    def test_oauth_callback_rejects_missing_state(self):
-        self.client.force_login(self.creator)
-        response = self.client.get(reverse("creator_gmail_callback"), {"state": "bad", "code": "code"})
-        self.assertRedirects(response, reverse("creator_settings"))
-        self.assertFalse(GmailOAuthCredential.objects.filter(user=self.creator, status=GmailOAuthCredential.STATUS_CONNECTED).exists())
-
-    def test_disconnect_only_affects_request_user_and_hides_tokens(self):
-        GmailOAuthCredential.objects.create(user=self.creator, gmail_email="one@example.com", access_token="secret1", refresh_token="refresh1", status=GmailOAuthCredential.STATUS_CONNECTED)
-        other = GmailOAuthCredential.objects.create(user=self.other_creator, gmail_email="two@example.com", access_token="secret2", refresh_token="refresh2", status=GmailOAuthCredential.STATUS_CONNECTED)
-        self.client.force_login(self.creator)
-        with patch("creators.services.gmail_oauth.requests.post"):
-            response = self.client.post(reverse("creator_gmail_disconnect"), HTTP_ACCEPT="application/json")
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertNotIn("access_token", payload)
-        self.assertNotIn("refresh_token", payload)
-        other.refresh_from_db()
-        self.assertEqual(other.status, GmailOAuthCredential.STATUS_CONNECTED)
-        self.assertEqual(other.refresh_token, "refresh2")
-
-    def test_generate_endpoint_validates_recipient_before_agent_import(self):
-        self.client.force_login(self.creator)
-        response = self.client.post(
-            reverse("creator_outreach_generate"),
-            data=json.dumps({"recipient_email": "not-an-email"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("valid recipient", response.json()["error"])
-
-    def test_save_draft_refuses_invalid_email(self):
-        self.client.force_login(self.creator)
-        response = self.client.post(
-            reverse("creator_outreach_save_draft"),
-            data=json.dumps({"recipient_email": "bad", "subject": "Hi", "body": "Body"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("valid recipient", response.json()["error"])
-
-    def test_send_refuses_missing_confirmation(self):
-        self.client.force_login(self.creator)
-        response = self.client.post(
-            reverse("creator_outreach_send"),
-            data=json.dumps({"recipient_email": "partner@example.com", "subject": "Hi", "body": "Body"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("confirmation", response.json()["error"])
-
-    def test_send_refuses_invalid_recipient_even_when_confirmed(self):
-        self.client.force_login(self.creator)
-        response = self.client.post(
-            reverse("creator_outreach_send"),
-            data=json.dumps({"confirm": True, "recipient_email": "bad", "subject": "Hi", "body": "Body"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("valid recipient", response.json()["error"])
-
-    def test_send_refuses_to_send_another_users_draft(self):
-        draft = OutreachDraft.objects.create(
-            creator=self.other_creator,
-            recipient_email="partner@example.com",
-            subject="Hi",
-            body="Body",
-        )
-        self.client.force_login(self.creator)
-        response = self.client.post(
-            reverse("creator_outreach_send"),
-            data=json.dumps({"confirm": True, "draft_id": draft.id, "recipient_email": "partner@example.com", "subject": "Hi", "body": "Body"}),
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 404)

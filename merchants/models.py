@@ -53,7 +53,6 @@ class MerchantMeta(models.Model):
     company_name = models.CharField(max_length=255, blank=True)
     uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     paypal_email = models.EmailField(blank=True)
-    outreach_email = models.EmailField(blank=True, help_text="Public creator outreach contact email.")
     shopify_access_token = models.CharField(max_length=255, blank=True)
     shopify_refresh_token = models.CharField(max_length=255, blank=True)
     shopify_store_domain = models.CharField(max_length=255, blank=True)
