@@ -1,0 +1,80 @@
+{% extends 'creators/base.html' %}
+{% block title %}Outreach Agent{% endblock %}
+{% block content %}
+<style>
+  .outreach-shell{max-width:1200px;margin:0 auto;padding:28px 20px 60px}.oa-grid{display:grid;grid-template-columns:340px 1fr;gap:18px}.oa-card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;box-shadow:0 8px 24px rgba(15,23,42,.06);padding:18px;margin-bottom:16px}.oa-card h2{font-size:18px;margin:0 0 12px}.oa-card h3{font-size:15px;margin:14px 0 8px}.oa-label{font-size:12px;font-weight:700;color:#475569;margin-bottom:4px}.oa-input,.oa-textarea,.oa-select{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;font:inherit}.oa-textarea{min-height:210px;white-space:pre-wrap}.oa-btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#304f91;color:white}.oa-btn.secondary{background:#f1f5f9;color:#0f172a}.oa-btn.danger{background:#b91c1c}.oa-btn:disabled{opacity:.55;cursor:not-allowed}.oa-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.oa-badge{display:inline-flex;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700;background:#fee2e2;color:#991b1b}.oa-badge.ok{background:#dcfce7;color:#166534}.oa-result{border:1px solid #dbeafe;background:#eff6ff;border-radius:14px;padding:12px;margin-top:12px}.oa-thread{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-top:8px;cursor:pointer}.oa-message{border-left:3px solid #cbd5e1;padding:10px;margin:10px 0;background:#f8fafc;white-space:pre-wrap}.oa-muted{color:#64748b;font-size:13px}.oa-list{padding-left:18px}.oa-confirm{border:1px solid #fecaca;background:#fef2f2;border-radius:14px;padding:12px;display:none;margin-top:12px}@media(max-width:900px){.oa-grid{grid-template-columns:1fr}}
+</style>
+<div class="outreach-shell" data-csrf="{{ csrf_token }}">
+  <div class="oa-row" style="justify-content:space-between;margin-bottom:18px">
+    <div><h1 style="margin:0">Creator Outreach Agent</h1><p class="oa-muted">Generate, revise, summarize, draft, and send creator-business emails from Gmail. The AI never sends email.</p></div>
+    <a class="oa-btn secondary" href="{% url 'creator_agent' %}">Existing Agent Chat</a>
+  </div>
+  <div class="oa-grid">
+    <aside>
+      <section class="oa-card">
+        <h2>Gmail connection</h2>
+        <p><span class="oa-badge {% if gmail_status.connected %}ok{% endif %}" id="gmailStatus">{{ gmail_status.status }}</span></p>
+        <p class="oa-muted" id="gmailEmail">{{ gmail_status.gmail_email|default:'No Gmail connected' }}</p>
+        <div class="oa-row">
+          <a class="oa-btn" href="{% url 'creator_gmail_connect' %}">{% if gmail_status.connected %}Reconnect Gmail{% else %}Connect Gmail{% endif %}</a>
+          <button class="oa-btn danger" id="disconnectBtn" type="button">Disconnect</button>
+        </div>
+      </section>
+      <section class="oa-card">
+        <h2>Business selector</h2>
+        <div class="oa-label">Search businesses</div><input id="businessQuery" class="oa-input" placeholder="Company, email, store...">
+        <button class="oa-btn secondary" id="businessSearchBtn" type="button" style="margin-top:8px">Search</button>
+        <div id="businessResults"></div>
+        <input type="hidden" id="businessId">
+        <h3>Manual recipient fallback</h3>
+        <input id="recipientEmail" class="oa-input" placeholder="partner@example.com">
+      </section>
+      <section class="oa-card">
+        <h2>Thread panel</h2>
+        <input id="threadQuery" class="oa-input" placeholder="Business, sender, subject, keyword">
+        <button class="oa-btn secondary" id="threadSearchBtn" type="button" style="margin-top:8px">Search Gmail threads</button>
+        <div id="threadResults"></div>
+      </section>
+    </aside>
+    <main>
+      <section class="oa-card">
+        <h2>AI email-writing panel</h2>
+        <div class="oa-row"><select id="tone" class="oa-select" style="max-width:220px"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select><button class="oa-btn" id="generateBtn" type="button">Generate outreach email</button><button class="oa-btn secondary" id="reviseBtn" type="button">Revise draft</button><button class="oa-btn secondary" id="summarizeBtn" type="button">Summarize thread</button><button class="oa-btn secondary" id="replySuggestBtn" type="button">Suggest reply</button><button class="oa-btn secondary" id="actionsBtn" type="button">Extract next actions</button></div>
+        <textarea id="revisionRequest" class="oa-textarea" style="min-height:70px;margin-top:10px" placeholder="Revision request, e.g. make it more concise and casual"></textarea>
+        <div id="agentCards"></div>
+      </section>
+      <section class="oa-card">
+        <h2>Selected Gmail thread</h2><div id="threadViewer" class="oa-muted">Search and open a thread to summarize or suggest replies.</div>
+      </section>
+      <section class="oa-card">
+        <h2>Draft editor</h2><input type="hidden" id="localDraftId"><input type="hidden" id="gmailDraftId"><input type="hidden" id="selectedThreadId">
+        <div class="oa-label">To</div><input id="draftTo" class="oa-input">
+        <div class="oa-label" style="margin-top:10px">Subject</div><input id="draftSubject" class="oa-input">
+        <div class="oa-label" style="margin-top:10px">Body</div><textarea id="draftBody" class="oa-textarea"></textarea>
+        <p class="oa-muted" id="draftStatus">Not saved to Gmail.</p>
+        <div class="oa-row"><button class="oa-btn secondary" id="saveDraftBtn" type="button">Save as Gmail Draft</button><button class="oa-btn secondary" id="updateDraftBtn" type="button">Update Gmail Draft</button><button class="oa-btn danger" id="prepareSendBtn" type="button">Send Email</button><button class="oa-btn danger" id="replyBtn" type="button">Reply to Thread</button></div>
+        <div id="confirmBox" class="oa-confirm"><strong>Confirm send from your Gmail</strong><p id="confirmPreview" class="oa-muted"></p><button class="oa-btn danger" id="confirmSendBtn" type="button">Yes, send now</button><button class="oa-btn secondary" id="cancelSendBtn" type="button">Cancel</button></div>
+      </section>
+    </main>
+  </div>
+</div>
+<script>
+const root=document.querySelector('.outreach-shell');const csrf=root.dataset.csrf;let selectedMessages=[];let sendMode='send';
+function esc(s){return String(s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+async function post(url,payload){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRFToken':csrf},body:JSON.stringify(payload||{})});const data=await r.json();if(!r.ok||data.ok===false)throw new Error(data.error||'Request failed');return data;}
+function showAgent(agent){const box=document.getElementById('agentCards');let html=`<div class="oa-result"><strong>${esc(agent.type)}</strong><p>${esc(agent.summary)}</p>`;if(agent.email&&(agent.email.subject||agent.email.body)){html+=`<p><b>Subject:</b> ${esc(agent.email.subject)}</p><pre style="white-space:pre-wrap">${esc(agent.email.body)}</pre>`;document.getElementById('draftTo').value=agent.email.to||document.getElementById('recipientEmail').value||document.getElementById('draftTo').value;document.getElementById('draftSubject').value=agent.email.subject||'';document.getElementById('draftBody').value=agent.email.body||'';}if(agent.items&&agent.items.length){html+='<ul class="oa-list">'+agent.items.map(i=>`<li><b>${esc(i.label)}</b>: ${esc(i.detail)} ${i.cta?`<em>${esc(i.cta)}</em>`:''}</li>`).join('')+'</ul>';}if(agent.followup)html+=`<p><b>Follow-up:</b> ${esc(agent.followup)}</p>`;html+='</div>';box.innerHTML=html+box.innerHTML;if(agent.draft_id)document.getElementById('localDraftId').value=agent.draft_id;}
+function draftPayload(extra={}){return Object.assign({draft_id:document.getElementById('localDraftId').value||null,gmail_draft_id:document.getElementById('gmailDraftId').value||'',business_id:document.getElementById('businessId').value||null,recipient_email:document.getElementById('draftTo').value||document.getElementById('recipientEmail').value,subject:document.getElementById('draftSubject').value,body:document.getElementById('draftBody').value,tone:document.getElementById('tone').value,thread_id:document.getElementById('selectedThreadId').value},extra);}
+document.getElementById('businessSearchBtn').onclick=async()=>{try{const data=await post('{% url "creator_outreach_business_search" %}',{query:document.getElementById('businessQuery').value});document.getElementById('businessResults').innerHTML=data.businesses.map(b=>`<div class="oa-thread" data-id="${b.id}" data-email="${esc(b.email)}"><b>${esc(b.name)}</b><br><span class="oa-muted">${esc(b.email||'No outreach email on file')}</span></div>`).join('');document.querySelectorAll('#businessResults .oa-thread').forEach(el=>el.onclick=()=>{document.getElementById('businessId').value=el.dataset.id;document.getElementById('recipientEmail').value=el.dataset.email;document.getElementById('draftTo').value=el.dataset.email;});}catch(e){alert(e.message)}};
+document.getElementById('generateBtn').onclick=async()=>{try{const d=await post('{% url "creator_outreach_generate" %}',{business_id:document.getElementById('businessId').value||null,recipient_email:document.getElementById('recipientEmail').value||document.getElementById('draftTo').value,tone:document.getElementById('tone').value});showAgent(d.agent);}catch(e){alert(e.message)}};
+document.getElementById('reviseBtn').onclick=async()=>{try{const d=await post('{% url "creator_outreach_revise" %}',draftPayload({revision_request:document.getElementById('revisionRequest').value}));showAgent(d.agent);}catch(e){alert(e.message)}};
+document.getElementById('threadSearchBtn').onclick=async()=>{try{const d=await post('{% url "creator_outreach_search_threads" %}',{query:document.getElementById('threadQuery').value,max_results:10});document.getElementById('threadResults').innerHTML=d.threads.map(t=>`<div class="oa-thread" data-id="${esc(t.id)}"><b>${esc(t.subject||'(no subject)')}</b><br><span class="oa-muted">${esc(t.snippet)}</span></div>`).join('');document.querySelectorAll('#threadResults .oa-thread').forEach(el=>el.onclick=async()=>{const d=await post('{% url "creator_outreach_read_thread" %}',{thread_id:el.dataset.id});selectedMessages=d.thread.messages||[];document.getElementById('selectedThreadId').value=d.thread.id;document.getElementById('threadViewer').innerHTML=selectedMessages.map(m=>`<div class="oa-message"><b>${esc(m.from)}</b> → ${esc(m.to)}<br><span class="oa-muted">${esc(m.date)}</span><br>${esc(m.body||m.snippet)}</div>`).join('');});}catch(e){alert(e.message)}};
+async function threadAgent(url){try{const d=await post(url,{business_id:document.getElementById('businessId').value||null,thread_id:document.getElementById('selectedThreadId').value,messages:selectedMessages,tone:document.getElementById('tone').value,recipient_email:document.getElementById('draftTo').value||document.getElementById('recipientEmail').value});showAgent(d.agent);}catch(e){alert(e.message)}}
+document.getElementById('summarizeBtn').onclick=()=>threadAgent('{% url "creator_outreach_summarize_thread" %}');document.getElementById('replySuggestBtn').onclick=()=>threadAgent('{% url "creator_outreach_suggest_reply" %}');document.getElementById('actionsBtn').onclick=()=>threadAgent('{% url "creator_outreach_next_actions" %}');
+document.getElementById('saveDraftBtn').onclick=async()=>{try{const d=await post('{% url "creator_outreach_save_draft" %}',draftPayload());document.getElementById('localDraftId').value=d.draft.id;document.getElementById('gmailDraftId').value=d.draft.gmail_draft_id;document.getElementById('draftStatus').textContent='Saved as Gmail draft.';}catch(e){alert(e.message)}};
+document.getElementById('updateDraftBtn').onclick=async()=>{try{const d=await post('{% url "creator_outreach_update_draft" %}',draftPayload());document.getElementById('draftStatus').textContent='Gmail draft updated.';}catch(e){alert(e.message)}};
+document.getElementById('prepareSendBtn').onclick=()=>{sendMode='send';document.getElementById('confirmPreview').textContent=`To: ${document.getElementById('draftTo').value} | Subject: ${document.getElementById('draftSubject').value}\n\n${document.getElementById('draftBody').value}`;document.getElementById('confirmBox').style.display='block';};
+document.getElementById('replyBtn').onclick=()=>{sendMode='reply';document.getElementById('confirmPreview').textContent='This replies in the selected Gmail thread from your Gmail.\n\n'+document.getElementById('draftBody').value;document.getElementById('confirmBox').style.display='block';};
+document.getElementById('cancelSendBtn').onclick=()=>document.getElementById('confirmBox').style.display='none';document.getElementById('confirmSendBtn').onclick=async()=>{try{const url=sendMode==='reply'?'{% url "creator_outreach_reply" %}':'{% url "creator_outreach_send" %}';const d=await post(url,draftPayload({confirm:true}));document.getElementById('draftStatus').textContent='Sent from Gmail after your confirmation.';document.getElementById('confirmBox').style.display='none';}catch(e){alert(e.message)}};
+document.getElementById('disconnectBtn').onclick=async()=>{try{await post('{% url "creator_gmail_disconnect" %}',{});location.reload();}catch(e){alert(e.message)}};
+</script>
+{% endblock %}
