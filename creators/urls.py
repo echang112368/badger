@@ -1,6 +1,4 @@
 from django.urls import path
-
-from agent import views_outreach
 from .views import (
     creator_dashboard,
     creator_agent,
@@ -31,20 +29,6 @@ urlpatterns = [
     path('dashboard/', creator_dashboard, name='creator_dashboard'),
     path('agent/', creator_agent, name='creator_agent'),
     path('agent/connectors/', creator_agent_connectors, name='creator_agent_connectors'),
-
-    path('outreach-agent/', views_outreach.outreach_agent_page, name='creator_outreach_agent'),
-    path('outreach-agent/businesses/search/', views_outreach.outreach_business_search, name='creator_outreach_business_search'),
-    path('outreach-agent/generate/', views_outreach.outreach_generate, name='creator_outreach_generate'),
-    path('outreach-agent/revise/', views_outreach.outreach_revise, name='creator_outreach_revise'),
-    path('outreach-agent/search-threads/', views_outreach.outreach_search_threads, name='creator_outreach_search_threads'),
-    path('outreach-agent/read-thread/', views_outreach.outreach_read_thread, name='creator_outreach_read_thread'),
-    path('outreach-agent/summarize-thread/', views_outreach.outreach_summarize_thread, name='creator_outreach_summarize_thread'),
-    path('outreach-agent/suggest-reply/', views_outreach.outreach_suggest_reply, name='creator_outreach_suggest_reply'),
-    path('outreach-agent/next-actions/', views_outreach.outreach_next_actions, name='creator_outreach_next_actions'),
-    path('outreach-agent/save-draft/', views_outreach.outreach_save_draft, name='creator_outreach_save_draft'),
-    path('outreach-agent/update-draft/', views_outreach.outreach_update_draft, name='creator_outreach_update_draft'),
-    path('outreach-agent/send/', views_outreach.outreach_send, name='creator_outreach_send'),
-    path('outreach-agent/reply/', views_outreach.outreach_reply, name='creator_outreach_reply'),
     path('earnings/', creator_earnings, name='creator_earnings'),
     path('affiliate-companies/', creator_affiliate_companies, name='creator_affiliate_companies'),
     path('affiliate-companies/delete/', delete_affiliate_merchants, name='creator_delete_affiliations'),
