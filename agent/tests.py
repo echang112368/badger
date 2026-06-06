@@ -7,7 +7,9 @@ from django.urls import reverse
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
 
-from .models import Conversation, Message
+from merchants.models import MerchantMeta
+
+from .models import Conversation, Message, OutreachDraft
 from .openai_client import OPENAI_RESPONSES_URL
 
 
@@ -100,3 +102,136 @@ class AgentAPITests(TestCase):
         self.assertEqual(response.status_code, 201)
         payload = response.json()
         self.assertIn("OPENAI_API_KEY", payload["messages"][1]["content"])
+
+
+class OutreachAgentTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(
+            username="outreach_creator",
+            password="pass123",
+            email="outreach_creator@example.com",
+            is_creator=True,
+        )
+        self.merchant_user = CustomUser.objects.create_user(
+            username="merchant_outreach",
+            password="pass123",
+            email="merchant@example.com",
+            is_merchant=True,
+        )
+        self.merchant_meta, _ = MerchantMeta.objects.get_or_create(user=self.merchant_user)
+        self.merchant_meta.company_name = "Merchant Co"
+        self.merchant_meta.marketplace_enabled = True
+        self.merchant_meta.save()
+
+    def test_outreach_page_requires_login(self):
+        response = self.client.get(reverse("creator_outreach_agent"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_outreach_page_uses_existing_gmail_status_without_tokens(self):
+        from creators.models import GmailOAuthCredential
+        from creators.services.gmail_oauth import encode_token
+
+        GmailOAuthCredential.objects.create(
+            user=self.creator,
+            gmail_email="creator@gmail.com",
+            access_token=encode_token("secret-access-token"),
+            refresh_token=encode_token("secret-refresh-token"),
+            status=GmailOAuthCredential.STATUS_CONNECTED,
+        )
+        self.client.force_login(self.creator)
+        response = self.client.get(reverse("creator_outreach_agent"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "creator@gmail.com")
+        self.assertNotContains(response, "secret-access-token")
+        self.assertNotContains(response, "secret-refresh-token")
+        self.assertContains(response, reverse("creator_gmail_connect"))
+
+    @patch("agent.views_outreach.run_email_writer")
+    def test_generate_endpoint_returns_structured_json_and_local_draft(self, mock_writer):
+        from agent.services.outreach_agents import EmailPayload, OutreachAgentOutput
+
+        mock_writer.return_value = OutreachAgentOutput(
+            type="draft_email",
+            summary="Draft ready.",
+            email=EmailPayload(to="merchant@example.com", subject="Partnership idea", body="Hi Merchant Co,"),
+            items=[],
+            requires_user_approval=True,
+            followup=None,
+        )
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_outreach_generate"),
+            data=json.dumps({"business_id": self.merchant_user.id, "recipient_email": "merchant@example.com", "tone": "professional"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["output"]["type"], "draft_email")
+        self.assertTrue(payload["output"]["requires_user_approval"])
+        self.assertTrue(OutreachDraft.objects.filter(creator=self.creator, recipient_email="merchant@example.com").exists())
+
+    def test_generate_validates_recipient(self):
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_outreach_generate"),
+            data=json.dumps({"business_id": self.merchant_user.id, "recipient_email": "not-email", "tone": "professional"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "invalid_email")
+
+    @patch("agent.views_outreach.gmail_service.create_draft")
+    def test_save_draft_uses_gmail_service(self, mock_create_draft):
+        mock_create_draft.return_value = {"draft_id": "draft-1", "message_id": "msg-1", "thread_id": "thread-1"}
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_outreach_save_draft"),
+            data=json.dumps({"recipient_email": "merchant@example.com", "subject": "Subject", "body": "Body"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["gmail"]["draft_id"], "draft-1")
+        mock_create_draft.assert_called_once()
+        self.assertEqual(mock_create_draft.call_args.args[0], self.creator)
+
+    def test_send_requires_explicit_confirmation(self):
+        draft = OutreachDraft.objects.create(
+            creator=self.creator,
+            recipient_email="merchant@example.com",
+            subject="Subject",
+            body="Body",
+        )
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_outreach_send"),
+            data=json.dumps({"draft_id": draft.id, "confirm": False}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "confirm_required")
+
+    def test_send_refuses_another_users_draft(self):
+        other = CustomUser.objects.create_user(username="other_creator", password="pass123", email="other@example.com", is_creator=True)
+        draft = OutreachDraft.objects.create(creator=other, recipient_email="merchant@example.com", subject="Subject", body="Body")
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_outreach_send"),
+            data=json.dumps({"draft_id": draft.id, "confirm": True}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_reply_send_requires_confirm_true_to_send(self):
+        self.client.force_login(self.creator)
+        with patch("agent.views_outreach.gmail_service.reply_to_thread") as mock_reply, patch("agent.views_outreach.gmail_service.create_draft") as mock_draft:
+            mock_draft.return_value = {"draft_id": "draft-2", "message_id": "msg-2", "thread_id": "thread-2"}
+            response = self.client.post(
+                reverse("creator_outreach_reply"),
+                data=json.dumps({"thread_id": "thread-2", "recipient_email": "merchant@example.com", "subject": "Re: Subject", "body": "Reply"}),
+                content_type="application/json",
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_reply.assert_not_called()
+            mock_draft.assert_called_once()
