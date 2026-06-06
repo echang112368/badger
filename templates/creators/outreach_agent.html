@@ -1,0 +1,88 @@
+{% extends 'creators/base.html' %}
+{% block title %}Outreach Agent{% endblock %}
+{% block content %}
+<style>
+  .oa-wrap{height:100vh;overflow:auto;padding:24px;background:#f4f6fb}.oa-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.oa-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}.oa-card h2{font-size:18px;margin:0 0 12px}.oa-muted{color:#64748b;font-size:13px}.oa-btn{border:0;border-radius:9px;padding:9px 13px;background:#4f46e5;color:white;font-weight:600}.oa-btn.secondary{background:#e2e8f0;color:#0f172a}.oa-btn.danger{background:#dc2626}.oa-btn:disabled{opacity:.55}.oa-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.oa-input,.oa-select,.oa-textarea{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:9px 10px;font:inherit}.oa-textarea{min-height:240px}.oa-label{display:block;font-size:12px;font-weight:700;color:#334155;margin:10px 0 5px}.oa-badge{display:inline-flex;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:700}.oa-ok{background:#dcfce7;color:#166534}.oa-warn{background:#fef3c7;color:#92400e}.oa-list{display:grid;gap:8px;margin-top:8px}.oa-item{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f8fafc;cursor:pointer}.oa-thread{max-height:260px;overflow:auto}.oa-msg{white-space:pre-wrap;border-left:3px solid #c7d2fe;padding:8px 10px;margin:8px 0;background:#f8fafc}.oa-modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:22px}.oa-modal.show{display:flex}.oa-modal-card{max-width:720px;width:100%;background:#fff;border-radius:14px;padding:18px}.oa-preview{max-height:280px;overflow:auto;white-space:pre-wrap;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:12px}
+</style>
+<div class="oa-wrap">
+  <div class="oa-row" style="justify-content:space-between;margin-bottom:18px">
+    <div><h1 style="margin:0">Creator Outreach Email Agent</h1><p class="oa-muted">Write, revise, draft, and send creator-business outreach from your connected Gmail — only after your confirmation.</p></div>
+    <a class="oa-btn secondary" href="{% url 'creator_agent' %}">Existing Agent</a>
+  </div>
+
+  <div class="oa-card" style="margin-bottom:18px">
+    <div class="oa-row" style="justify-content:space-between">
+      <div><h2>Gmail connection</h2><p class="oa-muted">Connect Gmail so Badger can help you draft and manage outreach emails. Badger will never send emails without your confirmation.</p></div>
+      {% if gmail_status.status == 'connected' or gmail_status.status == 'expired_refreshable' %}<span class="oa-badge oa-ok">{{ gmail_status.status }}</span>{% else %}<span class="oa-badge oa-warn">{{ gmail_status.status }}</span>{% endif %}
+    </div>
+    {% if gmail_status.gmail_email %}<p><strong>Connected Gmail:</strong> {{ gmail_status.gmail_email }}</p>{% endif %}
+    <div class="oa-row">
+      {% if gmail_status.status == 'connected' or gmail_status.status == 'expired_refreshable' %}
+        <a class="oa-btn secondary" href="{{ gmail_connect_url }}">Reconnect Gmail</a>
+        <form method="post" action="{{ gmail_disconnect_url }}">{% csrf_token %}<button class="oa-btn danger" type="submit">Disconnect Gmail</button></form>
+      {% elif gmail_status.status == 'needs_reauth' %}
+        <a class="oa-btn" href="{{ gmail_connect_url }}">Reconnect Gmail</a>
+      {% else %}
+        <a class="oa-btn" href="{{ gmail_connect_url }}">Connect Gmail</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="oa-grid">
+    <section class="oa-card">
+      <h2>Business selector</h2>
+      <label class="oa-label">Search businesses</label><div class="oa-row"><input id="businessSearch" class="oa-input" style="flex:1" placeholder="Company, username, email, store domain"><button id="businessSearchBtn" class="oa-btn secondary">Search</button></div>
+      <div id="businessResults" class="oa-list"></div>
+      <label class="oa-label">Manual business context</label><input id="manualBusiness" class="oa-input" placeholder="Company or context if not in Badger">
+      <label class="oa-label">Recipient email</label><input id="recipientEmail" class="oa-input" type="email" placeholder="recipient@example.com"><p id="selectedBusiness" class="oa-muted">No business selected yet.</p>
+    </section>
+
+    <section class="oa-card">
+      <h2>Thread panel</h2>
+      <label class="oa-label">Search Gmail threads</label><div class="oa-row"><input id="threadQuery" class="oa-input" style="flex:1" placeholder="Business name, sender, subject, keyword"><button id="threadSearchBtn" class="oa-btn secondary">Search Threads</button></div>
+      <div id="threadResults" class="oa-list"></div><div id="threadMessages" class="oa-thread"></div>
+      <div class="oa-row" style="margin-top:10px"><button id="summarizeBtn" class="oa-btn secondary">Summarize thread</button><button id="suggestReplyBtn" class="oa-btn secondary">Suggest reply</button><button id="nextActionsBtn" class="oa-btn secondary">Extract next actions</button></div>
+    </section>
+
+    <section class="oa-card">
+      <h2>AI email-writing panel</h2>
+      <label class="oa-label">Tone</label><select id="tone" class="oa-select"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select>
+      <label class="oa-label">Partnership context</label><input id="partnershipContext" class="oa-input" placeholder="Optional affiliate terms, product fit, campaign notes">
+      <label class="oa-label">Revision instruction</label><input id="revisionInstruction" class="oa-input" placeholder="Make it shorter, warmer, more specific...">
+      <div class="oa-row" style="margin-top:12px"><button id="generateBtn" class="oa-btn">Generate Outreach Email</button><button id="reviseBtn" class="oa-btn secondary">Revise Draft</button></div>
+      <div id="agentOutput" class="oa-list"></div>
+    </section>
+
+    <section class="oa-card">
+      <h2>Draft editor</h2>
+      <p class="oa-muted">Local status: <span id="localStatus">none</span> · Gmail draft: <span id="gmailStatus">not saved</span></p>
+      <label class="oa-label">To</label><input id="draftTo" class="oa-input" type="email">
+      <label class="oa-label">Subject</label><input id="draftSubject" class="oa-input">
+      <label class="oa-label">Body</label><textarea id="draftBody" class="oa-textarea"></textarea>
+      <div class="oa-row" style="margin-top:12px"><button id="saveDraftBtn" class="oa-btn secondary">Save as Gmail Draft</button><button id="updateDraftBtn" class="oa-btn secondary">Update Gmail Draft</button><button id="sendBtn" class="oa-btn danger">Send Email</button></div>
+    </section>
+  </div>
+</div>
+
+<div id="sendModal" class="oa-modal"><div class="oa-modal-card"><h2>Confirm send from Gmail</h2><p class="oa-muted">This will send from your connected Gmail account. AI text alone cannot trigger sending.</p><p><strong>To:</strong> <span id="confirmTo"></span></p><p><strong>Subject:</strong> <span id="confirmSubject"></span></p><div id="confirmBody" class="oa-preview"></div><div class="oa-row" style="justify-content:flex-end;margin-top:14px"><button id="cancelSend" class="oa-btn secondary">Cancel</button><button id="confirmSend" class="oa-btn danger">Confirm and send</button></div></div></div>
+<script>
+const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+let selectedBusinessId = null, selectedThread = null, localDraftId = null;
+function post(url, data){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrftoken},body:JSON.stringify(data)}).then(r=>r.json().then(j=>({status:r.status,data:j})));}
+function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function renderOutput(out){const box=document.getElementById('agentOutput'); if(!out){return} let html=`<div class="oa-item"><strong>${esc(out.type)}</strong><p>${esc(out.summary)}</p>`; if(out.items){html+=out.items.map(i=>`<div>• <strong>${esc(i.label)}</strong>: ${esc(i.detail)} ${i.cta?`<em>${esc(i.cta)}</em>`:''}</div>`).join('')} html+='</div>'; box.innerHTML=html; if(out.email){draftTo.value=out.email.to||draftTo.value; draftSubject.value=out.email.subject||draftSubject.value; draftBody.value=out.email.body||draftBody.value;}}
+function draftPayload(){return {draft_id:localDraftId, business_id:selectedBusinessId, manual_business:manualBusiness.value, recipient_email:draftTo.value||recipientEmail.value, subject:draftSubject.value, body:draftBody.value, tone:tone.value, thread_id:selectedThread?.id};}
+businessSearchBtn.onclick=async()=>{let r=await fetch(`{% url 'creator_outreach_business_search' %}?q=${encodeURIComponent(businessSearch.value)}`).then(r=>r.json()); businessResults.innerHTML=(r.businesses||[]).map(b=>`<div class="oa-item" data-id="${b.id}" data-email="${esc(b.contact_email)}" data-name="${esc(b.company_name)}"><strong>${esc(b.company_name)}</strong><div class="oa-muted">${esc(b.contact_email||'No email on file')} · ${esc(b.business_type)}</div></div>`).join(''); businessResults.querySelectorAll('.oa-item').forEach(el=>el.onclick=()=>{selectedBusinessId=el.dataset.id; recipientEmail.value=el.dataset.email; draftTo.value=el.dataset.email; selectedBusiness.textContent=`Selected: ${el.dataset.name}`;});};
+generateBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_generate' %}',{business_id:selectedBusinessId, manual_business:manualBusiness.value, recipient_email:recipientEmail.value||draftTo.value, tone:tone.value, partnership_context:partnershipContext.value}); if(r.data.ok){localDraftId=r.data.draft_id; localStatus.textContent='generated'; renderOutput(r.data.output)} else alert(r.data.error.message);};
+reviseBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_revise' %}',{...draftPayload(), revision_instruction:revisionInstruction.value}); if(r.data.ok){renderOutput(r.data.output); localStatus.textContent='edited'} else alert(r.data.error.message);};
+threadSearchBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_search_threads' %}',{query:threadQuery.value}); if(!r.data.ok){alert(r.data.error.message);return} threadResults.innerHTML=(r.data.threads||[]).map(t=>`<div class="oa-item" data-id="${esc(t.id)}"><strong>${esc(t.subject||'(no subject)')}</strong><div class="oa-muted">${esc(t.from)} · ${esc(t.snippet)}</div></div>`).join(''); threadResults.querySelectorAll('.oa-item').forEach(el=>el.onclick=async()=>{let rr=await post('{% url 'creator_outreach_read_thread' %}',{thread_id:el.dataset.id}); if(rr.data.ok){selectedThread=rr.data.thread; threadMessages.innerHTML=selectedThread.messages.map(m=>`<div class="oa-msg"><strong>${esc(m.from)}</strong><br>${esc(m.body||m.snippet)}</div>`).join('');}});};
+summarizeBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_summarize_thread' %}',{thread:selectedThread}); if(r.data.ok)renderOutput(r.data.output); else alert(r.data.error.message);};
+nextActionsBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_next_actions' %}',{thread:selectedThread}); if(r.data.ok)renderOutput(r.data.output); else alert(r.data.error.message);};
+suggestReplyBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_suggest_reply' %}',{thread:selectedThread, recipient_email:recipientEmail.value||draftTo.value, tone:tone.value}); if(r.data.ok)renderOutput(r.data.output); else alert(r.data.error.message);};
+saveDraftBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_save_draft' %}',draftPayload()); if(r.data.ok){localDraftId=r.data.draft_id; gmailStatus.textContent=r.data.gmail.draft_id; localStatus.textContent='gmail_drafted'} else alert(r.data.error.message);};
+updateDraftBtn.onclick=async()=>{let r=await post('{% url 'creator_outreach_update_draft' %}',draftPayload()); if(r.data.ok){gmailStatus.textContent=r.data.gmail.draft_id; localStatus.textContent='gmail_drafted'} else alert(r.data.error.message);};
+sendBtn.onclick=()=>{confirmTo.textContent=draftTo.value; confirmSubject.textContent=draftSubject.value; confirmBody.textContent=draftBody.value; sendModal.classList.add('show');};
+cancelSend.onclick=()=>sendModal.classList.remove('show');
+confirmSend.onclick=async()=>{let r=await post('{% url 'creator_outreach_send' %}',{...draftPayload(), confirm:true}); if(r.data.ok){sendModal.classList.remove('show'); localStatus.textContent='sent'; alert('Email sent.')} else alert(r.data.error.message);};
+</script>
+{% endblock %}
