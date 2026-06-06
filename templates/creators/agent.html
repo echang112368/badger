@@ -443,33 +443,208 @@
   }
   .ag-conn-action.disconnect:hover { background: #fee2e2; }
 
-  /* ── Integrated outreach email tool ── */
+  /* ── Inline email editor ── */
   #ag-outreach-tool {
     display: none;
-    border-bottom: 1px solid #e5e7eb;
-    background: #f8fafc;
-    max-height: 52vh;
-    overflow: auto;
-    padding: 14px 18px;
+    padding: 10px 24px 12px;
+    flex-shrink: 0;
   }
-  #ag-outreach-tool.open { display: block; }
-  .oa-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .oa-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
-  .oa-card h3 { font-size: 14px; margin: 0 0 8px; color: #111827; }
-  .oa-muted { color: #64748b; font-size: 12px; }
-  .oa-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .oa-input, .oa-select, .oa-textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; }
-  .oa-textarea { min-height: 160px; white-space: pre-wrap; }
-  .oa-label { display: block; font-size: 11px; font-weight: 700; color: #334155; margin: 8px 0 4px; }
-  .oa-btn { border: 0; border-radius: 8px; padding: 7px 10px; background: #304f91; color: white; font-weight: 600; font-size: 12px; }
-  .oa-btn.secondary { background: #e2e8f0; color: #0f172a; }
-  .oa-btn.danger { background: #dc2626; }
-  .oa-item { border: 1px solid #e5e7eb; border-radius: 9px; padding: 8px; background: #f8fafc; margin-top: 6px; cursor: pointer; font-size: 12px; }
-  .oa-msg { white-space: pre-wrap; border-left: 3px solid #c7d2fe; padding: 7px; margin-top: 6px; background: #f8fafc; font-size: 12px; }
+  #ag-outreach-tool.open {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .oe-card {
+    background: #fff;
+    border: 1px solid #e2e5ea;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  /* Header */
+  .oe-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    border-bottom: 1px solid #f0f2f5;
+    flex-wrap: wrap;
+  }
+  .oe-hdr-title { font-size: 13.5px; font-weight: 700; color: #111; }
+  .oe-status-pill {
+    font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px;
+    background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+  }
+  .oe-hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .oe-gmail-pill {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11.5px; color: #374151;
+    background: #f9fafb; border: 1px solid #e5e7eb;
+    border-radius: 20px; padding: 3px 10px;
+    text-decoration: none;
+  }
+  .oe-gmail-pill.disconnected { color: #9ca3af; }
+  .oe-fit-pill {
+    font-size: 11.5px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+    background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;
+  }
+  /* Fields */
+  .oe-field {
+    display: flex; align-items: center;
+    border-bottom: 1px solid #f0f2f5;
+    padding: 0 16px; min-height: 42px;
+  }
+  .oe-lbl { width: 58px; font-size: 13px; color: #9ca3af; flex-shrink: 0; }
+  .oe-fld-inp {
+    flex: 1; border: none; outline: none;
+    font-size: 14px; color: #111; font-family: inherit;
+    background: transparent; padding: 9px 0;
+  }
+  .oe-fld-inp::placeholder { color: #d1d5db; }
+  /* Toolbar */
+  .oe-toolbar {
+    display: flex; align-items: center;
+    padding: 5px 10px; border-bottom: 1px solid #f0f2f5; gap: 2px;
+  }
+  .oe-tb-btn {
+    width: 30px; height: 30px; border: none; background: none;
+    border-radius: 7px; cursor: pointer; color: #6b7280;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+    transition: background .1s, color .1s; font-family: inherit;
+  }
+  .oe-tb-btn:hover { background: #f3f4f6; color: #374151; }
+  .oe-tb-btn.active { background: #eef1fb; color: #304f91; }
+  .oe-tb-sep { width: 1px; height: 18px; background: #e5e7eb; margin: 0 4px; }
+  /* Context panel */
+  #oe-ctx-panel {
+    display: none; padding: 12px 16px;
+    border-bottom: 1px solid #f0f2f5; background: #fafbfc;
+  }
+  #oe-ctx-panel.open { display: block; }
+  .oe-ctx-hdr {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: #9ca3af; margin: 10px 0 6px;
+  }
+  .oe-ctx-hdr:first-child { margin-top: 0; }
+  .oe-ctx-row { display: flex; gap: 8px; align-items: center; }
+  .oe-ctx-inp {
+    flex: 1; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 7px 10px; font: inherit; font-size: 13px; outline: none; color: #111;
+    width: 100%; box-sizing: border-box;
+  }
+  .oe-ctx-inp:focus { border-color: #304f91; }
+  .oe-ctx-btn {
+    padding: 7px 12px; background: #f3f4f6; border: 1px solid #e5e7eb;
+    border-radius: 8px; font: inherit; font-size: 12px; font-weight: 600;
+    cursor: pointer; color: #374151; white-space: nowrap;
+  }
+  .oe-ctx-btn:hover { background: #e5e7eb; }
+  .oe-ctx-sel {
+    border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 10px;
+    font: inherit; font-size: 13px; color: #374151; background: #fff; outline: none;
+  }
+  .oe-ctx-note { font-size: 11px; color: #9ca3af; margin: 4px 0 0; }
+  .oe-ctx-item {
+    border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 7px 10px; margin-top: 5px; cursor: pointer; font-size: 12.5px;
+    transition: background .1s;
+  }
+  .oe-ctx-item:hover { background: #f9fafb; }
+  #businessResults { max-height: 130px; overflow-y: auto; }
+  .oe-ctx-msg {
+    white-space: pre-wrap; border-left: 3px solid #c7d2fe;
+    padding: 7px 10px; margin-top: 5px; background: #f8fafc; font-size: 12px;
+    border-radius: 0 6px 6px 0;
+  }
+  #threadMessages { max-height: 110px; overflow: auto; }
+  #agentOutput { margin-top: 6px; }
+  /* Body */
+  .oe-body {
+    width: 100%; min-height: 120px;
+    flex: 1;
+    border: none; outline: none; padding: 14px 16px;
+    font: inherit; font-size: 14px; line-height: 1.65; color: #111;
+    resize: none; box-sizing: border-box;
+  }
+  .oe-body::placeholder { color: #d1d5db; }
+  /* AI improve bar */
+  .oe-improve {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-top: 1px solid #f0f2f5; background: #fafbfc;
+  }
+  .oe-improve-inp {
+    flex: 1; border: none; outline: none; background: transparent;
+    font: inherit; font-size: 12.5px; color: #374151;
+  }
+  .oe-improve-inp::placeholder { color: #c4c9d4; }
+  .oe-rewrite-btn {
+    padding: 5px 14px; background: #fff; border: 1px solid #d1d5db;
+    border-radius: 20px; font: inherit; font-size: 12px; font-weight: 500;
+    color: #374151; cursor: pointer; white-space: nowrap;
+    transition: background .1s, border-color .1s;
+  }
+  .oe-rewrite-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+  /* Actions */
+  .oe-actions {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px 12px; border-top: 1px solid #f0f2f5;
+  }
+  .oe-act-primary {
+    padding: 8px 18px; background: #111; color: #fff;
+    border: none; border-radius: 8px; font: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .oe-act-primary:hover { background: #333; }
+  .oe-act-secondary {
+    padding: 8px 14px; background: #fff; color: #111;
+    border: 1px solid #d1d5db; border-radius: 8px; font: inherit;
+    font-size: 13px; font-weight: 500; cursor: pointer;
+  }
+  .oe-act-secondary:hover { background: #f9fafb; }
+  .oe-act-ghost {
+    padding: 8px 14px; background: none; color: #6b7280;
+    border: none; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .oe-act-ghost:hover { color: #374151; }
+  .oe-word-count { margin-left: auto; font-size: 12px; color: #9ca3af; }
+  /* Send confirmation modal */
   .oa-modal { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: none; align-items: center; justify-content: center; padding: 22px; z-index: 500; }
   .oa-modal.show { display: flex; }
-  .oa-modal-card { max-width: 720px; width: 100%; background: #fff; border-radius: 14px; padding: 18px; }
-  .oa-preview { max-height: 260px; overflow: auto; white-space: pre-wrap; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+  .oa-modal-card { max-width: 560px; width: 100%; background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 12px 40px rgba(0,0,0,.18); }
+  .oa-modal-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
+  .oa-modal-card p { font-size: 13.5px; color: #374151; margin: 6px 0; }
+  .oa-modal-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .oa-preview { max-height: 220px; overflow: auto; white-space: pre-wrap; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; font-size: 13px; }
+
+  /* ── Inline email card (inside chat thread) ── */
+  .oe-inline-card {
+    background: #fff;
+    border: 1px solid #e2e5ea;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,.08);
+    margin-top: 8px;
+    width: 100%;
+  }
+  .oe-inline-body {
+    width: 100%; min-height: 160px; max-height: 320px;
+    border: none; outline: none; padding: 14px 16px;
+    font: inherit; font-size: 14px; line-height: 1.65; color: #111;
+    resize: vertical; box-sizing: border-box;
+  }
+  .oe-inline-body::placeholder { color: #d1d5db; }
+  .oe-gen-row {
+    padding: 10px 16px; border-bottom: 1px solid #f0f2f5;
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
 
 </style>
 
@@ -502,7 +677,7 @@
         <button class="ag-chip" data-prompt="Summarize my creator profile and give me the three highest-impact next steps to grow my partnerships.">
           <i class="bi bi-lightning-charge-fill"></i> Summarize my next steps
         </button>
-        <button class="ag-chip" data-open-outreach="true" data-prompt="Draft a concise, professional partnership outreach message tailored to my creator profile.">
+        <button class="ag-chip" data-open-email="true">
           <i class="bi bi-pencil"></i> Draft brand outreach
         </button>
         <button class="ag-chip" data-prompt="Review my connected Instagram account and suggest 5 content ideas for affiliate partnerships.">
@@ -519,47 +694,101 @@
 
 
 
-    <!-- Integrated outreach email tool (kept inside the main Agent page) -->
-    <div id="ag-outreach-tool" aria-label="Creator outreach email tool">
-      <div class="oa-row" style="justify-content:space-between;margin-bottom:10px">
-        <div>
-          <strong>Outreach Email Tool</strong>
-          <span class="oa-muted">Use Gmail-connected helpers here; Badger never sends without your confirmation.</span>
+    <!-- Inline outreach email editor -->
+    <div id="ag-outreach-tool" aria-label="Outreach email editor">
+      <div class="oe-card">
+
+        <!-- Header -->
+        <div class="oe-hdr">
+          <span class="oe-hdr-title">Outreach email</span>
+          <span class="oe-status-pill" id="oe-status-pill">Editing</span>
+          <div class="oe-hdr-right">
+            {% if gmail_status.connected %}
+              <span class="oe-gmail-pill"><i class="bi bi-envelope-fill" style="font-size:11px"></i> Via Gmail · {{ gmail_status.gmail_email }}</span>
+            {% else %}
+              <a href="{% url 'creator_gmail_connect' %}" class="oe-gmail-pill disconnected"><i class="bi bi-envelope" style="font-size:11px"></i> Connect Gmail</a>
+            {% endif %}
+            <span class="oe-fit-pill" id="oe-fit-pill">— fit</span>
+          </div>
         </div>
-        <button id="oa-close" class="oa-btn secondary" type="button">Close</button>
-      </div>
-      <div class="oa-grid">
-        <section class="oa-card">
-          <h3>Business and recipient</h3>
-          <label class="oa-label">Search Badger businesses</label>
-          <div class="oa-row"><input id="businessSearch" class="oa-input" style="flex:1" placeholder="Company, username, email"><button id="businessSearchBtn" class="oa-btn secondary" type="button">Search</button></div>
+
+        <!-- To / Cc / Subject fields -->
+        <div class="oe-field">
+          <span class="oe-lbl">To</span>
+          <input id="draftTo" class="oe-fld-inp" type="email" placeholder="recipient@example.com">
+        </div>
+        <div class="oe-field">
+          <span class="oe-lbl">Cc</span>
+          <input id="oe-cc" class="oe-fld-inp" type="email" placeholder="Add recipients…">
+        </div>
+        <div class="oe-field">
+          <span class="oe-lbl">Subject</span>
+          <input id="draftSubject" class="oe-fld-inp" type="text" placeholder="Subject line">
+        </div>
+
+        <!-- Toolbar -->
+        <div class="oe-toolbar">
+          <button class="oe-tb-btn" id="oe-gen-btn" title="Generate email"><i class="bi bi-stars"></i></button>
+          <div class="oe-tb-sep"></div>
+          <button class="oe-tb-btn" id="oe-ctx-toggle" title="Business &amp; thread context"><i class="bi bi-buildings"></i></button>
+          <div class="oe-tb-sep"></div>
+          <button class="oe-tb-btn" id="oe-close" title="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+
+        <!-- Context panel (toggle) -->
+        <div id="oe-ctx-panel">
+          <div class="oe-ctx-hdr">Business context</div>
+          <div class="oe-ctx-row">
+            <input id="businessSearch" class="oe-ctx-inp" placeholder="Search Badger businesses…">
+            <button id="businessSearchBtn" class="oe-ctx-btn" type="button">Search</button>
+          </div>
           <div id="businessResults"></div>
-          <label class="oa-label">Manual business context</label><input id="manualBusiness" class="oa-input" placeholder="Company/context if not listed">
-          <label class="oa-label">Recipient email</label><input id="recipientEmail" class="oa-input" type="email" placeholder="recipient@example.com">
-          <p id="selectedBusiness" class="oa-muted">No business selected yet.</p>
-        </section>
-        <section class="oa-card">
-          <h3>Gmail threads</h3>
-          <div class="oa-row"><input id="threadQuery" class="oa-input" style="flex:1" placeholder="Business, sender, subject, keyword"><button id="threadSearchBtn" class="oa-btn secondary" type="button">Search</button></div>
-          <div id="threadResults"></div><div id="threadMessages" style="max-height:180px;overflow:auto"></div>
-          <div class="oa-row" style="margin-top:8px"><button id="summarizeBtn" class="oa-btn secondary" type="button">Summarize</button><button id="suggestReplyBtn" class="oa-btn secondary" type="button">Suggest reply</button><button id="nextActionsBtn" class="oa-btn secondary" type="button">Next actions</button></div>
-        </section>
-        <section class="oa-card">
-          <h3>Agent writing controls</h3>
-          <label class="oa-label">Tone</label><select id="tone" class="oa-select"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select>
-          <label class="oa-label">Partnership context</label><input id="partnershipContext" class="oa-input" placeholder="Optional fit, terms, campaign notes">
-          <label class="oa-label">Revision instruction</label><input id="revisionInstruction" class="oa-input" placeholder="Make it shorter, warmer, more specific...">
-          <div class="oa-row" style="margin-top:10px"><button id="generateBtn" class="oa-btn" type="button">Generate email</button><button id="reviseBtn" class="oa-btn secondary" type="button">Revise</button></div>
+          <input id="manualBusiness" class="oe-ctx-inp" style="margin-top:6px" placeholder="Or paste business name / context">
+          <input id="recipientEmail" class="oe-ctx-inp" type="email" style="margin-top:6px" placeholder="Recipient email (if different from To)">
+          <p id="selectedBusiness" class="oe-ctx-note"></p>
+          <div class="oe-ctx-row" style="margin-top:8px;gap:8px">
+            <select id="tone" class="oe-ctx-sel"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select>
+            <input id="partnershipContext" class="oe-ctx-inp" placeholder="Partnership notes (optional)">
+          </div>
+
+          <div class="oe-ctx-hdr">Gmail threads</div>
+          <div class="oe-ctx-row">
+            <input id="threadQuery" class="oe-ctx-inp" placeholder="Search threads by business, subject, keyword…">
+            <button id="threadSearchBtn" class="oe-ctx-btn" type="button">Search</button>
+          </div>
+          <div id="threadResults"></div>
+          <div id="threadMessages"></div>
+          <div class="oe-ctx-row" style="margin-top:6px;gap:6px">
+            <button id="summarizeBtn" class="oe-ctx-btn" type="button" style="font-size:11.5px;padding:5px 10px">Summarize</button>
+            <button id="suggestReplyBtn" class="oe-ctx-btn" type="button" style="font-size:11.5px;padding:5px 10px">Suggest reply</button>
+            <button id="nextActionsBtn" class="oe-ctx-btn" type="button" style="font-size:11.5px;padding:5px 10px">Next actions</button>
+          </div>
           <div id="agentOutput"></div>
-        </section>
-        <section class="oa-card">
-          <h3>Draft editor</h3>
-          <p class="oa-muted">Local status: <span id="localStatus">none</span> · Gmail draft: <span id="gmailStatus">not saved</span></p>
-          <label class="oa-label">To</label><input id="draftTo" class="oa-input" type="email">
-          <label class="oa-label">Subject</label><input id="draftSubject" class="oa-input">
-          <label class="oa-label">Body</label><textarea id="draftBody" class="oa-textarea"></textarea>
-          <div class="oa-row" style="margin-top:10px"><button id="saveDraftBtn" class="oa-btn secondary" type="button">Save Gmail Draft</button><button id="updateDraftBtn" class="oa-btn secondary" type="button">Update Draft</button><button id="sendBtn" class="oa-btn danger" type="button">Send Email</button></div>
-        </section>
+        </div>
+
+        <!-- Email body -->
+        <textarea id="draftBody" class="oe-body" placeholder="Your email will appear here…"></textarea>
+
+        <!-- AI improve bar -->
+        <div class="oe-improve">
+          <input id="revisionInstruction" class="oe-improve-inp" placeholder='Ask the agent to improve it — e.g. "make it shorter" or "sound more confident"'>
+          <button id="oe-rewrite-btn" class="oe-rewrite-btn" type="button">Rewrite</button>
+        </div>
+
+        <!-- Action bar -->
+        <div class="oe-actions">
+          <button id="sendBtn" class="oe-act-primary" type="button">Send now</button>
+          <button id="saveDraftBtn" class="oe-act-secondary" type="button">Save to Gmail drafts</button>
+          <button id="oe-close-2" class="oe-act-ghost" type="button">Discard</button>
+          <span id="oe-word-count" class="oe-word-count">0 words</span>
+        </div>
+
+        <!-- Hidden state trackers -->
+        <div hidden>
+          <span id="localStatus">none</span>
+          <span id="gmailStatus">not saved</span>
+        </div>
+
       </div>
     </div>
 
@@ -612,10 +841,10 @@
               </div>
             </div>
           </div>
-          <textarea id="ag-input" rows="1" placeholder="Ask Badger Agent anything… or use /gmail to create a draft"></textarea>
+          <textarea id="ag-input" rows="1" placeholder="Ask anything… or type /gmail to open the email editor"></textarea>
           <button id="ag-send" disabled><i class="bi bi-send-fill"></i></button>
         </div>
-        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Use /gmail + prompt to create a Gmail draft</div>
+        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type /gmail to open the email editor</div>
       </div>
     </div>
   </div>
@@ -623,7 +852,19 @@
 </div>
 
 
-<div id="sendModal" class="oa-modal"><div class="oa-modal-card"><h3>Confirm send from Gmail</h3><p class="oa-muted">This sends from your connected Gmail account only after this explicit confirmation.</p><p><strong>To:</strong> <span id="confirmTo"></span></p><p><strong>Subject:</strong> <span id="confirmSubject"></span></p><div id="confirmBody" class="oa-preview"></div><div class="oa-row" style="justify-content:flex-end;margin-top:14px"><button id="cancelSend" class="oa-btn secondary" type="button">Cancel</button><button id="confirmSend" class="oa-btn danger" type="button">Confirm and send</button></div></div></div>
+<div id="sendModal" class="oa-modal">
+  <div class="oa-modal-card">
+    <h3>Confirm send from Gmail</h3>
+    <p style="font-size:12.5px;color:#6b7280;margin:0 0 12px">This sends from your connected Gmail account only after this explicit confirmation.</p>
+    <p><strong>To:</strong> <span id="confirmTo"></span></p>
+    <p><strong>Subject:</strong> <span id="confirmSubject"></span></p>
+    <div id="confirmBody" class="oa-preview" style="margin-top:10px"></div>
+    <div class="oa-modal-row">
+      <button id="cancelSend" class="oe-act-secondary" type="button">Cancel</button>
+      <button id="confirmSend" class="oe-act-primary" type="button" style="background:#dc2626">Confirm and send</button>
+    </div>
+  </div>
+</div>
 
 {% csrf_token %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -633,7 +874,9 @@
   if (typeof marked !== 'undefined') {
     marked.setOptions({ gfm: true, breaks: false });
   }
-  const CSRF       = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const CSRF         = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
+  const GMAIL_CONNECTED = {% if gmail_status.connected %}true{% else %}false{% endif %};
+  const GMAIL_EMAIL     = '{{ gmail_status.gmail_email|default:""|escapejs }}';
   const LIST_URL   = '{% url "agent:list_conversations" %}';
   const NEW_URL    = '{% url "agent:new_conversation" %}';
   const HIST_URL   = id => `{% url "agent:history" %}?conversation_id=${id}`;
@@ -663,17 +906,256 @@
   let activeConvId = null;
 
 
-  /* ── Integrated Outreach Tool ─────────────────────── */
+  /* ── Inline email card factory ─────────────────────── */
+  function appendEmailEditorCard(output, recipientEmail, draftId) {
+    const cardId   = 'oe-ic-' + Date.now();
+    let _draftId   = draftId || (output && output.draft_id) || null;
+    const emailTo  = (output && output.email && output.email.to)      || recipientEmail || '';
+    const emailSub = (output && output.email && output.email.subject)  || '';
+    const emailBod = (output && output.email && output.email.body)     || '';
+    const hasContent = !!(emailSub || emailBod);
+
+    const gmailPill = GMAIL_CONNECTED
+      ? `<span class="oe-gmail-pill"><i class="bi bi-envelope-fill" style="font-size:11px"></i> Via Gmail · ${esc(GMAIL_EMAIL)}</span>`
+      : `<a href="/creators/gmail/connect/" class="oe-gmail-pill disconnected" style="text-decoration:none"><i class="bi bi-envelope" style="font-size:11px"></i> Connect Gmail</a>`;
+
+    const block = document.createElement('div');
+    block.className = 'msg-block';
+    block.innerHTML = `
+      <div class="msg-ai" style="align-items:flex-start">
+        <div class="msg-ai-av">AI</div>
+        <div style="flex:1;min-width:0">
+          <div class="oe-inline-card" id="${cardId}">
+            <div class="oe-hdr">
+              <span class="oe-hdr-title">Outreach email</span>
+              <span class="oe-status-pill" id="${cardId}-status">${hasContent ? 'Generated' : 'Editing'}</span>
+              <div class="oe-hdr-right">${gmailPill}<span class="oe-fit-pill" id="${cardId}-fit">— fit</span></div>
+            </div>
+            <div class="oe-field">
+              <span class="oe-lbl">To</span>
+              <input id="${cardId}-to" class="oe-fld-inp" type="email" value="${esc(emailTo)}" placeholder="recipient@example.com">
+            </div>
+            <div class="oe-field">
+              <span class="oe-lbl">Subject</span>
+              <input id="${cardId}-subject" class="oe-fld-inp" type="text" value="${esc(emailSub)}" placeholder="Subject line">
+            </div>
+            <div class="oe-toolbar">
+              <button class="oe-tb-btn" id="${cardId}-gen-btn" title="Generate / regenerate"><i class="bi bi-stars"></i></button>
+              <div class="oe-tb-sep"></div>
+              <button class="oe-tb-btn" id="${cardId}-x-btn" title="Remove"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="oe-gen-row" id="${cardId}-genrow" style="${hasContent ? 'display:none' : ''}">
+              <input id="${cardId}-biz" class="oe-ctx-inp" placeholder="Business name or context…" style="flex:1">
+              <input id="${cardId}-ctx" class="oe-ctx-inp" placeholder="Partnership notes…" style="flex:1">
+              <button id="${cardId}-do-gen" class="oe-ctx-btn" type="button">Generate</button>
+            </div>
+            <textarea id="${cardId}-body" class="oe-inline-body" placeholder="Your email will appear here…">${esc(emailBod)}</textarea>
+            <div class="oe-improve">
+              <input id="${cardId}-improve" class="oe-improve-inp" placeholder='Ask the agent to improve it — e.g. "make it shorter" or "sound more confident"'>
+              <button id="${cardId}-rewrite" class="oe-rewrite-btn" type="button">Rewrite</button>
+            </div>
+            <div class="oe-actions">
+              <button id="${cardId}-send" class="oe-act-primary" type="button">Send now</button>
+              <button id="${cardId}-save" class="oe-act-secondary" type="button">Save to Gmail drafts</button>
+              <button id="${cardId}-discard" class="oe-act-ghost" type="button">Discard</button>
+              <span id="${cardId}-wc" class="oe-word-count">0 words</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    thread.appendChild(block);
+    showThread();
+    thread.scrollTop = thread.scrollHeight;
+
+    const toEl      = document.getElementById(`${cardId}-to`);
+    const subjectEl = document.getElementById(`${cardId}-subject`);
+    const bodyEl    = document.getElementById(`${cardId}-body`);
+    const statusEl  = document.getElementById(`${cardId}-status`);
+    const genRow    = document.getElementById(`${cardId}-genrow`);
+
+    function _wc() {
+      const w = (bodyEl.value.trim().match(/\S+/g) || []).length;
+      document.getElementById(`${cardId}-wc`).textContent = w + ' word' + (w === 1 ? '' : 's');
+    }
+    function _fit() {
+      const words = (bodyEl.value.trim().match(/\S+/g) || []).length;
+      let s = 0;
+      if (subjectEl.value.trim()) s += 20;
+      if (toEl.value.trim())      s += 15;
+      if (words >= 50)  s += 20;
+      if (words >= 100) s += 15;
+      if (words <= 300) s += 10;
+      const lower = bodyEl.value.toLowerCase();
+      if (/love to|happy to|schedule|discuss|reach out|collaborate|partner/.test(lower)) s += 10;
+      if (/i am|i'm|my audience|my content|my niche/.test(lower)) s += 10;
+      s = Math.min(s, 100);
+      const pill = document.getElementById(`${cardId}-fit`);
+      if (!pill) return;
+      pill.textContent      = s + '/100 fit';
+      pill.style.background  = s >= 70 ? '#f0fdf4' : s >= 40 ? '#fffbeb' : '#fef2f2';
+      pill.style.color       = s >= 70 ? '#15803d'  : s >= 40 ? '#b45309' : '#b91c1c';
+      pill.style.borderColor = s >= 70 ? '#bbf7d0'  : s >= 40 ? '#fde68a' : '#fecaca';
+    }
+    bodyEl.addEventListener('input',    () => { _wc(); _fit(); });
+    subjectEl.addEventListener('input', _fit);
+    toEl.addEventListener('input',      _fit);
+    _wc(); _fit();
+
+    /* ✨ Toggle generate context row */
+    document.getElementById(`${cardId}-gen-btn`).addEventListener('click', () => {
+      const open = genRow.style.display === 'none';
+      genRow.style.display = open ? '' : 'none';
+      document.getElementById(`${cardId}-gen-btn`).classList.toggle('active', open);
+    });
+
+    /* Generate */
+    document.getElementById(`${cardId}-do-gen`).addEventListener('click', async () => {
+      const btn = document.getElementById(`${cardId}-do-gen`);
+      btn.textContent = 'Generating…'; btn.disabled = true;
+      const r = await postOutreach(OUTREACH_URLS.generate, {
+        recipient_email: toEl.value || document.getElementById(`${cardId}-biz`).value,
+        manual_business: document.getElementById(`${cardId}-biz`).value,
+        tone: 'professional',
+        partnership_context: document.getElementById(`${cardId}-ctx`).value,
+      });
+      btn.textContent = 'Generate'; btn.disabled = false;
+      if (r.data.ok) {
+        _draftId = r.data.draft_id || _draftId;
+        const e = r.data.output && r.data.output.email;
+        if (e) {
+          if (e.to)      toEl.value      = e.to;
+          if (e.subject) subjectEl.value = e.subject;
+          if (e.body)    bodyEl.value    = e.body;
+          statusEl.textContent = 'Generated';
+          genRow.style.display = 'none';
+          document.getElementById(`${cardId}-gen-btn`).classList.remove('active');
+          _wc(); _fit();
+        }
+      } else { alert(r.data.error?.message || 'Could not generate email.'); }
+    });
+
+    /* Rewrite */
+    document.getElementById(`${cardId}-rewrite`).addEventListener('click', async () => {
+      const btn = document.getElementById(`${cardId}-rewrite`);
+      btn.textContent = 'Rewriting…'; btn.disabled = true;
+      const r = await postOutreach(OUTREACH_URLS.revise, {
+        draft_id: _draftId,
+        recipient_email: toEl.value,
+        subject: subjectEl.value,
+        body: bodyEl.value,
+        tone: 'professional',
+        revision_instruction: document.getElementById(`${cardId}-improve`).value,
+      });
+      btn.textContent = 'Rewrite'; btn.disabled = false;
+      if (r.data.ok) {
+        const e = r.data.output && r.data.output.email;
+        if (e) {
+          if (e.to)      toEl.value      = e.to;
+          if (e.subject) subjectEl.value = e.subject;
+          if (e.body)    bodyEl.value    = e.body;
+          statusEl.textContent = 'Edited'; _wc(); _fit();
+        }
+      } else { alert(r.data.error?.message || 'Could not revise email.'); }
+    });
+
+    /* Save to Gmail drafts */
+    document.getElementById(`${cardId}-save`).addEventListener('click', async () => {
+      const btn = document.getElementById(`${cardId}-save`);
+      btn.textContent = 'Saving…'; btn.disabled = true;
+      const url = _draftId ? OUTREACH_URLS.updateDraft : OUTREACH_URLS.saveDraft;
+      const r = await postOutreach(url, {
+        draft_id: _draftId, recipient_email: toEl.value,
+        subject: subjectEl.value, body: bodyEl.value, tone: 'professional',
+      });
+      btn.textContent = 'Save to Gmail drafts'; btn.disabled = false;
+      if (r.data.ok) {
+        _draftId = r.data.draft_id || _draftId;
+        statusEl.textContent = 'Saved to Gmail';
+      } else { alert(r.data.error?.message || 'Could not save draft.'); }
+    });
+
+    /* Send now */
+    document.getElementById(`${cardId}-send`).addEventListener('click', () => {
+      document.getElementById('confirmTo').textContent      = toEl.value;
+      document.getElementById('confirmSubject').textContent = subjectEl.value;
+      document.getElementById('confirmBody').textContent    = bodyEl.value;
+      window._pendingCardSend = async () => {
+        const r = await postOutreach(OUTREACH_URLS.send, {
+          draft_id: _draftId, recipient_email: toEl.value,
+          subject: subjectEl.value, body: bodyEl.value,
+          tone: 'professional', confirm: true,
+        });
+        if (r.data.ok) {
+          statusEl.textContent = 'Sent';
+          const card = document.getElementById(cardId);
+          if (card) { card.style.opacity = '0.6'; card.style.pointerEvents = 'none'; }
+        } else { alert(r.data.error?.message || 'Send failed.'); }
+      };
+      document.getElementById('sendModal').classList.add('show');
+    });
+
+    /* Discard / close */
+    document.getElementById(`${cardId}-discard`).addEventListener('click', () => block.remove());
+    document.getElementById(`${cardId}-x-btn`).addEventListener('click',   () => block.remove());
+  }
+
+  async function openInlineEmailEditor(context) {
+    if (!activeConvId) {
+      try {
+        const res  = await fetch(NEW_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' } });
+        const conv = await res.json();
+        activeConvId = conv.id;
+        await loadConvList();
+        setActiveItem(conv.id);
+      } catch (e) { /* silent */ }
+    }
+    const emailMatch      = (context || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    const recipientEmail  = emailMatch ? emailMatch[0] : '';
+    const partnerCtx      = (context || '').replace(recipientEmail, '').trim();
+    showThread();
+    if (context) {
+      const thinkBlock = appendThinking();
+      let output = null, draftId = null;
+      try {
+        const r = await postOutreach(OUTREACH_URLS.generate, {
+          recipient_email: recipientEmail,
+          manual_business: partnerCtx,
+          tone: 'professional',
+          partnership_context: partnerCtx,
+        });
+        if (r.data.ok) { output = r.data.output; draftId = r.data.draft_id; }
+      } catch (e) { /* silent */ }
+      thinkBlock.remove();
+      appendEmailEditorCard(output, recipientEmail, draftId);
+    } else {
+      appendEmailEditorCard(null, '', null);
+    }
+  }
+
+  /* ── Inline Email Editor (standalone panel, secondary) ─ */
   const outreachTool = document.getElementById('ag-outreach-tool');
   let selectedBusinessId = null;
   let selectedThread = null;
   let localDraftId = null;
 
-  function openOutreachTool() {
+  function openOutreachTool(prefill) {
+    welcome.style.display = 'none';
+    thread.style.display  = 'none';
     outreachTool.classList.add('open');
-    document.getElementById('recipientEmail').focus();
+    if (prefill) {
+      if (prefill.partnershipContext) document.getElementById('partnershipContext').value = prefill.partnershipContext;
+      if (prefill.to) document.getElementById('draftTo').value = prefill.to;
+    }
   }
-  function closeOutreachTool() { outreachTool.classList.remove('open'); }
+  function closeOutreachTool() {
+    outreachTool.classList.remove('open');
+    if (thread.innerHTML.trim()) {
+      showThread();
+    } else {
+      showWelcome();
+    }
+  }
+
   function postOutreach(url, data) {
     return fetch(url, {
       method: 'POST',
@@ -681,21 +1163,27 @@
       body: JSON.stringify(data || {})
     }).then(r => r.json().then(j => ({status: r.status, data: j})));
   }
+
   function renderOutreachOutput(out) {
     const box = document.getElementById('agentOutput');
     if (!out) return;
-    let html = `<div class="oa-item"><strong>${esc(out.type)}</strong><p>${esc(out.summary)}</p>`;
-    if (out.items) {
-      html += out.items.map(i => `<div>• <strong>${esc(i.label)}</strong>: ${esc(i.detail)} ${i.cta ? `<em>${esc(i.cta)}</em>` : ''}</div>`).join('');
+    let html = `<div class="oe-ctx-item"><strong>${esc(out.type)}</strong><p style="margin:4px 0 0;font-size:12px;color:#374151">${esc(out.summary)}</p>`;
+    if (out.items && out.items.length) {
+      html += out.items.map(i =>
+        `<div style="font-size:12px;margin-top:3px">• <strong>${esc(i.label)}</strong>: ${esc(i.detail)}${i.cta ? ` <em style="color:#6b7280">${esc(i.cta)}</em>` : ''}</div>`
+      ).join('');
     }
     html += '</div>';
     box.innerHTML = html;
     if (out.email) {
-      document.getElementById('draftTo').value = out.email.to || document.getElementById('draftTo').value;
-      document.getElementById('draftSubject').value = out.email.subject || document.getElementById('draftSubject').value;
-      document.getElementById('draftBody').value = out.email.body || document.getElementById('draftBody').value;
+      if (out.email.to)      document.getElementById('draftTo').value      = out.email.to;
+      if (out.email.subject) document.getElementById('draftSubject').value = out.email.subject;
+      if (out.email.body)    document.getElementById('draftBody').value    = out.email.body;
+      updateWordCount();
+      updateFitScore();
     }
   }
+
   function outreachDraftPayload() {
     return {
       draft_id: localDraftId,
@@ -708,21 +1196,62 @@
       thread_id: selectedThread?.id
     };
   }
-  document.querySelectorAll('[data-open-outreach]').forEach(btn => btn.addEventListener('click', openOutreachTool));
-  document.getElementById('oa-close').addEventListener('click', closeOutreachTool);
-  document.getElementById('businessSearchBtn').addEventListener('click', async () => {
-    const q = encodeURIComponent(document.getElementById('businessSearch').value);
-    const r = await fetch(`${OUTREACH_URLS.businessSearch}?q=${q}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}}).then(r => r.json());
-    const results = document.getElementById('businessResults');
-    results.innerHTML = (r.businesses || []).map(b => `<div class="oa-item" data-id="${b.id}" data-email="${esc(b.contact_email)}" data-name="${esc(b.company_name)}"><strong>${esc(b.company_name)}</strong><div class="oa-muted">${esc(b.contact_email || 'No email on file')}</div></div>`).join('');
-    results.querySelectorAll('.oa-item').forEach(el => el.addEventListener('click', () => {
-      selectedBusinessId = el.dataset.id;
-      document.getElementById('recipientEmail').value = el.dataset.email;
-      document.getElementById('draftTo').value = el.dataset.email;
-      document.getElementById('selectedBusiness').textContent = `Selected: ${el.dataset.name}`;
-    }));
+
+  /* word count */
+  function updateWordCount() {
+    const words = (document.getElementById('draftBody').value.trim().match(/\S+/g) || []).length;
+    document.getElementById('oe-word-count').textContent = words + ' word' + (words === 1 ? '' : 's');
+  }
+
+  /* fit score heuristic */
+  function updateFitScore() {
+    const subject = document.getElementById('draftSubject').value.trim();
+    const body    = document.getElementById('draftBody').value.trim();
+    const to      = document.getElementById('draftTo').value.trim();
+    const words   = (body.match(/\S+/g) || []).length;
+    let score = 0;
+    if (subject)          score += 20;
+    if (to)               score += 15;
+    if (words >= 50)      score += 20;
+    if (words >= 100)     score += 15;
+    if (words <= 300)     score += 10;
+    const lower = body.toLowerCase();
+    if (/love to|happy to|schedule|discuss|reach out|collaborate|partner/.test(lower)) score += 10;
+    if (/i am|i'm|my audience|my content|my niche/.test(lower)) score += 10;
+    score = Math.min(score, 100);
+    const pill = document.getElementById('oe-fit-pill');
+    pill.textContent = score + '/100 fit';
+    pill.style.background = score >= 70 ? '#f0fdf4' : score >= 40 ? '#fffbeb' : '#fef2f2';
+    pill.style.color      = score >= 70 ? '#15803d'  : score >= 40 ? '#b45309' : '#b91c1c';
+    pill.style.borderColor= score >= 70 ? '#bbf7d0'  : score >= 40 ? '#fde68a' : '#fecaca';
+  }
+
+  document.getElementById('draftBody').addEventListener('input', () => { updateWordCount(); updateFitScore(); });
+  document.getElementById('draftSubject').addEventListener('input', updateFitScore);
+  document.getElementById('draftTo').addEventListener('input', updateFitScore);
+
+  /* Context panel toggle */
+  document.getElementById('oe-ctx-toggle').addEventListener('click', () => {
+    const panel = document.getElementById('oe-ctx-panel');
+    const btn   = document.getElementById('oe-ctx-toggle');
+    panel.classList.toggle('open');
+    btn.classList.toggle('active', panel.classList.contains('open'));
   });
-  document.getElementById('generateBtn').addEventListener('click', async () => {
+
+  /* Open / close */
+  document.querySelectorAll('[data-open-outreach]').forEach(btn => btn.addEventListener('click', () => openOutreachTool()));
+  document.querySelectorAll('[data-open-email]').forEach(btn => btn.addEventListener('click', () => {
+    showThread();
+    appendEmailEditorCard(null, '', null);
+  }));
+  document.getElementById('oe-close').addEventListener('click', closeOutreachTool);
+  document.getElementById('oe-close-2').addEventListener('click', closeOutreachTool);
+
+  /* Generate email */
+  document.getElementById('oe-gen-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('oe-gen-btn');
+    btn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation:ag-spin .7s linear infinite"></i>';
+    btn.disabled = true;
     const r = await postOutreach(OUTREACH_URLS.generate, {
       business_id: selectedBusinessId,
       manual_business: document.getElementById('manualBusiness').value,
@@ -730,60 +1259,143 @@
       tone: document.getElementById('tone').value,
       partnership_context: document.getElementById('partnershipContext').value
     });
-    if (r.data.ok) { localDraftId = r.data.draft_id; document.getElementById('localStatus').textContent = 'generated'; renderOutreachOutput(r.data.output); }
-    else alert(r.data.error.message);
+    btn.innerHTML = '<i class="bi bi-stars"></i>';
+    btn.disabled = false;
+    if (r.data.ok) {
+      localDraftId = r.data.draft_id;
+      document.getElementById('localStatus').textContent = 'generated';
+      document.getElementById('oe-status-pill').textContent = 'Generated';
+      renderOutreachOutput(r.data.output);
+    } else {
+      alert(r.data.error?.message || 'Could not generate email.');
+    }
   });
-  document.getElementById('reviseBtn').addEventListener('click', async () => {
-    const r = await postOutreach(OUTREACH_URLS.revise, {...outreachDraftPayload(), revision_instruction: document.getElementById('revisionInstruction').value});
-    if (r.data.ok) { renderOutreachOutput(r.data.output); document.getElementById('localStatus').textContent = 'edited'; }
-    else alert(r.data.error.message);
+
+  /* Rewrite / revise */
+  document.getElementById('oe-rewrite-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('oe-rewrite-btn');
+    btn.textContent = 'Rewriting…';
+    btn.disabled = true;
+    const r = await postOutreach(OUTREACH_URLS.revise, {
+      ...outreachDraftPayload(),
+      revision_instruction: document.getElementById('revisionInstruction').value
+    });
+    btn.textContent = 'Rewrite';
+    btn.disabled = false;
+    if (r.data.ok) {
+      renderOutreachOutput(r.data.output);
+      document.getElementById('localStatus').textContent = 'edited';
+      document.getElementById('oe-status-pill').textContent = 'Editing';
+    } else {
+      alert(r.data.error?.message || 'Could not revise email.');
+    }
   });
+
+  /* Business search */
+  document.getElementById('businessSearchBtn').addEventListener('click', async () => {
+    const q = encodeURIComponent(document.getElementById('businessSearch').value);
+    const r = await fetch(`${OUTREACH_URLS.businessSearch}?q=${q}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}}).then(r => r.json());
+    const results = document.getElementById('businessResults');
+    results.innerHTML = (r.businesses || []).map(b =>
+      `<div class="oe-ctx-item" data-id="${b.id}" data-email="${esc(b.contact_email)}" data-name="${esc(b.company_name)}">
+        <strong style="font-size:13px">${esc(b.company_name)}</strong>
+        <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">${esc(b.contact_email || 'No email on file')}</div>
+      </div>`
+    ).join('');
+    results.querySelectorAll('.oe-ctx-item').forEach(el => el.addEventListener('click', () => {
+      selectedBusinessId = el.dataset.id;
+      document.getElementById('recipientEmail').value = el.dataset.email;
+      document.getElementById('draftTo').value = el.dataset.email;
+      document.getElementById('selectedBusiness').textContent = 'Selected: ' + el.dataset.name;
+      updateFitScore();
+    }));
+  });
+
+  /* Thread search */
   document.getElementById('threadSearchBtn').addEventListener('click', async () => {
     const r = await postOutreach(OUTREACH_URLS.searchThreads, {query: document.getElementById('threadQuery').value});
-    if (!r.data.ok) { alert(r.data.error.message); return; }
+    if (!r.data.ok) { alert(r.data.error?.message || 'Thread search failed.'); return; }
     const results = document.getElementById('threadResults');
-    results.innerHTML = (r.data.threads || []).map(t => `<div class="oa-item" data-id="${esc(t.id)}"><strong>${esc(t.subject || '(no subject)')}</strong><div class="oa-muted">${esc(t.from)} · ${esc(t.snippet)}</div></div>`).join('');
-    results.querySelectorAll('.oa-item').forEach(el => el.addEventListener('click', async () => {
+    results.innerHTML = (r.data.threads || []).map(t =>
+      `<div class="oe-ctx-item" data-id="${esc(t.id)}">
+        <strong style="font-size:13px">${esc(t.subject || '(no subject)')}</strong>
+        <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">${esc(t.from)} · ${esc(t.snippet)}</div>
+      </div>`
+    ).join('');
+    results.querySelectorAll('.oe-ctx-item').forEach(el => el.addEventListener('click', async () => {
       const rr = await postOutreach(OUTREACH_URLS.readThread, {thread_id: el.dataset.id});
       if (rr.data.ok) {
         selectedThread = rr.data.thread;
-        document.getElementById('threadMessages').innerHTML = selectedThread.messages.map(m => `<div class="oa-msg"><strong>${esc(m.from)}</strong><br>${esc(m.body || m.snippet)}</div>`).join('');
+        document.getElementById('threadMessages').innerHTML = selectedThread.messages.map(m =>
+          `<div class="oe-ctx-msg"><strong>${esc(m.from)}</strong><br>${esc(m.body || m.snippet)}</div>`
+        ).join('');
       }
     }));
   });
+
   document.getElementById('summarizeBtn').addEventListener('click', async () => {
     const r = await postOutreach(OUTREACH_URLS.summarizeThread, {thread: selectedThread});
-    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error?.message || 'Failed.');
   });
   document.getElementById('nextActionsBtn').addEventListener('click', async () => {
     const r = await postOutreach(OUTREACH_URLS.nextActions, {thread: selectedThread});
-    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error?.message || 'Failed.');
   });
   document.getElementById('suggestReplyBtn').addEventListener('click', async () => {
-    const r = await postOutreach(OUTREACH_URLS.suggestReply, {thread: selectedThread, recipient_email: document.getElementById('recipientEmail').value || document.getElementById('draftTo').value, tone: document.getElementById('tone').value});
-    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+    const r = await postOutreach(OUTREACH_URLS.suggestReply, {
+      thread: selectedThread,
+      recipient_email: document.getElementById('draftTo').value || document.getElementById('recipientEmail').value,
+      tone: document.getElementById('tone').value
+    });
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error?.message || 'Failed.');
   });
+
+  /* Save to Gmail drafts (create or update) */
   document.getElementById('saveDraftBtn').addEventListener('click', async () => {
-    const r = await postOutreach(OUTREACH_URLS.saveDraft, outreachDraftPayload());
-    if (r.data.ok) { localDraftId = r.data.draft_id; document.getElementById('gmailStatus').textContent = r.data.gmail.draft_id; document.getElementById('localStatus').textContent = 'gmail_drafted'; }
-    else alert(r.data.error.message);
+    const url = localDraftId ? OUTREACH_URLS.updateDraft : OUTREACH_URLS.saveDraft;
+    const btn = document.getElementById('saveDraftBtn');
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+    const r = await postOutreach(url, outreachDraftPayload());
+    btn.textContent = 'Save to Gmail drafts';
+    btn.disabled = false;
+    if (r.data.ok) {
+      localDraftId = r.data.draft_id || localDraftId;
+      document.getElementById('gmailStatus').textContent = r.data.gmail?.draft_id || 'saved';
+      document.getElementById('localStatus').textContent = 'gmail_drafted';
+      document.getElementById('oe-status-pill').textContent = 'Saved to Gmail';
+    } else {
+      alert(r.data.error?.message || 'Could not save draft.');
+    }
   });
-  document.getElementById('updateDraftBtn').addEventListener('click', async () => {
-    const r = await postOutreach(OUTREACH_URLS.updateDraft, outreachDraftPayload());
-    if (r.data.ok) { document.getElementById('gmailStatus').textContent = r.data.gmail.draft_id; document.getElementById('localStatus').textContent = 'gmail_drafted'; }
-    else alert(r.data.error.message);
-  });
+
+  /* Send now */
   document.getElementById('sendBtn').addEventListener('click', () => {
-    document.getElementById('confirmTo').textContent = document.getElementById('draftTo').value;
+    document.getElementById('confirmTo').textContent      = document.getElementById('draftTo').value;
     document.getElementById('confirmSubject').textContent = document.getElementById('draftSubject').value;
-    document.getElementById('confirmBody').textContent = document.getElementById('draftBody').value;
+    document.getElementById('confirmBody').textContent    = document.getElementById('draftBody').value;
     document.getElementById('sendModal').classList.add('show');
   });
   document.getElementById('cancelSend').addEventListener('click', () => document.getElementById('sendModal').classList.remove('show'));
   document.getElementById('confirmSend').addEventListener('click', async () => {
-    const r = await postOutreach(OUTREACH_URLS.send, {...outreachDraftPayload(), confirm: true});
-    if (r.data.ok) { document.getElementById('sendModal').classList.remove('show'); document.getElementById('localStatus').textContent = 'sent'; alert('Email sent.'); }
-    else alert(r.data.error.message);
+    const btn = document.getElementById('confirmSend');
+    btn.textContent = 'Sending…'; btn.disabled = true;
+    try {
+      if (window._pendingCardSend) {
+        await window._pendingCardSend();
+        window._pendingCardSend = null;
+      } else {
+        const r = await postOutreach(OUTREACH_URLS.send, {...outreachDraftPayload(), confirm: true});
+        if (r.data.ok) {
+          document.getElementById('localStatus').textContent = 'sent';
+          const sp = document.getElementById('oe-status-pill');
+          if (sp) sp.textContent = 'Sent';
+          closeOutreachTool();
+        } else { alert(r.data.error?.message || 'Send failed.'); }
+      }
+    } catch (e) { alert('Send failed: ' + e.message); }
+    btn.textContent = 'Confirm and send'; btn.disabled = false;
+    document.getElementById('sendModal').classList.remove('show');
   });
 
   /* ── helpers ───────────────────────────────────────── */
@@ -989,6 +1601,19 @@
   async function send() {
     const content = input.value.trim();
     if (!content || sendBtn.disabled) return;
+
+    /* /gmail command → inline email card in thread */
+    if (content.toLowerCase().startsWith('/gmail')) {
+      const rest = content.slice(6).trim();
+      input.value = '';
+      input.style.height = '22px';
+      sendBtn.disabled = true;
+      appendUser(content);
+      await openInlineEmailEditor(rest);
+      sendBtn.disabled = !input.value.trim();
+      input.focus();
+      return;
+    }
 
     if (!activeConvId) {
       try {
