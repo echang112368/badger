@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Generator
 
 import requests
@@ -13,7 +14,9 @@ from creators.services.dashboard import build_creator_dashboard_context
 from creators.services.gmail_oauth import get_gmail_connection_status
 from instagram_connect.models import InstagramConnection
 
+from .models import OutreachDraft
 from .prompts import CREATOR_AGENT_SYSTEM_PROMPT
+from .services.outreach_agents import run_email_writer
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_CREATOR_AGENT_MODEL = "gpt-4.1-mini"
@@ -89,6 +92,55 @@ def _gmail_summary(user) -> dict[str, Any]:
         return {"connected": False, "email": ""}
 
 
+
+def _maybe_outreach_email_reply(user, message: str) -> str | None:
+    """Route explicit outreach-email asks to the specialist Agents SDK writer.
+
+    This keeps outreach as an internal capability of the main Agent page. It has
+    no Gmail write side effects; Gmail draft/save/send still happens only from
+    explicit UI actions in the integrated outreach tool.
+    """
+    lowered = message.lower()
+    if not any(term in lowered for term in ("outreach", "partnership email", "brand email", "draft email", "cold email")):
+        return None
+    recipient_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", message, flags=re.IGNORECASE)
+    if not recipient_match:
+        return (
+            "I can use the outreach email specialist for that. Please provide the validated recipient email "
+            "or open the Outreach Email Tool in this Agent page to select a business, confirm the recipient, "
+            "and generate a draft. I will not create a Gmail draft or send anything without your explicit action."
+        )
+    recipient = recipient_match.group(0)
+    context = {
+        "action": "main_agent_email_outreach",
+        "creator_profile": _creator_profile_summary(user),
+        "business": {"manual_context": message},
+        "recipient_email": recipient,
+        "tone": "professional",
+        "partnership_context": message,
+    }
+    output = run_email_writer(context, recipient)
+    data = output.model_dump() if hasattr(output, "model_dump") else output.dict()
+    if output.type == "draft_email":
+        draft = OutreachDraft.objects.create(
+            creator=user,
+            recipient_email=recipient,
+            subject=output.email.subject,
+            body=output.email.body,
+            tone="professional",
+            status=OutreachDraft.STATUS_GENERATED,
+            last_agent_response=data,
+        )
+        return (
+            f"I used the outreach email specialist to prepare a local draft (ID {draft.id}). "
+            "Review and edit it in the Outreach Email Tool before saving it to Gmail or sending.\n\n"
+            f"**To:** {output.email.to}\n\n"
+            f"**Subject:** {output.email.subject}\n\n"
+            f"{output.email.body}\n\n"
+            "This has not been sent and no Gmail draft was created."
+        )
+    return output.summary
+
 def build_creator_agent_input(user, conversation, message: str) -> str:
     dashboard_context = build_creator_dashboard_context(user)
     agent_context = {
@@ -107,6 +159,10 @@ def build_creator_agent_input(user, conversation, message: str) -> str:
 
 
 def generate_creator_agent_reply(user, conversation, message: str, timeout_seconds: int | None = None) -> str:
+    outreach_reply = _maybe_outreach_email_reply(user, message)
+    if outreach_reply is not None:
+        return outreach_reply
+
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         logger.warning("Creator agent OpenAI request skipped: OPENAI_API_KEY is missing.")
@@ -155,6 +211,11 @@ def stream_creator_agent_reply(
     user, conversation, message: str, timeout_seconds: int | None = None
 ) -> Generator[str, None, None]:
     """Yields text delta chunks as they stream from the OpenAI Responses API."""
+    outreach_reply = _maybe_outreach_email_reply(user, message)
+    if outreach_reply is not None:
+        yield outreach_reply
+        return
+
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         logger.warning("Creator agent streaming skipped: OPENAI_API_KEY is missing.")

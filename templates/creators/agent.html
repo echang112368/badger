@@ -442,6 +442,35 @@
     background: #fff0f0; color: #b91c1c; border: 1px solid #fecaca;
   }
   .ag-conn-action.disconnect:hover { background: #fee2e2; }
+
+  /* ── Integrated outreach email tool ── */
+  #ag-outreach-tool {
+    display: none;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+    max-height: 52vh;
+    overflow: auto;
+    padding: 14px 18px;
+  }
+  #ag-outreach-tool.open { display: block; }
+  .oa-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .oa-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+  .oa-card h3 { font-size: 14px; margin: 0 0 8px; color: #111827; }
+  .oa-muted { color: #64748b; font-size: 12px; }
+  .oa-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .oa-input, .oa-select, .oa-textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; }
+  .oa-textarea { min-height: 160px; white-space: pre-wrap; }
+  .oa-label { display: block; font-size: 11px; font-weight: 700; color: #334155; margin: 8px 0 4px; }
+  .oa-btn { border: 0; border-radius: 8px; padding: 7px 10px; background: #304f91; color: white; font-weight: 600; font-size: 12px; }
+  .oa-btn.secondary { background: #e2e8f0; color: #0f172a; }
+  .oa-btn.danger { background: #dc2626; }
+  .oa-item { border: 1px solid #e5e7eb; border-radius: 9px; padding: 8px; background: #f8fafc; margin-top: 6px; cursor: pointer; font-size: 12px; }
+  .oa-msg { white-space: pre-wrap; border-left: 3px solid #c7d2fe; padding: 7px; margin-top: 6px; background: #f8fafc; font-size: 12px; }
+  .oa-modal { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: none; align-items: center; justify-content: center; padding: 22px; z-index: 500; }
+  .oa-modal.show { display: flex; }
+  .oa-modal-card { max-width: 720px; width: 100%; background: #fff; border-radius: 14px; padding: 18px; }
+  .oa-preview { max-height: 260px; overflow: auto; white-space: pre-wrap; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
+
 </style>
 
 <div id="ag-shell">
@@ -473,7 +502,7 @@
         <button class="ag-chip" data-prompt="Summarize my creator profile and give me the three highest-impact next steps to grow my partnerships.">
           <i class="bi bi-lightning-charge-fill"></i> Summarize my next steps
         </button>
-        <button class="ag-chip" data-prompt="Draft a concise, professional partnership outreach message tailored to my creator profile.">
+        <button class="ag-chip" data-open-outreach="true" data-prompt="Draft a concise, professional partnership outreach message tailored to my creator profile.">
           <i class="bi bi-pencil"></i> Draft brand outreach
         </button>
         <button class="ag-chip" data-prompt="Review my connected Instagram account and suggest 5 content ideas for affiliate partnerships.">
@@ -485,6 +514,52 @@
         <button class="ag-chip" data-prompt="What metrics should I focus on to increase my affiliate earnings as a creator?">
           <i class="bi bi-bar-chart-line"></i> Improve my metrics
         </button>
+      </div>
+    </div>
+
+
+
+    <!-- Integrated outreach email tool (kept inside the main Agent page) -->
+    <div id="ag-outreach-tool" aria-label="Creator outreach email tool">
+      <div class="oa-row" style="justify-content:space-between;margin-bottom:10px">
+        <div>
+          <strong>Outreach Email Tool</strong>
+          <span class="oa-muted">Use Gmail-connected helpers here; Badger never sends without your confirmation.</span>
+        </div>
+        <button id="oa-close" class="oa-btn secondary" type="button">Close</button>
+      </div>
+      <div class="oa-grid">
+        <section class="oa-card">
+          <h3>Business and recipient</h3>
+          <label class="oa-label">Search Badger businesses</label>
+          <div class="oa-row"><input id="businessSearch" class="oa-input" style="flex:1" placeholder="Company, username, email"><button id="businessSearchBtn" class="oa-btn secondary" type="button">Search</button></div>
+          <div id="businessResults"></div>
+          <label class="oa-label">Manual business context</label><input id="manualBusiness" class="oa-input" placeholder="Company/context if not listed">
+          <label class="oa-label">Recipient email</label><input id="recipientEmail" class="oa-input" type="email" placeholder="recipient@example.com">
+          <p id="selectedBusiness" class="oa-muted">No business selected yet.</p>
+        </section>
+        <section class="oa-card">
+          <h3>Gmail threads</h3>
+          <div class="oa-row"><input id="threadQuery" class="oa-input" style="flex:1" placeholder="Business, sender, subject, keyword"><button id="threadSearchBtn" class="oa-btn secondary" type="button">Search</button></div>
+          <div id="threadResults"></div><div id="threadMessages" style="max-height:180px;overflow:auto"></div>
+          <div class="oa-row" style="margin-top:8px"><button id="summarizeBtn" class="oa-btn secondary" type="button">Summarize</button><button id="suggestReplyBtn" class="oa-btn secondary" type="button">Suggest reply</button><button id="nextActionsBtn" class="oa-btn secondary" type="button">Next actions</button></div>
+        </section>
+        <section class="oa-card">
+          <h3>Agent writing controls</h3>
+          <label class="oa-label">Tone</label><select id="tone" class="oa-select"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select>
+          <label class="oa-label">Partnership context</label><input id="partnershipContext" class="oa-input" placeholder="Optional fit, terms, campaign notes">
+          <label class="oa-label">Revision instruction</label><input id="revisionInstruction" class="oa-input" placeholder="Make it shorter, warmer, more specific...">
+          <div class="oa-row" style="margin-top:10px"><button id="generateBtn" class="oa-btn" type="button">Generate email</button><button id="reviseBtn" class="oa-btn secondary" type="button">Revise</button></div>
+          <div id="agentOutput"></div>
+        </section>
+        <section class="oa-card">
+          <h3>Draft editor</h3>
+          <p class="oa-muted">Local status: <span id="localStatus">none</span> · Gmail draft: <span id="gmailStatus">not saved</span></p>
+          <label class="oa-label">To</label><input id="draftTo" class="oa-input" type="email">
+          <label class="oa-label">Subject</label><input id="draftSubject" class="oa-input">
+          <label class="oa-label">Body</label><textarea id="draftBody" class="oa-textarea"></textarea>
+          <div class="oa-row" style="margin-top:10px"><button id="saveDraftBtn" class="oa-btn secondary" type="button">Save Gmail Draft</button><button id="updateDraftBtn" class="oa-btn secondary" type="button">Update Draft</button><button id="sendBtn" class="oa-btn danger" type="button">Send Email</button></div>
+        </section>
       </div>
     </div>
 
@@ -547,6 +622,9 @@
 
 </div>
 
+
+<div id="sendModal" class="oa-modal"><div class="oa-modal-card"><h3>Confirm send from Gmail</h3><p class="oa-muted">This sends from your connected Gmail account only after this explicit confirmation.</p><p><strong>To:</strong> <span id="confirmTo"></span></p><p><strong>Subject:</strong> <span id="confirmSubject"></span></p><div id="confirmBody" class="oa-preview"></div><div class="oa-row" style="justify-content:flex-end;margin-top:14px"><button id="cancelSend" class="oa-btn secondary" type="button">Cancel</button><button id="confirmSend" class="oa-btn danger" type="button">Confirm and send</button></div></div></div>
+
 {% csrf_token %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
@@ -561,6 +639,19 @@
   const HIST_URL   = id => `{% url "agent:history" %}?conversation_id=${id}`;
   const STREAM_URL = '{% url "agent:chat_stream" %}';
   const DEL_URL    = id => `/creators/agent/conversations/${id}/delete/`;
+  const OUTREACH_URLS = {
+    businessSearch: '{% url "creator_outreach_business_search" %}',
+    generate: '{% url "creator_outreach_generate" %}',
+    revise: '{% url "creator_outreach_revise" %}',
+    searchThreads: '{% url "creator_outreach_search_threads" %}',
+    readThread: '{% url "creator_outreach_read_thread" %}',
+    summarizeThread: '{% url "creator_outreach_summarize_thread" %}',
+    suggestReply: '{% url "creator_outreach_suggest_reply" %}',
+    nextActions: '{% url "creator_outreach_next_actions" %}',
+    saveDraft: '{% url "creator_outreach_save_draft" %}',
+    updateDraft: '{% url "creator_outreach_update_draft" %}',
+    send: '{% url "creator_outreach_send" %}'
+  };
 
   const sidebar  = document.getElementById('ag-conv-list');
   const emptyMsg = document.getElementById('ag-conv-empty');
@@ -570,6 +661,130 @@
   const sendBtn  = document.getElementById('ag-send');
 
   let activeConvId = null;
+
+
+  /* ── Integrated Outreach Tool ─────────────────────── */
+  const outreachTool = document.getElementById('ag-outreach-tool');
+  let selectedBusinessId = null;
+  let selectedThread = null;
+  let localDraftId = null;
+
+  function openOutreachTool() {
+    outreachTool.classList.add('open');
+    document.getElementById('recipientEmail').focus();
+  }
+  function closeOutreachTool() { outreachTool.classList.remove('open'); }
+  function postOutreach(url, data) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify(data || {})
+    }).then(r => r.json().then(j => ({status: r.status, data: j})));
+  }
+  function renderOutreachOutput(out) {
+    const box = document.getElementById('agentOutput');
+    if (!out) return;
+    let html = `<div class="oa-item"><strong>${esc(out.type)}</strong><p>${esc(out.summary)}</p>`;
+    if (out.items) {
+      html += out.items.map(i => `<div>• <strong>${esc(i.label)}</strong>: ${esc(i.detail)} ${i.cta ? `<em>${esc(i.cta)}</em>` : ''}</div>`).join('');
+    }
+    html += '</div>';
+    box.innerHTML = html;
+    if (out.email) {
+      document.getElementById('draftTo').value = out.email.to || document.getElementById('draftTo').value;
+      document.getElementById('draftSubject').value = out.email.subject || document.getElementById('draftSubject').value;
+      document.getElementById('draftBody').value = out.email.body || document.getElementById('draftBody').value;
+    }
+  }
+  function outreachDraftPayload() {
+    return {
+      draft_id: localDraftId,
+      business_id: selectedBusinessId,
+      manual_business: document.getElementById('manualBusiness').value,
+      recipient_email: document.getElementById('draftTo').value || document.getElementById('recipientEmail').value,
+      subject: document.getElementById('draftSubject').value,
+      body: document.getElementById('draftBody').value,
+      tone: document.getElementById('tone').value,
+      thread_id: selectedThread?.id
+    };
+  }
+  document.querySelectorAll('[data-open-outreach]').forEach(btn => btn.addEventListener('click', openOutreachTool));
+  document.getElementById('oa-close').addEventListener('click', closeOutreachTool);
+  document.getElementById('businessSearchBtn').addEventListener('click', async () => {
+    const q = encodeURIComponent(document.getElementById('businessSearch').value);
+    const r = await fetch(`${OUTREACH_URLS.businessSearch}?q=${q}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}}).then(r => r.json());
+    const results = document.getElementById('businessResults');
+    results.innerHTML = (r.businesses || []).map(b => `<div class="oa-item" data-id="${b.id}" data-email="${esc(b.contact_email)}" data-name="${esc(b.company_name)}"><strong>${esc(b.company_name)}</strong><div class="oa-muted">${esc(b.contact_email || 'No email on file')}</div></div>`).join('');
+    results.querySelectorAll('.oa-item').forEach(el => el.addEventListener('click', () => {
+      selectedBusinessId = el.dataset.id;
+      document.getElementById('recipientEmail').value = el.dataset.email;
+      document.getElementById('draftTo').value = el.dataset.email;
+      document.getElementById('selectedBusiness').textContent = `Selected: ${el.dataset.name}`;
+    }));
+  });
+  document.getElementById('generateBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.generate, {
+      business_id: selectedBusinessId,
+      manual_business: document.getElementById('manualBusiness').value,
+      recipient_email: document.getElementById('recipientEmail').value || document.getElementById('draftTo').value,
+      tone: document.getElementById('tone').value,
+      partnership_context: document.getElementById('partnershipContext').value
+    });
+    if (r.data.ok) { localDraftId = r.data.draft_id; document.getElementById('localStatus').textContent = 'generated'; renderOutreachOutput(r.data.output); }
+    else alert(r.data.error.message);
+  });
+  document.getElementById('reviseBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.revise, {...outreachDraftPayload(), revision_instruction: document.getElementById('revisionInstruction').value});
+    if (r.data.ok) { renderOutreachOutput(r.data.output); document.getElementById('localStatus').textContent = 'edited'; }
+    else alert(r.data.error.message);
+  });
+  document.getElementById('threadSearchBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.searchThreads, {query: document.getElementById('threadQuery').value});
+    if (!r.data.ok) { alert(r.data.error.message); return; }
+    const results = document.getElementById('threadResults');
+    results.innerHTML = (r.data.threads || []).map(t => `<div class="oa-item" data-id="${esc(t.id)}"><strong>${esc(t.subject || '(no subject)')}</strong><div class="oa-muted">${esc(t.from)} · ${esc(t.snippet)}</div></div>`).join('');
+    results.querySelectorAll('.oa-item').forEach(el => el.addEventListener('click', async () => {
+      const rr = await postOutreach(OUTREACH_URLS.readThread, {thread_id: el.dataset.id});
+      if (rr.data.ok) {
+        selectedThread = rr.data.thread;
+        document.getElementById('threadMessages').innerHTML = selectedThread.messages.map(m => `<div class="oa-msg"><strong>${esc(m.from)}</strong><br>${esc(m.body || m.snippet)}</div>`).join('');
+      }
+    }));
+  });
+  document.getElementById('summarizeBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.summarizeThread, {thread: selectedThread});
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+  });
+  document.getElementById('nextActionsBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.nextActions, {thread: selectedThread});
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+  });
+  document.getElementById('suggestReplyBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.suggestReply, {thread: selectedThread, recipient_email: document.getElementById('recipientEmail').value || document.getElementById('draftTo').value, tone: document.getElementById('tone').value});
+    if (r.data.ok) renderOutreachOutput(r.data.output); else alert(r.data.error.message);
+  });
+  document.getElementById('saveDraftBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.saveDraft, outreachDraftPayload());
+    if (r.data.ok) { localDraftId = r.data.draft_id; document.getElementById('gmailStatus').textContent = r.data.gmail.draft_id; document.getElementById('localStatus').textContent = 'gmail_drafted'; }
+    else alert(r.data.error.message);
+  });
+  document.getElementById('updateDraftBtn').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.updateDraft, outreachDraftPayload());
+    if (r.data.ok) { document.getElementById('gmailStatus').textContent = r.data.gmail.draft_id; document.getElementById('localStatus').textContent = 'gmail_drafted'; }
+    else alert(r.data.error.message);
+  });
+  document.getElementById('sendBtn').addEventListener('click', () => {
+    document.getElementById('confirmTo').textContent = document.getElementById('draftTo').value;
+    document.getElementById('confirmSubject').textContent = document.getElementById('draftSubject').value;
+    document.getElementById('confirmBody').textContent = document.getElementById('draftBody').value;
+    document.getElementById('sendModal').classList.add('show');
+  });
+  document.getElementById('cancelSend').addEventListener('click', () => document.getElementById('sendModal').classList.remove('show'));
+  document.getElementById('confirmSend').addEventListener('click', async () => {
+    const r = await postOutreach(OUTREACH_URLS.send, {...outreachDraftPayload(), confirm: true});
+    if (r.data.ok) { document.getElementById('sendModal').classList.remove('show'); document.getElementById('localStatus').textContent = 'sent'; alert('Email sent.'); }
+    else alert(r.data.error.message);
+  });
 
   /* ── helpers ───────────────────────────────────────── */
   function esc(s) {

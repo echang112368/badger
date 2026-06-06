@@ -1,4 +1,6 @@
 from django.urls import path
+
+from agent import views_outreach
 from .views import (
     creator_dashboard,
     creator_agent,
@@ -29,6 +31,19 @@ urlpatterns = [
     path('dashboard/', creator_dashboard, name='creator_dashboard'),
     path('agent/', creator_agent, name='creator_agent'),
     path('agent/connectors/', creator_agent_connectors, name='creator_agent_connectors'),
+
+    path('agent/outreach/businesses/search/', views_outreach.outreach_business_search, name='creator_outreach_business_search'),
+    path('agent/outreach/generate/', views_outreach.outreach_generate, name='creator_outreach_generate'),
+    path('agent/outreach/revise/', views_outreach.outreach_revise, name='creator_outreach_revise'),
+    path('agent/outreach/search-threads/', views_outreach.outreach_search_threads, name='creator_outreach_search_threads'),
+    path('agent/outreach/read-thread/', views_outreach.outreach_read_thread, name='creator_outreach_read_thread'),
+    path('agent/outreach/summarize-thread/', views_outreach.outreach_summarize_thread, name='creator_outreach_summarize_thread'),
+    path('agent/outreach/suggest-reply/', views_outreach.outreach_suggest_reply, name='creator_outreach_suggest_reply'),
+    path('agent/outreach/next-actions/', views_outreach.outreach_next_actions, name='creator_outreach_next_actions'),
+    path('agent/outreach/save-draft/', views_outreach.outreach_save_draft, name='creator_outreach_save_draft'),
+    path('agent/outreach/update-draft/', views_outreach.outreach_update_draft, name='creator_outreach_update_draft'),
+    path('agent/outreach/send/', views_outreach.outreach_send, name='creator_outreach_send'),
+    path('agent/outreach/reply/', views_outreach.outreach_reply, name='creator_outreach_reply'),
     path('earnings/', creator_earnings, name='creator_earnings'),
     path('affiliate-companies/', creator_affiliate_companies, name='creator_affiliate_companies'),
     path('affiliate-companies/delete/', delete_affiliate_merchants, name='creator_delete_affiliations'),
