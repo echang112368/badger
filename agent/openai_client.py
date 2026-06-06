@@ -8,6 +8,8 @@ from typing import Any, Generator
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 from creators.models import CreatorMeta
 from creators.services.dashboard import build_creator_dashboard_context
@@ -15,6 +17,7 @@ from creators.services.gmail_oauth import get_gmail_connection_status
 from instagram_connect.models import InstagramConnection
 
 from .models import OutreachDraft
+from .services import gmail as gmail_service
 from .prompts import CREATOR_AGENT_SYSTEM_PROMPT
 from .services.outreach_agents import run_email_writer
 
@@ -92,6 +95,107 @@ def _gmail_summary(user) -> dict[str, Any]:
         return {"connected": False, "email": ""}
 
 
+def _output_to_dict(output) -> dict[str, Any]:
+    return output.model_dump() if hasattr(output, "model_dump") else output.dict()
+
+
+def _valid_recipient_from_text(text: str) -> str | None:
+    recipient_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", text, flags=re.IGNORECASE)
+    if not recipient_match:
+        return None
+    recipient = recipient_match.group(0)
+    try:
+        validate_email(recipient)
+    except ValidationError:
+        return None
+    return recipient
+
+
+def _gmail_error_message(exc: Exception) -> str:
+    if isinstance(exc, gmail_service.MissingGmailConnection):
+        return "Connect Gmail before using `/gmail` to create drafts."
+    if isinstance(exc, (gmail_service.GmailNeedsReauth, gmail_service.GmailPermissionError)):
+        return "Reconnect Gmail before using `/gmail` to create drafts."
+    logger.exception("/gmail command failed while creating Gmail draft.")
+    return "Gmail could not create that draft. Please try again."
+
+
+def _maybe_gmail_command_reply(user, message: str) -> str | None:
+    """Handle explicit `/gmail ...` chat commands by writing a Gmail draft.
+
+    `/gmail` is intentionally draft-only. It uses the existing EmailWritingAgent
+    to prepare structured content, then the Django Gmail service creates a draft
+    in the connected Gmail account. Sending remains behind the existing explicit
+    confirmation flow in the outreach UI.
+    """
+    stripped = message.strip()
+    command, separator, prompt_text = stripped.partition(" ")
+    if command.lower() != "/gmail":
+        return None
+
+    prompt = prompt_text.strip() if separator else ""
+    if not prompt:
+        return (
+            "Use `/gmail` followed by the draft instructions and recipient email. "
+            "Example: `/gmail write a professional partnership email to brand@example.com about a gifted outerwear collab`."
+        )
+
+    recipient = _valid_recipient_from_text(prompt)
+    if not recipient:
+        return "Please include a valid recipient email after `/gmail` so I can create the Gmail draft."
+
+    context = {
+        "action": "slash_gmail_create_draft",
+        "creator_profile": _creator_profile_summary(user),
+        "business": {"manual_context": prompt},
+        "recipient_email": recipient,
+        "tone": "professional",
+        "partnership_context": prompt,
+        "gmail_command": True,
+    }
+    output = run_email_writer(context, recipient)
+    output_data = _output_to_dict(output)
+
+    if output.type != "draft_email":
+        return output.summary or "The email writing agent could not create a draft from that prompt."
+
+    subject = (output.email.subject or "").strip()
+    body = (output.email.body or "").strip()
+    if not subject or not body:
+        return "The email writing agent returned an incomplete draft. Please try again with more context."
+
+    draft = OutreachDraft.objects.create(
+        creator=user,
+        recipient_email=recipient,
+        subject=subject,
+        body=body,
+        tone="professional",
+        status=OutreachDraft.STATUS_GENERATED,
+        last_agent_response=output_data,
+    )
+
+    try:
+        result = gmail_service.create_draft(user, recipient, subject, body)
+    except Exception as exc:
+        draft.status = OutreachDraft.STATUS_FAILED
+        draft.save(update_fields=["status", "updated_at"])
+        return _gmail_error_message(exc)
+
+    draft.gmail_draft_id = result.get("draft_id", "")
+    draft.gmail_message_id = result.get("message_id", "")
+    draft.gmail_thread_id = result.get("thread_id", "")
+    draft.status = OutreachDraft.STATUS_GMAIL_DRAFTED
+    draft.save(update_fields=["gmail_draft_id", "gmail_message_id", "gmail_thread_id", "status", "updated_at"])
+
+    return (
+        "I used the email writing agent and created a Gmail draft in your connected Gmail account.\n\n"
+        f"**Gmail draft:** {draft.gmail_draft_id or 'created'}\n\n"
+        f"**To:** {recipient}\n\n"
+        f"**Subject:** {subject}\n\n"
+        f"{body}\n\n"
+        "This is only a draft; it has not been sent. Review it in Gmail or the Outreach Email Tool before sending."
+    )
+
 
 def _maybe_outreach_email_reply(user, message: str) -> str | None:
     """Route explicit outreach-email asks to the specialist Agents SDK writer.
@@ -103,14 +207,13 @@ def _maybe_outreach_email_reply(user, message: str) -> str | None:
     lowered = message.lower()
     if not any(term in lowered for term in ("outreach", "partnership email", "brand email", "draft email", "cold email")):
         return None
-    recipient_match = re.search(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", message, flags=re.IGNORECASE)
-    if not recipient_match:
+    recipient = _valid_recipient_from_text(message)
+    if not recipient:
         return (
             "I can use the outreach email specialist for that. Please provide the validated recipient email "
             "or open the Outreach Email Tool in this Agent page to select a business, confirm the recipient, "
             "and generate a draft. I will not create a Gmail draft or send anything without your explicit action."
         )
-    recipient = recipient_match.group(0)
     context = {
         "action": "main_agent_email_outreach",
         "creator_profile": _creator_profile_summary(user),
@@ -120,7 +223,7 @@ def _maybe_outreach_email_reply(user, message: str) -> str | None:
         "partnership_context": message,
     }
     output = run_email_writer(context, recipient)
-    data = output.model_dump() if hasattr(output, "model_dump") else output.dict()
+    data = _output_to_dict(output)
     if output.type == "draft_email":
         draft = OutreachDraft.objects.create(
             creator=user,
@@ -159,6 +262,10 @@ def build_creator_agent_input(user, conversation, message: str) -> str:
 
 
 def generate_creator_agent_reply(user, conversation, message: str, timeout_seconds: int | None = None) -> str:
+    gmail_command_reply = _maybe_gmail_command_reply(user, message)
+    if gmail_command_reply is not None:
+        return gmail_command_reply
+
     outreach_reply = _maybe_outreach_email_reply(user, message)
     if outreach_reply is not None:
         return outreach_reply
@@ -211,6 +318,11 @@ def stream_creator_agent_reply(
     user, conversation, message: str, timeout_seconds: int | None = None
 ) -> Generator[str, None, None]:
     """Yields text delta chunks as they stream from the OpenAI Responses API."""
+    gmail_command_reply = _maybe_gmail_command_reply(user, message)
+    if gmail_command_reply is not None:
+        yield gmail_command_reply
+        return
+
     outreach_reply = _maybe_outreach_email_reply(user, message)
     if outreach_reply is not None:
         yield outreach_reply

@@ -103,6 +103,53 @@ class AgentAPITests(TestCase):
         payload = response.json()
         self.assertIn("OPENAI_API_KEY", payload["messages"][1]["content"])
 
+    @patch("agent.openai_client.gmail_service.create_draft")
+    @patch("agent.openai_client.run_email_writer")
+    def test_gmail_slash_command_writes_gmail_draft(self, mock_writer, mock_create_draft):
+        from agent.services.outreach_agents import EmailPayload, OutreachAgentOutput
+
+        mock_writer.return_value = OutreachAgentOutput(
+            type="draft_email",
+            summary="Draft ready.",
+            email=EmailPayload(to="brand@example.com", subject="Partnership idea", body="Hi Brand,"),
+            items=[],
+            requires_user_approval=True,
+            followup=None,
+        )
+        mock_create_draft.return_value = {"draft_id": "gmail-draft-1", "message_id": "msg-1", "thread_id": "thread-1"}
+
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps({"message": "/gmail write a professional partnership email to brand@example.com about outerwear"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        assistant_message = payload["messages"][1]["content"]
+        self.assertIn("created a Gmail draft", assistant_message)
+        self.assertIn("gmail-draft-1", assistant_message)
+        mock_writer.assert_called_once()
+        mock_create_draft.assert_called_once_with(self.creator, "brand@example.com", "Partnership idea", "Hi Brand,")
+        draft = OutreachDraft.objects.get(creator=self.creator, recipient_email="brand@example.com")
+        self.assertEqual(draft.status, OutreachDraft.STATUS_GMAIL_DRAFTED)
+        self.assertEqual(draft.gmail_draft_id, "gmail-draft-1")
+
+    @patch("agent.openai_client.gmail_service.create_draft")
+    @patch("agent.openai_client.run_email_writer")
+    def test_gmail_slash_command_requires_valid_recipient_before_agent_or_gmail(self, mock_writer, mock_create_draft):
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps({"message": "/gmail write this partnership email"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertIn("valid recipient email", payload["messages"][1]["content"])
+        mock_writer.assert_not_called()
+        mock_create_draft.assert_not_called()
+
 
 class OutreachAgentTests(TestCase):
     def setUp(self):
