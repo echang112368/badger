@@ -242,6 +242,17 @@ def creator_agent(request):
 
 
 @login_required
+def creator_agent_connectors(request):
+    from .services.gmail_oauth import get_gmail_connection_status
+    connected_accounts = InstagramConnection.objects.filter(user=request.user)
+    gmail_status = get_gmail_connection_status(request.user)
+    return render(request, "creators/agent_connectors.html", {
+        "agent_connected_accounts": connected_accounts,
+        "gmail_status": gmail_status,
+    })
+
+
+@login_required
 def gmail_connect(request):
     try:
         authorization_url = build_gmail_authorization_url(request)

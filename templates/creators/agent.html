@@ -457,11 +457,8 @@
     </div>
 
     <div id="ag-sb-foot">
-      <a href="{% url 'creator_social_media' %}" class="ag-foot-link">
-        <i class="bi bi-instagram"></i>
-        {% with account=agent_connected_accounts.first %}
-        {% if account %}@{{ account.instagram_username|default:'Instagram' }}{% else %}Connect Instagram{% endif %}
-      {% endwith %}
+      <a href="{% url 'creator_agent_connectors' %}" class="ag-foot-link">
+        <i class="bi bi-sliders"></i> Customize
       </a>
     </div>
   </div>
