@@ -1,0 +1,4 @@
+# Badger Outreach Agent V2 AI workflow dependencies.
+# The OpenAI Agents SDK provides Agent/Runner structured-output workflows.
+openai-agents>=0.0.19
+pydantic>=2.7
