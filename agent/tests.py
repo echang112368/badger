@@ -100,3 +100,44 @@ class AgentAPITests(TestCase):
         self.assertEqual(response.status_code, 201)
         payload = response.json()
         self.assertIn("OPENAI_API_KEY", payload["messages"][1]["content"])
+
+    def test_creator_agent_page_embeds_outreach_tool_without_separate_tab(self):
+        response = self.client.get(reverse("creator_agent"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Email outreach tool")
+        self.assertContains(response, reverse("creator_outreach_generate"))
+        self.assertNotContains(response, "creator_outreach_agent")
+        self.assertNotContains(response, "/creators/outreach-agent/")
+
+    @patch("agent.views._run_main_agent_outreach_tool")
+    def test_stream_email_request_uses_main_agent_outreach_tool(self, mock_tool):
+        mock_tool.return_value = {
+            "agent": {
+                "type": "draft_email",
+                "summary": "Draft ready.",
+                "email": {
+                    "to": "brand@example.com",
+                    "subject": "Partnership idea",
+                    "body": "Hi Brand, let's partner.",
+                },
+                "items": [],
+                "requires_user_approval": True,
+                "followup": None,
+            },
+            "draft_id": 123,
+            "gmail_status": {"status": "connected", "gmail_email": "creator@example.com"},
+        }
+
+        response = self.client.post(
+            reverse("agent:chat_stream"),
+            data=json.dumps({"message": "Draft an outreach email to brand@example.com"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        stream_text = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn('"type": "outreach"', stream_text)
+        self.assertIn("brand@example.com", stream_text)
+        mock_tool.assert_called_once()
+        self.assertEqual(Message.objects.filter(conversation__creator=self.creator).count(), 2)

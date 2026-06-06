@@ -12,13 +12,14 @@ class MerchantMetaAdmin(admin.ModelAdmin):
     list_display = (
         'user',
         'company_name',
+        'outreach_email',
         'business_type',
         'billing_plan',
         'shopify_billing_status',
         'monthly_fee',
         'uuid',
     )
-    search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email', 'shopify_store_domain')
+    search_fields = ('user__username', 'company_name', 'uuid', 'paypal_email', 'outreach_email', 'shopify_store_domain')
     list_filter = ('business_type', 'billing_plan', 'shopify_billing_status')
     actions = ['generate_invoice']
     change_list_template = "admin/merchants/merchantmeta/change_list.html"

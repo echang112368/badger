@@ -442,6 +442,32 @@
     background: #fff0f0; color: #b91c1c; border: 1px solid #fecaca;
   }
   .ag-conn-action.disconnect:hover { background: #fee2e2; }
+
+  /* ── Embedded outreach specialist card ── */
+  .ag-outreach-card {
+    border: 1px solid #dbeafe; background: #f8fbff; border-radius: 14px;
+    padding: 14px; margin-top: 10px; box-shadow: 0 4px 14px rgba(48,79,145,.08);
+  }
+  .ag-outreach-card h3 { margin: 0 0 8px; font-size: 15px; }
+  .ag-outreach-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ag-outreach-card label { display: block; font-size: 11px; font-weight: 700; color: #475569; margin: 8px 0 4px; }
+  .ag-outreach-card input, .ag-outreach-card textarea, .ag-outreach-card select {
+    width: 100%; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px 10px;
+    font: inherit; font-size: 13px; background: #fff;
+  }
+  .ag-outreach-card textarea { min-height: 150px; white-space: pre-wrap; }
+  .ag-outreach-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .ag-outreach-actions button {
+    border: 0; border-radius: 9px; padding: 8px 10px; font-size: 12px; font-weight: 700;
+    cursor: pointer; background: #304f91; color: #fff;
+  }
+  .ag-outreach-actions button.secondary { background: #e2e8f0; color: #0f172a; }
+  .ag-outreach-actions button.danger { background: #b91c1c; color: #fff; }
+  .ag-outreach-status { font-size: 12px; color: #64748b; margin-top: 8px; white-space: pre-wrap; }
+  .ag-outreach-results { margin-top: 8px; }
+  .ag-outreach-pick { border: 1px solid #e2e8f0; background: #fff; border-radius: 10px; padding: 8px; margin-top: 6px; cursor: pointer; }
+  .ag-outreach-confirm { display: none; margin-top: 10px; padding: 10px; border: 1px solid #fecaca; border-radius: 12px; background: #fef2f2; }
+  @media (max-width: 780px) { .ag-outreach-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div id="ag-shell">
@@ -476,7 +502,7 @@
         <button class="ag-chip" data-prompt="Summarize my creator profile and give me the three highest-impact next steps to grow my partnerships.">
           <i class="bi bi-lightning-charge-fill"></i> Summarize my next steps
         </button>
-        <button class="ag-chip" data-prompt="Draft a concise, professional partnership outreach message tailored to my creator profile.">
+        <button class="ag-chip" data-prompt="Draft a concise Gmail outreach email for a brand partnership. Ask me for the recipient if you need it.">
           <i class="bi bi-pencil"></i> Draft brand outreach
         </button>
         <button class="ag-chip" data-prompt="Review my connected Instagram account and suggest 5 content ideas for affiliate partnerships.">
@@ -564,6 +590,18 @@
   const HIST_URL   = id => `{% url "agent:history" %}?conversation_id=${id}`;
   const STREAM_URL = '{% url "agent:chat_stream" %}';
   const DEL_URL    = id => `/creators/agent/conversations/${id}/delete/`;
+  const OUTREACH_BUSINESS_URL = '{% url "creator_outreach_business_search" %}';
+  const OUTREACH_GENERATE_URL = '{% url "creator_outreach_generate" %}';
+  const OUTREACH_REVISE_URL = '{% url "creator_outreach_revise" %}';
+  const OUTREACH_THREADS_URL = '{% url "creator_outreach_search_threads" %}';
+  const OUTREACH_READ_THREAD_URL = '{% url "creator_outreach_read_thread" %}';
+  const OUTREACH_SUMMARY_URL = '{% url "creator_outreach_summarize_thread" %}';
+  const OUTREACH_REPLY_SUGGEST_URL = '{% url "creator_outreach_suggest_reply" %}';
+  const OUTREACH_ACTIONS_URL = '{% url "creator_outreach_next_actions" %}';
+  const OUTREACH_SAVE_URL = '{% url "creator_outreach_save_draft" %}';
+  const OUTREACH_UPDATE_URL = '{% url "creator_outreach_update_draft" %}';
+  const OUTREACH_SEND_URL = '{% url "creator_outreach_send" %}';
+  const OUTREACH_REPLY_URL = '{% url "creator_outreach_reply" %}';
 
   const sidebar  = document.getElementById('ag-conv-list');
   const emptyMsg = document.getElementById('ag-conv-empty');
@@ -576,7 +614,12 @@
 
   /* ── helpers ───────────────────────────────────────── */
   function esc(s) {
-    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
   }
 
   function renderMarkdown(text) {
@@ -584,6 +627,161 @@
       return esc(text).replace(/\n/g, '<br>');
     }
     return marked.parse(String(text ?? ''));
+  }
+
+
+  async function postJson(url, payload) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRFToken': CSRF,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify(payload || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'Request failed.');
+    return data;
+  }
+
+  function outreachPayload(card, extra = {}) {
+    return Object.assign({
+      draft_id: card.querySelector('[data-field="localDraftId"]').value || null,
+      gmail_draft_id: card.querySelector('[data-field="gmailDraftId"]').value || '',
+      business_id: card.querySelector('[data-field="businessId"]').value || null,
+      recipient_email: card.querySelector('[data-field="to"]').value,
+      subject: card.querySelector('[data-field="subject"]').value,
+      body: card.querySelector('[data-field="body"]').value,
+      tone: card.querySelector('[data-field="tone"]').value,
+      thread_id: card.querySelector('[data-field="threadId"]').value,
+    }, extra);
+  }
+
+  function setOutreachAgent(card, agent) {
+    const email = agent.email || {};
+    if (email.to) card.querySelector('[data-field="to"]').value = email.to;
+    if (email.subject) card.querySelector('[data-field="subject"]').value = email.subject;
+    if (email.body) card.querySelector('[data-field="body"]').value = email.body;
+    const items = (agent.items || []).map(i => `• ${i.label}: ${i.detail}${i.cta ? ` (${i.cta})` : ''}`).join('\n');
+    card.querySelector('[data-field="status"]').textContent = [agent.summary, agent.followup, items].filter(Boolean).join('\n');
+  }
+
+  function renderOutreachTool(tool, aiBody) {
+    const agent = tool.agent || {};
+    const email = agent.email || {};
+    aiBody.classList.remove('streaming');
+    aiBody.innerHTML = `
+      <p>${esc(agent.type === 'draft_email' ? 'I used the email outreach specialist to prepare a draft. Review it below before any Gmail action.' : 'I opened the embedded email outreach tool. Add any missing details below, then generate or revise.')}</p>
+      <div class="ag-outreach-card">
+        <h3><i class="bi bi-envelope-paper"></i> Email outreach tool</h3>
+        <div class="ag-outreach-status">Gmail: ${esc((tool.gmail_status || {}).gmail_email || (tool.gmail_status || {}).status || 'not connected')}</div>
+        <input type="hidden" data-field="localDraftId" value="${esc(tool.draft_id || '')}">
+        <input type="hidden" data-field="gmailDraftId" value="">
+        <input type="hidden" data-field="businessId" value="">
+        <input type="hidden" data-field="threadId" value="">
+        <div class="ag-outreach-grid">
+          <div>
+            <label>Business search</label>
+            <input data-field="businessQuery" placeholder="Company, email, store...">
+            <div class="ag-outreach-actions"><button type="button" class="secondary" data-action="business-search">Search businesses</button></div>
+            <div class="ag-outreach-results" data-field="businessResults"></div>
+            <label>Gmail thread search</label>
+            <input data-field="threadQuery" placeholder="Sender, subject, keyword...">
+            <div class="ag-outreach-actions"><button type="button" class="secondary" data-action="thread-search">Search threads</button></div>
+            <div class="ag-outreach-results" data-field="threadResults"></div>
+          </div>
+          <div>
+            <label>To</label><input data-field="to" value="${esc(email.to || '')}" placeholder="partner@example.com">
+            <label>Tone</label><select data-field="tone"><option>professional</option><option>casual</option><option>concise</option><option>enthusiastic</option></select>
+            <label>Subject</label><input data-field="subject" value="${esc(email.subject || '')}">
+          </div>
+        </div>
+        <label>Body</label><textarea data-field="body">${esc(email.body || '')}</textarea>
+        <div class="ag-outreach-status" data-field="status">${esc(agent.summary || '')}${agent.followup ? '\n' + esc(agent.followup) : ''}</div>
+        <div class="ag-outreach-actions">
+          <button type="button" data-action="generate">Generate outreach email</button>
+          <button type="button" class="secondary" data-action="revise">Revise draft</button>
+          <button type="button" class="secondary" data-action="summarize">Summarize thread</button>
+          <button type="button" class="secondary" data-action="suggest-reply">Suggest reply</button>
+          <button type="button" class="secondary" data-action="next-actions">Next actions</button>
+          <button type="button" class="secondary" data-action="save-draft">Save Gmail draft</button>
+          <button type="button" class="secondary" data-action="update-draft">Update draft</button>
+          <button type="button" class="danger" data-action="prepare-send">Send email</button>
+          <button type="button" class="danger" data-action="prepare-reply">Reply to thread</button>
+        </div>
+        <div class="ag-outreach-confirm" data-field="confirmBox">
+          <strong>Confirm Gmail send</strong>
+          <div class="ag-outreach-status" data-field="confirmPreview"></div>
+          <div class="ag-outreach-actions"><button type="button" class="danger" data-action="confirm-send">Yes, send from Gmail</button><button type="button" class="secondary" data-action="cancel-send">Cancel</button></div>
+        </div>
+      </div>`;
+    const card = aiBody.querySelector('.ag-outreach-card');
+    let selectedMessages = [];
+    let sendMode = 'send';
+    card.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button) return;
+      const action = button.dataset.action;
+      const status = card.querySelector('[data-field="status"]');
+      try {
+        if (action === 'business-search') {
+          const data = await postJson(OUTREACH_BUSINESS_URL, { query: card.querySelector('[data-field="businessQuery"]').value });
+          card.querySelector('[data-field="businessResults"]').innerHTML = (data.businesses || []).map(b => `<div class="ag-outreach-pick" data-business-id="${b.id}" data-email="${esc(b.email || '')}"><strong>${esc(b.name)}</strong><br><span>${esc(b.email || 'No outreach email on file')}</span></div>`).join('');
+        } else if (action === 'thread-search') {
+          const data = await postJson(OUTREACH_THREADS_URL, { query: card.querySelector('[data-field="threadQuery"]').value, max_results: 10 });
+          card.querySelector('[data-field="threadResults"]').innerHTML = (data.threads || []).map(t => `<div class="ag-outreach-pick" data-thread-id="${esc(t.id)}"><strong>${esc(t.subject || '(no subject)')}</strong><br><span>${esc(t.snippet || '')}</span></div>`).join('');
+        } else if (action === 'generate') {
+          const data = await postJson(OUTREACH_GENERATE_URL, outreachPayload(card));
+          card.querySelector('[data-field="localDraftId"]').value = data.agent.draft_id || '';
+          setOutreachAgent(card, data.agent);
+        } else if (action === 'revise') {
+          const request = prompt('How should the email be revised?', 'Make it more concise and specific.');
+          const data = await postJson(OUTREACH_REVISE_URL, outreachPayload(card, { revision_request: request || 'Revise this email.' }));
+          setOutreachAgent(card, data.agent);
+        } else if (['summarize', 'suggest-reply', 'next-actions'].includes(action)) {
+          const url = action === 'summarize' ? OUTREACH_SUMMARY_URL : (action === 'suggest-reply' ? OUTREACH_REPLY_SUGGEST_URL : OUTREACH_ACTIONS_URL);
+          const data = await postJson(url, outreachPayload(card, { messages: selectedMessages }));
+          setOutreachAgent(card, data.agent);
+        } else if (action === 'save-draft') {
+          const data = await postJson(OUTREACH_SAVE_URL, outreachPayload(card));
+          card.querySelector('[data-field="localDraftId"]').value = data.draft.id;
+          card.querySelector('[data-field="gmailDraftId"]').value = data.draft.gmail_draft_id;
+          status.textContent = 'Saved as Gmail draft.';
+        } else if (action === 'update-draft') {
+          await postJson(OUTREACH_UPDATE_URL, outreachPayload(card));
+          status.textContent = 'Gmail draft updated.';
+        } else if (action === 'prepare-send' || action === 'prepare-reply') {
+          sendMode = action === 'prepare-reply' ? 'reply' : 'send';
+          card.querySelector('[data-field="confirmPreview"]').textContent = `To: ${card.querySelector('[data-field="to"]').value}\nSubject: ${card.querySelector('[data-field="subject"]').value}\n\n${card.querySelector('[data-field="body"]').value}`;
+          card.querySelector('[data-field="confirmBox"]').style.display = 'block';
+        } else if (action === 'cancel-send') {
+          card.querySelector('[data-field="confirmBox"]').style.display = 'none';
+        } else if (action === 'confirm-send') {
+          const url = sendMode === 'reply' ? OUTREACH_REPLY_URL : OUTREACH_SEND_URL;
+          await postJson(url, outreachPayload(card, { confirm: true }));
+          status.textContent = sendMode === 'reply' ? 'Reply sent from Gmail after your confirmation.' : 'Email sent from Gmail after your confirmation.';
+          card.querySelector('[data-field="confirmBox"]').style.display = 'none';
+        }
+      } catch (err) { status.textContent = err.message; }
+    });
+    card.addEventListener('click', async (event) => {
+      const business = event.target.closest('[data-business-id]');
+      if (business) {
+        card.querySelector('[data-field="businessId"]').value = business.dataset.businessId;
+        if (business.dataset.email) card.querySelector('[data-field="to"]').value = business.dataset.email;
+      }
+      const threadPick = event.target.closest('[data-thread-id]');
+      if (threadPick) {
+        try {
+          const data = await postJson(OUTREACH_READ_THREAD_URL, { thread_id: threadPick.dataset.threadId });
+          selectedMessages = data.thread.messages || [];
+          card.querySelector('[data-field="threadId"]').value = data.thread.id;
+          card.querySelector('[data-field="status"]').textContent = `Selected thread: ${data.thread.subject || data.thread.id}`;
+        } catch (err) { card.querySelector('[data-field="status"]').textContent = err.message; }
+      }
+    });
   }
 
   function showThread() {
@@ -816,6 +1014,7 @@
     const aiBody = aiBlock.querySelector('.msg-ai-body');
     let streamedText = '';
     let streaming    = false;
+    let renderedTool = false;
 
     try {
       const res = await fetch(STREAM_URL, {
@@ -863,10 +1062,18 @@
             streamedText += evt.text;
             aiBody.textContent = streamedText;
             thread.scrollTop = thread.scrollHeight;
+          } else if (evt.type === 'outreach') {
+            aiRow.classList.remove('thinking');
+            renderOutreachTool(evt.tool || {}, aiBody);
+            renderedTool = true;
+            thread.scrollTop = thread.scrollHeight;
           } else if (evt.type === 'done') {
-            // Swap plain-text stream for rendered markdown
+            // Swap plain-text stream for rendered markdown unless a specialist tool rendered a card.
             aiBody.classList.remove('streaming');
-            aiBody.innerHTML = renderMarkdown(streamedText);
+            if (!renderedTool) {
+              streamedText = streamedText || evt.text || '';
+              aiBody.innerHTML = renderMarkdown(streamedText);
+            }
             thread.scrollTop = thread.scrollHeight;
             updateItemTitle(activeConvId, evt.title || 'New chat');
             await loadConvList();
@@ -875,7 +1082,7 @@
         }
       }
 
-      if (!streaming) {
+      if (!streaming && !renderedTool) {
         aiRow.classList.remove('thinking');
         aiBody.innerHTML = renderMarkdown(streamedText || 'No response received.');
       }
