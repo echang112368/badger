@@ -103,6 +103,122 @@ class AgentAPITests(TestCase):
         payload = response.json()
         self.assertIn("OPENAI_API_KEY", payload["messages"][1]["content"])
 
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key", "OPENAI_CREATOR_AGENT_MODEL": "gpt-4.1-mini"})
+    @patch("agent.openai_client.requests.post")
+    def test_contract_review_slash_command_uses_contract_review_prompt(self, mock_post):
+        mock_response = Mock()
+        mock_response.json.return_value = {"output_text": "## 10. Overall risk rating\nHigh risk."}
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        contract_text = (
+            "Deliverables: 2 TikToks. Usage: Brand may run paid ads in perpetuity. "
+            "Exclusivity lasts 6 months for all supplement content."
+        )
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps({"message": f"/contract-review {contract_text}"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["messages"][1]["content"], "## 10. Overall risk rating\nHigh risk.")
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        self.assertEqual(mock_post.call_args.args[0], OPENAI_RESPONSES_URL)
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Bearer test-key")
+        self.assertEqual(call_kwargs["json"]["model"], "gpt-4.1-mini")
+        self.assertEqual(call_kwargs["json"]["temperature"], 0.2)
+        self.assertIn("/contract-review tool", call_kwargs["json"]["input"])
+        self.assertIn("## 16. Confidentiality", call_kwargs["json"]["input"])
+        self.assertIn(contract_text, call_kwargs["json"]["input"])
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key", "OPENAI_CREATOR_AGENT_MODEL": "gpt-4.1-mini"})
+    @patch("agent.openai_client.requests.post")
+    def test_contract_review_slash_command_accepts_image_attachment_without_pasted_text(self, mock_post):
+        mock_response = Mock()
+        mock_response.json.return_value = {"output_text": "Screenshot contract review."}
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps(
+                {
+                    "message": "/contract-review",
+                    "attachments": [
+                        {
+                            "filename": "contract-screenshot.png",
+                            "mime_type": "image/png",
+                            "data_url": "data:image/png;base64,iVBORw0KGgo=",
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["messages"][1]["content"], "Screenshot contract review.")
+        call_kwargs = mock_post.call_args.kwargs
+        request_input = call_kwargs["json"]["input"]
+        self.assertIsInstance(request_input, list)
+        content_items = request_input[0]["content"]
+        self.assertIn("input_text", [item["type"] for item in content_items])
+        self.assertIn("input_image", [item["type"] for item in content_items])
+        image_item = next(item for item in content_items if item["type"] == "input_image")
+        self.assertEqual(image_item["image_url"], "data:image/png;base64,iVBORw0KGgo=")
+        self.assertIn("contract-screenshot.png", content_items[-1]["text"])
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key", "OPENAI_CREATOR_AGENT_MODEL": "gpt-4.1-mini"})
+    @patch("agent.openai_client.requests.post")
+    def test_contract_review_slash_command_accepts_file_attachment_without_pasted_text(self, mock_post):
+        mock_response = Mock()
+        mock_response.json.return_value = {"output_text": "PDF contract review."}
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps(
+                {
+                    "message": "/contract-review",
+                    "attachments": [
+                        {
+                            "filename": "creator-agreement.pdf",
+                            "mime_type": "application/pdf",
+                            "data_url": "data:application/pdf;base64,JVBERi0xLjQ=",
+                        }
+                    ],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertEqual(payload["messages"][1]["content"], "PDF contract review.")
+        content_items = mock_post.call_args.kwargs["json"]["input"][0]["content"]
+        self.assertIn("input_file", [item["type"] for item in content_items])
+        file_item = next(item for item in content_items if item["type"] == "input_file")
+        self.assertEqual(file_item["filename"], "creator-agreement.pdf")
+        self.assertEqual(file_item["file_data"], "data:application/pdf;base64,JVBERi0xLjQ=")
+
+    @patch("agent.openai_client.requests.post")
+    def test_contract_review_slash_command_requires_contract_text(self, mock_post):
+        response = self.client.post(
+            reverse("agent:chat"),
+            data=json.dumps({"message": "/contract-review"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertIn("paste the agreement text", payload["messages"][1]["content"])
+        mock_post.assert_not_called()
+
     @patch("agent.openai_client.gmail_service.create_draft")
     @patch("agent.openai_client.run_email_writer")
     def test_gmail_slash_command_writes_gmail_draft(self, mock_writer, mock_create_draft):
@@ -134,6 +250,7 @@ class AgentAPITests(TestCase):
         draft = OutreachDraft.objects.get(creator=self.creator, recipient_email="brand@example.com")
         self.assertEqual(draft.status, OutreachDraft.STATUS_GMAIL_DRAFTED)
         self.assertEqual(draft.gmail_draft_id, "gmail-draft-1")
+
 
     @patch("agent.openai_client.gmail_service.create_draft")
     @patch("agent.openai_client.run_email_writer")
