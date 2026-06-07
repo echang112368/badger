@@ -44,6 +44,7 @@ urlpatterns = [
     path('agent/outreach/update-draft/', views_outreach.outreach_update_draft, name='creator_outreach_update_draft'),
     path('agent/outreach/send/', views_outreach.outreach_send, name='creator_outreach_send'),
     path('agent/outreach/reply/', views_outreach.outreach_reply, name='creator_outreach_reply'),
+    path('agent/outreach/drafts/', views_outreach.outreach_list_drafts, name='creator_outreach_list_drafts'),
     path('earnings/', creator_earnings, name='creator_earnings'),
     path('affiliate-companies/', creator_affiliate_companies, name='creator_affiliate_companies'),
     path('affiliate-companies/delete/', delete_affiliate_merchants, name='creator_delete_affiliations'),

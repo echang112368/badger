@@ -635,10 +635,10 @@
     width: 100%;
   }
   .oe-inline-body {
-    width: 100%; min-height: 160px; max-height: 320px;
+    width: 100%; min-height: 80px;
     border: none; outline: none; padding: 14px 16px;
     font: inherit; font-size: 14px; line-height: 1.65; color: #111;
-    resize: vertical; box-sizing: border-box;
+    resize: none; overflow: hidden; box-sizing: border-box;
   }
   .oe-inline-body::placeholder { color: #d1d5db; }
   .oe-gen-row {
@@ -893,7 +893,8 @@
     nextActions: '{% url "creator_outreach_next_actions" %}',
     saveDraft: '{% url "creator_outreach_save_draft" %}',
     updateDraft: '{% url "creator_outreach_update_draft" %}',
-    send: '{% url "creator_outreach_send" %}'
+    send: '{% url "creator_outreach_send" %}',
+    listDrafts: '{% url "creator_outreach_list_drafts" %}'
   };
 
   const sidebar  = document.getElementById('ag-conv-list');
@@ -940,14 +941,7 @@
               <input id="${cardId}-subject" class="oe-fld-inp" type="text" value="${esc(emailSub)}" placeholder="Subject line">
             </div>
             <div class="oe-toolbar">
-              <button class="oe-tb-btn" id="${cardId}-gen-btn" title="Generate / regenerate"><i class="bi bi-stars"></i></button>
-              <div class="oe-tb-sep"></div>
               <button class="oe-tb-btn" id="${cardId}-x-btn" title="Remove"><i class="bi bi-x-lg"></i></button>
-            </div>
-            <div class="oe-gen-row" id="${cardId}-genrow" style="${hasContent ? 'display:none' : ''}">
-              <input id="${cardId}-biz" class="oe-ctx-inp" placeholder="Business name or context…" style="flex:1">
-              <input id="${cardId}-ctx" class="oe-ctx-inp" placeholder="Partnership notes…" style="flex:1">
-              <button id="${cardId}-do-gen" class="oe-ctx-btn" type="button">Generate</button>
             </div>
             <textarea id="${cardId}-body" class="oe-inline-body" placeholder="Your email will appear here…">${esc(emailBod)}</textarea>
             <div class="oe-improve">
@@ -971,7 +965,6 @@
     const subjectEl = document.getElementById(`${cardId}-subject`);
     const bodyEl    = document.getElementById(`${cardId}-body`);
     const statusEl  = document.getElementById(`${cardId}-status`);
-    const genRow    = document.getElementById(`${cardId}-genrow`);
 
     function _wc() {
       const w = (bodyEl.value.trim().match(/\S+/g) || []).length;
@@ -996,43 +989,15 @@
       pill.style.color       = s >= 70 ? '#15803d'  : s >= 40 ? '#b45309' : '#b91c1c';
       pill.style.borderColor = s >= 70 ? '#bbf7d0'  : s >= 40 ? '#fde68a' : '#fecaca';
     }
-    bodyEl.addEventListener('input',    () => { _wc(); _fit(); });
+    function _resize() {
+      bodyEl.style.height = 'auto';
+      bodyEl.style.height = bodyEl.scrollHeight + 'px';
+    }
+    bodyEl.addEventListener('input', () => { _resize(); _wc(); _fit(); });
     subjectEl.addEventListener('input', _fit);
     toEl.addEventListener('input',      _fit);
-    _wc(); _fit();
+    _resize(); _wc(); _fit();
 
-    /* ✨ Toggle generate context row */
-    document.getElementById(`${cardId}-gen-btn`).addEventListener('click', () => {
-      const open = genRow.style.display === 'none';
-      genRow.style.display = open ? '' : 'none';
-      document.getElementById(`${cardId}-gen-btn`).classList.toggle('active', open);
-    });
-
-    /* Generate */
-    document.getElementById(`${cardId}-do-gen`).addEventListener('click', async () => {
-      const btn = document.getElementById(`${cardId}-do-gen`);
-      btn.textContent = 'Generating…'; btn.disabled = true;
-      const r = await postOutreach(OUTREACH_URLS.generate, {
-        recipient_email: toEl.value || document.getElementById(`${cardId}-biz`).value,
-        manual_business: document.getElementById(`${cardId}-biz`).value,
-        tone: 'professional',
-        partnership_context: document.getElementById(`${cardId}-ctx`).value,
-      });
-      btn.textContent = 'Generate'; btn.disabled = false;
-      if (r.data.ok) {
-        _draftId = r.data.draft_id || _draftId;
-        const e = r.data.output && r.data.output.email;
-        if (e) {
-          if (e.to)      toEl.value      = e.to;
-          if (e.subject) subjectEl.value = e.subject;
-          if (e.body)    bodyEl.value    = e.body;
-          statusEl.textContent = 'Generated';
-          genRow.style.display = 'none';
-          document.getElementById(`${cardId}-gen-btn`).classList.remove('active');
-          _wc(); _fit();
-        }
-      } else { alert(r.data.error?.message || 'Could not generate email.'); }
-    });
 
     /* Rewrite */
     document.getElementById(`${cardId}-rewrite`).addEventListener('click', async () => {
@@ -1053,7 +1018,7 @@
           if (e.to)      toEl.value      = e.to;
           if (e.subject) subjectEl.value = e.subject;
           if (e.body)    bodyEl.value    = e.body;
-          statusEl.textContent = 'Edited'; _wc(); _fit();
+          statusEl.textContent = 'Edited'; _resize(); _wc(); _fit();
         }
       } else { alert(r.data.error?.message || 'Could not revise email.'); }
     });
@@ -1526,6 +1491,17 @@
     } catch (e) { /* silent */ }
   }
 
+  async function loadPendingDrafts() {
+    try {
+      const res  = await fetch(OUTREACH_URLS.listDrafts, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      (data.drafts || []).forEach(d => {
+        const output = { email: { to: d.recipient_email, subject: d.subject, body: d.body }, draft_id: d.id };
+        appendEmailEditorCard(output, d.recipient_email, d.id);
+      });
+    } catch (e) { /* silent */ }
+  }
+
   async function openConversation(id) {
     activeConvId = id;
     setActiveItem(id);
@@ -1747,7 +1723,7 @@
     }
   });
 
-  /* ── Boot: load conversation list, open most recent ── */
+  /* ── Boot: load conversation list, open most recent, restore drafts ── */
   (async () => {
     await loadConvList();
     const first = sidebar.querySelector('.ag-conv-item');
@@ -1767,6 +1743,7 @@
         }
       } catch (e) { /* silent */ }
     }
+    await loadPendingDrafts();
   })();
 })();
 </script>
