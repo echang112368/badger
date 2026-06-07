@@ -21,9 +21,11 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import landing_page
 from merchants import views as merchant_views
 from creators.api_views import SearchAPIView
+from creators.views import creator_rate_calculator
 
 urlpatterns = [
     path('', landing_page, name='landing'),
+    path('rate-calculator/', creator_rate_calculator, name='rate_calculator'),
     path('creators/', include('creators.urls')),
     path('merchant/', include('merchants.urls')),
     path('customer/', include('customer.urls')),
