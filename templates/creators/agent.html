@@ -976,18 +976,18 @@
               <input id="${cardId}-subject" class="oe-fld-inp" type="text" value="${esc(emailSub)}" placeholder="Subject line">
             </div>
             <div class="oe-rte-toolbar" id="${cardId}-rte-tb">
-              <button class="oe-rte-btn" data-cmd="bold"      title="Bold"><b>B</b></button>
-              <button class="oe-rte-btn" data-cmd="italic"    title="Italic"><i>I</i></button>
-              <button class="oe-rte-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+              <button class="oe-rte-btn" type="button" data-cmd="bold"      title="Bold"><b>B</b></button>
+              <button class="oe-rte-btn" type="button" data-cmd="italic"    title="Italic"><i>I</i></button>
+              <button class="oe-rte-btn" type="button" data-cmd="underline" title="Underline"><u>U</u></button>
               <div class="oe-rte-sep"></div>
-              <button class="oe-rte-btn" id="${cardId}-link-btn" title="Insert link"><i class="bi bi-link-45deg" style="font-size:15px"></i></button>
-              <button class="oe-rte-btn" id="${cardId}-img-btn"  title="Insert image"><i class="bi bi-image" style="font-size:14px"></i></button>
+              <button class="oe-rte-btn" type="button" id="${cardId}-link-btn" title="Insert link"><i class="bi bi-link-45deg" style="font-size:15px"></i></button>
+              <button class="oe-rte-btn" type="button" id="${cardId}-img-btn"  title="Insert image"><i class="bi bi-image" style="font-size:14px"></i></button>
               <input type="file" id="${cardId}-img-inp" accept="image/*" style="display:none">
             </div>
             <div class="oe-rte-link-bar" id="${cardId}-link-bar">
               <input class="oe-rte-link-inp" id="${cardId}-link-url" type="url" placeholder="https://…">
-              <button class="oe-rte-link-apply"  id="${cardId}-link-apply">Apply</button>
-              <button class="oe-rte-link-cancel" id="${cardId}-link-cancel">Cancel</button>
+              <button class="oe-rte-link-apply" type="button" id="${cardId}-link-apply">Apply</button>
+              <button class="oe-rte-link-cancel" type="button" id="${cardId}-link-cancel">Cancel</button>
             </div>
             <div id="${cardId}-body" class="oe-inline-body" contenteditable="true" data-placeholder="Your email will appear here…"></div>
             <div class="oe-improve">
@@ -1048,48 +1048,154 @@
     /* ── RTE toolbar ── */
     let _savedRange = null;
 
-    /* Save selection whenever the user selects text in the editor */
+    function _nodeInsideEditor(node) {
+      return !!node && (node === bodyEl || bodyEl.contains(node));
+    }
+
+    function _selectionInsideEditor(sel) {
+      return !!(sel && sel.rangeCount > 0 && _nodeInsideEditor(sel.anchorNode) && _nodeInsideEditor(sel.focusNode));
+    }
+
+    /* Save selection whenever the user selects text in the editor. This lets
+       toolbar/link controls keep acting on the highlighted text after focus
+       moves to a button or to the link URL input. */
     function _saveRange() {
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && bodyEl.contains(sel.anchorNode)) {
+      if (_selectionInsideEditor(sel)) {
         _savedRange = sel.getRangeAt(0).cloneRange();
       }
     }
+
     function _restoreRange() {
       bodyEl.focus();
-      if (!_savedRange) return;
+      if (!_savedRange) return false;
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(_savedRange);
+      return true;
     }
+
+    function _editorChanged() {
+      bodyEl.dispatchEvent(new Event('input', { bubbles: true }));
+      statusEl.textContent = 'Editing';
+    }
+
+    function _selectNodeContents(node) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      _savedRange = range.cloneRange();
+    }
+
+    function _wrapRange(range, wrapper) {
+      const selected = range.extractContents();
+      wrapper.appendChild(selected);
+      range.insertNode(wrapper);
+      _selectNodeContents(wrapper);
+      _editorChanged();
+    }
+
+    function _applyInlineFormat(cmd) {
+      _restoreRange();
+      const sel = window.getSelection();
+      if (!_selectionInsideEditor(sel)) return;
+
+      // Prefer the browser editing command so repeated clicks can naturally
+      // toggle formatting. If it does not mutate the selected HTML, fall back
+      // to explicitly wrapping the selected range so the button visibly works.
+      const before = bodyEl.innerHTML;
+      document.execCommand(cmd, false, null);
+      const changed = bodyEl.innerHTML !== before;
+      _saveRange();
+
+      if (!changed && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+        const tags = { bold: 'strong', italic: 'em', underline: 'u' };
+        const tag = tags[cmd];
+        if (tag) _wrapRange(sel.getRangeAt(0), document.createElement(tag));
+      } else if (changed) {
+        _editorChanged();
+      }
+    }
+
+    function _normalizeUrl(url) {
+      const trimmed = url.trim();
+      if (!trimmed) return '';
+      if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+      return 'https://' + trimmed;
+    }
+
+    function _applyLink(rawUrl) {
+      const url = _normalizeUrl(rawUrl);
+      if (!url) return;
+      _restoreRange();
+      const sel = window.getSelection();
+      if (!_selectionInsideEditor(sel) || sel.rangeCount === 0) return;
+
+      const range = sel.getRangeAt(0);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+
+      if (range.collapsed) {
+        anchor.textContent = url;
+        range.insertNode(anchor);
+        _selectNodeContents(anchor);
+        _editorChanged();
+        return;
+      }
+
+      // Use execCommand first because it preserves complex selections well;
+      // fall back to manual wrapping for browsers where createLink no-ops.
+      const before = bodyEl.innerHTML;
+      document.execCommand('createLink', false, url);
+      const changed = bodyEl.innerHTML !== before;
+      if (changed) {
+        bodyEl.querySelectorAll('a').forEach(link => {
+          if (link.getAttribute('href') === url) {
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+          }
+        });
+        _editorChanged();
+        _saveRange();
+        return;
+      }
+
+      _wrapRange(range, anchor);
+    }
+
     bodyEl.addEventListener('mouseup',  _saveRange);
     bodyEl.addEventListener('keyup',    _saveRange);
+    bodyEl.addEventListener('blur',     _saveRange);
+    bodyEl.addEventListener('input',    _saveRange);
+    document.addEventListener('selectionchange', () => {
+      if (document.activeElement === bodyEl) _saveRange();
+    });
 
     /* B / I / U — prevent focus steal on mousedown, apply on click */
     document.getElementById(`${cardId}-rte-tb`).querySelectorAll('[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', e => e.preventDefault());
-      btn.addEventListener('click', () => {
-        _restoreRange();
-        document.execCommand(btn.dataset.cmd, false, null);
-      });
+      btn.addEventListener('click', () => _applyInlineFormat(btn.dataset.cmd));
     });
 
     /* Link */
     document.getElementById(`${cardId}-link-btn`).addEventListener('mousedown', e => e.preventDefault());
     document.getElementById(`${cardId}-link-btn`).addEventListener('click', () => {
+      _saveRange();
       const bar = document.getElementById(`${cardId}-link-bar`);
       const open = bar.style.display === 'none' || !bar.style.display;
       bar.style.display = open ? 'flex' : 'none';
       if (open) document.getElementById(`${cardId}-link-url`).focus();
     });
+    document.getElementById(`${cardId}-link-apply`).addEventListener('mousedown', e => e.preventDefault());
     document.getElementById(`${cardId}-link-apply`).addEventListener('click', () => {
-      const url = document.getElementById(`${cardId}-link-url`).value.trim();
-      if (url) {
-        _restoreRange();
-        document.execCommand('createLink', false, url);
-      }
+      const input = document.getElementById(`${cardId}-link-url`);
+      _applyLink(input.value);
       document.getElementById(`${cardId}-link-bar`).style.display = 'none';
-      document.getElementById(`${cardId}-link-url`).value = '';
+      input.value = '';
     });
     document.getElementById(`${cardId}-link-cancel`).addEventListener('click', () => {
       document.getElementById(`${cardId}-link-bar`).style.display = 'none';
