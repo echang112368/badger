@@ -308,7 +308,28 @@
     max-width: 720px;
     margin: 0 auto;
     padding: 0 24px;
+    position: relative;
   }
+  #ag-cmd-picker {
+    display: none;
+    position: absolute;
+    bottom: 100%; left: 24px; right: 24px;
+    margin-bottom: 6px;
+    background: #1c1c1e;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.4);
+    z-index: 200;
+    overflow: hidden;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .ag-cmd-item {
+    padding: 11px 16px; margin: 3px;
+    border-radius: 9px; cursor: pointer;
+    color: #e5e7eb; font-size: 14px;
+  }
+  .ag-cmd-item:hover, .ag-cmd-item.active { background: #2a2a2c; }
   #ag-composer {
     background: #fff;
     border: 1px solid #d1d5db;
@@ -833,6 +854,7 @@
     <!-- Composer -->
     <div id="ag-composer-wrap">
       <div id="ag-composer-inner">
+        <div id="ag-cmd-picker"></div>
         <div id="ag-composer">
           <!-- Connectors + button -->
           <div id="ag-plus-wrap">
@@ -876,7 +898,7 @@
               </div>
             </div>
           </div>
-          <textarea id="ag-input" rows="1" placeholder="Ask anything… or type /gmail to open the email editor"></textarea>
+          <textarea id="ag-input" rows="1" placeholder="Ask anything… or type / for commands"></textarea>
           <button id="ag-send" disabled><i class="bi bi-send-fill"></i></button>
         </div>
         <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type /gmail to open the email editor</div>
@@ -1677,6 +1699,46 @@
     });
   });
 
+  /* ── Slash command picker ──────────────────────────── */
+  const SLASH_COMMANDS = [
+    { name: 'gmail', description: 'Open outreach email editor', icon: 'bi-envelope' },
+  ];
+
+  const cmdPicker    = document.getElementById('ag-cmd-picker');
+  let _cmdActive     = 0;
+  let _cmdFiltered   = [];
+
+  function _renderCmdPicker(query) {
+    const q = (query || '').toLowerCase();
+    _cmdFiltered = SLASH_COMMANDS.filter(c =>
+      c.name.startsWith(q) || c.description.toLowerCase().includes(q)
+    );
+    if (!_cmdFiltered.length) { _hideCmdPicker(); return; }
+    _cmdActive = Math.max(0, Math.min(_cmdActive, _cmdFiltered.length - 1));
+    cmdPicker.innerHTML = _cmdFiltered.map((c, i) => `
+      <div class="ag-cmd-item${i === _cmdActive ? ' active' : ''}" data-idx="${i}">${c.name}</div>`
+    ).join('');
+    cmdPicker.style.display = 'block';
+    cmdPicker.querySelectorAll('.ag-cmd-item').forEach(el => {
+      el.addEventListener('mousedown', e => { e.preventDefault(); _selectCmd(Number(el.dataset.idx)); });
+    });
+  }
+
+  function _hideCmdPicker() {
+    cmdPicker.style.display = 'none';
+    _cmdActive = 0;
+    _cmdFiltered = [];
+  }
+
+  function _selectCmd(idx) {
+    const cmd = _cmdFiltered[idx];
+    if (!cmd) return;
+    input.value = '/' + cmd.name + ' ';
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+    _hideCmdPicker();
+  }
+
   /* ── Input auto-resize + send enable ──────────────── */
   input.addEventListener('input', () => {
     input.style.height = '22px';
@@ -1684,6 +1746,13 @@
     input.style.height = newH + 'px';
     input.style.overflowY = newH >= 180 ? 'auto' : 'hidden';
     sendBtn.disabled = !input.value.trim();
+    /* slash command picker */
+    const val = input.value;
+    if (val.startsWith('/') && !val.includes(' ')) {
+      _renderCmdPicker(val.slice(1));
+    } else {
+      _hideCmdPicker();
+    }
   });
 
   /* ── Send (streaming) ──────────────────────────────── */
@@ -1818,6 +1887,13 @@
 
   sendBtn.addEventListener('click', send);
   input.addEventListener('keydown', e => {
+    if (cmdPicker.style.display !== 'none' && _cmdFiltered.length) {
+      if (e.key === 'ArrowDown')  { e.preventDefault(); _cmdActive = (_cmdActive + 1) % _cmdFiltered.length; _renderCmdPicker(input.value.slice(1)); return; }
+      if (e.key === 'ArrowUp')    { e.preventDefault(); _cmdActive = (_cmdActive - 1 + _cmdFiltered.length) % _cmdFiltered.length; _renderCmdPicker(input.value.slice(1)); return; }
+      if (e.key === 'Enter')      { e.preventDefault(); _selectCmd(_cmdActive); return; }
+      if (e.key === 'Escape')     { e.preventDefault(); _hideCmdPicker(); return; }
+      if (e.key === 'Tab')        { e.preventDefault(); _selectCmd(_cmdActive); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
 
