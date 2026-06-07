@@ -18,12 +18,16 @@ from instagram_connect.models import InstagramConnection
 
 from .models import OutreachDraft
 from .services import gmail as gmail_service
-from .prompts import CREATOR_AGENT_SYSTEM_PROMPT
+from .prompts import CONTRACT_REVIEW_SYSTEM_PROMPT, CREATOR_AGENT_SYSTEM_PROMPT
 from .services.outreach_agents import run_email_writer
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEFAULT_CREATOR_AGENT_MODEL = "gpt-4.1-mini"
 logger = logging.getLogger(__name__)
+
+CONTRACT_REVIEW_MAX_ATTACHMENTS = 4
+CONTRACT_REVIEW_MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+CONTRACT_REVIEW_IMAGE_MIME_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 
 
 def _extract_output_text(payload: dict[str, Any]) -> str:
@@ -197,6 +201,237 @@ def _maybe_gmail_command_reply(user, message: str) -> str | None:
     )
 
 
+def _extract_contract_review_prompt(message: str) -> str | None:
+    stripped = message.strip()
+    command, separator, prompt_text = stripped.partition(" ")
+    if command.lower() != "/contract-review":
+        return None
+    return prompt_text.strip() if separator else ""
+
+
+def _contract_review_usage_message() -> str:
+    return (
+        "Use `/contract-review` with the contract you want me to analyze. "
+        "You can paste the agreement text after the command, attach a PDF or text file, "
+        "or attach a screenshot/image of the contract. "
+        "Example: `/contract-review Deliverables: 2 TikToks by July 15...`"
+    )
+
+
+def _normalize_contract_review_attachments(attachments: list[dict[str, Any]] | None) -> list[dict[str, str]]:
+    normalized = []
+    for raw in attachments or []:
+        if not isinstance(raw, dict):
+            continue
+        filename = str(raw.get("filename") or raw.get("name") or "contract-attachment").strip()
+        mime_type = str(raw.get("mime_type") or raw.get("content_type") or "application/octet-stream").strip()
+        data_url = str(raw.get("data_url") or "").strip()
+        base64_data = str(raw.get("content_base64") or raw.get("data") or "").strip()
+
+        if not data_url and base64_data:
+            data_url = f"data:{mime_type};base64,{base64_data}"
+        if not data_url.startswith("data:"):
+            continue
+        try:
+            encoded = data_url.split(",", 1)[1]
+        except IndexError:
+            continue
+        estimated_size = (len(encoded) * 3) // 4
+        if estimated_size > CONTRACT_REVIEW_MAX_ATTACHMENT_BYTES:
+            continue
+        normalized.append({"filename": filename, "mime_type": mime_type, "data_url": data_url})
+        if len(normalized) >= CONTRACT_REVIEW_MAX_ATTACHMENTS:
+            break
+    return normalized
+
+
+def _contract_review_attachment_content_items(attachments: list[dict[str, str]]) -> list[dict[str, Any]]:
+    content_items = []
+    for attachment in attachments:
+        filename = attachment["filename"]
+        mime_type = attachment["mime_type"]
+        data_url = attachment["data_url"]
+        if mime_type in CONTRACT_REVIEW_IMAGE_MIME_TYPES:
+            content_items.append(
+                {
+                    "type": "input_image",
+                    "image_url": data_url,
+                    "detail": "high",
+                }
+            )
+        else:
+            content_items.append(
+                {
+                    "type": "input_file",
+                    "filename": filename,
+                    "file_data": data_url,
+                }
+            )
+    return content_items
+
+
+def build_contract_review_input(user, contract_text: str) -> str:
+    creator_context = {
+        "creator_profile": _creator_profile_summary(user),
+        "connected_accounts": _connected_accounts_summary(user),
+    }
+    return (
+        f"{CONTRACT_REVIEW_SYSTEM_PROMPT}\n\n"
+        "Use the creator context only to make examples or platform notes more relevant; do not invent contract facts from it.\n"
+        f"Creator context JSON: {json.dumps(creator_context, default=str, ensure_ascii=False)}\n\n"
+        "Pasted contract text, if any, starts below. Analyze only the provided text and attached contract materials; cite exact supplied or visible clause language when flagging concerns.\n\n"
+        f"{contract_text}"
+    )
+
+
+def build_contract_review_request_input(
+    user, contract_text: str, attachments: list[dict[str, Any]] | None = None
+) -> str | list[dict[str, Any]]:
+    normalized_attachments = _normalize_contract_review_attachments(attachments)
+    text_input = build_contract_review_input(user, contract_text)
+    if not normalized_attachments:
+        return text_input
+
+    content_items = [{"type": "input_text", "text": text_input}]
+    content_items.extend(_contract_review_attachment_content_items(normalized_attachments))
+    attachment_names = ", ".join(item["filename"] for item in normalized_attachments)
+    content_items.append(
+        {
+            "type": "input_text",
+            "text": (
+                "Attached contract materials: "
+                f"{attachment_names}. Review the pasted text and attached file/image content together. "
+                "If text is visible in a screenshot, read the screenshot and reference the visible clause language."
+            ),
+        }
+    )
+    return [{"role": "user", "content": content_items}]
+
+
+def _maybe_contract_review_command_reply(
+    user, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
+) -> str | None:
+    contract_text = _extract_contract_review_prompt(message)
+    if contract_text is None:
+        return None
+    normalized_attachments = _normalize_contract_review_attachments(attachments)
+    if not contract_text and not normalized_attachments:
+        return _contract_review_usage_message()
+
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("/contract-review skipped: OPENAI_API_KEY is missing.")
+        return (
+            "I can run `/contract-review`, but the OpenAI API key is not configured on the server. "
+            "Set OPENAI_API_KEY to enable contract reviews."
+        )
+
+    model = os.environ.get(
+        "OPENAI_CREATOR_AGENT_MODEL",
+        getattr(settings, "OPENAI_CREATOR_AGENT_MODEL", DEFAULT_CREATOR_AGENT_MODEL),
+    ).strip() or DEFAULT_CREATOR_AGENT_MODEL
+    if timeout_seconds is None:
+        timeout_seconds = int(os.environ.get("OPENAI_CONTRACT_REVIEW_TIMEOUT", "45"))
+
+    body = {
+        "model": model,
+        "input": build_contract_review_request_input(user, contract_text, normalized_attachments),
+        "temperature": 0.2,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    try:
+        response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=body, timeout=timeout_seconds)
+        response.raise_for_status()
+        response_payload = response.json()
+        output_text = _extract_output_text(response_payload)
+    except requests.Timeout as exc:
+        logger.exception("/contract-review OpenAI request timed out for user_id=%s", user.id)
+        return f"OpenAI API timeout while reviewing the contract: {exc}"
+    except requests.RequestException as exc:
+        logger.exception("/contract-review OpenAI request failed for user_id=%s", user.id)
+        return f"OpenAI API request failed while reviewing the contract: {exc}"
+    except (ValueError, TypeError) as exc:
+        logger.exception("/contract-review OpenAI response parsing failed for user_id=%s", user.id)
+        return f"OpenAI response parsing failed while reviewing the contract: {exc}"
+
+    if output_text:
+        return output_text
+
+    logger.warning("/contract-review OpenAI response returned no output text for user_id=%s", user.id)
+    return "OpenAI returned an empty contract review. Please try again with the contract text."
+
+
+def _stream_contract_review_command_reply(
+    user, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
+) -> Generator[str, None, None] | None:
+    contract_text = _extract_contract_review_prompt(message)
+    if contract_text is None:
+        return None
+    normalized_attachments = _normalize_contract_review_attachments(attachments)
+
+    def _stream() -> Generator[str, None, None]:
+        if not contract_text and not normalized_attachments:
+            yield _contract_review_usage_message()
+            return
+
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            logger.warning("/contract-review streaming skipped: OPENAI_API_KEY is missing.")
+            yield (
+                "I can run `/contract-review`, but the OpenAI API key is not configured on the server. "
+                "Set OPENAI_API_KEY to enable contract reviews."
+            )
+            return
+
+        model = os.environ.get(
+            "OPENAI_CREATOR_AGENT_MODEL",
+            getattr(settings, "OPENAI_CREATOR_AGENT_MODEL", DEFAULT_CREATOR_AGENT_MODEL),
+        ).strip() or DEFAULT_CREATOR_AGENT_MODEL
+        actual_timeout = timeout_seconds
+        if actual_timeout is None:
+            actual_timeout = int(os.environ.get("OPENAI_CONTRACT_REVIEW_TIMEOUT", "90"))
+
+        body = {
+            "model": model,
+            "input": build_contract_review_request_input(user, contract_text, normalized_attachments),
+            "temperature": 0.2,
+            "stream": True,
+        }
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+        try:
+            with requests.post(
+                OPENAI_RESPONSES_URL, headers=headers, json=body, stream=True, timeout=actual_timeout
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    if not line_str.startswith("data: "):
+                        continue
+                    data_str = line_str[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        event_data = json.loads(data_str)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if event_data.get("type") == "response.output_text.delta":
+                        delta = event_data.get("delta", "")
+                        if delta:
+                            yield delta
+        except requests.Timeout:
+            logger.exception("/contract-review streaming timed out for user_id=%s", user.id)
+            yield "\n\n[Contract review timed out. Please try again.]"
+        except requests.RequestException as exc:
+            logger.exception("/contract-review streaming failed for user_id=%s", user.id)
+            yield f"\n\n[Error connecting to AI service for contract review: {exc}]"
+
+    return _stream()
+
+
 def _maybe_outreach_email_reply(user, message: str) -> str | None:
     """Route explicit outreach-email asks to the specialist Agents SDK writer.
 
@@ -261,7 +496,15 @@ def build_creator_agent_input(user, conversation, message: str) -> str:
     )
 
 
-def generate_creator_agent_reply(user, conversation, message: str, timeout_seconds: int | None = None) -> str:
+def generate_creator_agent_reply(
+    user, conversation, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
+) -> str:
+    contract_review_reply = _maybe_contract_review_command_reply(
+        user, message, attachments=attachments, timeout_seconds=timeout_seconds
+    )
+    if contract_review_reply is not None:
+        return contract_review_reply
+
     gmail_command_reply = _maybe_gmail_command_reply(user, message)
     if gmail_command_reply is not None:
         return gmail_command_reply
@@ -315,9 +558,16 @@ def generate_creator_agent_reply(user, conversation, message: str, timeout_secon
 
 
 def stream_creator_agent_reply(
-    user, conversation, message: str, timeout_seconds: int | None = None
+    user, conversation, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
 ) -> Generator[str, None, None]:
     """Yields text delta chunks as they stream from the OpenAI Responses API."""
+    contract_review_stream = _stream_contract_review_command_reply(
+        user, message, attachments=attachments, timeout_seconds=timeout_seconds
+    )
+    if contract_review_stream is not None:
+        yield from contract_review_stream
+        return
+
     gmail_command_reply = _maybe_gmail_command_reply(user, message)
     if gmail_command_reply is not None:
         yield gmail_command_reply
