@@ -634,13 +634,48 @@
     margin-top: 8px;
     width: 100%;
   }
+  .oe-rte-toolbar {
+    display: flex; align-items: center; gap: 2px;
+    padding: 6px 10px; border-bottom: 1px solid #f0f2f5; flex-wrap: wrap;
+  }
+  .oe-rte-btn {
+    width: 30px; height: 30px; border: none; background: none;
+    border-radius: 6px; cursor: pointer; color: #6b7280;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-family: inherit; transition: background .1s; flex-shrink: 0;
+  }
+  .oe-rte-btn:hover { background: #f3f4f6; color: #374151; }
+  .oe-rte-btn.active { background: #eef1fb; color: #304f91; }
+  .oe-rte-sep { width: 1px; height: 18px; background: #e5e7eb; margin: 0 4px; flex-shrink: 0; }
+  .oe-rte-link-bar {
+    display: none; align-items: center; gap: 6px;
+    padding: 8px 12px; background: #f9fafb; border-bottom: 1px solid #f0f2f5;
+  }
+  .oe-rte-link-inp {
+    flex: 1; height: 30px; border: 1px solid #e5e7eb; border-radius: 6px;
+    padding: 0 8px; font: inherit; font-size: 13px; outline: none; min-width: 0;
+  }
+  .oe-rte-link-inp:focus { border-color: #304f91; }
+  .oe-rte-link-apply {
+    padding: 5px 12px; background: #304f91; color: #fff; border: none;
+    border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .oe-rte-link-cancel {
+    padding: 5px 10px; background: none; border: none; color: #6b7280;
+    font: inherit; font-size: 12px; cursor: pointer; border-radius: 6px; white-space: nowrap;
+  }
+  .oe-rte-link-cancel:hover { background: #f3f4f6; }
   .oe-inline-body {
-    width: 100%; min-height: 80px;
+    width: 100%; min-height: 120px;
     border: none; outline: none; padding: 14px 16px;
     font: inherit; font-size: 14px; line-height: 1.65; color: #111;
-    resize: none; overflow: hidden; box-sizing: border-box;
+    box-sizing: border-box; word-break: break-word;
   }
-  .oe-inline-body::placeholder { color: #d1d5db; }
+  .oe-inline-body[contenteditable]:empty:before {
+    content: attr(data-placeholder); color: #d1d5db; pointer-events: none; display: block;
+  }
+  .oe-inline-body a { color: #304f91; text-decoration: underline; }
+  .oe-inline-body img { max-width: 100%; height: auto; margin: 4px 0; border-radius: 4px; display: block; }
   .oe-gen-row {
     padding: 10px 16px; border-bottom: 1px solid #f0f2f5;
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -940,7 +975,21 @@
               <span class="oe-lbl">Subject</span>
               <input id="${cardId}-subject" class="oe-fld-inp" type="text" value="${esc(emailSub)}" placeholder="Subject line">
             </div>
-            <textarea id="${cardId}-body" class="oe-inline-body" placeholder="Your email will appear here…">${esc(emailBod)}</textarea>
+            <div class="oe-rte-toolbar" id="${cardId}-rte-tb">
+              <button class="oe-rte-btn" data-cmd="bold"      title="Bold"><b>B</b></button>
+              <button class="oe-rte-btn" data-cmd="italic"    title="Italic"><i>I</i></button>
+              <button class="oe-rte-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+              <div class="oe-rte-sep"></div>
+              <button class="oe-rte-btn" id="${cardId}-link-btn" title="Insert link"><i class="bi bi-link-45deg" style="font-size:15px"></i></button>
+              <button class="oe-rte-btn" id="${cardId}-img-btn"  title="Insert image"><i class="bi bi-image" style="font-size:14px"></i></button>
+              <input type="file" id="${cardId}-img-inp" accept="image/*" style="display:none">
+            </div>
+            <div class="oe-rte-link-bar" id="${cardId}-link-bar">
+              <input class="oe-rte-link-inp" id="${cardId}-link-url" type="url" placeholder="https://…">
+              <button class="oe-rte-link-apply"  id="${cardId}-link-apply">Apply</button>
+              <button class="oe-rte-link-cancel" id="${cardId}-link-cancel">Cancel</button>
+            </div>
+            <div id="${cardId}-body" class="oe-inline-body" contenteditable="true" data-placeholder="Your email will appear here…"></div>
             <div class="oe-improve">
               <input id="${cardId}-improve" class="oe-improve-inp" placeholder='Ask the agent to improve it — e.g. "make it shorter" or "sound more confident"'>
               <button id="${cardId}-rewrite" class="oe-rewrite-btn" type="button">Rewrite</button>
@@ -963,19 +1012,24 @@
     const bodyEl    = document.getElementById(`${cardId}-body`);
     const statusEl  = document.getElementById(`${cardId}-status`);
 
+    /* Set initial content — convert plain-text newlines to <br> */
+    if (emailBod) bodyEl.innerHTML = emailBod.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+
+    function _bodyText() { return bodyEl.innerText || ''; }
     function _wc() {
-      const w = (bodyEl.value.trim().match(/\S+/g) || []).length;
+      const w = (_bodyText().trim().match(/\S+/g) || []).length;
       document.getElementById(`${cardId}-wc`).textContent = w + ' word' + (w === 1 ? '' : 's');
     }
     function _fit() {
-      const words = (bodyEl.value.trim().match(/\S+/g) || []).length;
+      const txt   = _bodyText();
+      const words = (txt.trim().match(/\S+/g) || []).length;
       let s = 0;
       if (subjectEl.value.trim()) s += 20;
       if (toEl.value.trim())      s += 15;
       if (words >= 50)  s += 20;
       if (words >= 100) s += 15;
       if (words <= 300) s += 10;
-      const lower = bodyEl.value.toLowerCase();
+      const lower = txt.toLowerCase();
       if (/love to|happy to|schedule|discuss|reach out|collaborate|partner/.test(lower)) s += 10;
       if (/i am|i'm|my audience|my content|my niche/.test(lower)) s += 10;
       s = Math.min(s, 100);
@@ -986,14 +1040,77 @@
       pill.style.color       = s >= 70 ? '#15803d'  : s >= 40 ? '#b45309' : '#b91c1c';
       pill.style.borderColor = s >= 70 ? '#bbf7d0'  : s >= 40 ? '#fde68a' : '#fecaca';
     }
-    function _resize() {
-      bodyEl.style.height = 'auto';
-      bodyEl.style.height = bodyEl.scrollHeight + 'px';
-    }
-    bodyEl.addEventListener('input', () => { _resize(); _wc(); _fit(); });
+    bodyEl.addEventListener('input', () => { _wc(); _fit(); });
     subjectEl.addEventListener('input', _fit);
     toEl.addEventListener('input',      _fit);
-    _resize(); _wc(); _fit();
+    _wc(); _fit();
+
+    /* ── RTE toolbar ── */
+    let _savedRange = null;
+
+    /* Save selection whenever the user selects text in the editor */
+    function _saveRange() {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && bodyEl.contains(sel.anchorNode)) {
+        _savedRange = sel.getRangeAt(0).cloneRange();
+      }
+    }
+    function _restoreRange() {
+      bodyEl.focus();
+      if (!_savedRange) return;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(_savedRange);
+    }
+    bodyEl.addEventListener('mouseup',  _saveRange);
+    bodyEl.addEventListener('keyup',    _saveRange);
+
+    /* B / I / U — prevent focus steal on mousedown, apply on click */
+    document.getElementById(`${cardId}-rte-tb`).querySelectorAll('[data-cmd]').forEach(btn => {
+      btn.addEventListener('mousedown', e => e.preventDefault());
+      btn.addEventListener('click', () => {
+        _restoreRange();
+        document.execCommand(btn.dataset.cmd, false, null);
+      });
+    });
+
+    /* Link */
+    document.getElementById(`${cardId}-link-btn`).addEventListener('mousedown', e => e.preventDefault());
+    document.getElementById(`${cardId}-link-btn`).addEventListener('click', () => {
+      const bar = document.getElementById(`${cardId}-link-bar`);
+      const open = bar.style.display === 'none' || !bar.style.display;
+      bar.style.display = open ? 'flex' : 'none';
+      if (open) document.getElementById(`${cardId}-link-url`).focus();
+    });
+    document.getElementById(`${cardId}-link-apply`).addEventListener('click', () => {
+      const url = document.getElementById(`${cardId}-link-url`).value.trim();
+      if (url) {
+        _restoreRange();
+        document.execCommand('createLink', false, url);
+      }
+      document.getElementById(`${cardId}-link-bar`).style.display = 'none';
+      document.getElementById(`${cardId}-link-url`).value = '';
+    });
+    document.getElementById(`${cardId}-link-cancel`).addEventListener('click', () => {
+      document.getElementById(`${cardId}-link-bar`).style.display = 'none';
+    });
+
+    /* Image upload */
+    document.getElementById(`${cardId}-img-btn`).addEventListener('click', () => {
+      document.getElementById(`${cardId}-img-inp`).click();
+    });
+    document.getElementById(`${cardId}-img-inp`).addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        _restoreRange();
+        document.execCommand('insertImage', false, ev.target.result);
+        _wc(); _fit();
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
 
 
     /* Rewrite */
@@ -1004,7 +1121,7 @@
         draft_id: _draftId,
         recipient_email: toEl.value,
         subject: subjectEl.value,
-        body: bodyEl.value,
+        body: bodyEl.innerHTML,
         tone: 'professional',
         revision_instruction: document.getElementById(`${cardId}-improve`).value,
       });
@@ -1014,8 +1131,8 @@
         if (e) {
           if (e.to)      toEl.value      = e.to;
           if (e.subject) subjectEl.value = e.subject;
-          if (e.body)    bodyEl.value    = e.body;
-          statusEl.textContent = 'Edited'; _resize(); _wc(); _fit();
+          if (e.body)    bodyEl.innerHTML = e.body.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+          statusEl.textContent = 'Edited'; _wc(); _fit();
         }
       } else { alert(r.data.error?.message || 'Could not revise email.'); }
     });
@@ -1027,7 +1144,7 @@
       const url = _draftId ? OUTREACH_URLS.updateDraft : OUTREACH_URLS.saveDraft;
       const r = await postOutreach(url, {
         draft_id: _draftId, recipient_email: toEl.value,
-        subject: subjectEl.value, body: bodyEl.value, tone: 'professional',
+        subject: subjectEl.value, body: bodyEl.innerHTML, tone: 'professional',
       });
       btn.textContent = 'Save to Gmail drafts'; btn.disabled = false;
       if (r.data.ok) {
@@ -1040,11 +1157,11 @@
     document.getElementById(`${cardId}-send`).addEventListener('click', () => {
       document.getElementById('confirmTo').textContent      = toEl.value;
       document.getElementById('confirmSubject').textContent = subjectEl.value;
-      document.getElementById('confirmBody').textContent    = bodyEl.value;
+      document.getElementById('confirmBody').textContent    = bodyEl.innerText;
       window._pendingCardSend = async () => {
         const r = await postOutreach(OUTREACH_URLS.send, {
           draft_id: _draftId, recipient_email: toEl.value,
-          subject: subjectEl.value, body: bodyEl.value,
+          subject: subjectEl.value, body: bodyEl.innerHTML,
           tone: 'professional', confirm: true,
         });
         if (r.data.ok) {
