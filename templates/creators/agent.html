@@ -940,9 +940,6 @@
               <span class="oe-lbl">Subject</span>
               <input id="${cardId}-subject" class="oe-fld-inp" type="text" value="${esc(emailSub)}" placeholder="Subject line">
             </div>
-            <div class="oe-toolbar">
-              <button class="oe-tb-btn" id="${cardId}-x-btn" title="Remove"><i class="bi bi-x-lg"></i></button>
-            </div>
             <textarea id="${cardId}-body" class="oe-inline-body" placeholder="Your email will appear here…">${esc(emailBod)}</textarea>
             <div class="oe-improve">
               <input id="${cardId}-improve" class="oe-improve-inp" placeholder='Ask the agent to improve it — e.g. "make it shorter" or "sound more confident"'>
@@ -1061,7 +1058,6 @@
 
     /* Discard / close */
     document.getElementById(`${cardId}-discard`).addEventListener('click', () => block.remove());
-    document.getElementById(`${cardId}-x-btn`).addEventListener('click',   () => block.remove());
   }
 
   async function openInlineEmailEditor(context) {
