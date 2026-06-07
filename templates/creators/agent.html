@@ -1089,7 +1089,7 @@
     }
 
     function _restoreRange() {
-      bodyEl.focus();
+      if (document.activeElement !== bodyEl) bodyEl.focus();
       if (!_savedRange) return false;
       const sel = window.getSelection();
       sel.removeAllRanges();
@@ -1120,7 +1120,12 @@
     }
 
     function _applyInlineFormat(cmd) {
-      _restoreRange();
+      /* Only restore the saved range if the editor has lost its selection.
+         Calling removeAllRanges/addRange when the editor already has a valid
+         selection resets the browser's pending-format state, which breaks the
+         toggle-off flow for a collapsed cursor. */
+      const liveSel = window.getSelection();
+      if (!_selectionInsideEditor(liveSel)) _restoreRange();
       const sel = window.getSelection();
       if (!_selectionInsideEditor(sel)) return;
 
@@ -1189,18 +1194,25 @@
       _wrapRange(range, anchor);
     }
 
+    function _updateToolbarState() {
+      ['bold', 'italic', 'underline'].forEach(cmd => {
+        const btn = document.querySelector(`#${cardId}-rte-tb [data-cmd="${cmd}"]`);
+        if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+      });
+    }
+
     bodyEl.addEventListener('mouseup',  _saveRange);
     bodyEl.addEventListener('keyup',    _saveRange);
     bodyEl.addEventListener('blur',     _saveRange);
     bodyEl.addEventListener('input',    _saveRange);
     document.addEventListener('selectionchange', () => {
-      if (document.activeElement === bodyEl) _saveRange();
+      if (document.activeElement === bodyEl) { _saveRange(); _updateToolbarState(); }
     });
 
     /* B / I / U — prevent focus steal on mousedown, apply on click */
     document.getElementById(`${cardId}-rte-tb`).querySelectorAll('[data-cmd]').forEach(btn => {
       btn.addEventListener('mousedown', e => e.preventDefault());
-      btn.addEventListener('click', () => _applyInlineFormat(btn.dataset.cmd));
+      btn.addEventListener('click', () => { _applyInlineFormat(btn.dataset.cmd); _updateToolbarState(); });
     });
 
     /* Link */
