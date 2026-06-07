@@ -457,3 +457,32 @@ def outreach_reply(request):
         status=OutreachDraft.STATUS_GMAIL_DRAFTED,
     )
     return JsonResponse({"ok": True, "draft_id": draft.id, "gmail": result})
+
+
+@login_required
+@require_GET
+def outreach_list_drafts(request):
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(days=7)
+    drafts = OutreachDraft.objects.filter(
+        creator=request.user,
+        status__in=[
+            OutreachDraft.STATUS_GENERATED,
+            OutreachDraft.STATUS_EDITED,
+            OutreachDraft.STATUS_GMAIL_DRAFTED,
+        ],
+        created_at__gte=cutoff,
+    ).order_by("created_at")[:10]
+    return JsonResponse({
+        "drafts": [
+            {
+                "id": d.id,
+                "recipient_email": d.recipient_email,
+                "subject": d.subject,
+                "body": d.body,
+                "tone": d.tone,
+                "status": d.status,
+            }
+            for d in drafts
+        ]
+    })
