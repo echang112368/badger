@@ -395,6 +395,12 @@
     font-size: 11px; font-weight: 600;
   }
   .ag-attachment-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ag-attachment-chip-remove {
+    flex-shrink: 0; border: none; background: none; padding: 0;
+    color: #304f91; cursor: pointer; font-size: 12px; line-height: 1;
+    opacity: .6; display: flex; align-items: center;
+  }
+  .ag-attachment-chip-remove:hover { opacity: 1; }
   .ag-user-attachments {
     margin-top: 6px;
     display: flex; gap: 6px; flex-wrap: wrap;
@@ -936,11 +942,11 @@
           </div>
           <textarea id="ag-input" rows="1" placeholder="Ask anything… or type / for commands"></textarea>
           <input id="ag-contract-file" type="file" accept=".pdf,.txt,.md,.doc,.docx,image/png,image/jpeg,image/webp,image/gif" multiple hidden>
-          <button id="ag-attach-contract" class="ag-attach-btn" type="button" title="Attach contract file or screenshot for /contract-review"><i class="bi bi-paperclip"></i></button>
+          <button id="ag-attach-contract" class="ag-attach-btn" type="button" title="Attach a file or image"><i class="bi bi-paperclip"></i></button>
           <button id="ag-send" disabled><i class="bi bi-send-fill"></i></button>
         </div>
         <div id="ag-attachment-list"></div>
-        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type /contract-review and paste text, attach a file, or attach a screenshot</div>
+        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type / for commands · Attach files or images with the paperclip</div>
       </div>
     </div>
   </div>
@@ -1910,11 +1916,24 @@
       attachmentList.innerHTML = '';
       return;
     }
-    attachmentList.innerHTML = selectedContractFiles.map(file => `
-      <span class="ag-attachment-chip"><i class="bi bi-paperclip"></i><span>${esc(file.name)}</span></span>`
+    attachmentList.innerHTML = selectedContractFiles.map((file, i) => `
+      <span class="ag-attachment-chip">
+        <i class="bi bi-paperclip"></i>
+        <span>${esc(file.name)}</span>
+        <button class="ag-attachment-chip-remove" data-idx="${i}" title="Remove" type="button">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </span>`
     ).join('');
     attachmentList.style.display = 'flex';
   }
+
+  attachmentList.addEventListener('click', e => {
+    const btn = e.target.closest('.ag-attachment-chip-remove');
+    if (!btn) return;
+    selectedContractFiles.splice(Number(btn.dataset.idx), 1);
+    renderSelectedContractFiles();
+  });
 
   function clearSelectedContractFiles() {
     selectedContractFiles = [];
@@ -1951,13 +1970,7 @@
   contractFileInput.addEventListener('change', () => {
     selectedContractFiles = Array.from(contractFileInput.files || []).slice(0, 4);
     renderSelectedContractFiles();
-    if (selectedContractFiles.length && !input.value.trim()) {
-      input.value = '/contract-review ';
-      input.dispatchEvent(new Event('input'));
-      input.focus();
-    } else {
-      sendBtn.disabled = !input.value.trim();
-    }
+    sendBtn.disabled = !input.value.trim();
   });
 
   /* ── Input auto-resize + send enable ──────────────── */
@@ -1980,17 +1993,12 @@
   async function send() {
     const content = input.value.trim();
     if (!content || sendBtn.disabled) return;
-    const isContractReview = content.toLowerCase().startsWith('/contract-review');
     let contractAttachments = [];
-    if (selectedContractFiles.length && !isContractReview) {
-      alert('Attached files and screenshots are currently supported for /contract-review. Start your message with /contract-review to use them.');
-      return;
-    }
-    if (selectedContractFiles.length && isContractReview) {
+    if (selectedContractFiles.length) {
       try {
         contractAttachments = await selectedContractAttachmentsForPayload();
       } catch (e) {
-        alert(e.message || 'Could not read contract attachment.');
+        alert(e.message || 'Could not read attachment.');
         return;
       }
     }
