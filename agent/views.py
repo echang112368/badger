@@ -81,6 +81,9 @@ def chat(request):
     content = (payload.get("message") or "").strip()
     if not content:
         return JsonResponse({"error": "Message is required."}, status=400)
+    attachments = payload.get("attachments")
+    if not isinstance(attachments, list):
+        attachments = []
 
     conversation_id = payload.get("conversation_id")
     if conversation_id:
@@ -96,7 +99,7 @@ def chat(request):
     user_message = Message.objects.create(
         conversation=conv, role=Message.ROLE_USER, content=content
     )
-    assistant_content = generate_creator_agent_reply(request.user, conv, content)
+    assistant_content = generate_creator_agent_reply(request.user, conv, content, attachments=attachments)
     assistant_message = Message.objects.create(
         conversation=conv, role=Message.ROLE_ASSISTANT, content=assistant_content
     )
@@ -121,6 +124,9 @@ def chat_stream(request):
     content = (payload.get("message") or "").strip()
     if not content:
         return JsonResponse({"error": "Message is required."}, status=400)
+    attachments = payload.get("attachments")
+    if not isinstance(attachments, list):
+        attachments = []
 
     conversation_id = payload.get("conversation_id")
     if conversation_id:
@@ -139,7 +145,7 @@ def chat_stream(request):
     def _event_stream():
         yield f"data: {json.dumps({'type': 'status', 'text': 'Thinking…'})}\n\n"
         chunks = []
-        for chunk in stream_creator_agent_reply(user, conv, content):
+        for chunk in stream_creator_agent_reply(user, conv, content, attachments=attachments):
             chunks.append(chunk)
             yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
         full_text = "".join(chunks) or "I couldn't generate a response. Please try again."
