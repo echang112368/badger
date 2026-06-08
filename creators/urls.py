@@ -5,7 +5,6 @@ from .views import (
     creator_dashboard,
     creator_agent,
     creator_agent_connectors,
-    creator_rate_calculator,
     creator_earnings,
     creator_affiliate_companies,
     creator_affiliate_companies_data,
@@ -32,7 +31,6 @@ urlpatterns = [
     path('dashboard/', creator_dashboard, name='creator_dashboard'),
     path('agent/', creator_agent, name='creator_agent'),
     path('agent/connectors/', creator_agent_connectors, name='creator_agent_connectors'),
-    path('rate-calculator/', creator_rate_calculator, name='creator_rate_calculator'),
 
     path('agent/outreach/businesses/search/', views_outreach.outreach_business_search, name='creator_outreach_business_search'),
     path('agent/outreach/generate/', views_outreach.outreach_generate, name='creator_outreach_generate'),
