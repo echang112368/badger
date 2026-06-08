@@ -242,6 +242,155 @@ def creator_rate_calculator(request):
 
 
 @login_required
+@require_GET
+def creator_rate_calculator_report(request):
+    """Auto-generate a rate report from the creator's connected social analytics."""
+    from agent.services.rate_calculator import calculate_creator_rate
+
+    user = request.user
+    meta = CreatorMeta.objects.filter(user=user).first()
+
+    # --- Pull social analytics snapshot (Instagram first, fallback to others) ---
+    snapshot = SocialAnalyticsSnapshot.objects.filter(user=user, platform="instagram").first()
+    if not snapshot:
+        snapshot = SocialAnalyticsSnapshot.objects.filter(user=user).order_by("-synced_at").first()
+
+    payload_data = snapshot.payload if snapshot else {}
+    account      = payload_data.get("account") or {}
+    engagement   = payload_data.get("engagement") or {}
+    summary      = payload_data.get("summary_metrics") or {}
+    demographics = payload_data.get("demographics") or {}
+    platform_slug = (snapshot.platform if snapshot else "instagram") or "instagram"
+
+    # --- Followers ---
+    followers = int(account.get("followers_count") or 0)
+    if not followers:
+        conn = getattr(user, "instagram_connection", None)
+        if conn:
+            followers = int(conn.followers_count or 0)
+
+    # --- Average views ---
+    average_views = int(summary.get("average_views") or engagement.get("views") or 0)
+
+    # --- Engagement rate (stored as 0–100 in engagement dict, as ratio in summary) ---
+    eng_rate_raw = summary.get("average_engagement_rate")
+    if eng_rate_raw is not None:
+        eng_rate = round(float(eng_rate_raw) * 100, 2) if float(eng_rate_raw) <= 1 else round(float(eng_rate_raw), 2)
+    else:
+        eng_rate = float(engagement.get("engagement_rate") or 0)
+
+    # --- Per-post averages (derive from rates × followers) ---
+    def rate_to_avg(rate_key):
+        r = summary.get(rate_key)
+        return int(round(float(r) * followers)) if r and followers else 0
+
+    avg_likes    = rate_to_avg("average_like_rate")    or int(engagement.get("likes") or 0)
+    avg_comments = rate_to_avg("average_comment_rate") or int(engagement.get("comments") or 0)
+    avg_saves    = rate_to_avg("average_save_rate")    or int(engagement.get("saves") or 0)
+    avg_shares   = rate_to_avg("average_share_rate")   or int(engagement.get("shares") or 0)
+
+    # --- Tier-1 audience % (US + UK + CA + AU share) ---
+    tier1_countries = {"united states", "us", "united kingdom", "uk", "canada", "ca", "australia", "au"}
+    country_rows    = demographics.get("audience_country") or []
+    total_country   = sum(int(r.get("value") or 0) for r in country_rows) or 1
+    tier1_sum       = sum(int(r.get("value") or 0) for r in country_rows if (r.get("label") or "").lower() in tier1_countries)
+    tier1_pct       = int(round((tier1_sum / total_country) * 100)) if country_rows else 65
+
+    # --- Niche ---
+    niche_map = {
+        "finance": "finance", "fintech": "finance", "investing": "finance",
+        "saas": "saas/tech", "tech": "saas/tech", "software": "saas/tech",
+        "legal": "legal", "law": "legal",
+        "insurance": "insurance",
+        "real estate": "real estate", "realestate": "real estate",
+        "health": "health/wellness", "wellness": "health/wellness", "mental health": "health/wellness",
+        "beauty": "beauty/skincare", "skincare": "beauty/skincare", "makeup": "beauty/skincare",
+        "fitness": "fitness", "workout": "fitness", "gym": "fitness",
+        "fashion": "fashion", "style": "fashion",
+        "food": "food", "cooking": "food", "recipes": "food",
+        "travel": "travel",
+        "lifestyle": "lifestyle",
+        "entertainment": "entertainment/humor", "humor": "entertainment/humor", "comedy": "entertainment/humor",
+    }
+    creator_niches = [str(n).lower().strip() for n in (meta.niches if meta else []) if n]
+    niche = "lifestyle"
+    for cn in creator_niches:
+        for key, val in niche_map.items():
+            if key in cn:
+                niche = val
+                break
+        else:
+            continue
+        break
+
+    # --- Prior paid deals ---
+    paid_count = int(meta.paid_brand_deals_count if meta else 0)
+    if paid_count == 0:
+        prior_deals = "0"
+    elif paid_count <= 3:
+        prior_deals = "1-3"
+    elif paid_count <= 10:
+        prior_deals = "4-10"
+    else:
+        prior_deals = "10+"
+
+    # --- Content format best guess from platform ---
+    format_defaults = {
+        "instagram": "reel", "tiktok": "tiktok video",
+        "youtube": "youtube integration", "linkedin": "static post",
+        "newsletter": "newsletter feature", "blog": "blog post", "podcast": "podcast mention",
+    }
+    content_format = format_defaults.get(platform_slug, "reel")
+
+    rc_payload = {
+        "platform":                        platform_slug,
+        "content_format":                  content_format,
+        "follower_count":                  followers,
+        "average_views":                   average_views or 1,
+        "engagement_rate":                 eng_rate,
+        "average_likes":                   avg_likes,
+        "average_comments":                avg_comments,
+        "average_saves":                   avg_saves,
+        "average_shares":                  avg_shares,
+        "audience_tier1_percentage":       tier1_pct,
+        "niche":                           niche,
+        "number_of_deliverables":          1,
+        "brand_type":                      "mid-market",
+        "prior_paid_brand_deals":          prior_deals,
+        "inbound_brand_inquiries_per_month": 0,
+        "production_complexity":           "medium",
+        "deadline_urgency":                "2+ weeks",
+        "usage_rights_requested":          "organic creator post only",
+        "whitelisting_duration":           "none",
+        "exclusivity_duration_days":       0,
+        "campaign_duration_days":          30,
+        "whitelisting_requested":          False,
+        "exclusivity_requested":           False,
+        "raw_footage_requested":           False,
+        "cross_platform_usage_requested":  False,
+        "paid_ad_usage_requested":         False,
+        "perpetual_rights_requested":      False,
+    }
+
+    result = calculate_creator_rate(rc_payload)
+
+    # Surface the inputs used so the frontend can show them
+    result["inputs_used"] = {
+        "platform":             platform_slug,
+        "content_format":       content_format,
+        "follower_count":       followers,
+        "average_views":        average_views,
+        "engagement_rate":      eng_rate,
+        "audience_tier1_pct":   tier1_pct,
+        "niche":                niche,
+        "prior_paid_deals":     prior_deals,
+    }
+    result["has_social_data"] = bool(snapshot and followers)
+
+    return JsonResponse(result)
+
+
+@login_required
 def gmail_connect(request):
     try:
         authorization_url = build_gmail_authorization_url(request)
