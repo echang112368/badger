@@ -960,7 +960,7 @@ class _MockGoogleResponse:
 @override_settings(
     GOOGLE_CLIENT_ID="client-id",
     GOOGLE_CLIENT_SECRET="client-secret",
-    GOOGLE_REDIRECT_URI="http://testserver/creators/gmail/callback/",
+    GMAIL_REDIRECT_URI="http://testserver/creators/gmail/callback/",
 )
 class GmailOAuthTests(TestCase):
     def setUp(self):
@@ -1124,7 +1124,7 @@ class GmailOAuthTests(TestCase):
         self.assertEqual(decode_token(refreshed.access_token), "new-access")
         self.assertGreater(refreshed.expires_at, timezone.now())
 
-    @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GOOGLE_REDIRECT_URI="")
+    @override_settings(GOOGLE_CLIENT_ID="", GOOGLE_CLIENT_SECRET="", GMAIL_REDIRECT_URI="")
     def test_missing_google_settings_produces_friendly_redirect(self):
         self.client.force_login(self.user)
         response = self.client.get(reverse("creator_gmail_connect"))

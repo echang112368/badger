@@ -61,7 +61,7 @@ class GmailOAuthStateError(GmailOAuthError):
 def _required_google_settings() -> tuple[str, str, str]:
     client_id = getattr(settings, "GOOGLE_CLIENT_ID", "")
     client_secret = getattr(settings, "GOOGLE_CLIENT_SECRET", "")
-    redirect_uri = getattr(settings, "GOOGLE_REDIRECT_URI", "")
+    redirect_uri = getattr(settings, "GMAIL_REDIRECT_URI", "")
     if not client_id or not client_secret or not redirect_uri:
         raise GmailOAuthConfigurationError()
     return client_id, client_secret, redirect_uri
