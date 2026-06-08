@@ -201,6 +201,33 @@ def _maybe_gmail_command_reply(user, message: str) -> str | None:
     )
 
 
+
+def _extract_rate_calculator_command(message: str) -> str | None:
+    stripped = message.strip()
+    command, separator, prompt_text = stripped.partition(" ")
+    if command.lower() not in {"/rate-calculator", "/calculate-rate"}:
+        return None
+    return prompt_text.strip() if separator else ""
+
+
+def _rate_calculator_command_reply(message: str) -> str | None:
+    prompt_text = _extract_rate_calculator_command(message)
+    if prompt_text is None:
+        return None
+
+    extra_context = f"\n\nI captured your notes for the estimate: {prompt_text}" if prompt_text else ""
+    return (
+        "### Rate Calculator\n"
+        "Use the structured Rate Calculator to price campaign deliverables from average views, engagement, "
+        "audience quality, niche, usage rights, whitelisting, exclusivity, production complexity, rush timing, "
+        "and bundle scope. It opens as a normal page instead of an iframe so the browser does not block it.\n\n"
+        "[Open the Rate Calculator](/rate-calculator/)"
+        f"{extra_context}\n\n"
+        "Creator rates are not standardized; this is a data-backed estimate, not a guaranteed market price. "
+        "This is not legal advice."
+    )
+
+
 def _extract_contract_review_prompt(message: str) -> str | None:
     stripped = message.strip()
     command, separator, prompt_text = stripped.partition(" ")
@@ -499,6 +526,10 @@ def build_creator_agent_input(user, conversation, message: str) -> str:
 def generate_creator_agent_reply(
     user, conversation, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
 ) -> str:
+    rate_calculator_reply = _rate_calculator_command_reply(message)
+    if rate_calculator_reply is not None:
+        return rate_calculator_reply
+
     contract_review_reply = _maybe_contract_review_command_reply(
         user, message, attachments=attachments, timeout_seconds=timeout_seconds
     )
@@ -561,6 +592,11 @@ def stream_creator_agent_reply(
     user, conversation, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
 ) -> Generator[str, None, None]:
     """Yields text delta chunks as they stream from the OpenAI Responses API."""
+    rate_calculator_reply = _rate_calculator_command_reply(message)
+    if rate_calculator_reply is not None:
+        yield rate_calculator_reply
+        return
+
     contract_review_stream = _stream_contract_review_command_reply(
         user, message, attachments=attachments, timeout_seconds=timeout_seconds
     )
