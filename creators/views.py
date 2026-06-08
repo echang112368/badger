@@ -253,11 +253,6 @@ def creator_agent_connectors(request):
 
 
 @login_required
-def creator_rate_calculator(request):
-    return render(request, "creators/rate_calculator.html")
-
-
-@login_required
 def gmail_connect(request):
     try:
         authorization_url = build_gmail_authorization_url(request)

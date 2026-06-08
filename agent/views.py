@@ -7,7 +7,6 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .models import Conversation, Message
 from .openai_client import generate_creator_agent_reply, stream_creator_agent_reply
-from .services.rate_calculator import calculate_creator_rate
 
 
 def _serialize_message(message: Message) -> dict:
@@ -159,16 +158,3 @@ def chat_stream(request):
     resp["Cache-Control"] = "no-cache"
     resp["X-Accel-Buffering"] = "no"
     return resp
-
-
-@login_required
-@require_POST
-def rate_calculator_calculate(request):
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
-
-    result = calculate_creator_rate(payload)
-    status = 400 if result.get("invalid_inputs") else 200
-    return JsonResponse(result, status=status)
