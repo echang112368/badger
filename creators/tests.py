@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
+from youtube_connect.models import YouTubeConnection
 from .models import CreatorMeta, GmailOAuthCredential, SocialAnalyticsSnapshot
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
@@ -33,7 +34,7 @@ from .services.instagram_metrics import (
     safe_divide,
     standard_deviation,
 )
-from .services.social_dashboard import InstagramAnalyticsService, SocialDashboardService
+from .services.social_dashboard import InstagramAnalyticsService, SocialDashboardService, YouTubeAnalyticsService
 
 
 class CreatorProfileTests(TestCase):
@@ -704,6 +705,99 @@ class InstagramMetricsModuleTests(SimpleTestCase):
         self.assertTrue(cards)
         self.assertIn("title", cards[0])
         self.assertIn("metric_name", cards[0])
+
+
+class YouTubeSocialDashboardIntegrationTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="youtube_dashboard_creator",
+            email="youtube_dashboard_creator@example.com",
+            password="pass123",
+            is_creator=True,
+        )
+
+    def test_youtube_appears_connectable_when_not_connected(self):
+        dashboard = SocialDashboardService(self.user).build_dashboard(allow_auto_refresh=False, allow_ai_refresh=False)
+        youtube = next(platform for platform in dashboard["platforms"] if platform.slug == SocialAnalyticsSnapshot.PLATFORM_YOUTUBE)
+
+        self.assertFalse(youtube.connected)
+        self.assertTrue(youtube.can_connect)
+        self.assertEqual(youtube.connect_url, "/youtube/connect/")
+
+    def test_connected_youtube_contributes_counts_and_followers(self):
+        YouTubeConnection.objects.create(
+            user=self.user,
+            youtube_channel_id="UC123",
+            youtube_channel_title="Creator Channel",
+            subscribers_count=250,
+            video_count=12,
+            view_count=1000,
+            youtube_access_token="token",
+            last_synced_at=timezone.now(),
+        )
+        SocialAnalyticsSnapshot.objects.create(
+            user=self.user,
+            platform=SocialAnalyticsSnapshot.PLATFORM_YOUTUBE,
+            payload={
+                "account": {"channel_id": "UC123", "title": "Creator Channel", "subscriber_count": 250, "video_count": 12, "view_count": 1000},
+                "performance": {"views": 1000},
+                "engagement": {"likes": 10, "comments": 3, "shares": 2, "views": 1000},
+                "demographics": {"audience_gender_age": [], "audience_country": [], "audience_city": []},
+                "media_insights": [],
+                "recent_media": [],
+                "failed_requests": [],
+            },
+        )
+
+        dashboard = SocialDashboardService(self.user).build_dashboard(allow_auto_refresh=False, allow_ai_refresh=False)
+        youtube = next(platform for platform in dashboard["platforms"] if platform.slug == SocialAnalyticsSnapshot.PLATFORM_YOUTUBE)
+
+        self.assertTrue(youtube.connected)
+        self.assertEqual(youtube.connect_url, "/youtube/connect/")
+        self.assertEqual(dashboard["overall"]["connected_platforms_count"], 1)
+        self.assertEqual(dashboard["overall"]["total_followers"], 250)
+
+    @patch.object(YouTubeAnalyticsService, "fetch_and_cache")
+    def test_stale_youtube_refresh_is_triggered(self, mock_fetch_and_cache):
+        connection = YouTubeConnection.objects.create(
+            user=self.user,
+            youtube_channel_id="UC123",
+            youtube_channel_title="Creator Channel",
+            subscribers_count=250,
+            video_count=12,
+            youtube_access_token="token",
+            last_synced_at=timezone.now() - timedelta(hours=25),
+        )
+        payload = YouTubeAnalyticsService(self.user).empty_metrics()
+        payload["account"] = {"channel_id": connection.youtube_channel_id, "title": connection.youtube_channel_title, "subscriber_count": 250, "video_count": 12}
+        mock_fetch_and_cache.return_value = payload
+
+        refreshed = SocialDashboardService(self.user).refresh_stale_platforms()
+
+        self.assertEqual(len(refreshed), 1)
+        self.assertEqual(refreshed[0].slug, SocialAnalyticsSnapshot.PLATFORM_YOUTUBE)
+        mock_fetch_and_cache.assert_called_once()
+
+    @patch.object(InstagramAnalyticsService, "fetch_and_cache")
+    def test_instagram_behavior_remains_connectable_and_refreshable(self, mock_fetch_and_cache):
+        connection = InstagramConnection.objects.create(
+            user=self.user,
+            instagram_user_id="178900000000001",
+            instagram_username="creator",
+            instagram_access_token="token",
+            access_token="token",
+            followers_count=10,
+            media_count=2,
+            last_synced_at=timezone.now() - timedelta(hours=25),
+        )
+        payload = InstagramAnalyticsService(self.user).empty_metrics()
+        payload["account"] = {"id": connection.instagram_user_id, "username": connection.instagram_username, "followers_count": 10, "media_count": 2}
+        mock_fetch_and_cache.return_value = payload
+
+        refreshed = SocialDashboardService(self.user).refresh_stale_platforms()
+
+        self.assertEqual(refreshed[0].slug, SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM)
+        mock_fetch_and_cache.assert_called_once()
 
 
 class SocialDashboardAutoResyncTests(TestCase):

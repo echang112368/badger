@@ -34,6 +34,7 @@ from accounts.models import CustomUser
 from ledger.models import LedgerEntry
 from .services.social_dashboard import SocialDashboardService
 from instagram_connect.models import InstagramConnection
+from youtube_connect.models import YouTubeConnection
 from agent.models import Conversation
 from .services.dashboard import build_creator_dashboard_context
 from .services.ai_profile_feedback import refresh_ai_score_if_stale
@@ -54,6 +55,7 @@ _SOCIAL_REFRESH_JOBS: dict[str, dict] = {}
 _SOCIAL_REFRESH_JOBS_LOCK = threading.Lock()
 _SOCIAL_REFRESH_PLATFORM_LABELS = {
     SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM: "Instagram",
+    SocialAnalyticsSnapshot.PLATFORM_YOUTUBE: "YouTube",
 }
 
 
@@ -80,7 +82,7 @@ def _run_social_refresh_job(job_id: str, user_id: int, platform: str, reanalyze:
     _set_social_refresh_job(
         job_id,
         status="running",
-        step="fetching_instagram",
+        step="fetching_social",
         message=f"Fetching latest {platform_label} profile, audience, and post insights...",
         started_at=timezone.now().isoformat(),
     )
@@ -157,11 +159,16 @@ def _start_social_refresh_job(user, platform: str, reanalyze: bool = False) -> s
 
 
 def _build_loading_social_dashboard(user, platform: str | None = None) -> dict:
-    connection = getattr(user, "instagram_connection", None)
-    if connection is None:
-        connection = InstagramConnection.objects.filter(user=user).first()
+    instagram_connection = getattr(user, "instagram_connection", None)
+    if instagram_connection is None:
+        instagram_connection = InstagramConnection.objects.filter(user=user).first()
+    youtube_connection = getattr(user, "youtube_connection", None)
+    if youtube_connection is None:
+        youtube_connection = YouTubeConnection.objects.filter(user=user).first()
 
-    instagram_connected = bool(connection)
+    instagram_connected = bool(instagram_connection)
+    youtube_connected = bool(youtube_connection)
+    total_followers = (getattr(instagram_connection, "followers_count", 0) or 0) + (getattr(youtube_connection, "subscribers_count", 0) or 0)
     platforms = [
         {
             "slug": SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM,
@@ -170,46 +177,23 @@ def _build_loading_social_dashboard(user, platform: str | None = None) -> dict:
             "can_connect": True,
             "connect_url": "/instagram/connect/",
             "refreshed": False,
-            "last_synced_at": getattr(connection, "last_synced_at", None),
-            "metrics": {
-                "account": {
-                    "username": getattr(connection, "instagram_username", "") or "connected",
-                    "followers_count": getattr(connection, "followers_count", 0) or 0,
-                    "media_count": getattr(connection, "media_count", 0) or 0,
-                }
-            },
+            "last_synced_at": getattr(instagram_connection, "last_synced_at", None),
+            "metrics": {"account": {"username": getattr(instagram_connection, "instagram_username", "") or "connected", "followers_count": getattr(instagram_connection, "followers_count", 0) or 0, "media_count": getattr(instagram_connection, "media_count", 0) or 0}},
         },
         {
-            "slug": "tiktok",
-            "name": "TikTok",
-            "connected": False,
-            "can_connect": False,
-            "connect_url": "#",
-            "refreshed": False,
-            "last_synced_at": None,
-            "metrics": {},
-        },
-        {
-            "slug": "youtube",
+            "slug": SocialAnalyticsSnapshot.PLATFORM_YOUTUBE,
             "name": "YouTube",
-            "connected": False,
-            "can_connect": False,
-            "connect_url": "#",
+            "connected": youtube_connected,
+            "can_connect": True,
+            "connect_url": "/youtube/connect/",
             "refreshed": False,
-            "last_synced_at": None,
-            "metrics": {},
+            "last_synced_at": getattr(youtube_connection, "last_synced_at", None),
+            "metrics": {"account": {"username": getattr(youtube_connection, "youtube_channel_title", "") or "connected", "followers_count": getattr(youtube_connection, "subscribers_count", 0) or 0, "media_count": getattr(youtube_connection, "video_count", 0) or 0}},
         },
+        {"slug": "tiktok", "name": "TikTok", "connected": False, "can_connect": False, "connect_url": "#", "refreshed": False, "last_synced_at": None, "metrics": {}},
     ]
-    return {
-        "overall": {
-            "connected_platforms": 1 if instagram_connected else 0,
-            "total_followers": getattr(connection, "followers_count", 0) or 0,
-            "total_reach": 0,
-            "average_engagement_rate": 0,
-            "top_platform": "Instagram" if instagram_connected else "None",
-        },
-        "platforms": platforms,
-    }
+    top_platform = "Instagram" if instagram_connected else "YouTube" if youtube_connected else "None"
+    return {"overall": {"connected_platforms_count": int(instagram_connected) + int(youtube_connected), "total_followers": total_followers, "total_reach": 0, "average_engagement_rate": 0, "top_platform": top_platform}, "platforms": platforms}
 
 
 def _trigger_ai_refresh(user_id: int) -> None:
@@ -1506,6 +1490,7 @@ def creator_settings(request):
             )
 
     instagram_connection = getattr(request.user, "instagram_connection", None)
+    youtube_connection = getattr(request.user, "youtube_connection", None)
 
     return render(
         request,
@@ -1514,6 +1499,7 @@ def creator_settings(request):
             "creator_meta": creator_meta,
             "creator": request.user,
             "instagram_connection": instagram_connection,
+            "youtube_connection": youtube_connection,
             "gmail_status": get_gmail_connection_status(request.user),
         },
     )
@@ -1607,7 +1593,7 @@ def creator_support(request):
 @login_required
 def creator_social_media(request):
     refresh_platform = request.GET.get("refresh")
-    if refresh_platform and refresh_platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM}:
+    if refresh_platform and refresh_platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM, SocialAnalyticsSnapshot.PLATFORM_YOUTUBE}:
         refresh_platform = None
     force_reanalyze = bool(request.GET.get("reanalyze"))
     service = SocialDashboardService(request.user)
@@ -1659,7 +1645,7 @@ def creator_social_media(request):
 @require_POST
 def creator_social_media_refresh_start(request):
     platform = (request.POST.get("platform") or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM).strip()
-    if platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM}:
+    if platform not in {SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM, SocialAnalyticsSnapshot.PLATFORM_YOUTUBE}:
         return JsonResponse({"error": "Unsupported platform."}, status=400)
 
     reanalyze = request.POST.get("reanalyze") in {"1", "true", "True", "yes", "on"}
