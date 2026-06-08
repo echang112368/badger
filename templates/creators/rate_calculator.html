@@ -1,0 +1,159 @@
+{% extends 'creators/base.html' %}
+{% block title %}Rate Calculator{% endblock %}
+{% block content %}
+<style>
+  .rate-shell { max-width: 1180px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+  .rate-hero { background: linear-gradient(135deg, #111827, #4338ca); color: #fff; border-radius: 24px; padding: 2rem; box-shadow: 0 18px 45px rgba(17,24,39,.18); }
+  .rate-hero p { color: rgba(255,255,255,.82); max-width: 760px; }
+  .rate-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(340px, .9fr); gap: 1.25rem; margin-top: 1.25rem; }
+  .rate-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 20px; padding: 1.25rem; box-shadow: 0 10px 30px rgba(15,23,42,.06); }
+  .rate-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+  .rate-form-grid .full { grid-column: 1 / -1; }
+  .rate-card label { font-weight: 700; color: #374151; font-size: .88rem; margin-bottom: .3rem; }
+  .rate-card input, .rate-card select { width: 100%; border: 1px solid #d1d5db; border-radius: 12px; padding: .72rem .8rem; }
+  .rate-checks { display: grid; gap: .55rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rate-checks label { display: flex; gap: .45rem; align-items: center; font-weight: 600; }
+  .rate-checks input { width: auto; }
+  .rate-submit { border: 0; border-radius: 999px; background: #4f46e5; color: #fff; font-weight: 800; padding: .85rem 1.25rem; width: 100%; margin-top: 1rem; }
+  .rate-submit:hover { background: #4338ca; }
+  .rate-prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+  .price-box { border-radius: 16px; padding: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .price-box strong { display: block; font-size: 1.55rem; color: #111827; }
+  .price-box span { color: #64748b; font-weight: 700; }
+  .breakdown-row { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem 0; border-bottom: 1px solid #eef2f7; }
+  .breakdown-row span:first-child { color: #475569; }
+  .breakdown-row span:last-child { font-weight: 800; color: #0f172a; }
+  .pill-list { display: flex; flex-direction: column; gap: .5rem; padding-left: 0; list-style: none; }
+  .pill-list li { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 12px; padding: .65rem .75rem; }
+  .pill-list.assumptions li { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+  .muted { color: #64748b; }
+  .negotiation { background: #ecfdf5; border: 1px solid #bbf7d0; color: #065f46; border-radius: 14px; padding: .9rem; font-weight: 700; }
+  @media (max-width: 960px) { .rate-grid, .rate-form-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="rate-shell">
+  <section class="rate-hero">
+    <h1 class="mb-2">Creator Rate Calculator</h1>
+    <p class="mb-0">Use Badger's structured RateCalculatorAgent to price campaign deliverables from average views, engagement, audience quality, usage rights, exclusivity, timing, and production complexity. Rates are not standardized; this is a data-backed estimate, not a guaranteed market price.</p>
+  </section>
+
+  <div class="rate-grid">
+    <section class="rate-card">
+      <h2 class="h4 mb-3">Campaign inputs</h2>
+      <form id="rate-form">
+        {% csrf_token %}
+        <div class="rate-form-grid">
+          <div><label>Platform</label><select name="platform" required><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="linkedin">LinkedIn</option><option value="newsletter">Newsletter</option><option value="blog">Blog</option><option value="podcast">Podcast</option></select></div>
+          <div><label>Content format</label><select name="content_format" required><option value="reel">Reel</option><option value="story">Story</option><option value="static post">Static post</option><option value="carousel">Carousel</option><option value="tiktok video">TikTok video</option><option value="short">YouTube Short</option><option value="youtube integration">YouTube integration</option><option value="youtube dedicated video">YouTube dedicated video</option><option value="newsletter feature">Newsletter feature</option><option value="blog post">Blog post</option><option value="podcast mention">Podcast mention</option></select></div>
+          <div><label>Follower count</label><input name="follower_count" type="number" min="0" placeholder="50000"></div>
+          <div><label>Average views</label><input name="average_views" type="number" min="1" required placeholder="35000"></div>
+          <div><label>Engagement rate %</label><input name="engagement_rate" type="number" step="0.1" min="0" max="100" required placeholder="5.5"></div>
+          <div><label>Tier 1 audience %</label><input name="audience_tier1_percentage" type="number" step="1" min="0" max="100" required placeholder="65"></div>
+          <div><label>Average likes</label><input name="average_likes" type="number" min="0"></div>
+          <div><label>Average comments</label><input name="average_comments" type="number" min="0"></div>
+          <div><label>Average saves</label><input name="average_saves" type="number" min="0"></div>
+          <div><label>Average shares</label><input name="average_shares" type="number" min="0"></div>
+          <div><label>Niche/category</label><select name="niche" required><option value="finance">Finance</option><option value="saas/tech">SaaS/tech</option><option value="legal">Legal</option><option value="insurance">Insurance</option><option value="real estate">Real estate</option><option value="health/wellness">Health/wellness</option><option value="beauty/skincare">Beauty/skincare</option><option value="fitness">Fitness</option><option value="fashion">Fashion</option><option value="food">Food</option><option value="travel">Travel</option><option value="lifestyle">Lifestyle</option><option value="entertainment/humor">Entertainment/humor</option></select></div>
+          <div><label>Deliverables</label><input name="number_of_deliverables" type="number" min="1" required value="1"></div>
+          <div><label>Brand type</label><select name="brand_type" required><option value="startup">Startup</option><option value="small business">Small business</option><option value="mid-market">Mid-market</option><option value="enterprise">Enterprise</option></select></div>
+          <div><label>Prior paid brand deals</label><select name="prior_paid_brand_deals" required><option value="0">0</option><option value="1-3">1-3</option><option value="4-10">4-10</option><option value="10+">10+</option></select></div>
+          <div><label>Inbound inquiries/month</label><input name="inbound_brand_inquiries_per_month" type="number" min="0" step="1"></div>
+          <div><label>Production complexity</label><select name="production_complexity" required><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+          <div><label>Deadline urgency</label><select name="deadline_urgency" required><option value="2+ weeks">2+ weeks</option><option value="1 week">1 week</option><option value="3-5 days">3-5 days</option><option value="48 hours">48 hours</option></select></div>
+          <div><label>Usage rights</label><select name="usage_rights_requested" required><option value="organic creator post only">Organic creator post only</option><option value="brand organic reposting">Brand organic reposting</option><option value="paid ad usage 30 days">Paid ad usage for 30 days</option><option value="paid ad usage 90 days">Paid ad usage for 90 days</option><option value="paid ad usage 6 months">Paid ad usage for 6 months</option><option value="paid ad usage 1 year">Paid ad usage for 1 year</option><option value="perpetual paid usage">Perpetual paid usage</option><option value="full content buyout">Full content buyout</option></select></div>
+          <div><label>Whitelisting/Spark Ads duration</label><select name="whitelisting_duration"><option value="none">None</option><option value="30 days">30 days</option><option value="90 days">90 days</option><option value="6 months">6 months</option><option value="1 year">1 year</option><option value="perpetual">Perpetual</option></select></div>
+          <div><label>Exclusivity days</label><input name="exclusivity_duration_days" type="number" min="0" placeholder="30"></div>
+          <div><label>Campaign duration days</label><input name="campaign_duration_days" type="number" min="0"></div>
+          <div class="full rate-checks">
+            <label><input name="whitelisting_requested" type="checkbox"> Whitelisting/Spark Ads requested</label>
+            <label><input name="exclusivity_requested" type="checkbox"> Exclusivity requested</label>
+            <label><input name="raw_footage_requested" type="checkbox"> Raw footage requested</label>
+            <label><input name="cross_platform_usage_requested" type="checkbox"> Cross-platform usage</label>
+            <label><input name="paid_ad_usage_requested" type="checkbox"> Paid ad usage requested</label>
+            <label><input name="perpetual_rights_requested" type="checkbox"> Perpetual rights requested</label>
+          </div>
+        </div>
+        <button class="rate-submit" type="submit">Calculate rate range</button>
+      </form>
+    </section>
+
+    <aside class="rate-card">
+      <h2 class="h4 mb-3">Recommendation</h2>
+      <div class="rate-prices mb-3">
+        <div class="price-box"><span>Floor</span><strong id="floor">$0</strong></div>
+        <div class="price-box"><span>Target</span><strong id="target">$0</strong></div>
+        <div class="price-box"><span>Ceiling</span><strong id="ceiling">$0</strong></div>
+      </div>
+      <p class="muted mb-2">Confidence: <strong id="confidence">—</strong></p>
+      <h3 class="h6">Line-item pricing breakdown</h3><div id="breakdown" class="mb-3"></div>
+      <h3 class="h6">Risk flags</h3><ul id="risk-flags" class="pill-list"><li>No calculation yet.</li></ul>
+      <h3 class="h6 mt-3">Assumptions</h3><ul id="assumptions" class="pill-list assumptions"><li>No calculation yet.</li></ul>
+    </aside>
+  </div>
+
+  <section class="rate-card mt-3">
+    <h2 class="h4">Creator explanation</h2>
+    <p id="explanation" class="muted">Fill in the campaign details to see the math behind your rate.</p>
+    <h3 class="h5">Negotiation message</h3>
+    <p id="anchor" class="negotiation">Your one-sentence brand response will appear here.</p>
+    <h3 class="h5">Suggested package structure</h3>
+    <p id="package" class="muted">Package guidance will appear here.</p>
+    <h3 class="h5">Pushback responses</h3>
+    <ul id="pushbacks" class="muted"></ul>
+  </section>
+</div>
+
+<script>
+  const form = document.getElementById('rate-form');
+  const money = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const fieldNames = ['platform','content_format','follower_count','average_views','engagement_rate','average_likes','average_comments','average_saves','average_shares','audience_tier1_percentage','niche','number_of_deliverables','brand_type','prior_paid_brand_deals','inbound_brand_inquiries_per_month','production_complexity','deadline_urgency','usage_rights_requested','whitelisting_duration','exclusivity_duration_days','campaign_duration_days'];
+  const boolNames = ['whitelisting_requested','exclusivity_requested','raw_footage_requested','cross_platform_usage_requested','paid_ad_usage_requested','perpetual_rights_requested'];
+  const numberNames = new Set(['follower_count','average_views','engagement_rate','average_likes','average_comments','average_saves','average_shares','audience_tier1_percentage','number_of_deliverables','inbound_brand_inquiries_per_month','exclusivity_duration_days','campaign_duration_days']);
+
+  function collectPayload() {
+    const data = {};
+    fieldNames.forEach((name) => {
+      const el = form.elements[name];
+      if (!el) return;
+      data[name] = numberNames.has(name) && el.value !== '' ? Number(el.value) : el.value;
+    });
+    boolNames.forEach((name) => { data[name] = Boolean(form.elements[name]?.checked); });
+    return data;
+  }
+
+  function renderList(id, items, emptyText) {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    (items && items.length ? items : [emptyText]).forEach((item) => {
+      const li = document.createElement('li');
+      li.textContent = item;
+      el.appendChild(li);
+    });
+  }
+
+  function renderResult(data) {
+    document.getElementById('floor').textContent = money(data.rate_recommendation.floor);
+    document.getElementById('target').textContent = money(data.rate_recommendation.target);
+    document.getElementById('ceiling').textContent = money(data.rate_recommendation.ceiling);
+    document.getElementById('confidence').textContent = data.confidence_level || '—';
+    const labels = { base_rate: 'Base content rate', engagement_adjustment: 'Performance adjustment', audience_quality_adjustment: 'Audience quality adjustment', niche_premium: 'Niche premium', production_complexity_fee: 'Production complexity fee', usage_rights_fee: 'Usage rights fee', whitelisting_fee: 'Whitelisting/Spark Ads fee', exclusivity_fee: 'Exclusivity fee', rush_fee: 'Rush fee', bundle_discount: 'Bundle discount', final_target_rate: 'Final target rate' };
+    document.getElementById('breakdown').innerHTML = Object.entries(labels).map(([key, label]) => `<div class="breakdown-row"><span>${label}</span><span>${money(data.line_item_breakdown[key])}</span></div>`).join('');
+    renderList('risk-flags', data.risk_flags, 'No major risk flags.');
+    renderList('assumptions', [...(data.missing_inputs || []).map((m) => `Missing: ${m}`), ...(data.assumptions || [])], 'No assumptions listed.');
+    document.getElementById('explanation').textContent = data.creator_explanation || '';
+    document.getElementById('anchor').textContent = data.brand_negotiation_anchor || 'Add required inputs to generate a negotiation anchor.';
+    document.getElementById('package').textContent = data.package_suggestion || 'Add required inputs to generate a package suggestion.';
+    renderList('pushbacks', data.pushback_responses, 'No pushback responses yet.');
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const response = await fetch('{% url "agent:rate_calculator_calculate" %}', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }, body: JSON.stringify(collectPayload())
+    });
+    const data = await response.json();
+    renderResult(data);
+  });
+</script>
+{% endblock %}
