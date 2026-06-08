@@ -389,6 +389,82 @@ def _maybe_contract_review_command_reply(
     return "OpenAI returned an empty contract review. Please try again with the contract text."
 
 
+RATE_REPORT_SYSTEM_PROMPT = """You are an expert influencer marketing analyst who calculates fair, data-driven sponsorship rates for content creators.
+
+Given a creator's real social media metrics, produce a detailed rate report as a JSON object. Base your analysis on current influencer market rates (2024–2025), platform norms, engagement quality, and audience value.
+
+Return ONLY valid JSON with this exact structure:
+{
+  "rate_recommendation": {"floor": <int>, "target": <int>, "ceiling": <int>},
+  "confidence_level": "<low|medium|high>",
+  "explanation": "<2-4 sentence narrative explaining WHY these rates make sense given the creator's specific metrics. Be specific — reference their actual follower count, engagement rate, average views, etc.>",
+  "line_item_breakdown": {
+    "base_rate": <int>,
+    "engagement_adjustment": <int>,
+    "audience_quality_adjustment": <int>,
+    "niche_premium": <int>,
+    "production_complexity_fee": <int>,
+    "usage_rights_fee": <int>,
+    "whitelisting_fee": <int>,
+    "exclusivity_fee": <int>,
+    "rush_fee": <int>,
+    "bundle_discount": <int>,
+    "final_target_rate": <int>
+  },
+  "risk_flags": ["<string>", ...],
+  "assumptions": ["<string>", ...],
+  "brand_negotiation_anchor": "<one-sentence script the creator can say to a brand when presenting their rate>",
+  "package_suggestion": "<brief suggestion for how to package their offering to maximize deal value>"
+}
+
+Rules:
+- floor ≈ 70% of target, ceiling ≈ 120-130% of target
+- All monetary values are integers in USD
+- line_item_breakdown.final_target_rate must equal target
+- engagement_adjustment can be negative if engagement is low
+- risk_flags should call out data gaps or concerns (e.g. very low engagement, small audience, missing data)
+- assumptions lists anything you assumed due to missing data
+- Be realistic and honest — don't inflate rates"""
+
+
+def generate_rate_report(metrics: dict[str, Any], timeout_seconds: int = 30) -> dict[str, Any]:
+    """Call OpenAI to produce an AI-driven rate report from the creator's real social metrics."""
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        return {"error": "OPENAI_API_KEY not configured."}
+
+    model = os.environ.get(
+        "OPENAI_CREATOR_AGENT_MODEL",
+        getattr(settings, "OPENAI_CREATOR_AGENT_MODEL", DEFAULT_CREATOR_AGENT_MODEL),
+    ).strip() or DEFAULT_CREATOR_AGENT_MODEL
+
+    metrics_text = json.dumps(metrics, indent=2)
+    user_message = f"Here are the creator's real social media metrics collected via OAuth:\n\n{metrics_text}\n\nGenerate a comprehensive rate report."
+
+    body = {
+        "model": model,
+        "input": [{"role": "user", "content": [{"type": "input_text", "text": user_message}]}],
+        "instructions": RATE_REPORT_SYSTEM_PROMPT,
+        "temperature": 0.3,
+    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    try:
+        response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=body, timeout=timeout_seconds)
+        response.raise_for_status()
+        raw_text = _extract_output_text(response.json()) or ""
+        # Strip markdown fences if present
+        cleaned = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        return json.loads(cleaned)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.exception("Rate report OpenAI request failed: %s", exc)
+        return {"error": str(exc)}
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        logger.exception("Rate report JSON parse failed: %s", exc)
+        return {"error": f"Could not parse AI response: {exc}"}
+
+
 def _stream_contract_review_command_reply(
     user, message: str, attachments: list[dict[str, Any]] | None = None, timeout_seconds: int | None = None
 ) -> Generator[str, None, None] | None:
