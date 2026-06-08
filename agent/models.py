@@ -89,6 +89,22 @@ class OutreachDraft(models.Model):
         return f"Outreach draft {self.id} to {self.recipient_email}"
 
 
+class RateReport(models.Model):
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="rate_reports",
+    )
+    report_data = models.JSONField(default=dict)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"RateReport {self.id} for {self.creator_id}"
+
+
 class OutreachThreadSummary(models.Model):
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,

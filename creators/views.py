@@ -245,9 +245,21 @@ def creator_rate_calculator(request):
 @require_GET
 def creator_rate_calculator_report(request):
     """Use OpenAI to generate an AI-driven rate report from the creator's real social analytics."""
+    from datetime import timedelta
     from agent.openai_client import generate_rate_report
+    from agent.models import RateReport
 
     user = request.user
+
+    # Return cached report if generated in the last 24 hours
+    # (avoids score drift on repeated runs when nothing has changed)
+    cutoff = timezone.now() - timedelta(hours=24)
+    cached = RateReport.objects.filter(creator=user, created_at__gte=cutoff).order_by("-created_at").first()
+    if cached and cached.report_data and not request.GET.get("refresh"):
+        result = cached.report_data
+        result["cached"] = True
+        return JsonResponse(result)
+
     meta = CreatorMeta.objects.filter(user=user).first()
 
     # --- Pull all connected social analytics snapshots ---

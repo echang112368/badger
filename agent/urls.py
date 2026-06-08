@@ -12,4 +12,6 @@ urlpatterns = [
     path("chat/", views.chat, name="chat"),
     path("chat/stream/", views.chat_stream, name="chat_stream"),
     path("rate-calculator/calculate/", views.rate_calculator_calculate, name="rate_calculator_calculate"),
+    path("rate-report/save/", views.rate_report_save, name="rate_report_save"),
+    path("rate-report/list/", views.rate_report_list, name="rate_report_list"),
 ]
