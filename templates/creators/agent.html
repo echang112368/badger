@@ -277,6 +277,30 @@
   }
   .msg-ai-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 12px 0; }
 
+  .ag-tool-card {
+    border: 1px solid #dbeafe;
+    background: linear-gradient(135deg, #f8fbff, #eef2ff);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 28px rgba(48,79,145,.08);
+    max-width: 560px;
+  }
+  .ag-tool-card h3 {
+    margin: 0 0 6px;
+    color: #111827;
+    font-size: 16px;
+  }
+  .ag-tool-card p { margin: 0 0 12px; color: #4b5563; }
+  .ag-tool-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ag-tool-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 999px; padding: 8px 12px;
+    background: #304f91; color: #fff; text-decoration: none;
+    font-weight: 700; font-size: 13px;
+  }
+  .ag-tool-btn:hover { color: #fff; background: #263f74; }
+  .ag-tool-note { color: #64748b; font-size: 12px; }
+
   /* Typing indicator */
   .msg-ai.thinking .msg-ai-body { color: #9aa3b3; }
 
@@ -983,6 +1007,7 @@
   const NEW_URL    = '{% url "agent:new_conversation" %}';
   const HIST_URL   = id => `{% url "agent:history" %}?conversation_id=${id}`;
   const STREAM_URL = '{% url "agent:chat_stream" %}';
+  const RATE_CALCULATOR_URL = '{% url "rate_calculator" %}';
   const DEL_URL    = id => `/creators/agent/conversations/${id}/delete/`;
   const OUTREACH_URLS = {
     businessSearch: '{% url "creator_outreach_business_search" %}',
@@ -1670,11 +1695,27 @@
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  function removeBlockedEmbeds(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('script, object, embed').forEach(el => el.remove());
+    template.content.querySelectorAll('iframe').forEach(frame => {
+      const src = frame.getAttribute('src') || '';
+      const link = document.createElement('a');
+      link.href = src || RATE_CALCULATOR_URL;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = src ? `Open linked tool: ${src}` : 'Open linked tool';
+      frame.replaceWith(link);
+    });
+    return template.innerHTML;
+  }
+
   function renderMarkdown(text) {
     if (typeof marked === 'undefined') {
       return esc(text).replace(/\n/g, '<br>');
     }
-    return marked.parse(String(text ?? ''));
+    return removeBlockedEmbeds(marked.parse(String(text ?? '')));
   }
 
   function showThread() {
@@ -1710,6 +1751,31 @@
         <div class="msg-ai-body"></div>
       </div>`;
     block.querySelector('.msg-ai-body').innerHTML = renderMarkdown(content);
+    thread.appendChild(block);
+    thread.scrollTop = thread.scrollHeight;
+    return block;
+  }
+
+  function appendRateCalculatorCard(notes = '') {
+    showThread();
+    const block = document.createElement('div');
+    block.className = 'msg-block';
+    const noteHtml = notes ? `<p class="ag-tool-note"><strong>Your notes:</strong> ${esc(notes)}</p>` : '';
+    block.innerHTML = `
+      <div class="msg-ai">
+        <div class="msg-ai-av">AI</div>
+        <div class="msg-ai-body">
+          <div class="ag-tool-card">
+            <h3><i class="bi bi-calculator"></i> Rate Calculator</h3>
+            <p>Open the structured pricing tool to calculate a floor, target, and ceiling from views, engagement, audience quality, usage rights, exclusivity, rush timing, and deliverables.</p>
+            ${noteHtml}
+            <div class="ag-tool-actions">
+              <a class="ag-tool-btn" href="${RATE_CALCULATOR_URL}" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right"></i> Open Rate Calculator</a>
+              <span class="ag-tool-note">Opens as a normal page, not an iframe, so the browser will not refuse the connection.</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
     thread.appendChild(block);
     thread.scrollTop = thread.scrollHeight;
     return block;
@@ -1873,6 +1939,7 @@
   const SLASH_COMMANDS = [
     { name: 'gmail', description: 'Open outreach email editor', icon: 'bi-envelope' },
     { name: 'contract-review', description: 'Analyze creator contract risks', icon: 'bi-file-earmark-text' },
+    { name: 'rate-calculator', description: 'Open structured creator pricing calculator', icon: 'bi-calculator' },
   ];
 
   const cmdPicker    = document.getElementById('ag-cmd-picker');
@@ -1887,7 +1954,7 @@
     if (!_cmdFiltered.length) { _hideCmdPicker(); return; }
     _cmdActive = Math.max(0, Math.min(_cmdActive, _cmdFiltered.length - 1));
     cmdPicker.innerHTML = _cmdFiltered.map((c, i) => `
-      <div class="ag-cmd-item${i === _cmdActive ? ' active' : ''}" data-idx="${i}">${c.name}</div>`
+      <div class="ag-cmd-item${i === _cmdActive ? ' active' : ''}" data-idx="${i}"><i class="bi ${c.icon}"></i> /${c.name}<small style="display:block;color:#9ca3af;margin-left:24px">${c.description}</small></div>`
     ).join('');
     cmdPicker.style.display = 'block';
     cmdPicker.querySelectorAll('.ag-cmd-item').forEach(el => {
@@ -2016,6 +2083,20 @@
       return;
     }
 
+    /* /rate-calculator command → safe tool launcher card (no iframe) */
+    const lowerContent = content.toLowerCase();
+    if (/^\/(rate-calculator|calculate-rate)(\s|$)/i.test(lowerContent)) {
+      const rest = content.replace(/^\/(rate-calculator|calculate-rate)\b/i, '').trim();
+      input.value = '';
+      input.style.height = '22px';
+      sendBtn.disabled = true;
+      appendUser(content, contractAttachments);
+      appendRateCalculatorCard(rest);
+      if (contractAttachments.length) clearSelectedContractFiles();
+      sendBtn.disabled = !input.value.trim();
+      input.focus();
+      return;
+    }
     if (!activeConvId) {
       try {
         const res  = await fetch(NEW_URL, {
