@@ -1062,6 +1062,8 @@
   const RATE_CALCULATOR_URL      = '{% url "rate_calculator" %}';
   const RATE_CALC_API_URL        = '{% url "agent:rate_calculator_calculate" %}';
   const RATE_CALC_REPORT_URL     = '{% url "creator_rate_calculator_report" %}';
+  const RATE_REPORT_SAVE_URL     = '{% url "agent:rate_report_save" %}';
+  const RATE_REPORT_LIST_URL     = '{% url "agent:rate_report_list" %}';
   const DEL_URL    = id => `/creators/agent/conversations/${id}/delete/`;
   const OUTREACH_URLS = {
     businessSearch: '{% url "creator_outreach_business_search" %}',
@@ -1810,12 +1812,73 @@
     return block;
   }
 
-  async function appendRateCalculatorCard() {
-    showThread();
-    const cid   = 'rc-ic-' + Date.now();
-    const money = v => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v||0);
-    const pct   = v => (v != null ? v + '%' : '—');
+  const RC_BREAKDOWN_LABELS = {base_rate:'Base content rate',engagement_adjustment:'Performance adjustment',audience_quality_adjustment:'Audience quality',niche_premium:'Niche premium',production_complexity_fee:'Production complexity',usage_rights_fee:'Usage rights',whitelisting_fee:'Whitelisting fee',exclusivity_fee:'Exclusivity fee',rush_fee:'Rush fee',bundle_discount:'Bundle discount',final_target_rate:'Final target rate'};
 
+  function _renderRateReportInto(resultsEl, subtitleEl, data) {
+    const money = v => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v||0);
+    const rec   = data.rate_recommendation || {};
+    const inp   = data.inputs_used || {};
+
+    if (subtitleEl) {
+      const base = data.has_social_data
+        ? `Based on your ${inp.platform || 'social'} analytics`
+        : 'Based on estimated defaults — connect social media for precise results';
+      subtitleEl.innerHTML = data.cached
+        ? `${esc(base)} · <a href="#" class="rc-refresh-link" style="color:#4f46e5;font-size:11px">Refresh</a>`
+        : base;
+      const refreshLink = subtitleEl.querySelector('.rc-refresh-link');
+      if (refreshLink) {
+        refreshLink.addEventListener('click', async e => {
+          e.preventDefault();
+          subtitleEl.textContent = 'Recalculating…';
+          resultsEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;color:#94a3b8;font-size:13px;padding:.5rem 0"><div class="ag-status-spinner"></div><span>Fetching fresh analytics…</span></div>`;
+          try {
+            const res2  = await fetch(RATE_CALC_REPORT_URL + '?refresh=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data2 = await res2.json();
+            _renderRateReportInto(resultsEl, subtitleEl, data2);
+            fetch(RATE_REPORT_SAVE_URL, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body:JSON.stringify(data2) }).catch(()=>{});
+            thread.scrollTop = thread.scrollHeight;
+          } catch(_) { subtitleEl.textContent = base; }
+        });
+      }
+    }
+
+    const flagsHtml = (arr, emptyTxt) =>
+      `<ul class="rc-ic-flags">${(arr && arr.length ? arr : [emptyTxt]).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
+    const assumptionsItems = [...(data.missing_inputs||[]).map(m=>'Missing: '+m), ...(data.assumptions||[])];
+
+    resultsEl.innerHTML = `
+      <div class="rc-ic-prices">
+        <div class="rc-ic-price-box"><span>Floor</span><strong>${money(rec.floor)}</strong></div>
+        <div class="rc-ic-price-box"><span>Target</span><strong>${money(rec.target)}</strong></div>
+        <div class="rc-ic-price-box"><span>Ceiling</span><strong>${money(rec.ceiling)}</strong></div>
+      </div>
+      <div class="rc-ic-confidence">Confidence: <strong>${data.confidence_level || '—'}</strong></div>
+      ${data.explanation ? `<div style="background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:.75rem .85rem;margin-bottom:.65rem;font-size:13px;color:#1e3a5f;line-height:1.55">${esc(data.explanation)}</div>` : ''}
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.65rem .75rem;margin-bottom:.65rem;font-size:11px;color:#475569">
+        <strong style="display:block;margin-bottom:.3rem;color:#1e3a5f">Data used for this report</strong>
+        ${inp.platform ? `<span style="margin-right:.75rem">Platform: <strong>${inp.platform}</strong></span>` : ''}
+        ${inp.follower_count ? `<span style="margin-right:.75rem">Followers: <strong>${Number(inp.follower_count).toLocaleString()}</strong></span>` : ''}
+        ${inp.average_views ? `<span style="margin-right:.75rem">Avg views: <strong>${Number(inp.average_views).toLocaleString()}</strong></span>` : ''}
+        ${inp.engagement_rate != null ? `<span style="margin-right:.75rem">Engagement: <strong>${inp.engagement_rate}%</strong></span>` : ''}
+        ${inp.audience_tier1_pct != null ? `<span style="margin-right:.75rem">Tier-1 audience: <strong>${inp.audience_tier1_pct}%</strong></span>` : ''}
+        ${inp.niche ? `<span style="margin-right:.75rem">Niche: <strong>${inp.niche}</strong></span>` : ''}
+        ${inp.prior_paid_deals != null ? `<span>Prior paid deals: <strong>${inp.prior_paid_deals}</strong></span>` : ''}
+      </div>
+      <div class="rc-ic-section-title">Line-item breakdown</div>
+      ${Object.entries(RC_BREAKDOWN_LABELS).map(([k,l])=>`<div class="rc-ic-breakdown-row"><span>${l}</span><span>${money((data.line_item_breakdown||{})[k])}</span></div>`).join('')}
+      <div class="rc-ic-section-title">Risk flags</div>
+      ${flagsHtml(data.risk_flags, 'No major risk flags.')}
+      <div class="rc-ic-section-title">Assumptions</div>
+      <ul class="rc-ic-flags assumptions">${(assumptionsItems.length ? assumptionsItems : ['No assumptions listed.']).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
+      <div class="rc-ic-section-title">Negotiation message</div>
+      <div class="rc-ic-anchor">${esc(data.brand_negotiation_anchor || '—')}</div>
+      <div class="rc-ic-section-title">Suggested package</div>
+      <div style="font-size:12px;color:#374151;margin-top:.2rem">${esc(data.package_suggestion || '—')}</div>`;
+  }
+
+  function _makeRateCardShell() {
+    const cid   = 'rc-ic-' + Date.now();
     const block = document.createElement('div');
     block.className = 'msg-block';
     block.innerHTML = `
@@ -1836,72 +1899,53 @@
           </div>
         </div>
       </div>`;
+    return { block, cid };
+  }
+
+  async function appendRateCalculatorCard() {
+    showThread();
+    const { block, cid } = _makeRateCardShell();
     thread.appendChild(block);
     thread.scrollTop = thread.scrollHeight;
 
-    const card    = block.querySelector(`#${cid}`);
-    const results = card.querySelector(`#${cid}-results`);
+    const card     = block.querySelector(`#${cid}`);
+    const results  = card.querySelector(`#${cid}-results`);
     const subtitle = card.querySelector(`#${cid}-subtitle`);
-    const breakdown_labels = {base_rate:'Base content rate',engagement_adjustment:'Performance adjustment',audience_quality_adjustment:'Audience quality',niche_premium:'Niche premium',production_complexity_fee:'Production complexity',usage_rights_fee:'Usage rights',whitelisting_fee:'Whitelisting fee',exclusivity_fee:'Exclusivity fee',rush_fee:'Rush fee',bundle_discount:'Bundle discount',final_target_rate:'Final target rate'};
 
     try {
       const res  = await fetch(RATE_CALC_REPORT_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const data = await res.json();
-      const rec  = data.rate_recommendation || {};
-      const inp  = data.inputs_used || {};
-
-      subtitle.textContent = data.has_social_data
-        ? `Based on your ${inp.platform || 'social'} analytics`
-        : 'Based on estimated defaults — connect social media for precise results';
-
-      const flagsHtml = (arr, emptyTxt) =>
-        `<ul class="rc-ic-flags">${(arr && arr.length ? arr : [emptyTxt]).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
-      const assumptionsItems = [...(data.missing_inputs||[]).map(m=>'Missing: '+m), ...(data.assumptions||[])];
-
-      results.innerHTML = `
-        <div class="rc-ic-prices">
-          <div class="rc-ic-price-box"><span>Floor</span><strong>${money(rec.floor)}</strong></div>
-          <div class="rc-ic-price-box"><span>Target</span><strong>${money(rec.target)}</strong></div>
-          <div class="rc-ic-price-box"><span>Ceiling</span><strong>${money(rec.ceiling)}</strong></div>
-        </div>
-        <div class="rc-ic-confidence">Confidence: <strong>${data.confidence_level || '—'}</strong></div>
-
-        ${data.explanation ? `<div style="background:#fff;border:1px solid #dbeafe;border-radius:10px;padding:.75rem .85rem;margin-bottom:.65rem;font-size:13px;color:#1e3a5f;line-height:1.55">${esc(data.explanation)}</div>` : ''}
-
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.65rem .75rem;margin-bottom:.65rem;font-size:11px;color:#475569">
-          <strong style="display:block;margin-bottom:.3rem;color:#1e3a5f">Data used for this report</strong>
-          ${inp.platform ? `<span style="margin-right:.75rem">Platform: <strong>${inp.platform}</strong></span>` : ''}
-          ${inp.follower_count ? `<span style="margin-right:.75rem">Followers: <strong>${Number(inp.follower_count).toLocaleString()}</strong></span>` : ''}
-          ${inp.average_views ? `<span style="margin-right:.75rem">Avg views: <strong>${Number(inp.average_views).toLocaleString()}</strong></span>` : ''}
-          ${inp.engagement_rate != null ? `<span style="margin-right:.75rem">Engagement: <strong>${inp.engagement_rate}%</strong></span>` : ''}
-          ${inp.audience_tier1_pct != null ? `<span style="margin-right:.75rem">Tier-1 audience: <strong>${inp.audience_tier1_pct}%</strong></span>` : ''}
-          ${inp.niche ? `<span style="margin-right:.75rem">Niche: <strong>${inp.niche}</strong></span>` : ''}
-          ${inp.prior_paid_deals != null ? `<span>Prior paid deals: <strong>${inp.prior_paid_deals}</strong></span>` : ''}
-        </div>
-
-        <div class="rc-ic-section-title">Line-item breakdown</div>
-        ${Object.entries(breakdown_labels).map(([k,l])=>`<div class="rc-ic-breakdown-row"><span>${l}</span><span>${money((data.line_item_breakdown||{})[k])}</span></div>`).join('')}
-
-        <div class="rc-ic-section-title">Risk flags</div>
-        ${flagsHtml(data.risk_flags, 'No major risk flags.')}
-
-        <div class="rc-ic-section-title">Assumptions</div>
-        <ul class="rc-ic-flags assumptions">${(assumptionsItems.length ? assumptionsItems : ['No assumptions listed.']).map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
-
-        <div class="rc-ic-section-title">Negotiation message</div>
-        <div class="rc-ic-anchor">${esc(data.brand_negotiation_anchor || '—')}</div>
-
-        <div class="rc-ic-section-title">Suggested package</div>
-        <div style="font-size:12px;color:#374151;margin-top:.2rem">${esc(data.package_suggestion || '—')}</div>
-
-`;
-
+      _renderRateReportInto(results, subtitle, data);
+      if (!data.cached) {
+        fetch(RATE_REPORT_SAVE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          body: JSON.stringify(data),
+        }).catch(() => {});
+      }
       thread.scrollTop = thread.scrollHeight;
     } catch(e) {
       results.innerHTML = `<p style="color:#ef4444;font-size:13px">Could not generate rate report. Please try again.</p>`;
     }
 
     return block;
+  }
+
+  async function loadSavedRateReports() {
+    try {
+      const res  = await fetch(RATE_REPORT_LIST_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      (data.reports || []).forEach(r => {
+        appendUser('/calculate-rate', []);
+        const { block, cid } = _makeRateCardShell();
+        thread.appendChild(block);
+        const results  = block.querySelector(`#${cid}-results`);
+        const subtitle = block.querySelector(`#${cid}-subtitle`);
+        _renderRateReportInto(results, subtitle, r.report_data);
+        showThread();
+      });
+      if ((data.reports || []).length) thread.scrollTop = thread.scrollHeight;
+    } catch(_) {}
   }
 
   function appendThinking() {
@@ -2381,6 +2425,7 @@
       } catch (e) { /* silent */ }
     }
     await loadPendingDrafts();
+    await loadSavedRateReports();
   })();
 })();
 </script>

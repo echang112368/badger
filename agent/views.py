@@ -5,7 +5,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Conversation, Message
+from .models import Conversation, Message, RateReport
 from .openai_client import generate_creator_agent_reply, stream_creator_agent_reply
 from .services.rate_calculator import calculate_creator_rate
 
@@ -172,3 +172,24 @@ def rate_calculator_calculate(request):
     result = calculate_creator_rate(payload)
     status = 400 if result.get("invalid_inputs") else 200
     return JsonResponse(result, status=status)
+
+
+@login_required
+@require_POST
+def rate_report_save(request):
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+    report = RateReport.objects.create(creator=request.user, report_data=data)
+    return JsonResponse({"id": report.id})
+
+
+@login_required
+@require_GET
+def rate_report_list(request):
+    from datetime import timedelta
+    from django.utils import timezone
+    cutoff  = timezone.now() - timedelta(days=7)
+    reports = RateReport.objects.filter(creator=request.user, created_at__gte=cutoff).order_by("created_at")[:5]
+    return JsonResponse({"reports": [{"id": r.id, "report_data": r.report_data} for r in reports]})

@@ -445,7 +445,7 @@ def generate_rate_report(metrics: dict[str, Any], timeout_seconds: int = 30) -> 
         "model": model,
         "input": [{"role": "user", "content": [{"type": "input_text", "text": user_message}]}],
         "instructions": RATE_REPORT_SYSTEM_PROMPT,
-        "temperature": 0.3,
+        "temperature": 0,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
@@ -453,7 +453,6 @@ def generate_rate_report(metrics: dict[str, Any], timeout_seconds: int = 30) -> 
         response = requests.post(OPENAI_RESPONSES_URL, headers=headers, json=body, timeout=timeout_seconds)
         response.raise_for_status()
         raw_text = _extract_output_text(response.json()) or ""
-        # Strip markdown fences if present
         cleaned = re.sub(r"^```(?:json)?\s*", "", raw_text.strip(), flags=re.IGNORECASE)
         cleaned = re.sub(r"\s*```$", "", cleaned)
         return json.loads(cleaned)
@@ -582,6 +581,36 @@ def _maybe_outreach_email_reply(user, message: str) -> str | None:
         )
     return output.summary
 
+def _latest_rate_report_summary(user) -> dict | None:
+    """Return a concise summary of the creator's most recent rate report for agent context."""
+    try:
+        from .models import RateReport
+        report = RateReport.objects.filter(creator=user).order_by("-created_at").first()
+        if not report:
+            return None
+        d = report.report_data or {}
+        rec = d.get("rate_recommendation") or {}
+        inp = d.get("inputs_used") or {}
+        return {
+            "generated_at": report.created_at.isoformat(),
+            "floor": rec.get("floor"),
+            "target": rec.get("target"),
+            "ceiling": rec.get("ceiling"),
+            "confidence": d.get("confidence_level"),
+            "explanation": d.get("explanation"),
+            "platform": inp.get("platform"),
+            "followers": inp.get("follower_count"),
+            "avg_views": inp.get("average_views"),
+            "engagement_rate_pct": inp.get("engagement_rate"),
+            "niche": inp.get("niche"),
+            "negotiation_anchor": d.get("brand_negotiation_anchor"),
+            "package_suggestion": d.get("package_suggestion"),
+            "risk_flags": d.get("risk_flags", []),
+        }
+    except Exception:
+        return None
+
+
 def build_creator_agent_input(user, conversation, message: str) -> str:
     dashboard_context = build_creator_dashboard_context(user)
     agent_context = {
@@ -591,10 +620,13 @@ def build_creator_agent_input(user, conversation, message: str) -> str:
         "gmail_connection": _gmail_summary(user),
         "recent_conversation": _recent_history(conversation),
         "current_message": message,
+        "rate_report": _latest_rate_report_summary(user),
     }
     return (
         f"{CREATOR_AGENT_SYSTEM_PROMPT}\n\n"
         "Use this JSON context for the logged-in creator. Do not expose raw JSON unless asked.\n"
+        "If rate_report is present, use it to answer any questions about the creator's recommended rates, "
+        "pricing strategy, or negotiation — reference specific numbers from the report.\n"
         f"{json.dumps(agent_context, default=str, ensure_ascii=False)}"
     )
 
