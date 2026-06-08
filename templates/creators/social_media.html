@@ -220,7 +220,7 @@
         <div>
           <span class="loading-pill mb-2"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Thinking &amp; buffering</span>
           <h2 class="h5 mb-1" style="color:#152647;">Loading your social analytics</h2>
-          <p class="mb-0 text-muted" data-social-refresh-message>We opened the page right away. Instagram insights and AI summaries are filling in now.</p>
+          <p class="mb-0 text-muted" data-social-refresh-message>We opened the page right away. Social insights and AI summaries are filling in now.</p>
         </div>
         <button type="button" class="btn btn-sm btn-outline-primary" data-social-refresh-reload hidden>Show updated dashboard</button>
       </div>
@@ -229,7 +229,7 @@
       </div>
       <div class="d-flex flex-wrap gap-3 mt-3">
         <span class="refresh-step is-active" data-refresh-step="queued"><i class="bi bi-hourglass-split me-1"></i>Preparing</span>
-        <span class="refresh-step" data-refresh-step="fetching_instagram"><i class="bi bi-instagram me-1"></i>Fetching Instagram</span>
+        <span class="refresh-step" data-refresh-step="fetching_social"><i class="bi bi-instagram me-1"></i>Fetching Social</span>
         <span class="refresh-step" data-refresh-step="refreshing_metrics"><i class="bi bi-bar-chart me-1"></i>Building metrics</span>
         <span class="refresh-step" data-refresh-step="complete"><i class="bi bi-check-circle me-1"></i>Ready</span>
       </div>
@@ -312,7 +312,7 @@
               {% else %}
                 <button class="btn btn-outline-secondary" disabled>Coming Soon</button>
               {% endif %}
-            {% elif social_loading and platform.slug == 'instagram' %}
+            {% elif social_loading and platform.connected %}
               <div class="metric-card analyzer-card p-3 p-lg-4 mb-3" aria-busy="true">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                   <div>
@@ -416,7 +416,7 @@
               <div class="text-muted small mt-3">
                 Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Syncing for the first time{% endif %}
               </div>
-            {% elif platform.slug == 'instagram' %}
+            {% elif platform.connected %}
 
               {# ── Profile Analyzer ── #}
               <div class="metric-card analyzer-card p-3 p-lg-4 mb-3">
@@ -685,7 +685,7 @@
     var reloadButton = banner.querySelector('[data-social-refresh-reload]');
     var progressByStep = {
       queued: 25,
-      fetching_instagram: 45,
+      fetching_social: 45,
       refreshing_metrics: 72,
       complete: 100,
       failed: 100

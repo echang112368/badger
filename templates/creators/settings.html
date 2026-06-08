@@ -79,6 +79,60 @@
         {% endif %}
       </div>
 
+      <div class="bg-white shadow-sm rounded-lg p-6" id="youtubeConnectionCard">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">YouTube Connection</h2>
+            <p class="text-sm text-gray-500">Connect your YouTube channel to sync subscriber, audience, and video analytics.</p>
+          </div>
+          {% if youtube_connection %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">Connected</span>
+          {% else %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">Not connected</span>
+          {% endif %}
+        </div>
+
+        <div id="youtubeMessage" class="mt-4 hidden rounded-md border px-3 py-2 text-sm"></div>
+
+        {% if youtube_connection %}
+          <dl class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Channel</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="ytChannel">{{ youtube_connection.youtube_channel_title|default:'-' }}{% if youtube_connection.youtube_channel_handle %} · {{ youtube_connection.youtube_channel_handle }}{% endif %}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Subscribers</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="ytSubscribers">{{ youtube_connection.subscribers_count }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Video Count</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="ytVideoCount">{{ youtube_connection.video_count }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Total Views</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="ytViewCount">{{ youtube_connection.view_count }}</dd>
+            </div>
+            <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
+              <dt class="text-xs uppercase tracking-wide text-gray-500">Last Synced</dt>
+              <dd class="mt-1 text-sm font-medium text-gray-900" id="ytLastSync">{{ youtube_connection.last_synced_at|date:"M d, Y H:i"|default:"Never" }}</dd>
+            </div>
+          </dl>
+
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button type="button" id="youtubeSyncBtn" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-white shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">Sync now</button>
+            <a href="/youtube/connect/" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-sm hover:bg-gray-50">Reconnect YouTube</a>
+            <form method="post" action="{% url 'youtube_disconnect' %}" class="inline-flex">
+              {% csrf_token %}
+              <button type="submit" class="inline-flex items-center rounded-md border border-red-300 bg-white px-4 py-2 text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500">Disconnect YouTube</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="mt-5">
+            <a href="/youtube/connect/" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-white shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">Connect YouTube</a>
+          </div>
+        {% endif %}
+      </div>
+
       <div class="bg-white shadow-sm rounded-lg p-6" id="gmailConnectionCard">
         <div class="flex items-start justify-between gap-3">
           <div>
@@ -207,6 +261,64 @@
   const disconnectResult = new URLSearchParams(window.location.search).get('instagram_disconnect');
   if (disconnectResult === 'success') {
     showInstagramMessage('Instagram was disconnected and synced data was removed.', true);
+  }
+
+
+  const youtubeSyncBtn = document.getElementById('youtubeSyncBtn');
+  const youtubeMessageBox = document.getElementById('youtubeMessage');
+
+  function showYouTubeMessage(message, ok) {
+    if (!youtubeMessageBox) return;
+    youtubeMessageBox.textContent = message;
+    youtubeMessageBox.classList.remove('hidden', 'border-green-200', 'bg-green-50', 'text-green-700', 'border-red-200', 'bg-red-50', 'text-red-700');
+    youtubeMessageBox.classList.add(ok ? 'border-green-200' : 'border-red-200', ok ? 'bg-green-50' : 'bg-red-50', ok ? 'text-green-700' : 'text-red-700');
+  }
+
+  function updateYouTubeStats(data) {
+    const channelEl = document.getElementById('ytChannel');
+    const subscribersEl = document.getElementById('ytSubscribers');
+    const videosEl = document.getElementById('ytVideoCount');
+    const viewsEl = document.getElementById('ytViewCount');
+    const lastSyncEl = document.getElementById('ytLastSync');
+    if (channelEl) channelEl.textContent = [data.youtube_channel_title, data.youtube_channel_handle].filter(Boolean).join(' · ') || '-';
+    if (subscribersEl && data.subscribers_count !== undefined) subscribersEl.textContent = data.subscribers_count;
+    if (videosEl && data.video_count !== undefined) videosEl.textContent = data.video_count;
+    if (viewsEl && data.view_count !== undefined) viewsEl.textContent = data.view_count;
+    if (lastSyncEl && data.last_synced_at) {
+      const timestamp = new Date(data.last_synced_at);
+      lastSyncEl.textContent = Number.isNaN(timestamp.getTime()) ? data.last_synced_at : timestamp.toLocaleString();
+    }
+  }
+
+  const youtubeOauthResult = new URLSearchParams(window.location.search).get('youtube_oauth');
+  if (youtubeOauthResult === 'success') {
+    showYouTubeMessage('YouTube connected successfully.', true);
+  } else if (youtubeOauthResult === 'error') {
+    showYouTubeMessage('YouTube connection failed. Please try again.', false);
+  }
+
+  const youtubeDisconnectResult = new URLSearchParams(window.location.search).get('youtube_disconnect');
+  if (youtubeDisconnectResult === 'success') {
+    showYouTubeMessage('YouTube was disconnected and synced data was removed.', true);
+  }
+
+  if (youtubeSyncBtn) {
+    youtubeSyncBtn.addEventListener('click', async () => {
+      youtubeSyncBtn.disabled = true;
+      youtubeSyncBtn.textContent = 'Syncing...';
+      try {
+        const response = await fetch('/youtube/sync/', { method: 'GET', headers: { 'Accept': 'application/json' } });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.message || 'Failed to sync YouTube metrics.');
+        updateYouTubeStats(payload);
+        showYouTubeMessage('YouTube metrics were synced successfully.', true);
+      } catch (error) {
+        showYouTubeMessage(error.message || 'Unable to sync YouTube metrics right now.', false);
+      } finally {
+        youtubeSyncBtn.disabled = false;
+        youtubeSyncBtn.textContent = 'Sync now';
+      }
+    });
   }
 
   if (syncBtn) {

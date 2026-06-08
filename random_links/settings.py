@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'instagram_connect',
+    'youtube_connect',
 
 ]
 
@@ -269,6 +270,21 @@ META_OAUTH_SCOPES = [
 ]
 META_ENABLE_FB_LOGIN = os.environ.get("META_ENABLE_FB_LOGIN", "true").strip().lower() != "false"
 META_FORCE_REAUTH = os.environ.get("META_FORCE_REAUTH", "false").strip().lower() == "true"
+
+YOUTUBE_CLIENT_ID = os.environ.get("YOUTUBE_CLIENT_ID", "")
+YOUTUBE_CLIENT_SECRET = os.environ.get("YOUTUBE_CLIENT_SECRET", "")
+YOUTUBE_REDIRECT_URI = os.environ.get("YOUTUBE_REDIRECT_URI", "")
+YOUTUBE_OAUTH_SCOPES = [
+    scope.strip()
+    for scope in os.environ.get(
+        "YOUTUBE_OAUTH_SCOPES",
+        (
+            "https://www.googleapis.com/auth/youtube.readonly,"
+            "https://www.googleapis.com/auth/yt-analytics.readonly"
+        ),
+    ).split(",")
+    if scope.strip()
+]
 
 
 TEMPLATES = [
