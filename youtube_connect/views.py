@@ -78,7 +78,8 @@ def _normalise_sync_error_message(error: YouTubeAPIError) -> str:
 def connect_youtube(request):
     state = generate_oauth_state()
     request.session["youtube_oauth_state"] = state
-    return redirect(build_oauth_url(state))
+    already_connected = YouTubeConnection.objects.filter(user=request.user).exists()
+    return redirect(build_oauth_url(state, force_account_picker=already_connected))
 
 
 @login_required

@@ -59,7 +59,7 @@ def resolve_youtube_oauth_scopes() -> str:
     return " ".join(deduped)
 
 
-def build_oauth_url(state: str) -> str:
+def build_oauth_url(state: str, force_account_picker: bool = False) -> str:
     params = {
         "client_id": settings.YOUTUBE_CLIENT_ID,
         "redirect_uri": settings.YOUTUBE_REDIRECT_URI,
@@ -68,6 +68,7 @@ def build_oauth_url(state: str) -> str:
         "scope": resolve_youtube_oauth_scopes(),
         "access_type": "offline",
         "include_granted_scopes": "true",
+        "prompt": "select_account consent" if force_account_picker else "consent",
     }
     return f"{get_oauth_url_base()}?{urlencode(params)}"
 

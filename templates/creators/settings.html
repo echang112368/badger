@@ -163,7 +163,7 @@
             {% if gmail_status.expires_at %}
               <div class="rounded-md border border-gray-100 bg-gray-50 p-3">
                 <dt class="text-xs uppercase tracking-wide text-gray-500">Access expires</dt>
-                <dd class="mt-1 text-sm font-medium text-gray-900">{{ gmail_status.expires_at }}</dd>
+                <dd class="mt-1 text-sm font-medium text-gray-900" id="gmailExpiresAt" data-iso="{{ gmail_status.expires_at }}">{{ gmail_status.expires_at }}</dd>
               </div>
             {% endif %}
           </dl>
@@ -347,5 +347,22 @@
       }
     });
   }
+
+  (function () {
+    const el = document.getElementById('gmailExpiresAt');
+    if (!el) return;
+    const iso = el.dataset.iso;
+    if (!iso) return;
+    try {
+      const d = new Date(iso);
+      if (isNaN(d)) return;
+      const now = new Date();
+      const expired = d < now;
+      el.textContent = d.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      }) + (expired ? ' (expired — will refresh automatically)' : '');
+    } catch (_) {}
+  })();
 </script>
 {% endblock %}
