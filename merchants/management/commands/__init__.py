@@ -1,0 +1,1 @@
+"""Merchants management commands."""

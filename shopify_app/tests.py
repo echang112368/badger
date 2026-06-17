@@ -11,6 +11,7 @@ import jwt
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from django.contrib.messages import get_messages
+from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -564,6 +565,153 @@ class ShopifyTokenManagementTests(TestCase):
         meta.refresh_from_db()
         self.assertEqual(meta.shopify_access_token, "")
         self.assertEqual(meta.shopify_refresh_token, "")
+
+
+@override_settings(SHOPIFY_UNINSTALL_GRACE_DAYS=30)
+class ShopifyUninstallLifecycleTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            username="merchant_lifecycle",
+            password="pass12345",
+            email="merchant_lifecycle@example.com",
+            is_merchant=True,
+        )
+        self.meta = self.user.merchantmeta
+        self.meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        self.meta.shopify_store_domain = "example.myshopify.com"
+        self.meta.shopify_access_token = "token"
+        self.meta.shopify_refresh_token = "refresh"
+        self.meta.shopify_billing_status = "ACTIVE"
+        self.meta.shopify_billing_plan = MerchantMeta.BillingPlan.BADGER_CREATOR
+        self.meta.save(
+            update_fields=[
+                "business_type",
+                "shopify_store_domain",
+                "shopify_access_token",
+                "shopify_refresh_token",
+                "shopify_billing_status",
+                "shopify_billing_plan",
+            ]
+        )
+
+    @patch("shopify_app.uninstall.views.is_valid_shopify_webhook", return_value=True)
+    def test_uninstall_webhook_keeps_account_active_during_grace_period(self, _mock_signature):
+        response = self.client.post(
+            reverse("shopify_webhooks_app_uninstalled"),
+            data='{"myshopify_domain": "example.myshopify.com"}',
+            content_type="application/json",
+            HTTP_X_SHOPIFY_SHOP_DOMAIN="example.myshopify.com",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.meta.refresh_from_db()
+        self.user.refresh_from_db()
+
+        self.assertIsNotNone(self.meta.shopify_uninstalled_at)
+        self.assertEqual(self.meta.shopify_billing_status, "CANCELLED")
+        self.assertEqual(self.meta.shopify_access_token, "")
+        self.assertEqual(self.meta.shopify_refresh_token, "")
+        self.assertTrue(self.user.is_active)
+
+    def test_expired_grace_releases_shop_association_and_deactivates_account(self):
+        self.meta.cancel_shopify_account(
+            canceled_at=timezone.now() - timezone.timedelta(days=31)
+        )
+
+        self.assertTrue(self.meta.process_shopify_uninstall_grace_expiration())
+
+        self.meta.refresh_from_db()
+        self.user.refresh_from_db()
+        self.assertEqual(self.meta.shopify_store_domain, "")
+        self.assertEqual(self.meta.shopify_oauth_authorization_line, "")
+        self.assertFalse(self.user.is_active)
+        self.assertFalse(self.user.is_merchant)
+
+    def test_management_command_releases_expired_uninstalls(self):
+        self.meta.cancel_shopify_account(
+            canceled_at=timezone.now() - timezone.timedelta(days=31)
+        )
+
+        call_command("process_shopify_uninstall_grace")
+
+        self.meta.refresh_from_db()
+        self.assertEqual(self.meta.shopify_store_domain, "")
+
+
+@override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key", SHOPIFY_UNINSTALL_GRACE_DAYS=30)
+class ShopifyReinstallAfterGraceTests(TestCase):
+    def setUp(self):
+        self.shop_domain = "example.myshopify.com"
+        self.url = reverse("shopify_oauth_callback")
+
+    @patch("shopify_app.oauth.exchange_code_for_token")
+    @patch("shopify_app.oauth.validate_shopify_hmac", return_value=True)
+    @patch("shopify_app.views._attempt_script_tag_injection", return_value=None)
+    @patch("shopify_app.views._attempt_shopify_webhook_registration", return_value=False)
+    def test_new_account_can_claim_store_after_old_account_grace_expired(
+        self, _mock_webhooks, _mock_scripts, _mock_hmac, mock_exchange
+    ):
+        old_user = CustomUser.objects.create_user(
+            username="old_merchant",
+            email="old@example.com",
+            password="pass12345",
+            is_merchant=True,
+        )
+        old_meta = old_user.merchantmeta
+        old_meta.business_type = MerchantMeta.BusinessType.SHOPIFY
+        old_meta.shopify_store_domain = self.shop_domain
+        old_meta.shopify_access_token = "old_token"
+        old_meta.shopify_refresh_token = "old_refresh"
+        old_meta.save(
+            update_fields=[
+                "business_type",
+                "shopify_store_domain",
+                "shopify_access_token",
+                "shopify_refresh_token",
+            ]
+        )
+        old_meta.cancel_shopify_account(
+            canceled_at=timezone.now() - timezone.timedelta(days=31)
+        )
+
+        new_user = CustomUser.objects.create_user(
+            username="new_merchant",
+            email="new@example.com",
+            password="pass12345",
+        )
+        new_meta, _ = MerchantMeta.objects.get_or_create(user=new_user)
+        new_meta.business_type = MerchantMeta.BusinessType.INDEPENDENT
+        new_meta.save(update_fields=["business_type"])
+        self.client.force_login(new_user)
+
+        mock_exchange.return_value = AccessTokenResponse(
+            access_token="new_offline_token",
+            scope="read_products",
+            associated_user_scope="",
+            refresh_token="new_refresh_token",
+            raw={},
+        )
+
+        session = self.client.session
+        session[STATE_SESSION_KEY] = "abc"
+        session.save()
+
+        response = self.client.get(
+            self.url,
+            {"shop": self.shop_domain, "code": "abc", "state": "abc", "hmac": "1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        old_meta.refresh_from_db()
+        new_meta.refresh_from_db()
+        old_user.refresh_from_db()
+
+        self.assertEqual(old_meta.shopify_store_domain, "")
+        self.assertFalse(old_user.is_active)
+        self.assertEqual(new_meta.shopify_store_domain, self.shop_domain)
+        self.assertEqual(new_meta.shopify_access_token, "new_offline_token")
+        self.assertEqual(new_meta.business_type, MerchantMeta.BusinessType.SHOPIFY)
 
 @override_settings(SHOPIFY_API_SECRET="shh", SHOPIFY_API_KEY="key")
 class ShopifyOAuthAuthorizeTests(TestCase):
