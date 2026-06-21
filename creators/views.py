@@ -1254,6 +1254,8 @@ def _refresh_shopify_assets(items):
 
 @login_required
 def creator_affiliate_companies(request):
+    from datetime import datetime, timezone as dt_tz
+
     links = list(
         MerchantCreatorLink.objects.filter(creator=request.user)
         .select_related("merchant__merchantmeta", "merchant__creator_preferences")
@@ -1300,6 +1302,12 @@ def creator_affiliate_companies(request):
             active_rows.append(row)
         else:
             archived_rows.append(row)
+
+    epoch = datetime(1970, 1, 1, tzinfo=dt_tz.utc)
+    row_activity = lambda row: row["timestamp"] or epoch
+    requests_rows.sort(key=row_activity, reverse=True)
+    active_rows.sort(key=row_activity, reverse=True)
+    archived_rows.sort(key=row_activity, reverse=True)
 
     return render(
         request,

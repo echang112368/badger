@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("creators", "0005_creatormeta_partnership_fields"),
+        ("links", "0001_initial"),
     ]
 
     operations = [

@@ -527,7 +527,6 @@ class InstagramAnalyticsService:
             + int(engagement.get("shares") or 0)
         )
 
-        engagement_rate = round((total_engagement / followers) * 100, 2) if followers > 0 else 0
         reach_ratio = round((reach / followers), 2) if followers > 0 else 0
 
         media_insights = payload.get("media_insights") or []
@@ -537,6 +536,7 @@ class InstagramAnalyticsService:
             audience=normalized_audience,
             target_filters=None,
         )
+        engagement_rate = round((creator_metrics.get("average_engagement_rate") or 0) * 100, 4)
         content_performance = creator_metrics.get("posts") or rated_posts
         if not content_performance and isinstance(payload.get("content_performance"), list):
             content_performance = [
@@ -1111,10 +1111,10 @@ class YouTubeAnalyticsService:
         comments = int(engagement.get("comments") or performance.get("comments") or 0)
         shares = int(engagement.get("shares") or performance.get("shares") or 0)
         total_engagement = likes + comments + shares
-        engagement_rate = round((total_engagement / followers) * 100, 2) if followers > 0 else 0
         reach_ratio = round((reach / followers), 2) if followers > 0 else 0
         content_performance = self._build_content_performance_rows(payload.get("media_insights") or [])
         summary_metrics = calculate_creator_metrics(content_performance, followers_count=followers, audience=demographics, target_filters=None)
+        engagement_rate = round((summary_metrics.get("average_engagement_rate") or 0) * 100, 4)
         if not content_performance and isinstance(payload.get("content_performance"), list):
             content_performance = [row for row in payload.get("content_performance", []) if isinstance(row, dict)]
         recommendation_labels = build_labels(summary_metrics, demographics, followers, missing_metrics)

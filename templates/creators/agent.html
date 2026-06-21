@@ -1,4 +1,5 @@
 {% extends 'creators/base.html' %}
+{% load static %}
 {% block title %}Agent{% endblock %}
 {% block content_class %}{% endblock %}
 {% block content %}
@@ -144,29 +145,45 @@
     padding: 40px 20px 0;
     text-align: center;
   }
+  #ag-welcome-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    object-fit: cover;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  }
   #ag-welcome h2 {
-    font-size: 26px;
-    font-weight: 700;
+    font-size: 28px;
+    font-weight: 800;
     color: #111;
+    margin: 0 0 10px;
+    letter-spacing: -.3px;
+  }
+  #ag-welcome-sub {
+    font-size: 14.5px;
+    color: #6b7280;
     margin: 0 0 32px;
+    max-width: 480px;
+    line-height: 1.55;
   }
 
-  /* Suggestion chips row */
+  /* Suggestion chips grid */
   .ag-suggestions {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    justify-content: center;
-    max-width: 560px;
+    max-width: 520px;
+    width: 100%;
     margin-bottom: 32px;
   }
   .ag-chip {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    padding: 10px 16px;
+    border-radius: 14px;
+    padding: 13px 16px;
     background: #fff;
     font-size: 13.5px;
     font-weight: 500;
@@ -175,13 +192,21 @@
     transition: background .12s, border-color .12s, box-shadow .12s;
     font-family: inherit;
     box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    text-align: left;
   }
   .ag-chip:hover {
     background: #f9fafb;
     border-color: #d1d5db;
     box-shadow: 0 2px 8px rgba(0,0,0,.09);
   }
-  .ag-chip i { font-size: 15px; color: #304f91; }
+  .ag-chip i { font-size: 16px; color: #304f91; flex-shrink: 0; }
+  .ag-chip-last {
+    grid-column: 1 / -1;
+    justify-content: center;
+    max-width: 260px;
+    margin: 0 auto;
+    width: 100%;
+  }
 
   /* ── Thread ── */
   #ag-thread {
@@ -846,7 +871,9 @@
 
     <!-- Welcome state -->
     <div id="ag-welcome">
+      <img id="ag-welcome-logo" src="{% static 'img/justbadger-logo.png' %}" alt="Badger">
       <h2>What's on the agenda today?</h2>
+      <p id="ag-welcome-sub">Your always-on manager — it pitches brands, negotiates rates, replies to partnerships, and plans your content.</p>
       <div class="ag-suggestions">
         <button class="ag-chip" data-prompt="Summarize my creator profile and give me the three highest-impact next steps to grow my partnerships.">
           <i class="bi bi-lightning-charge-fill"></i> Summarize my next steps
@@ -858,10 +885,10 @@
           <i class="bi bi-lightbulb"></i> Suggest content ideas
         </button>
         <button class="ag-chip" data-prompt="Help me write a professional reply to a pending partnership request.">
-          <i class="bi bi-reply"></i> Reply to partnerships
+          <i class="bi bi-reply-fill"></i> Reply to partnerships
         </button>
-        <button class="ag-chip" data-prompt="What metrics should I focus on to increase my affiliate earnings as a creator?">
-          <i class="bi bi-bar-chart-line"></i> Improve my metrics
+        <button class="ag-chip ag-chip-last" data-prompt="/calculate-rate">
+          <i class="bi bi-calculator"></i> Calculate my rate
         </button>
       </div>
     </div>
@@ -1022,7 +1049,7 @@
           <button id="ag-send" disabled><i class="bi bi-send-fill"></i></button>
         </div>
         <div id="ag-attachment-list"></div>
-        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type / for commands · Attach files or images with the paperclip</div>
+        <div class="ag-composer-hint">Badger Agent · Press Enter to send · Type / for commands · Attach files with the paperclip</div>
       </div>
     </div>
   </div>
@@ -2099,6 +2126,7 @@
       input.value = btn.dataset.prompt;
       input.dispatchEvent(new Event('input'));
       input.focus();
+      send();
     });
   });
 

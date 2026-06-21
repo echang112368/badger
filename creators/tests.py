@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
@@ -11,7 +12,7 @@ from django.utils import timezone
 from accounts.models import CustomUser
 from instagram_connect.models import InstagramConnection
 from youtube_connect.models import YouTubeConnection
-from .models import CreatorMeta, GmailOAuthCredential, SocialAnalyticsSnapshot
+from .models import CreatorMeta, GmailOAuthCredential, PartnerMessage, SocialAnalyticsSnapshot
 from ledger.models import LedgerEntry
 from collect.models import ReferralVisit, ReferralConversion
 from links.models import (
@@ -161,6 +162,63 @@ class CreatorRequestTests(TestCase):
         self.assertFalse(
             MerchantCreatorLink.objects.filter(id=link.id).exists()
         )
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"])
+class PartnershipMessagingTests(TestCase):
+    def setUp(self):
+        self.creator = CustomUser.objects.create_user(
+            username="creator_msg",
+            password="pass",
+            email="creator_msg@example.com",
+            is_creator=True,
+        )
+        self.merchant = CustomUser.objects.create_user(
+            username="merchant_msg",
+            password="pass",
+            email="merchant_msg@example.com",
+            is_merchant=True,
+        )
+        self.link = MerchantCreatorLink.objects.create(
+            merchant=self.merchant,
+            creator=self.creator,
+            status=STATUS_ACTIVE,
+        )
+
+    def test_business_message_is_visible_to_creator(self):
+        self.client.force_login(self.merchant)
+        response = self.client.post(
+            reverse("merchant_partner_messages", args=[self.link.id]),
+            data=json.dumps({"content": "Hello from business"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PartnerMessage.objects.count(), 1)
+
+        self.client.force_login(self.creator)
+        response = self.client.get(reverse("creator_partner_messages", args=[self.link.id]))
+        self.assertEqual(response.status_code, 200)
+        messages = response.json()["messages"]
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["content"], "Hello from business")
+        self.assertEqual(messages[0]["sender_id"], self.merchant.id)
+
+    def test_creator_message_is_visible_to_business(self):
+        self.client.force_login(self.creator)
+        response = self.client.post(
+            reverse("creator_partner_messages", args=[self.link.id]),
+            data={"content": "Hello from creator"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PartnerMessage.objects.count(), 1)
+
+        self.client.force_login(self.merchant)
+        response = self.client.get(reverse("merchant_partner_messages", args=[self.link.id]))
+        self.assertEqual(response.status_code, 200)
+        messages = response.json()["messages"]
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0]["content"], "Hello from creator")
+        self.assertEqual(messages[0]["sender_id"], self.creator.id)
 
 
 class CreatorAffiliateCompaniesViewTests(TestCase):

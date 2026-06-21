@@ -1313,9 +1313,13 @@ def merchant_requests(request):
             archived_rows.append(row)
 
     _epoch = datetime(1970, 1, 1, tzinfo=dt_tz.utc)
+    row_activity = lambda row: row['timestamp'] or _epoch
+    pending_rows.sort(key=row_activity, reverse=True)
+    active_rows.sort(key=row_activity, reverse=True)
+    archived_rows.sort(key=row_activity, reverse=True)
     all_rows = sorted(
         active_rows + pending_rows,
-        key=lambda r: r['timestamp'] or _epoch,
+        key=row_activity,
         reverse=True,
     )
 

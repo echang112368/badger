@@ -390,10 +390,12 @@
 (function() {
   const ME   = JSON.parse(document.getElementById('me-id').textContent);
   const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
-  const MSGS_URL = id => `/merchants/partnerships/messages/${id}/`;
-  const ACT_URL  = id => `/merchants/requests/${id}/update/`;
+  const MSGS_BASE = '{% url "merchant_partner_messages" 0 %}';
+  const ACT_BASE  = '{% url "merchant_update_request" 0 %}';
+  const MSGS_URL = id => MSGS_BASE.replace('/0/', `/${id}/`);
+  const ACT_URL  = id => ACT_BASE.replace('/0/', `/${id}/`);
 
-  let activeRow = null, pollTimer = null;
+  let activeRow = null, pollTimer = null, lastThreadSignature = '';
   let currentCreatorHasReplied = true, currentCreatorName = '';
 
   function fmt(iso) {
@@ -416,6 +418,43 @@
     const t = document.getElementById('dm-toast');
     t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 4000);
+  }
+  function moveRowToTop(row) {
+    const panel = row?.closest('.dm-tab-panel');
+    if (!panel) return;
+    const firstRow = panel.querySelector('.dm-row');
+    if (firstRow && firstRow !== row) panel.insertBefore(row, firstRow);
+  }
+  function updateRowActivity(row, content, iso) {
+    if (!row) return;
+    const preview = row.querySelector('.dm-row-preview');
+    if (preview) preview.textContent = content.slice(0, 60);
+    const meta = row.querySelector('.dm-row-meta');
+    if (meta) {
+      let time = meta.querySelector('.dm-row-time');
+      if (!time) {
+        time = document.createElement('span');
+        time.className = 'dm-row-time';
+        meta.insertBefore(time, meta.firstChild);
+      }
+      time.textContent = fmt(iso);
+    }
+    moveRowToTop(row);
+  }
+  function updateThreadFromMessages(linkId, msgs, d) {
+    const signature = msgs.map(m => `${m.id}:${m.created_at}`).join('|');
+    if (signature === lastThreadSignature) return;
+    lastThreadSignature = signature;
+
+    const thr = document.getElementById('dm-thread');
+    if (thr) {
+      thr.innerHTML = msgs.length ? buildThread(msgs, d) : '<div class="thread-empty">No messages yet</div>';
+      thr.scrollTop = thr.scrollHeight;
+    }
+
+    const lastMsg = msgs.at(-1);
+    const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
+    if (lastMsg && row) updateRowActivity(row, lastMsg.content || '', lastMsg.created_at);
   }
 
   // ── Tabs ──────────────────────────────────────────────────
@@ -453,6 +492,7 @@
     document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
     row.classList.add('active');
     activeRow = row;
+    lastThreadSignature = '';
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
     // Clear unread badge on this row (messages will be marked read server-side via GET)
@@ -475,7 +515,12 @@
       const data = await res.json();
       creatorHasReplied = data.creator_has_replied !== false;
       const msgs = data.messages || [];
-      if (msgs.length) msgHtml = buildThread(msgs, d);
+      if (msgs.length) {
+        msgHtml = buildThread(msgs, d);
+        lastThreadSignature = msgs.map(m => `${m.id}:${m.created_at}`).join('|');
+        const lastMsg = msgs.at(-1);
+        if (lastMsg) updateRowActivity(row, lastMsg.content || '', lastMsg.created_at);
+      }
     } catch(e) { console.error(e); }
 
     currentCreatorHasReplied = creatorHasReplied;
@@ -553,8 +598,8 @@
         inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
       });
     }
-    if (!creatorHasReplied && !isArc) {
-      pollTimer = setInterval(() => poll(d.linkId), 30000);
+    if (!isArc) {
+      pollTimer = setInterval(() => poll(d.linkId), 5000);
     }
   }
 
@@ -624,9 +669,10 @@
             <div class="cluster-meta mine">You · ${fmt(data.message.created_at)}</div>`;
           thr.appendChild(cl);
           thr.scrollTop = thr.scrollHeight;
+          lastThreadSignature = '';
         }
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
-        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0, 60);
+        updateRowActivity(row, content, data.message.created_at);
       } else if (res.status === 403) {
         showToast(data.error || 'Waiting for creator reply first.');
         inp.value = content;
@@ -637,12 +683,14 @@
 
   // ── Poll ───────────────────────────────────────────────────
   async function poll(linkId) {
-    if (currentCreatorHasReplied) { clearInterval(pollTimer); pollTimer = null; return; }
+    if (!activeRow || activeRow.dataset.linkId !== String(linkId)) return;
     try {
       const res  = await fetch(MSGS_URL(linkId));
       const data = await res.json();
+      const msgs = data.messages || [];
+      updateThreadFromMessages(linkId, msgs, activeRow.dataset);
       if (data.creator_has_replied) {
-        clearInterval(pollTimer); pollTimer = null;
+        if (currentCreatorHasReplied) return;
         currentCreatorHasReplied = true;
         const inp = document.getElementById('dm-input');
         const btn = document.getElementById('dm-send');
@@ -665,16 +713,12 @@
           btn.addEventListener('click', () => send(linkId));
         }
         document.getElementById('dm-waiting-notice')?.remove();
-        const msgs = data.messages || [];
-        if (msgs.length) {
-          const thr = document.getElementById('dm-thread');
-          if (thr) {
-            thr.innerHTML = buildThread(msgs, activeRow ? activeRow.dataset : null);
-            thr.scrollTop = thr.scrollHeight;
-          }
-        }
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
-        if (row) row.dataset.creatorHasReplied = 'true';
+        if (row) {
+          row.dataset.creatorHasReplied = 'true';
+          const lastMsg = msgs.at(-1);
+          if (lastMsg) updateRowActivity(row, lastMsg.content || '', lastMsg.created_at);
+        }
         showToast(`${currentCreatorName} replied — you can now continue the conversation`);
       }
     } catch(e) { console.error(e); }

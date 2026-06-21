@@ -418,10 +418,12 @@
 (function() {
   const ME   = JSON.parse(document.getElementById('me-id').textContent);
   const CSRF = document.cookie.split(';').map(c=>c.trim().split('=')).find(([k])=>k==='csrftoken')?.[1]||'';
-  const MSGS_URL = id => `/creators/affiliate-companies/messages/${id}/`;
-  const ACT_URL  = id => `/creators/respond-request/${id}/`;
+  const MSGS_BASE = '{% url "creator_partner_messages" 0 %}';
+  const ACT_BASE  = '{% url "respond_request" 0 %}';
+  const MSGS_URL = id => MSGS_BASE.replace('/0/', `/${id}/`);
+  const ACT_URL  = id => ACT_BASE.replace('/0/', `/${id}/`);
 
-  let activeRow = null;
+  let activeRow = null, pollTimer = null, lastThreadSignature = '';
 
   function fmt(iso) {
     if (!iso) return '';
@@ -433,6 +435,50 @@
   }
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function moveRowToTop(row) {
+    const panel = row?.closest('.dm-tab-panel');
+    if (!panel) return;
+    const firstRow = panel.querySelector('.dm-row');
+    if (firstRow && firstRow !== row) panel.insertBefore(row, firstRow);
+  }
+  function updateRowActivity(row, content, iso) {
+    if (!row) return;
+    const preview = row.querySelector('.dm-row-preview');
+    if (preview) preview.textContent = content.slice(0, 60);
+    const meta = row.querySelector('.dm-row-meta');
+    if (meta) {
+      let time = meta.querySelector('.dm-row-time');
+      if (!time) {
+        time = document.createElement('span');
+        time.className = 'dm-row-time';
+        meta.insertBefore(time, meta.firstChild);
+      }
+      time.textContent = fmt(iso);
+    }
+    moveRowToTop(row);
+  }
+  function updateThreadFromMessages(linkId, msgs, d) {
+    const signature = msgs.map(m => `${m.id}:${m.created_at}`).join('|');
+    if (signature === lastThreadSignature) return;
+    lastThreadSignature = signature;
+
+    const thr = document.getElementById('dm-thread');
+    if (thr) {
+      thr.innerHTML = msgs.length ? buildThread(msgs, d) : '<div class="thread-empty">No messages yet</div>';
+      thr.scrollTop = thr.scrollHeight;
+    }
+
+    const lastMsg = msgs.at(-1);
+    const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
+    if (lastMsg && row) updateRowActivity(row, lastMsg.content || '', lastMsg.created_at);
+  }
+  async function refreshConvo(linkId, d) {
+    try {
+      const res = await fetch(MSGS_URL(linkId));
+      const data = await res.json();
+      updateThreadFromMessages(linkId, data.messages || [], d);
+    } catch(e) { console.error(e); }
   }
 
   // ── Tabs ──────────────────────────────────────────────────
@@ -474,6 +520,8 @@
     document.querySelectorAll('.dm-row').forEach(r => r.classList.remove('active'));
     row.classList.add('active');
     activeRow = row;
+    lastThreadSignature = '';
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
     const d = row.dataset;
     const isReq = d.status === 'requested';
@@ -486,7 +534,12 @@
       const data = await res.json();
       creatorHasReplied = data.creator_has_replied !== false;
       const msgs = data.messages || [];
-      if (msgs.length) msgHtml = buildThread(msgs, d);
+      if (msgs.length) {
+        msgHtml = buildThread(msgs, d);
+        lastThreadSignature = msgs.map(m => `${m.id}:${m.created_at}`).join('|');
+        const lastMsg = msgs.at(-1);
+        if (lastMsg) updateRowActivity(row, lastMsg.content || '', lastMsg.created_at);
+      }
     } catch(e) { console.error(e); }
 
     const statusMap = {
@@ -543,6 +596,11 @@
         inp.style.height = 'auto';
         inp.style.height = Math.min(inp.scrollHeight, 120) + 'px';
       });
+    }
+    if (!isArc) {
+      pollTimer = setInterval(() => {
+        if (activeRow && activeRow.dataset.linkId === d.linkId) refreshConvo(d.linkId, d);
+      }, 5000);
     }
 
   }
@@ -614,9 +672,10 @@
             <div class="cluster-meta mine">You · ${fmt(data.message.created_at)}</div>`;
           thr.appendChild(cl);
           thr.scrollTop = thr.scrollHeight;
+          lastThreadSignature = '';
         }
         const row = document.querySelector(`.dm-row[data-link-id="${linkId}"]`);
-        if (row) row.querySelector('.dm-row-preview').textContent = content.slice(0, 60);
+        updateRowActivity(row, content, data.message.created_at);
       }
     } catch(e) { console.error(e); }
     finally { if (btn) btn.disabled = false; inp.focus(); }
