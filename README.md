@@ -87,6 +87,13 @@ Run with ngrok http 8000 --request-header-remove "ngrok-skip-browser-warning"
 - run python manage.py inject_scripts_all_merchants
 - make sure you have turned on ngrok, entre the ngrok http url and approve it to turn it on
 
+2. Instagram redirect URI error
+- If Instagram shows `Invalid Request: Request parameters are invalid: Invalid redirect_uri`, go to Meta Developers -> your app -> Use cases -> Instagram API -> API setup with Instagram login.
+- Check section 4, `Set up Instagram business login`, and make sure the redirect URI there exactly matches `META_REDIRECT_URI` in `.env`.
+- For local ngrok development, this is usually `https://<current-ngrok-domain>/instagram/callback/`.
+- The URL must match exactly, including `https`, the current ngrok domain, `/instagram/callback/`, and the trailing slash.
+- Restart the Django server after changing `.env`, then retry from `/instagram/connect/`.
+
 ## Paypal API
 1. Ensure that the right email credentials are set (
 PAYPAL_INVOICER_EMAIL = "sb-sbodx44976751@business.example.com") in random_links/settings.py
