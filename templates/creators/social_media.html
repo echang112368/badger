@@ -379,12 +379,65 @@
                 </div>
               </div>
 
+              {% if platform.slug == 'youtube' %}
+              {# ── YouTube skeleton: Watch Time & Reach + Subscriber Growth ── #}
+              <div class="row g-3 mb-3" aria-busy="true">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Watch Time &amp; Reach</h3>
+                    {% for i in '1234567' %}<div class="skeleton-line my-3" style="width:{% cycle '88' '72' '64' '78' '55' '80' '68' %}%;"></div>{% endfor %}
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Subscriber Growth</h3>
+                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '70' '58' '64' '80' '52' %}%;"></div>{% endfor %}
+                  </div>
+                </div>
+              </div>
+
+              {# ── YouTube skeleton: Traffic Sources & Device Analytics ── #}
+              <div class="row g-3 mb-3" aria-busy="true">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Traffic Sources</h3>
+                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '82' '72' '65' '78' '60' %}%;"></div>{% endfor %}
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Device Analytics</h3>
+                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '74' '66' '58' '70' '50' %}%;"></div>{% endfor %}
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+
               <div class="metric-card p-3 mb-3" aria-busy="true">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                   <h3 class="h6 mb-0">Post Performance Explorer</h3>
                   <span class="small text-muted"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading post insights</span>
                 </div>
                 <div class="table-responsive">
+                  {% if platform.slug == 'youtube' %}
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Thumbnail</th><th>Title</th><th>Type</th><th>Date</th><th>Views</th><th>Watch Time</th><th>Avg %</th><th>Eng. Rate</th></tr></thead>
+                    <tbody>
+                      {% for row in '12345' %}
+                        <tr>
+                          <td><div class="skeleton-block" style="width:72px;height:52px;min-height:52px;"></div></td>
+                          <td><div class="skeleton-line" style="width:160px;"></div></td>
+                          <td><div class="skeleton-line" style="width:55px;"></div></td>
+                          <td><div class="skeleton-line" style="width:105px;"></div></td>
+                          <td><div class="skeleton-line" style="width:42px;"></div></td>
+                          <td><div class="skeleton-line" style="width:50px;"></div></td>
+                          <td><div class="skeleton-line" style="width:40px;"></div></td>
+                          <td><div class="skeleton-line" style="width:58px;"></div></td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                  {% else %}
                   <table class="table table-sm align-middle mb-0">
                     <thead><tr><th>Preview</th><th>Media ID</th><th>Type</th><th>Post Date</th><th>Views</th><th>Reach</th><th>Engagement Rate</th></tr></thead>
                     <tbody>
@@ -401,6 +454,7 @@
                       {% endfor %}
                     </tbody>
                   </table>
+                  {% endif %}
                 </div>
               </div>
 
@@ -565,21 +619,216 @@
                 </div>
               </div>
 
+              {% if platform.slug == 'youtube' %}
+              {# ── YouTube: Watch Time & Reach + Subscriber Growth ── #}
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Watch Time &amp; Reach <span class="text-muted fw-normal small">(28 days)</span></h3>
+                    <ul class="list-group list-group-flush small">
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.performance.insights.views|default:platform.metrics.engagement.views }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Engaged Views</span><strong>{{ platform.metrics.performance.insights.engagedViews|default:'-' }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Watch Time (mins)</span><strong>{{ platform.metrics.performance.insights.estimatedMinutesWatched|default:'-' }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Avg View Duration (s)</span><strong>{{ platform.metrics.performance.insights.averageViewDuration|default:'-' }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Avg % Viewed</span><strong>{{ platform.metrics.performance.insights.averageViewPercentage|default:'-' }}{% if platform.metrics.performance.insights.averageViewPercentage %}%{% endif %}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Impressions</span><strong>{{ platform.metrics.reach_analytics.impressions|default:'-' }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Impression CTR</span><strong>{% if platform.metrics.reach_analytics.impressionClickThroughRate %}{{ platform.metrics.reach_analytics.impressionClickThroughRate }}%{% else %}-{% endif %}</strong></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Subscriber Growth <span class="text-muted fw-normal small">(28 days)</span></h3>
+                    <ul class="list-group list-group-flush small mb-2">
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Gained</span><strong class="text-success">+{{ platform.metrics.performance.insights.subscribersGained|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Lost</span><strong class="text-danger">-{{ platform.metrics.performance.insights.subscribersLost|default:0 }}</strong></li>
+                      <li class="list-group-item d-flex justify-content-between px-0"><span>Net</span>
+                        {% with gained=platform.metrics.performance.insights.subscribersGained|default:0 lost=platform.metrics.performance.insights.subscribersLost|default:0 %}
+                        <strong>{% if gained or lost %}+{{ gained }} / -{{ lost }}{% else %}-{% endif %}</strong>
+                        {% endwith %}
+                      </li>
+                    </ul>
+                    {% if platform.metrics.subscriber_sources %}
+                      <h4 class="h6 text-muted small mt-2 mb-1">Sources</h4>
+                      <ul class="list-group list-group-flush small">
+                        {% for src in platform.metrics.subscriber_sources|slice:':6' %}
+                          <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>
+                              {% if src.label == 'YT_SEARCH' %}YouTube Search
+                              {% elif src.label == 'EXT_URL' %}External
+                              {% elif src.label == 'RELATED_VIDEO' %}Suggested Videos
+                              {% elif src.label == 'BROWSE' %}Browse Features
+                              {% elif src.label == 'NOTIFICATION' %}Notifications
+                              {% elif src.label == 'NO_LINK_OTHER' %}Direct / Unknown
+                              {% elif src.label == 'PLAYLIST' %}Playlists
+                              {% else %}{{ src.label }}{% endif %}
+                            </span>
+                            <strong>{{ src.value }}</strong>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    {% else %}
+                      <p class="small text-muted mb-0">No subscriber source data yet.</p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              {# ── YouTube: Traffic Sources & Device Analytics ── #}
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Traffic Sources <span class="text-muted fw-normal small">(views, 28 days)</span></h3>
+                    {% if platform.metrics.traffic_sources %}
+                      <ul class="list-group list-group-flush small">
+                        {% for src in platform.metrics.traffic_sources %}
+                          <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>
+                              {% if src.label == 'YT_SEARCH' %}YouTube Search
+                              {% elif src.label == 'EXT_URL' %}External
+                              {% elif src.label == 'RELATED_VIDEO' %}Suggested Videos
+                              {% elif src.label == 'BROWSE' %}Browse Features
+                              {% elif src.label == 'NOTIFICATION' %}Notifications
+                              {% elif src.label == 'NO_LINK_OTHER' %}Direct / Unknown
+                              {% elif src.label == 'PLAYLIST' %}Playlists
+                              {% else %}{{ src.label }}{% endif %}
+                            </span>
+                            <strong>{{ src.value }}</strong>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    {% else %}
+                      <p class="small text-muted mb-0">No traffic source data yet.</p>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="metric-card p-3 h-100">
+                    <h3 class="h6">Device Analytics <span class="text-muted fw-normal small">(views, 28 days)</span></h3>
+                    {% if platform.metrics.device_analytics %}
+                      <ul class="list-group list-group-flush small">
+                        {% for dev in platform.metrics.device_analytics %}
+                          <li class="list-group-item d-flex justify-content-between px-0">
+                            <span>
+                              {% if dev.label == 'MOBILE' %}Mobile
+                              {% elif dev.label == 'COMPUTER' %}Computer
+                              {% elif dev.label == 'TABLET' %}Tablet
+                              {% elif dev.label == 'TV' %}TV
+                              {% elif dev.label == 'GAME_CONSOLE' %}Game Console
+                              {% else %}{{ dev.label }}{% endif %}
+                            </span>
+                            <strong>{{ dev.value }}</strong>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    {% else %}
+                      <p class="small text-muted mb-0">No device data yet.</p>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              {% else %}
+              {# ── Instagram: Performance & Engagement ── #}
               <div class="row g-3 mb-3">
                 <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Performance Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li></ul></div></div>
                 <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
               </div>
+              {% endif %}
 
+              {# ── YouTube: Engagement summary (below reach/traffic rows) ── #}
+              {% if platform.slug == 'youtube' %}
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
+              </div>
+              {% endif %}
+
+              {# ── Post Performance Explorer ── #}
               <div class="metric-card p-3 mb-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <h3 class="h6 mb-0">Post Performance Explorer</h3>
                   <div class="d-flex gap-2 align-items-center">
                     <label class="small text-muted" for="content-search-{{ platform.slug }}">Find media</label>
-                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm w-auto" style="min-width: 160px;" placeholder="Search by media ID or type">
+                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm w-auto" style="min-width: 160px;" placeholder="Search by title or type">
                   </div>
                 </div>
                 <p class="small text-muted mb-3">Standardized post analytics ranked by standardized performance score.</p>
 
+                {% if platform.slug == 'youtube' %}
+                {# ── YouTube video table ── #}
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
+                    <thead>
+                      <tr>
+                        <th>Thumbnail</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Date</th>
+                        <th>Views</th>
+                        <th>Watch Time (m)</th>
+                        <th>Avg Duration (s)</th>
+                        <th>Avg %</th>
+                        <th>Likes</th>
+                        <th>Comments</th>
+                        <th>Eng. Rate</th>
+                        <th>Subs Gained</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in platform.metrics.content_performance %}
+                        <tr>
+                          <td>
+                            {% if row.thumbnail_url %}
+                              {% if row.permalink %}
+                                <a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer">
+                                  <img src="{{ row.thumbnail_url }}" alt="{{ row.title|default:row.media_id }} thumbnail" class="rounded border" style="width: 72px; height: 52px; object-fit: cover;">
+                                </a>
+                              {% else %}
+                                <img src="{{ row.thumbnail_url }}" alt="{{ row.title|default:row.media_id }} thumbnail" class="rounded border" style="width: 72px; height: 52px; object-fit: cover;">
+                              {% endif %}
+                            {% else %}
+                              <span class="text-muted small">N/A</span>
+                            {% endif %}
+                          </td>
+                          <td style="max-width:200px;">
+                            {% if row.permalink %}
+                              <a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer" class="text-truncate d-block" style="max-width:190px;" title="{{ row.title }}">{{ row.title|default:row.media_id }}</a>
+                            {% else %}
+                              <span class="text-truncate d-block" style="max-width:190px;" title="{{ row.title }}">{{ row.title|default:row.media_id }}</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if row.media_type == 'SHORTS' %}
+                              <span class="badge text-bg-danger rounded-pill">SHORTS</span>
+                            {% else %}
+                              <span class="badge rounded-pill text-bg-light border">VIDEO</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if row.timestamp or row.post_date %}
+                              <time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>
+                            {% else %}
+                              <span class="text-muted small">N/A</span>
+                            {% endif %}
+                          </td>
+                          <td>{{ row.views }}</td>
+                          <td>{{ row.watch_time_minutes|default:'-' }}</td>
+                          <td>{{ row.avg_view_duration|default:'-' }}</td>
+                          <td>{% if row.avg_view_percentage %}{{ row.avg_view_percentage|floatformat:1 }}%{% else %}-{% endif %}</td>
+                          <td>{{ row.likes }}</td>
+                          <td>{{ row.comments }}</td>
+                          <td style="white-space:nowrap">{{ row.engagement_rate|percent_sigfigs:4 }}</td>
+                          <td>{{ row.subscribers_gained|default:'0' }}</td>
+                        </tr>
+                      {% empty %}
+                        <tr><td colspan="12" class="text-muted">No video data yet. Refresh to fetch insights.</td></tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+
+                {% else %}
+                {# ── Instagram / generic table ── #}
                 <div class="table-responsive">
                   <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
                     <thead>
@@ -634,6 +883,7 @@
                     </tbody>
                   </table>
                 </div>
+                {% endif %}
               </div>
 
               <div class="metric-card p-3 mb-3">

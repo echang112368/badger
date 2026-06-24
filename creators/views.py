@@ -1711,10 +1711,11 @@ def creator_social_media(request):
         refresh_platform = None
     force_reanalyze = bool(request.GET.get("reanalyze"))
     service = SocialDashboardService(request.user)
-    should_show_loading = bool(refresh_platform) or service.needs_refresh()
+    needs_ai, ai_platform = service.needs_ai_analysis()
+    should_show_loading = bool(refresh_platform) or service.needs_refresh() or needs_ai
 
     if should_show_loading:
-        platform = refresh_platform or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
+        platform = refresh_platform or ai_platform or SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM
         job_id = _start_social_refresh_job(
             request.user,
             platform=platform,

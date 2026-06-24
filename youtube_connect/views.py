@@ -1,8 +1,6 @@
 import logging
-import threading
 
 from django.contrib.auth.decorators import login_required
-from django.db import close_old_connections
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -25,24 +23,6 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _trigger_initial_analysis(user_id: int) -> None:
-    def _run():
-        from django.contrib.auth import get_user_model
-        close_old_connections()
-        User = get_user_model()
-        try:
-            user = User.objects.get(pk=user_id)
-            YouTubeAnalyticsService(user).build_platform_data(
-                refresh=True,
-                force_reanalyze=True,
-                allow_ai_refresh=True,
-            )
-        except Exception:
-            logger.exception("Auto-analysis failed for YouTube user_id=%s", user_id)
-
-    threading.Thread(target=_run, daemon=True).start()
 
 
 def _channel_defaults(channel: dict, token_data: dict, access_token: str, refresh_token: str | None = None) -> dict:
@@ -144,7 +124,6 @@ def youtube_callback(request):
         if created:
             connection.connected_at = now
             connection.save(update_fields=["connected_at"])
-            _trigger_initial_analysis(request.user.id)
 
     except YouTubeAPIError as exc:
         logger.warning("YouTube OAuth callback failed: %s", exc)

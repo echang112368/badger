@@ -1028,6 +1028,10 @@ class YouTubeAnalyticsService:
             "ai_profile_feedback": {},
             "failed_requests": [],
             "synced_at": None,
+            "reach_analytics": {},
+            "traffic_sources": [],
+            "device_analytics": [],
+            "subscriber_sources": [],
         }
 
     def fetch_and_cache(self, connection: YouTubeConnection, snapshot: SocialAnalyticsSnapshot | None = None) -> dict[str, Any]:
@@ -1065,6 +1069,10 @@ class YouTubeAnalyticsService:
         start_date = (now.date() - timedelta(days=28)).isoformat()
         end_date = now.date().isoformat()
         payload["performance"] = self._fetch_performance(connection, channel_id, start_date, end_date)
+        payload["reach_analytics"] = self._fetch_reach(connection, channel_id, start_date, end_date)
+        payload["traffic_sources"] = self._fetch_traffic_sources(connection, channel_id, start_date, end_date)
+        payload["device_analytics"] = self._fetch_device_analytics(connection, channel_id, start_date, end_date)
+        payload["subscriber_sources"] = self._fetch_subscriber_sources(connection, channel_id, start_date, end_date)
         payload["demographics"] = self._fetch_demographics(connection, channel_id, start_date, end_date)
         payload["recent_media"] = recent_media
         payload["media_insights"] = self._build_media_insights(connection, channel_id, videos, start_date, end_date)
@@ -1166,6 +1174,10 @@ class YouTubeAnalyticsService:
             "comments": payload.get("comments") or {},
             "failed_requests": payload.get("failed_requests") or [],
             "synced_at": payload.get("synced_at"),
+            "reach_analytics": self._normalise_reach_analytics(payload.get("reach_analytics") or {}),
+            "traffic_sources": payload.get("traffic_sources") or [],
+            "device_analytics": payload.get("device_analytics") or [],
+            "subscriber_sources": payload.get("subscriber_sources") or [],
         }
 
     def _safe_call(self, label: str, func, *args, **kwargs):
@@ -1214,6 +1226,88 @@ class YouTubeAnalyticsService:
         payload = self._safe_call("reports.query.performance", query_youtube_analytics, connection.youtube_access_token, channel_id=channel_id, start_date=start_date, end_date=end_date, metrics=metrics) or {}
         return self._row_to_metric_dict(payload)
 
+    @staticmethod
+    def _normalise_reach_analytics(raw: dict[str, Any]) -> dict[str, Any]:
+        out = dict(raw)
+        if "impressionClickThroughRate" in out:
+            out["impressionClickThroughRate"] = round(float(out["impressionClickThroughRate"] or 0) * 100, 2)
+        return out
+
+    def _fetch_reach(self, connection: YouTubeConnection, channel_id: str, start_date: str, end_date: str) -> dict[str, Any]:
+        payload = self._safe_call(
+            "reports.query.reach",
+            query_youtube_analytics,
+            connection.youtube_access_token,
+            channel_id=channel_id,
+            start_date=start_date,
+            end_date=end_date,
+            metrics="views,estimatedMinutesWatched,impressions,impressionClickThroughRate",
+        ) or {}
+        return self._row_to_metric_dict(payload)
+
+    def _fetch_traffic_sources(self, connection: YouTubeConnection, channel_id: str, start_date: str, end_date: str) -> list:
+        payload = self._safe_call(
+            "reports.query.traffic_sources",
+            query_youtube_analytics,
+            connection.youtube_access_token,
+            channel_id=channel_id,
+            start_date=start_date,
+            end_date=end_date,
+            metrics="views",
+            dimensions="insightTrafficSourceType",
+            sort="-views",
+        ) or {}
+        return self._analytics_rows(payload)
+
+    def _fetch_device_analytics(self, connection: YouTubeConnection, channel_id: str, start_date: str, end_date: str) -> list:
+        payload = self._safe_call(
+            "reports.query.device_analytics",
+            query_youtube_analytics,
+            connection.youtube_access_token,
+            channel_id=channel_id,
+            start_date=start_date,
+            end_date=end_date,
+            metrics="views",
+            dimensions="deviceType",
+            sort="-views",
+        ) or {}
+        return self._analytics_rows(payload)
+
+    def _fetch_subscriber_sources(self, connection: YouTubeConnection, channel_id: str, start_date: str, end_date: str) -> list:
+        payload = self._safe_call(
+            "reports.query.subscriber_sources",
+            query_youtube_analytics,
+            connection.youtube_access_token,
+            channel_id=channel_id,
+            start_date=start_date,
+            end_date=end_date,
+            metrics="subscribersGained",
+            dimensions="insightTrafficSourceType",
+            sort="-subscribersGained",
+        ) or {}
+        return self._analytics_rows(payload)
+
+    @staticmethod
+    def _is_short(video: dict) -> bool:
+        """Return True if the video duration is 60 seconds or less (YouTube Shorts threshold)."""
+        import re
+        duration = (video.get("contentDetails") or {}).get("duration", "")
+        if not duration:
+            return False
+        # Parse ISO 8601 duration e.g. PT1M3S, PT59S, PT1H2M3S
+        match = re.fullmatch(
+            r"P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?",
+            duration,
+        )
+        if not match:
+            return False
+        days = int(match.group(1) or 0)
+        hours = int(match.group(2) or 0)
+        minutes = int(match.group(3) or 0)
+        seconds = float(match.group(4) or 0)
+        total_seconds = days * 86400 + hours * 3600 + minutes * 60 + seconds
+        return total_seconds <= 60
+
     def _fetch_demographics(self, connection: YouTubeConnection, channel_id: str, start_date: str, end_date: str) -> dict[str, Any]:
         gender_age = self._safe_call("reports.query.age_gender", query_youtube_analytics, connection.youtube_access_token, channel_id=channel_id, start_date=start_date, end_date=end_date, metrics="viewerPercentage", dimensions="ageGroup,gender", sort="-viewerPercentage") or {}
         country = self._safe_call("reports.query.country", query_youtube_analytics, connection.youtube_access_token, channel_id=channel_id, start_date=start_date, end_date=end_date, metrics="views", dimensions="country", sort="-views", max_results=10) or {}
@@ -1223,10 +1317,29 @@ class YouTubeAnalyticsService:
         rows = []
         for media in self._normalize_recent_videos(videos):
             video_id = media["video_id"]
-            metrics = self._video_statistics_metrics(next((v for v in videos if str(v.get("id")) == video_id), {}))
-            analytics = self._safe_call("reports.query.video", query_youtube_analytics, connection.youtube_access_token, channel_id=channel_id, start_date=start_date, end_date=end_date, metrics="views,engagedViews,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost", filters=f"video=={video_id}") or {}
-            metrics.update(self._row_to_metric_dict(analytics))
-            rows.append({"media_id": video_id, "video_id": video_id, "media_type": "VIDEO", "media_product_type": "YOUTUBE", "timestamp": media.get("timestamp"), "thumbnail_url": media.get("thumbnail_url"), "permalink": media.get("permalink"), "metrics": [{"name": name, "value": value, "period": "lifetime", "fetched_at": timezone.now().isoformat()} for name, value in metrics.items()]})
+            source_video = next((v for v in videos if str(v.get("id")) == video_id), {})
+            metrics = self._video_statistics_metrics(source_video)
+            analytics_raw = self._safe_call("reports.query.video", query_youtube_analytics, connection.youtube_access_token, channel_id=channel_id, start_date=start_date, end_date=end_date, metrics="views,engagedViews,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost", filters=f"video=={video_id}") or {}
+            analytics_dict = self._row_to_metric_dict(analytics_raw)
+            metrics.update(analytics_dict)
+            snippet = source_video.get("snippet") if isinstance(source_video.get("snippet"), dict) else {}
+            title = snippet.get("title") or ""
+            duration = (source_video.get("contentDetails") or {}).get("duration", "")
+            is_short = self._is_short(source_video)
+            media_type = "SHORTS" if is_short else "VIDEO"
+            rows.append({
+                "media_id": video_id,
+                "video_id": video_id,
+                "title": title,
+                "duration": duration,
+                "is_short": is_short,
+                "media_type": media_type,
+                "media_product_type": "YOUTUBE",
+                "timestamp": media.get("timestamp"),
+                "thumbnail_url": media.get("thumbnail_url"),
+                "permalink": media.get("permalink"),
+                "metrics": [{"name": name, "value": value, "period": "lifetime", "fetched_at": timezone.now().isoformat()} for name, value in metrics.items()],
+            })
         return rows
 
     @staticmethod
@@ -1280,14 +1393,50 @@ class YouTubeAnalyticsService:
     def _build_content_performance_rows(media_insights: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows = []
         for item in media_insights:
-            metrics = {metric.get("name"): int(metric.get("value") or 0) for metric in item.get("metrics", []) if isinstance(metric, dict)}
+            metrics = {
+                metric.get("name"): (
+                    float(metric.get("value") or 0)
+                    if metric.get("name") == "averageViewPercentage"
+                    else int(metric.get("value") or 0)
+                )
+                for metric in item.get("metrics", [])
+                if isinstance(metric, dict)
+            }
             views = metrics.get("views", 0)
             reach = metrics.get("engagedViews") or views
             likes = metrics.get("likes", 0)
             comments = metrics.get("comments", 0)
             shares = metrics.get("shares", 0)
             engagement = likes + comments + shares
-            rows.append({"media_id": str(item.get("media_id") or item.get("video_id") or "-"), "media_type": "VIDEO", "media_product_type": "YOUTUBE", "timestamp": item.get("timestamp"), "post_date": item.get("timestamp"), "thumbnail_url": item.get("thumbnail_url") or "", "permalink": item.get("permalink") or "", "views": views, "reach": reach, "likes": likes, "comments": comments, "saves": 0, "shares": shares, "engagement": engagement, "engagement_rate": round((engagement / reach), 4) if reach else None, "save_rate": None, "share_rate": round((shares / reach), 4) if reach else None, "profile_visit_rate": None, "raw_activity_score": (views * 2) + (engagement * 3)})
+            is_short = bool(item.get("is_short"))
+            media_type = item.get("media_type") or ("SHORTS" if is_short else "VIDEO")
+            rows.append({
+                "media_id": str(item.get("media_id") or item.get("video_id") or "-"),
+                "title": item.get("title") or "",
+                "is_short": is_short,
+                "media_type": media_type,
+                "media_product_type": "YOUTUBE",
+                "timestamp": item.get("timestamp"),
+                "post_date": item.get("timestamp"),
+                "thumbnail_url": item.get("thumbnail_url") or "",
+                "permalink": item.get("permalink") or "",
+                "views": views,
+                "reach": reach,
+                "likes": likes,
+                "comments": comments,
+                "saves": 0,
+                "shares": shares,
+                "watch_time_minutes": int(metrics.get("estimatedMinutesWatched") or 0),
+                "avg_view_duration": int(metrics.get("averageViewDuration") or 0),
+                "avg_view_percentage": float(metrics.get("averageViewPercentage") or 0.0),
+                "subscribers_gained": int(metrics.get("subscribersGained") or 0),
+                "engagement": engagement,
+                "engagement_rate": round((engagement / reach), 4) if reach else None,
+                "save_rate": None,
+                "share_rate": round((shares / reach), 4) if reach else None,
+                "profile_visit_rate": None,
+                "raw_activity_score": (views * 2) + (engagement * 3),
+            })
         rows.sort(key=lambda row: (row.get("raw_activity_score") or 0, row.get("views") or 0, row.get("engagement") or 0), reverse=True)
         return rows
 
@@ -1366,6 +1515,28 @@ class SocialDashboardService:
         if platform:
             return self._platform_needs_resync(platform)
         return any(self._platform_needs_resync(slug) for slug in self.registry)
+
+    def needs_ai_analysis(self) -> tuple[bool, str | None]:
+        """Returns (True, platform_slug) if a connected platform has no AI cache yet."""
+        for slug in self.registry:
+            if slug == SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM:
+                connected = (
+                    getattr(self.user, "instagram_connection", None)
+                    or InstagramConnection.objects.filter(user=self.user).first()
+                )
+            elif slug == SocialAnalyticsSnapshot.PLATFORM_YOUTUBE:
+                connected = (
+                    getattr(self.user, "youtube_connection", None)
+                    or YouTubeConnection.objects.filter(user=self.user).first()
+                )
+            else:
+                connected = None
+            if not connected:
+                continue
+            snapshot = SocialAnalyticsSnapshot.objects.filter(user=self.user, platform=slug).first()
+            if snapshot is None or not (snapshot.payload or {}).get("_ai_cache"):
+                return True, slug
+        return False, None
 
     def _platform_needs_resync(self, platform: str) -> bool:
         if platform == SocialAnalyticsSnapshot.PLATFORM_INSTAGRAM:
