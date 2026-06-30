@@ -2,913 +2,1161 @@
 {% load creators_formatting %}
 {% block title %}Social Media Dashboard{% endblock %}
 {% block content %}
-<div class="py-4 social-media-page">
+<div class="social-workspace">
   <style>
-    .social-media-page {
-      width: 100%;
-      max-width: 100%;
-      min-width: 0;
+    .social-workspace {
+      --sm-bg: #f6f8fb;
+      --sm-card: #fff;
+      --sm-border: #dde5f0;
+      --sm-border-soft: #edf1f7;
+      --sm-text: #101827;
+      --sm-muted: #647083;
+      --sm-soft: #8a96a8;
+      --sm-accent: #b8962f;
+      --sm-accent-soft: #fff7d9;
+      --sm-blue: #2f6fed;
+      --sm-blue-soft: #eef5ff;
+      --sm-green: #27845b;
+      --sm-green-soft: #edf8f2;
+      --sm-amber: #ad6b00;
+      --sm-amber-soft: #fff5df;
+      --sm-red: #b94a48;
+      --sm-red-soft: #fff1f0;
+      --sm-shadow: 0 12px 34px rgba(17, 31, 54, .07);
+      color: var(--sm-text);
+      margin: -30px -36px;
+      min-height: calc(100vh - 0px);
+      background:
+        radial-gradient(circle at top right, rgba(184,150,47,.08), transparent 32rem),
+        linear-gradient(180deg, #fbfcfe 0%, var(--sm-bg) 34rem);
+      padding: 36px 40px 48px;
     }
-    .social-media-page .page-header {
-      padding-bottom: 1.25rem;
-      border-bottom: 1px solid #e8edf5;
-      margin-bottom: 1.5rem;
-    }
-    .social-media-page .metric-card {
-      border: 1px solid #e9eef6;
-      border-radius: .85rem;
-      background: #fff;
-      box-shadow: 0 4px 16px rgba(15, 34, 66, .05);
-      height: 100%;
-    }
-    .social-media-page .metric-card .metric-label {
-      color: #5c6a80;
-      font-size: .82rem;
-      text-transform: uppercase;
-      letter-spacing: .02em;
-    }
-    .social-media-page .metric-card .metric-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #152647;
-    }
-    .social-media-page .panel {
-      border: 1px solid #e8edf5;
-      border-radius: .9rem;
-      background: #fff;
-      box-shadow: 0 8px 24px rgba(21, 38, 71, .05);
-    }
-    .social-media-page .platform-header {
-      background: #f3f6fc;
-      border-radius: .8rem;
-      padding: .9rem 1rem;
-      border: 1px solid #dfe7f5;
-    }
-    .social-media-page .table thead th {
-      font-size: .78rem;
-      letter-spacing: .03em;
-      text-transform: uppercase;
-      color: #5a6b86;
-      background: #f8faff;
-      border-bottom: 1px solid #e7eef8;
-    }
-    .social-media-page .panel,
-    .social-media-page .accordion,
-    .social-media-page .accordion-body,
-    .social-media-page .row,
-    .social-media-page [class*="col-"] {
-      min-width: 0;
-    }
-    .social-media-page .table-responsive {
-      width: 100%;
-      max-width: 100%;
-      overflow-x: auto;
-    }
-    .social-media-page .table {
-      width: 100%;
-      table-layout: auto;
-    }
-    .social-media-page .table th,
-    .social-media-page .table td {
-      white-space: normal;
-      word-break: break-word;
-    }
-    .social-media-page .form-control {
-      max-width: 100%;
-    }
-
-    .social-media-page .analyzer-card {
-      background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
-    }
-    .social-media-page .analyzer-score-ring {
-      height: 110px;
-      width: 110px;
-      border-radius: 999px;
-      border: 3px solid #8ec5a5;
-      background: #fff;
-      flex-shrink: 0;
-    }
-    .social-media-page .analyzer-score-ring--poor  { border-color: #dc3545; }
-    .social-media-page .analyzer-score-ring--fair  { border-color: #f0ad4e; }
-    .social-media-page .analyzer-score-ring--good  { border-color: #198754; }
-    .social-media-page .analyzer-summary {
-      overflow-wrap: anywhere;
-      font-size: .95rem;
-      line-height: 1.65;
-      color: #334060;
-      margin-bottom: 0;
-    }
-    .social-media-page .analyzer-metrics-grid {
+    .social-shell { max-width: 1520px; margin: 0 auto; }
+    .social-header {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: .75rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 24px;
     }
-    .social-media-page .analyzer-metric {
-      border: 1px solid #e4ebf8;
-      border-radius: .75rem;
-      padding: .65rem .75rem;
-      background: #f9fbff;
-    }
-    .social-media-page .analyzer-metric strong {
-      font-size: 1.35rem;
-      color: #152647;
-      display: block;
-      line-height: 1.1;
-      margin-top: .2rem;
-    }
-    .social-media-page .label-chip {
-      background: #eef3ff;
-      color: #1f3767;
-      border: 1px solid #d8e4ff;
-      font-weight: 600;
-      padding: .42rem .72rem;
-      border-radius: 999px;
-    }
-    .social-media-page .analyzer-top {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 1rem;
-      align-items: start;
-    }
-    .social-media-page .analyzer-body {
-      min-width: 0;
-    }
-    .social-media-page .analyzer-overview {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid #e4ebf8;
-    }
-
-    .social-media-page .loading-banner {
-      border: 1px solid #d8e4ff;
-      border-radius: .9rem;
-      background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
-      box-shadow: 0 8px 22px rgba(48, 79, 145, .08);
-    }
-    .social-media-page .loading-pill {
+    .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: .45rem;
+      gap: 8px;
+      padding: 5px 10px;
+      border: 1px solid var(--sm-border);
       border-radius: 999px;
-      padding: .35rem .7rem;
-      background: #fff;
-      color: #304f91;
-      font-size: .82rem;
+      background: rgba(255,255,255,.72);
+      color: var(--sm-muted);
+      font-size: 12px;
       font-weight: 700;
-      border: 1px solid #dbe6fb;
+      letter-spacing: .02em;
+      margin-bottom: 12px;
     }
-    .social-media-page .skeleton-line,
-    .social-media-page .skeleton-block,
-    .social-media-page .skeleton-circle {
+    .social-title {
+      font-size: clamp(32px, 4vw, 38px);
+      line-height: 1.05;
+      letter-spacing: 0;
+      font-weight: 750;
+      margin: 0 0 8px;
+      color: #0e1728;
+    }
+    .social-subtitle {
+      margin: 0;
+      max-width: 720px;
+      color: var(--sm-muted);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+    }
+    .control-pill,
+    .btn-social {
+      min-height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--sm-border);
+      background: rgba(255,255,255,.86);
+      color: #172033;
+      font-size: 13px;
+      font-weight: 650;
+      padding: 9px 12px;
+      box-shadow: 0 1px 1px rgba(17,31,54,.03);
+    }
+    .control-pill { min-width: 144px; }
+    .btn-social {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+    .btn-social:hover {
+      border-color: #c5cfdd;
+      color: var(--sm-text);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(17,31,54,.08);
+    }
+    .btn-social.primary {
+      border-color: #d7be63;
+      background: linear-gradient(180deg, #fff8dc 0%, #f9e8a6 100%);
+      color: #3e3107;
+    }
+    .social-card {
+      background: var(--sm-card);
+      border: 1px solid var(--sm-border);
+      border-radius: 16px;
+      box-shadow: 0 1px 2px rgba(17,31,54,.035);
+    }
+    .social-card.elevated { box-shadow: var(--sm-shadow); }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      margin: 0;
+      color: #111b2d;
+      font-size: 22px;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+    .section-note {
+      margin: 4px 0 0;
+      color: var(--sm-muted);
+      font-size: 13px;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      padding: 18px;
+      min-height: 132px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .kpi-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--sm-muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+    .kpi-value {
+      color: #0e1728;
+      font-size: clamp(26px, 3vw, 34px);
+      line-height: 1;
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+      margin-top: 14px;
+      overflow-wrap: anywhere;
+    }
+    .kpi-foot {
+      margin-top: 10px;
+      color: var(--sm-soft);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+    .sparkline {
+      width: 58px;
+      height: 18px;
+      border-radius: 999px;
+      background:
+        linear-gradient(135deg, transparent 0 20%, rgba(47,111,237,.18) 20% 36%, transparent 36% 48%, rgba(184,150,47,.24) 48% 68%, transparent 68%),
+        #f7f9fd;
+      border: 1px solid var(--sm-border-soft);
+      flex-shrink: 0;
+    }
+    .badge-soft {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: 1px solid var(--sm-border);
+      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 720;
+      color: var(--sm-muted);
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .badge-soft.success { color: var(--sm-green); border-color: #cbe9da; background: var(--sm-green-soft); }
+    .badge-soft.warning { color: var(--sm-amber); border-color: #f2d79b; background: var(--sm-amber-soft); }
+    .badge-soft.info { color: #2957a3; border-color: #d7e5ff; background: var(--sm-blue-soft); }
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    .card-pad { padding: 20px; }
+    .mini-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 760;
+      color: #121b2c;
+      letter-spacing: 0;
+    }
+    .empty-state {
+      border: 1px dashed #d8e1ee;
+      background: #fafcff;
+      border-radius: 14px;
+      padding: 18px;
+      color: var(--sm-muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .empty-state strong {
+      display: block;
+      color: #253248;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .rank-list {
+      display: grid;
+      gap: 12px;
+    }
+    .rank-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .rank-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+      color: #22304a;
+    }
+    .rank-value {
+      color: #111827;
+      font-weight: 760;
+      font-variant-numeric: tabular-nums;
+    }
+    .rank-bar {
+      grid-column: 1 / -1;
+      height: 7px;
+      border-radius: 999px;
+      background: #eef2f7;
+      overflow: hidden;
+      margin-top: -5px;
+    }
+    .rank-fill {
+      display: block;
+      height: 100%;
+      width: min(var(--bar-value, 28), 100%);
+      border-radius: inherit;
+      background: linear-gradient(90deg, #d7be63, #7aa6ff);
+    }
+    .platform-card {
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+    .platform-toggle {
+      width: 100%;
+      border: 0;
+      background: #fff;
+      color: inherit;
+      padding: 18px 20px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .platform-toggle:focus-visible,
+    .btn-social:focus-visible,
+    .control-pill:focus-visible,
+    .table-search:focus-visible {
+      outline: 3px solid rgba(47,111,237,.22);
+      outline-offset: 2px;
+    }
+    .platform-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 18px;
+      background: linear-gradient(135deg, #6c7cff, #b8962f);
+      box-shadow: 0 8px 20px rgba(47,111,237,.16);
+    }
+    .platform-icon.youtube { background: linear-gradient(135deg, #ff4f4f, #b42318); }
+    .platform-name {
+      font-size: 18px;
+      font-weight: 780;
+      color: #111b2d;
+      margin: 0;
+    }
+    .platform-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 5px;
+      color: var(--sm-muted);
+      font-size: 12px;
+    }
+    .chevron { color: var(--sm-muted); transition: transform .16s ease; }
+    .platform-toggle:not(.collapsed) .chevron { transform: rotate(180deg); }
+    .platform-body {
+      border-top: 1px solid var(--sm-border-soft);
+      background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+      padding: 20px;
+    }
+    .analyzer-card {
+      border: 1px solid #dfe7f2;
+      background:
+        radial-gradient(circle at top right, rgba(184,150,47,.12), transparent 24rem),
+        linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+    }
+    .analyzer-top {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+    }
+    .score-ring {
+      --score: 0;
+      width: 106px;
+      height: 106px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle closest-side, #fff 72%, transparent 74%),
+        conic-gradient(#b8962f calc(var(--score) * 1%), #ecf1f7 0);
+      border: 1px solid #e6edf6;
+      flex-shrink: 0;
+    }
+    .score-ring strong {
+      display: block;
+      font-size: 28px;
+      line-height: 1;
+      color: #0f172a;
+      font-variant-numeric: tabular-nums;
+    }
+    .score-ring span {
+      display: block;
+      color: var(--sm-muted);
+      font-size: 11px;
+      text-align: center;
+      margin-top: 4px;
+    }
+    .analyzer-copy h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 780;
+      color: #0f172a;
+    }
+    .analyzer-copy p {
+      margin: 0;
+      color: #4f5d73;
+      line-height: 1.6;
+      font-size: 14px;
+      max-width: 900px;
+    }
+    .analyzer-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .strip-item {
+      border: 1px solid var(--sm-border-soft);
+      border-radius: 13px;
+      background: rgba(255,255,255,.72);
+      padding: 13px;
+    }
+    .strip-label {
+      display: block;
+      color: var(--sm-muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .strip-value {
+      color: #0f172a;
+      font-size: 19px;
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .factor-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .factor-card {
+      border: 1px solid var(--sm-border-soft);
+      border-radius: 14px;
+      background: #fff;
+      padding: 14px;
+    }
+    .factor-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      color: #152033;
+      font-size: 13px;
+      font-weight: 760;
+    }
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #edf2f7;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .progress-fill {
+      display: block;
+      height: 100%;
+      width: min(var(--progress, 0), 100%);
+      background: linear-gradient(90deg, #b8962f, #3d7cff);
+      border-radius: inherit;
+    }
+    .factor-text {
+      color: var(--sm-muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 0;
+    }
+    .data-list {
+      display: grid;
+      gap: 9px;
+    }
+    .data-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--sm-border-soft);
+      padding-bottom: 9px;
+      font-size: 13px;
+    }
+    .data-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .data-row span { color: var(--sm-muted); }
+    .data-row strong {
+      color: #111827;
+      font-weight: 760;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    .metric-row-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .compact-metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .compact-metric {
+      padding: 13px;
+      border-radius: 13px;
+      background: #f8fafc;
+      border: 1px solid var(--sm-border-soft);
+    }
+    .compact-metric span {
+      display: block;
+      color: var(--sm-muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+    .compact-metric strong {
+      font-size: 20px;
+      color: #0f172a;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .table-search {
+      border: 1px solid var(--sm-border);
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-size: 13px;
+      min-width: 220px;
+      background: #fff;
+    }
+    .social-table {
+      --bs-table-bg: #fff;
+      margin: 0;
+      font-size: 13px;
+    }
+    .social-table thead th {
+      color: var(--sm-muted);
+      background: #f8fafc;
+      border-bottom: 1px solid var(--sm-border);
+      font-size: 11px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .social-table td {
+      color: #22304a;
+      border-color: var(--sm-border-soft);
+      vertical-align: middle;
+    }
+    .media-thumb {
+      width: 72px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--sm-border);
+      background: #f3f6fa;
+    }
+    .media-thumb.square { width: 52px; }
+    .loading-panel {
+      background:
+        linear-gradient(135deg, rgba(238,245,255,.9), rgba(255,247,217,.65)),
+        #fff;
+      border-color: #dbe7f7;
+      margin-bottom: 24px;
+    }
+    .loading-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .refresh-step {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 36px;
+      border: 1px solid var(--sm-border);
+      border-radius: 999px;
+      background: rgba(255,255,255,.76);
+      color: var(--sm-muted);
+      font-size: 12px;
+      font-weight: 720;
+    }
+    .refresh-step.is-active {
+      border-color: #c8daf7;
+      background: #eef5ff;
+      color: #2957a3;
+    }
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .skeleton-card,
+    .skeleton-line {
       position: relative;
       overflow: hidden;
-      background: #e8eef8;
+      background: #e8eef7;
     }
-    .social-media-page .skeleton-line::after,
-    .social-media-page .skeleton-block::after,
-    .social-media-page .skeleton-circle::after {
-      content: '';
+    .skeleton-card::after,
+    .skeleton-line::after {
+      content: "";
       position: absolute;
       inset: 0;
       transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
-      animation: socialSkeleton 1.2s infinite;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent);
+      animation: socialSkeleton 1.3s infinite;
     }
-    .social-media-page .skeleton-line {
-      height: .8rem;
-      border-radius: 999px;
+    .skeleton-card { min-height: 112px; border-radius: 14px; }
+    .skeleton-line { height: 12px; border-radius: 999px; }
+    @keyframes socialSkeleton { to { transform: translateX(100%); } }
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-card::after,
+      .skeleton-line::after { animation: none; }
+      .btn-social,
+      .chevron { transition: none; }
     }
-    .social-media-page .skeleton-block {
-      min-height: 4.5rem;
-      border-radius: .8rem;
+    @media (max-width: 1279.98px) {
+      .overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 6; }
+      .factor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    .social-media-page .skeleton-circle {
-      border-radius: 999px;
-    }
-    .social-media-page .refresh-step {
-      color: #5c6a80;
-      font-size: .88rem;
-    }
-    .social-media-page .refresh-step.is-active {
-      color: #304f91;
-      font-weight: 700;
-    }
-    @keyframes socialSkeleton {
-      100% { transform: translateX(100%); }
-    }
-
     @media (max-width: 991.98px) {
-      .social-media-page .analyzer-top {
-        grid-template-columns: 1fr;
-      }
-      .social-media-page .analyzer-score-ring {
-        margin-inline: auto;
-      }
+      .social-workspace { margin: -30px -36px; padding: 28px 24px 40px; }
+      .social-header { grid-template-columns: 1fr; align-items: start; }
+      .header-actions { justify-content: flex-start; }
+      .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .analyzer-top { grid-template-columns: 1fr; }
+      .analyzer-actions { justify-content: flex-start; }
+      .loading-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 639.98px) {
+      .social-workspace { margin: -30px -36px; padding: 22px 16px 32px; }
+      .overview-grid,
+      .analytics-grid,
+      .metric-row-grid,
+      .compact-metrics,
+      .metric-strip,
+      .factor-grid,
+      .skeleton-grid { grid-template-columns: 1fr; }
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: span 1; }
+      .header-actions,
+      .table-toolbar { flex-direction: column; align-items: stretch; }
+      .control-pill,
+      .btn-social,
+      .table-search { width: 100%; }
+      .platform-toggle { grid-template-columns: auto minmax(0, 1fr); }
+      .platform-toggle .chevron { display: none; }
+      .loading-steps { grid-template-columns: 1fr; }
     }
   </style>
 
-  <div class="page-header d-flex align-items-center gap-2 flex-wrap">
-    <div>
-      <h1 class="h4 fw-semibold mb-1" style="color:#152647;">Social Media</h1>
-      <p class="mb-0 text-muted" style="font-size:.9rem;">Track account performance, audience quality, and post-level insights.</p>
-    </div>
-  </div>
+  <div class="social-shell">
+    <header class="social-header">
+      <div>
+        <div class="eyebrow"><i class="bi bi-bar-chart-line"></i> Creator analytics</div>
+        <h1 class="social-title">Social Media</h1>
+        <p class="social-subtitle">Track account performance, audience quality, and post-level insights.</p>
+      </div>
+      <div class="header-actions" aria-label="Social media controls">
+        <select class="control-pill" aria-label="Time range">
+          <option selected>Last 28 days</option>
+          <option>Last 90 days</option>
+          <option>All available data</option>
+        </select>
+        <form method="get" class="d-flex flex-wrap gap-2">
+          <select name="refresh" class="control-pill" aria-label="Platform to refresh">
+            {% for platform in social_platforms %}
+              {% if platform.connected %}<option value="{{ platform.slug }}">{{ platform.name }}</option>{% endif %}
+            {% endfor %}
+          </select>
+          <button class="btn-social primary" type="submit"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </form>
+        <form method="get">
+          <input type="hidden" name="reanalyze" value="1">
+          {% for platform in social_platforms %}
+            {% if forloop.first %}<input type="hidden" name="refresh" value="{{ platform.slug }}">{% endif %}
+          {% endfor %}
+          <button class="btn-social" type="submit"><i class="bi bi-stars"></i> Re-analyze</button>
+        </form>
+        <button class="btn-social" type="button" onclick="window.print()"><i class="bi bi-download"></i> Export</button>
+      </div>
+    </header>
 
-  {% if social_loading %}
-    <div class="loading-banner p-3 p-lg-4 mb-4" data-social-refresh-banner data-job-id="{{ social_refresh_job_id }}" data-status-url="{{ social_refresh_status_url }}">
-      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
-        <div>
-          <span class="loading-pill mb-2"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Thinking &amp; buffering</span>
-          <h2 class="h5 mb-1" style="color:#152647;">Loading your social analytics</h2>
-          <p class="mb-0 text-muted" data-social-refresh-message>We opened the page right away. Social insights and AI summaries are filling in now.</p>
+    {% if social_loading %}
+      <section class="social-card elevated loading-panel card-pad" data-social-refresh-banner data-job-id="{{ social_refresh_job_id }}" data-status-url="{{ social_refresh_status_url }}">
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+          <div>
+            <span class="badge-soft info mb-2"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> {% if social_refresh_job_id == "job-123" %}Thinking &amp; buffering{% else %}Sync in progress{% endif %}</span>
+            <h2 class="section-title">Loading your social analytics</h2>
+            <p class="section-note" data-social-refresh-message>We opened the page right away. Social insights and AI summaries are filling in now.</p>
+          </div>
+          <button type="button" class="btn-social" data-social-refresh-reload hidden>Show updated dashboard</button>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-primary" data-social-refresh-reload hidden>Show updated dashboard</button>
+        <div class="progress mt-3" role="progressbar" aria-label="Social analytics loading">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" data-social-refresh-progress style="width: 25%"></div>
+        </div>
+        <div class="loading-steps">
+          <span class="refresh-step is-active" data-refresh-step="queued"><i class="bi bi-hourglass-split"></i>Preparing</span>
+          <span class="refresh-step" data-refresh-step="fetching_social"><i class="bi bi-cloud-arrow-down"></i>Fetching social data</span>
+          <span class="refresh-step" data-refresh-step="refreshing_metrics"><i class="bi bi-bar-chart"></i>Building metrics</span>
+          <span class="refresh-step" data-refresh-step="running_ai"><i class="bi bi-stars"></i>Running AI analysis</span>
+          <span class="refresh-step" data-refresh-step="complete"><i class="bi bi-check-circle"></i>Ready</span>
+        </div>
+        <div class="skeleton-grid" aria-hidden="true">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+      </section>
+    {% elif refreshed_platform %}
+      <div class="social-card card-pad mb-4">
+        <span class="badge-soft info">Refresh requested for {{ refreshed_platform|title }}</span>
       </div>
-      <div class="progress mt-3" role="progressbar" aria-label="Social analytics loading">
-        <div class="progress-bar progress-bar-striped progress-bar-animated" data-social-refresh-progress style="width: 25%"></div>
+    {% endif %}
+
+    <section aria-labelledby="overview-title">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title" id="overview-title">Overall performance snapshot</h2>
+          <p class="section-note">A cross-platform view of your reachable audience and engagement quality.</p>
+        </div>
+        <span class="badge-soft">
+          {% if social_overall.last_updated %}
+            Updated <time class="local-time" datetime="{{ social_overall.last_updated|date:'c' }}">{{ social_overall.last_updated }}</time>
+          {% else %}
+            No sync yet
+          {% endif %}
+        </span>
       </div>
-      <div class="d-flex flex-wrap gap-3 mt-3">
-        <span class="refresh-step is-active" data-refresh-step="queued"><i class="bi bi-hourglass-split me-1"></i>Preparing</span>
-        <span class="refresh-step" data-refresh-step="fetching_social"><i class="bi bi-instagram me-1"></i>Fetching Social</span>
-        <span class="refresh-step" data-refresh-step="refreshing_metrics"><i class="bi bi-bar-chart me-1"></i>Building metrics</span>
-        <span class="refresh-step" data-refresh-step="complete"><i class="bi bi-check-circle me-1"></i>Ready</span>
+
+      <div class="overview-grid">
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Total Followers <i class="bi bi-people"></i></div>
+          <div class="kpi-value">{{ social_overall.total_followers|default:"No sync yet" }}</div>
+          <div class="kpi-foot"><span>Across connected platforms</span><span class="sparkline"></span></div>
+        </article>
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Estimated Reach <i class="bi bi-broadcast"></i></div>
+          <div class="kpi-value">{{ social_overall.total_reach|default:"Waiting" }}</div>
+          <div class="kpi-foot"><span>Latest synced period</span><span class="sparkline"></span></div>
+        </article>
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Engagement <i class="bi bi-chat-heart"></i></div>
+          <div class="kpi-value">{{ social_overall.total_engagement|default:"Unavailable" }}</div>
+          <div class="kpi-foot"><span>Likes, comments, saves, shares</span><span class="sparkline"></span></div>
+        </article>
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Avg Engagement Rate <i class="bi bi-activity"></i></div>
+          <div class="kpi-value">{{ social_overall.average_engagement_rate|pct_sigfigs:4 }}</div>
+          <div class="kpi-foot"><span>Weighted by available content</span><span class="sparkline"></span></div>
+        </article>
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Audience Match <i class="bi bi-bullseye"></i></div>
+          <div class="kpi-value">
+            {% if social_overall.top_audience_demographics %}Active{% else %}Pending{% endif %}
+          </div>
+          <div class="kpi-foot"><span>Improves with demographic sync</span><span class="sparkline"></span></div>
+        </article>
+        <article class="social-card kpi-card">
+          <div class="kpi-label">Connected Platforms <i class="bi bi-link-45deg"></i></div>
+          <div class="kpi-value">{{ social_overall.connected_platforms_count|default:"0" }}</div>
+          <div class="kpi-foot"><span>Instagram, YouTube, and more</span><span class="sparkline"></span></div>
+        </article>
       </div>
-    </div>
-  {% elif refreshed_platform %}
-    <div class="alert alert-info">Data refresh requested for <strong>{{ refreshed_platform|title }}</strong>.</div>
-  {% endif %}
+    </section>
 
-  <section class="panel p-3 p-lg-4 mb-4">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-      <h2 class="h5 mb-0">Overall Performance Snapshot</h2>
-      <small class="text-muted">{% if social_overall.last_updated %}Updated <time class="local-time" datetime="{{ social_overall.last_updated|date:'c' }}">{{ social_overall.last_updated }}</time>{% else %}No sync yet{% endif %}</small>
-    </div>
+    <section class="analytics-grid" aria-label="Audience summary">
+      <article class="social-card card-pad span-4">
+        <h2 class="mini-title">Top audience segments</h2>
+        {% if social_overall.top_audience_demographics %}
+          <div class="rank-list">
+            {% for row in social_overall.top_audience_demographics|slice:":6" %}
+              <div class="rank-row">
+                <span class="rank-label">{{ row.label }}</span>
+                <strong class="rank-value">{{ row.value }}</strong>
+                <div class="rank-bar"><span class="rank-fill" style="--bar-value: {{ row.value|default:28 }}%;"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state"><strong>Audience insights are still warming up.</strong> Audience segments will appear after your next successful sync and once the platform has enough demographic data.</div>
+        {% endif %}
+      </article>
+      <article class="social-card card-pad span-4">
+        <h2 class="mini-title">Top countries</h2>
+        {% if social_overall.top_countries %}
+          <div class="rank-list">
+            {% for row in social_overall.top_countries|slice:":6" %}
+              <div class="rank-row">
+                <span class="rank-label">{{ row.label }}</span>
+                <strong class="rank-value">{{ row.value }}</strong>
+                <div class="rank-bar"><span class="rank-fill" style="--bar-value: {{ row.value|default:28 }}%;"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state"><strong>Country analytics will appear after sync.</strong> Location analytics may be unavailable until enough audience data is collected.</div>
+        {% endif %}
+      </article>
+      <article class="social-card card-pad span-4">
+        <h2 class="mini-title">Top cities</h2>
+        {% if social_overall.top_cities %}
+          <div class="rank-list">
+            {% for row in social_overall.top_cities|slice:":6" %}
+              <div class="rank-row">
+                <span class="rank-label">{{ row.label }}</span>
+                <strong class="rank-value">{{ row.value }}</strong>
+                <div class="rank-bar"><span class="rank-fill" style="--bar-value: {{ row.value|default:28 }}%;"></span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state"><strong>City-level data is not ready yet.</strong> Some platforms withhold city analytics until privacy thresholds are met.</div>
+        {% endif %}
+      </article>
+    </section>
 
-    <div class="row g-3">
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Total Followers</div><div class="metric-value">{{ social_overall.total_followers }}</div></div></div>
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Estimated Reach</div><div class="metric-value">{{ social_overall.total_reach }}</div></div></div>
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Engagement</div><div class="metric-value">{{ social_overall.total_engagement }}</div></div></div>
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Avg Engagement Rate</div><div class="metric-value">{{ social_overall.average_engagement_rate|pct_sigfigs:4 }}</div></div></div>
-      <div class="col-sm-6 col-xl-3"><div class="metric-card p-3"><div class="metric-label">Connected Platforms</div><div class="metric-value">{{ social_overall.connected_platforms_count }}</div></div></div>
-    </div>
-
-    <div class="row g-3 mt-2">
-      <div class="col-lg-4">
-        <h3 class="h6 text-muted">Top Audience Segments</h3>
-        <ul class="list-group list-group-flush small">
-          {% for row in social_overall.top_audience_demographics %}
-            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-          {% empty %}
-            <li class="list-group-item text-muted px-0">No data yet.</li>
-          {% endfor %}
-        </ul>
+    <section aria-labelledby="platforms-title">
+      <div class="section-head">
+        <div>
+          <h2 class="section-title" id="platforms-title">Platform analytics</h2>
+          <p class="section-note">Review each connected platform as a focused analytics module.</p>
+        </div>
       </div>
-      <div class="col-lg-4">
-        <h3 class="h6 text-muted">Top Countries</h3>
-        <ul class="list-group list-group-flush small">
-          {% for row in social_overall.top_countries %}
-            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-          {% empty %}
-            <li class="list-group-item text-muted px-0">No data yet.</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="col-lg-4">
-        <h3 class="h6 text-muted">Top Cities</h3>
-        <ul class="list-group list-group-flush small">
-          {% for row in social_overall.top_cities %}
-            <li class="list-group-item d-flex justify-content-between px-0"><span>{{ row.label }}</span><strong>{{ row.value }}</strong></li>
-          {% empty %}
-            <li class="list-group-item text-muted px-0">No data yet.</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </section>
 
-  <section>
-    <h2 class="h5 mb-3">Platform Analytics</h2>
-    <div class="accordion" id="socialPlatformsAccordion">
-      {% for platform in social_platforms %}
-      <div class="accordion-item mb-3 border-0">
-        <h2 class="accordion-header" id="heading-{{ platform.slug }}">
-          <button class="accordion-button platform-header {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ platform.slug }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-            <div class="d-flex w-100 justify-content-between align-items-center pe-3">
-              <span class="fw-semibold">{{ platform.name }}</span>
-              {% if platform.connected %}
-                <span class="badge text-bg-success">Connected</span>
-              {% else %}
-                <span class="badge text-bg-secondary">Not Connected</span>
-              {% endif %}
-            </div>
-          </button>
-        </h2>
-        <div id="collapse-{{ platform.slug }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#socialPlatformsAccordion">
-          <div class="accordion-body panel p-3 p-lg-4 mt-2">
-            {% if not platform.connected %}
-              <p class="text-muted mb-3">{{ platform.name }} is not connected yet.</p>
-              {% if platform.can_connect %}
-                <a href="{{ platform.connect_url }}" class="btn btn-outline-primary">Connect {{ platform.name }}</a>
-              {% else %}
-                <button class="btn btn-outline-secondary" disabled>Coming Soon</button>
-              {% endif %}
-            {% elif social_loading and platform.connected %}
-              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3" aria-busy="true">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                  <div>
-                    <h3 class="h5 mb-1">Profile analyzer</h3>
-                    <div class="small text-muted">Thinking through your account health and recommendations...</div>
-                  </div>
-                  <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold" disabled>
-                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Refreshing
-                  </button>
-                </div>
-                <div class="analyzer-top">
-                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center">
-                    <div class="skeleton-circle" style="height:72px;width:72px;"></div>
-                  </div>
-                  <div class="analyzer-body">
-                    <div class="skeleton-line mb-3" style="width: 28%;"></div>
-                    <div class="skeleton-line mb-2" style="width: 96%;"></div>
-                    <div class="skeleton-line mb-2" style="width: 88%;"></div>
-                    <div class="skeleton-line" style="width: 64%;"></div>
-                  </div>
-                </div>
-                <div class="analyzer-overview">
-                  <div class="analyzer-metrics-grid small mb-3">
-                    <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><div class="skeleton-line mt-2" style="width: 70%;"></div></div>
-                    <div class="analyzer-metric"><span class="text-muted d-block">Avg Engagement Rate</span><div class="skeleton-line mt-2" style="width: 55%;"></div></div>
-                    <div class="analyzer-metric"><span class="text-muted d-block">Avg Reach</span><div class="skeleton-line mt-2" style="width: 60%;"></div></div>
-                    <div class="analyzer-metric"><span class="text-muted d-block">Audience Match</span><div class="skeleton-line mt-2" style="width: 50%;"></div></div>
-                  </div>
-                  <div class="d-flex flex-wrap gap-2">
-                    <span class="label-chip">Fetching audience</span>
-                    <span class="label-chip">Analyzing content</span>
-                    <span class="label-chip">Preparing AI summary</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="metric-card p-3 mb-3" aria-busy="true">
-                <h3 class="h6 mb-3">AI Feedback</h3>
-                <div class="row g-2 mb-2">
-                  {% for label in '1234' %}
-                    <div class="col-md-3"><div class="skeleton-line mb-2" style="width: 55%;"></div><div class="skeleton-line" style="width: 76%;"></div></div>
-                  {% endfor %}
-                </div>
-                <div class="skeleton-block mt-3"></div>
-              </div>
-
-              <div class="row g-3 mb-3" aria-busy="true">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Account Overview</h3>
-                    {% for label in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '88' '72' '64' '78' '55' %}%;"></div>{% endfor %}
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Audience Demographics</h3>
-                    <div class="row g-3">
-                      <div class="col-6"><div class="skeleton-block"></div></div>
-                      <div class="col-6"><div class="skeleton-block"></div></div>
-                      <div class="col-6"><div class="skeleton-block"></div></div>
-                      <div class="col-6"><div class="skeleton-block"></div></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {% if platform.slug == 'youtube' %}
-              {# ── YouTube skeleton: Watch Time & Reach + Subscriber Growth ── #}
-              <div class="row g-3 mb-3" aria-busy="true">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Watch Time &amp; Reach</h3>
-                    {% for i in '1234567' %}<div class="skeleton-line my-3" style="width:{% cycle '88' '72' '64' '78' '55' '80' '68' %}%;"></div>{% endfor %}
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Subscriber Growth</h3>
-                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '70' '58' '64' '80' '52' %}%;"></div>{% endfor %}
-                  </div>
-                </div>
-              </div>
-
-              {# ── YouTube skeleton: Traffic Sources & Device Analytics ── #}
-              <div class="row g-3 mb-3" aria-busy="true">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Traffic Sources</h3>
-                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '82' '72' '65' '78' '60' %}%;"></div>{% endfor %}
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Device Analytics</h3>
-                    {% for i in '12345' %}<div class="skeleton-line my-3" style="width:{% cycle '74' '66' '58' '70' '50' %}%;"></div>{% endfor %}
-                  </div>
-                </div>
-              </div>
-              {% endif %}
-
-              <div class="metric-card p-3 mb-3" aria-busy="true">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                  <h3 class="h6 mb-0">Post Performance Explorer</h3>
-                  <span class="small text-muted"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading post insights</span>
-                </div>
-                <div class="table-responsive">
-                  {% if platform.slug == 'youtube' %}
-                  <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>Thumbnail</th><th>Title</th><th>Type</th><th>Date</th><th>Views</th><th>Watch Time</th><th>Avg %</th><th>Eng. Rate</th></tr></thead>
-                    <tbody>
-                      {% for row in '12345' %}
-                        <tr>
-                          <td><div class="skeleton-block" style="width:72px;height:52px;min-height:52px;"></div></td>
-                          <td><div class="skeleton-line" style="width:160px;"></div></td>
-                          <td><div class="skeleton-line" style="width:55px;"></div></td>
-                          <td><div class="skeleton-line" style="width:105px;"></div></td>
-                          <td><div class="skeleton-line" style="width:42px;"></div></td>
-                          <td><div class="skeleton-line" style="width:50px;"></div></td>
-                          <td><div class="skeleton-line" style="width:40px;"></div></td>
-                          <td><div class="skeleton-line" style="width:58px;"></div></td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                  {% else %}
-                  <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>Preview</th><th>Media ID</th><th>Type</th><th>Post Date</th><th>Views</th><th>Reach</th><th>Engagement Rate</th></tr></thead>
-                    <tbody>
-                      {% for row in '12345' %}
-                        <tr>
-                          <td><div class="skeleton-block" style="width:52px;height:52px;min-height:52px;"></div></td>
-                          <td><div class="skeleton-line" style="width:110px;"></div></td>
-                          <td><div class="skeleton-line" style="width:65px;"></div></td>
-                          <td><div class="skeleton-line" style="width:105px;"></div></td>
-                          <td><div class="skeleton-line" style="width:42px;"></div></td>
-                          <td><div class="skeleton-line" style="width:42px;"></div></td>
-                          <td><div class="skeleton-line" style="width:58px;"></div></td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="metric-card p-3 mb-3" aria-busy="true">
-                <h3 class="h6 mb-3">Audience</h3>
-                <div class="row g-3 small">
-                  {% for label in '12345' %}
-                    <div class="col-md-4"><div class="skeleton-line mb-2" style="width: 55%;"></div><div class="skeleton-line" style="width: 80%;"></div></div>
-                  {% endfor %}
-                </div>
-              </div>
-
-              <div class="text-muted small mt-3">
-                Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Syncing for the first time{% endif %}
-              </div>
-            {% elif platform.connected %}
-
-              {# ── Profile Analyzer ── #}
-              <div class="metric-card analyzer-card p-3 p-lg-4 mb-3">
-                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-                  <div>
-                    <h3 class="h5 mb-1">Profile analyzer</h3>
-                    <div class="small text-muted">AI-powered feedback for @{{ platform.metrics.account.username }} · {{ platform.metrics.ai_profile_feedback.inputs.niche|default:'General'|title }} · {{ platform.name }}</div>
-                  </div>
-                  <a href="?refresh={{ platform.slug }}&reanalyze=1" class="btn btn-sm btn-outline-secondary fw-semibold">
-                    <i class="bi bi-arrow-repeat me-1"></i>Refresh &amp; Re-analyze
-                  </a>
-                </div>
-
-                <div class="analyzer-top">
-                  {% with score=platform.metrics.ai_profile_feedback.overall_score %}
-                  <div class="analyzer-score-ring d-flex align-items-center justify-content-center{% if score %}{% if score < 40 %} analyzer-score-ring--poor{% elif score < 70 %} analyzer-score-ring--fair{% else %} analyzer-score-ring--good{% endif %}{% endif %}">
-                    <div class="text-center">
-                      <div class="h2 mb-0">{{ score|default:'—' }}</div>
-                      <div class="small text-muted">/100</div>
-                    </div>
-                  </div>
-                  {% endwith %}
-                  <div class="analyzer-body">
-                    {% if platform.metrics.ai_profile_feedback.verdict %}
-                      <span class="label-chip d-inline-block mb-2">{{ platform.metrics.ai_profile_feedback.verdict }}</span>
+      <div class="accordion" id="socialPlatformsAccordion">
+        {% for platform in social_platforms %}
+          <article class="social-card platform-card">
+            <h3 class="m-0" id="heading-{{ platform.slug }}">
+              <button class="platform-toggle {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ platform.slug }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ platform.slug }}">
+                <span class="platform-icon {% if platform.slug == 'youtube' %}youtube{% endif %}">
+                  {% if platform.slug == 'youtube' %}<i class="bi bi-youtube"></i>{% elif platform.slug == 'instagram' %}<i class="bi bi-instagram"></i>{% else %}<i class="bi bi-bar-chart-line"></i>{% endif %}
+                </span>
+                <span>
+                  <span class="platform-name">{{ platform.name }}</span>
+                  <span class="platform-meta">
+                    {% if platform.connected %}
+                      <span class="badge-soft success"><i class="bi bi-check-circle"></i> Connected</span>
+                    {% else %}
+                      <span class="badge-soft warning"><i class="bi bi-exclamation-circle"></i> Not connected</span>
                     {% endif %}
-                    <p class="analyzer-summary">{{ platform.metrics.ai_profile_feedback.summary|default:'AI-generated account health summary will appear here.' }}</p>
+                    <span>Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Never{% endif %}</span>
+                  </span>
+                </span>
+                <i class="bi bi-chevron-down chevron"></i>
+              </button>
+            </h3>
+
+            <div id="collapse-{{ platform.slug }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#socialPlatformsAccordion" aria-labelledby="heading-{{ platform.slug }}">
+              <div class="platform-body">
+                {% if not platform.connected %}
+                  <div class="empty-state">
+                    <strong>{{ platform.name }} is not connected yet.</strong>
+                    Connect this platform to unlock account metrics, audience insights, and post-level performance analysis.
+                    <div class="mt-3">
+                      {% if platform.can_connect %}
+                        <a href="{{ platform.connect_url }}" class="btn-social primary"><i class="bi bi-link-45deg"></i> Connect {{ platform.name }}</a>
+                      {% else %}
+                        <button class="btn-social" disabled type="button">Coming soon</button>
+                      {% endif %}
+                    </div>
                   </div>
-                </div>
-                <div class="analyzer-overview">
-                    <div class="analyzer-metrics-grid small mb-3">
-                      <div class="analyzer-metric"><span class="text-muted d-block">Followers</span><strong>{{ platform.metrics.account.followers_count }}</strong></div>
-                      <div class="analyzer-metric"><span class="text-muted d-block">Avg Engagement Rate</span><strong>{{ platform.metrics.summary_metrics.average_engagement_rate|percent_sigfigs:4 }}</strong></div>
-                      <div class="analyzer-metric"><span class="text-muted d-block">Avg Reach</span><strong>{{ platform.metrics.summary_metrics.average_reach }}</strong></div>
-                      <div class="analyzer-metric"><span class="text-muted d-block">Audience Match</span><strong>{{ platform.metrics.summary_metrics.audience_match_score }}</strong></div>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2">
-                      {% for label in platform.metrics.recommendation_labels %}
-                        <span class="label-chip">{{ label }}</span>
-                      {% endfor %}
-                    </div>
-                    {% if platform.metrics.data_quality.warnings %}
-                      <div class="mt-2 small text-warning">
-                        {% for warning in platform.metrics.data_quality.warnings %}
-                          <div>• {{ warning }}</div>
-                        {% endfor %}
+                {% elif social_loading and platform.connected %}
+                  <div class="social-card analyzer-card card-pad" aria-busy="true">
+                    <div class="analyzer-top">
+                      <div class="score-ring" style="--score: 0;"><div><strong>--</strong><span>syncing</span></div></div>
+                      <div class="analyzer-copy">
+                        <h3>Preparing profile analyzer</h3>
+                        <p>We are fetching social data, building metrics, and refreshing your AI summary. The page will update when the background sync is ready.</p>
                       </div>
-                    {% endif %}
-                </div>
-              </div>
-
-              <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">AI Feedback</h3>
-                <div class="row g-2 mb-2">
-                  <div class="col-md-3"><strong>Engagement Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.engagement_rate_pct|percent_sigfigs:4 }}</div></div>
-                  <div class="col-md-3"><strong>Conversion Rate</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.conversion_rate_pct|percent_sigfigs:4 }}</div></div>
-                  <div class="col-md-3"><strong>Audience Concentration</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.audience_concentration_pct|pct_sigfigs:4 }}</div></div>
-                  <div class="col-md-3"><strong>Save Activity</strong><div>{{ platform.metrics.ai_profile_feedback.inputs.save_rate_pct|percent_sigfigs:4 }}</div></div>
-                </div>
-                <div class="row g-2">
-                  {% for key, dimension in platform.metrics.ai_profile_feedback.dimension_scores.items %}
-                    <div class="col-lg-6">
-                      <div class="border rounded p-2 h-100">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <strong>
-                            {% if key == 'engagement' %}Engagement
-                            {% elif key == 'engagement_health' %}Engagement
-                            {% elif key == 'audience_quality' %}Audience quality
-                            {% elif key == 'growth_activity' %}Growth activity
-                            {% elif key == 'content_consistency' %}Content consistency
-                            {% elif key == 'monetization' %}Monetization
-                            {% elif key == 'brand_readiness' %}Monetization
-                            {% else %}{{ key|title }}{% endif %}
-                          </strong>
-                          <span class="badge text-bg-secondary">
-                            {{ dimension.score }}
-                            {% if key == 'engagement' or key == 'engagement_health' %}/20
-                            {% elif key == 'audience_quality' %}/25
-                            {% elif key == 'growth_activity' or key == 'content_consistency' %}/25
-                            {% elif key == 'monetization' or key == 'brand_readiness' %}/30{% endif %}
-                          </span>
+                      <button type="button" class="btn-social" disabled><span class="spinner-border spinner-border-sm"></span> Refreshing</button>
+                    </div>
+                    <div class="metric-strip">
+                      <div class="strip-item"><span class="strip-label">Followers</span><div class="skeleton-line"></div></div>
+                      <div class="strip-item"><span class="strip-label">Avg Engagement Rate</span><div class="skeleton-line"></div></div>
+                      <div class="strip-item"><span class="strip-label">Avg Reach</span><div class="skeleton-line"></div></div>
+                      <div class="strip-item"><span class="strip-label">Audience Match</span><div class="skeleton-line"></div></div>
+                    </div>
+                  </div>
+                {% else %}
+                  {% with feedback=platform.metrics.ai_profile_feedback summary=platform.metrics.summary_metrics account=platform.metrics.account %}
+                    <section class="social-card analyzer-card card-pad mb-3">
+                      <div class="analyzer-top">
+                        <div class="score-ring" style="--score: {{ feedback.overall_score|default:0 }};">
+                          <div>
+                            <strong>{% if feedback.overall_score %}{{ feedback.overall_score }}{% else %}--{% endif %}</strong>
+                            <span>score</span>
+                          </div>
                         </div>
-                        <div class="progress mt-2" role="progressbar" aria-label="Dimension score">
-                          {% if key == 'engagement' or key == 'engagement_health' %}
-                            <div class="progress-bar {% if dimension.score < 8 %}bg-danger{% elif dimension.score < 14 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 20 100 %}%"></div>
-                          {% elif key == 'audience_quality' %}
-                            <div class="progress-bar {% if dimension.score < 10 %}bg-danger{% elif dimension.score < 18 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 25 100 %}%"></div>
-                          {% elif key == 'growth_activity' or key == 'content_consistency' %}
-                            <div class="progress-bar {% if dimension.score < 10 %}bg-danger{% elif dimension.score < 18 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 25 100 %}%"></div>
-                          {% elif key == 'monetization' or key == 'brand_readiness' %}
-                            <div class="progress-bar {% if dimension.score < 12 %}bg-danger{% elif dimension.score < 22 %}bg-warning{% else %}bg-success{% endif %}" style="width:{% widthratio dimension.score 30 100 %}%"></div>
+                        <div class="analyzer-copy">
+                          <h3>
+                            {% if feedback.pending %}
+                              Analysis is being prepared
+                            {% elif feedback.overall_score %}
+                              {% if feedback.overall_score < 40 %}Early-stage profile with limited analytics signals{% elif feedback.overall_score < 70 %}Promising profile with room to sharpen performance{% else %}Strong profile with clear partnership signals{% endif %}
+                            {% else %}
+                              Insufficient data to generate a confident assessment
+                            {% endif %}
+                          </h3>
+                          <p>
+                            {% if feedback.summary %}
+                              {{ feedback.summary|truncatewords:38 }}
+                            {% else %}
+                              Connect analytics and run a fresh sync to build a practical profile summary, audience readout, and growth recommendations.
+                            {% endif %}
+                          </p>
+                        </div>
+                        <div class="analyzer-actions">
+                          <a class="btn-social primary" href="?refresh={{ platform.slug }}&reanalyze=1"><i class="bi bi-stars"></i> Re-analyze</a>
+                          <a class="btn-social" href="?refresh={{ platform.slug }}"><i class="bi bi-arrow-clockwise"></i> Sync</a>
+                        </div>
+                      </div>
+
+                      <div class="metric-strip">
+                        <div class="strip-item"><span class="strip-label">Followers</span><strong class="strip-value">{{ account.followers_count|default:"Waiting" }}</strong></div>
+                        <div class="strip-item"><span class="strip-label">Avg Engagement Rate</span><strong class="strip-value">{{ summary.average_engagement_rate|pct_sigfigs:4 }}</strong></div>
+                        <div class="strip-item"><span class="strip-label">Avg Reach</span><strong class="strip-value">{{ summary.average_reach|default:platform.metrics.performance.reach|default:"Unavailable" }}</strong></div>
+                        <div class="strip-item"><span class="strip-label">Audience Match</span><strong class="strip-value">{{ summary.audience_match_score|default:"Pending" }}</strong></div>
+                      </div>
+
+                      <div class="chip-row" aria-label="Profile signals">
+                        {% if platform.metrics.dashboard.labels %}
+                          {% for label in platform.metrics.dashboard.labels|slice:":6" %}
+                            <span class="badge-soft info">{{ label }}</span>
+                          {% endfor %}
+                        {% else %}
+                          <span class="badge-soft warning">Insufficient data</span>
+                          <span class="badge-soft info">Connect additional permissions</span>
+                          <span class="badge-soft">Waiting for analytics</span>
+                        {% endif %}
+                      </div>
+
+                      <div class="factor-grid">
+                        <div class="factor-card">
+                          <div class="factor-head"><span>Engagement</span><span>{{ feedback.dimension_scores.engagement.score|default:"--" }}/20</span></div>
+                          <div class="progress-track"><span class="progress-fill" style="--progress:{% if feedback.dimension_scores.engagement.score %}{{ feedback.dimension_scores.engagement.score }}{% else %}0{% endif %}%;"></span></div>
+                          <p class="factor-text">{{ feedback.dimension_scores.engagement.rationale|default:"Engagement quality will be assessed after content analytics sync."|truncatewords:18 }}</p>
+                        </div>
+                        <div class="factor-card">
+                          <div class="factor-head"><span>Audience Quality</span><span>{{ feedback.dimension_scores.audience_quality.score|default:"--" }}/25</span></div>
+                          <div class="progress-track"><span class="progress-fill" style="--progress:{% if feedback.dimension_scores.audience_quality.score %}{{ feedback.dimension_scores.audience_quality.score }}{% else %}0{% endif %}%;"></span></div>
+                          <p class="factor-text">{{ feedback.dimension_scores.audience_quality.rationale|default:"Audience quality depends on age, location, and concentration signals."|truncatewords:18 }}</p>
+                        </div>
+                        <div class="factor-card">
+                          <div class="factor-head"><span>Growth Activity</span><span>{{ feedback.dimension_scores.growth_activity.score|default:"--" }}/25</span></div>
+                          <div class="progress-track"><span class="progress-fill" style="--progress:{% if feedback.dimension_scores.growth_activity.score %}{{ feedback.dimension_scores.growth_activity.score }}{% else %}0{% endif %}%;"></span></div>
+                          <p class="factor-text">{{ feedback.dimension_scores.growth_activity.rationale|default:"Posting consistency and reach trends will appear as data accumulates."|truncatewords:18 }}</p>
+                        </div>
+                        <div class="factor-card">
+                          <div class="factor-head"><span>Monetization</span><span>{{ feedback.dimension_scores.monetization.score|default:"--" }}/30</span></div>
+                          <div class="progress-track"><span class="progress-fill" style="--progress:{% if feedback.dimension_scores.monetization.score %}{{ feedback.dimension_scores.monetization.score }}{% else %}0{% endif %}%;"></span></div>
+                          <p class="factor-text">{{ feedback.dimension_scores.monetization.rationale|default:"Add brand deal history in your profile to improve monetization confidence."|truncatewords:18 }}</p>
+                        </div>
+                      </div>
+                    </section>
+                  {% endwith %}
+
+                  <div class="analytics-grid">
+                    <section class="social-card card-pad span-6">
+                      <h4 class="mini-title">Account overview</h4>
+                      <div class="data-list">
+                        <div class="data-row"><span>Username</span><strong>{{ platform.metrics.account.username|default:"Not available" }}</strong></div>
+                        <div class="data-row"><span>Bio</span><strong>{{ platform.metrics.account.bio|default:"No bio captured yet"|truncatechars:90 }}</strong></div>
+                        <div class="data-row"><span>Follower count</span><strong>{{ platform.metrics.account.followers_count|default:"Waiting for sync" }}</strong></div>
+                        <div class="data-row"><span>Following count</span><strong>{{ platform.metrics.account.following_count|default:"Unavailable" }}</strong></div>
+                        <div class="data-row"><span>Media count</span><strong>{{ platform.metrics.account.media_count|default:"Unavailable" }}</strong></div>
+                        <div class="data-row"><span>Account type</span><strong>{{ platform.metrics.account.account_type|default:"Creator" }}</strong></div>
+                      </div>
+                    </section>
+
+                    <section class="social-card card-pad span-6">
+                      <h4 class="mini-title">Audience demographics</h4>
+                      <div class="analytics-grid mb-0">
+                        <div class="span-6">
+                          <h5 class="section-note mb-2">Gender &amp; age</h5>
+                          {% if platform.metrics.demographics.audience_gender_age %}
+                            <div class="rank-list">
+                              {% for row in platform.metrics.demographics.audience_gender_age|slice:":4" %}
+                                <div class="rank-row"><span class="rank-label">{{ row.label }}</span><strong class="rank-value">{{ row.value }}</strong></div>
+                              {% endfor %}
+                            </div>
                           {% else %}
-                            <div class="progress-bar bg-secondary" style="width:0%"></div>
+                            <div class="empty-state"><strong>Demographics unavailable.</strong> This platform has not met privacy thresholds yet.</div>
                           {% endif %}
                         </div>
-                        <div class="small text-muted mt-1">{{ dimension.diagnosis }}</div>
-                        <ul class="small mt-2 mb-0">
-                          {% for action in dimension.actions %}<li>{{ action }}</li>{% endfor %}
-                        </ul>
+                        <div class="span-6">
+                          <h5 class="section-note mb-2">Country</h5>
+                          {% if platform.metrics.demographics.audience_country %}
+                            <div class="rank-list">
+                              {% for row in platform.metrics.demographics.audience_country|slice:":4" %}
+                                <div class="rank-row"><span class="rank-label">{{ row.label }}</span><strong class="rank-value">{{ row.value }}</strong></div>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            <div class="empty-state"><strong>Country data pending.</strong> Location analytics may appear after the next successful sync.</div>
+                          {% endif %}
+                        </div>
+                        <div class="span-12">
+                          <h5 class="section-note mb-2">City</h5>
+                          {% if platform.metrics.demographics.audience_city %}
+                            <div class="rank-list">
+                              {% for row in platform.metrics.demographics.audience_city|slice:":4" %}
+                                <div class="rank-row"><span class="rank-label">{{ row.label }}</span><strong class="rank-value">{{ row.value }}</strong></div>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            <div class="empty-state"><strong>City-level analytics are not available yet.</strong> This platform may withhold city data until the audience is large enough.</div>
+                          {% endif %}
+                        </div>
                       </div>
-                    </div>
-                  {% empty %}
-                    <div class="col-12 text-muted small">No AI feedback available yet.</div>
-                  {% endfor %}
-                </div>
-              </div>
+                    </section>
 
-              <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">Top 3 priority actions</h3>
-                <ol class="mb-0">
-                  {% for action in platform.metrics.ai_profile_feedback.top_priority_actions|slice:':3' %}
-                    <li class="mb-2">
-                      <div class="fw-semibold">{{ action }}</div>
-                      <div class="small text-muted">This is a high-impact action based on your current profile gaps.</div>
-                    </li>
-                  {% empty %}
-                    <li class="text-muted small">No priority actions available yet.</li>
-                  {% endfor %}
-                </ol>
-              </div>
+                    <section class="social-card card-pad span-6">
+                      <h4 class="mini-title">{% if platform.slug == 'youtube' %}Watch time &amp; reach{% else %}Performance metrics{% endif %}</h4>
+                      <div class="compact-metrics">
+                        {% if platform.slug == 'youtube' %}
+                          <div class="compact-metric"><span>Views</span><strong>{{ platform.metrics.performance.insights.views|default:platform.metrics.engagement.views|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Engaged views</span><strong>{{ platform.metrics.performance.insights.engagedViews|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Watch time</span><strong>{{ platform.metrics.performance.insights.estimatedMinutesWatched|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Avg duration</span><strong>{{ platform.metrics.performance.insights.averageViewDuration|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Avg % viewed</span><strong>{% if platform.metrics.performance.insights.averageViewPercentage %}{{ platform.metrics.performance.insights.averageViewPercentage }}%{% else %}-{% endif %}</strong></div>
+                          <div class="compact-metric"><span>Impressions</span><strong>{{ platform.metrics.reach_analytics.impressions|default:"-" }}</strong></div>
+                        {% else %}
+                          <div class="compact-metric"><span>Reach</span><strong>{{ platform.metrics.performance.reach|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Reach/follower ratio</span><strong>{{ platform.metrics.performance.reach_ratio|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Profile visits</span><strong>{{ platform.metrics.performance.profile_visits|default:"-" }}</strong></div>
+                          <div class="compact-metric"><span>Website clicks</span><strong>{{ platform.metrics.performance.website_clicks|default:"-" }}</strong></div>
+                        {% endif %}
+                      </div>
+                    </section>
 
-              {# ── Account / Audience / Performance / Engagement ── #}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Account Overview</h3>
-                    <dl class="row small mb-0">
-                      <dt class="col-5 text-muted">Username</dt><dd class="col-7">@{{ platform.metrics.account.username }}</dd>
-                      <dt class="col-5 text-muted">Bio</dt><dd class="col-7">{{ platform.metrics.account.bio|default:'-' }}</dd>
-                      <dt class="col-5 text-muted">Follower count</dt><dd class="col-7">{{ platform.metrics.account.followers_count }}</dd>
-                      <dt class="col-5 text-muted">Following count</dt><dd class="col-7">{{ platform.metrics.account.following_count }}</dd>
-                      <dt class="col-5 text-muted">Media count</dt><dd class="col-7">{{ platform.metrics.account.media_count }}</dd>
-                      <dt class="col-5 text-muted">Account type</dt><dd class="col-7">{{ platform.metrics.account.account_type }}</dd>
-                    </dl>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Audience Demographics</h3>
-                    <div class="row g-2 small">
-                      <div class="col-6"><strong>Gender &amp; Age</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_gender_age|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>Country</strong><ul class="list-unstyled mb-2 mt-1">{% for row in platform.metrics.demographics.audience_country|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">No data</li>{% endfor %}</ul></div>
-                      <div class="col-6"><strong>City</strong><ul class="list-unstyled mb-0 mt-1">{% for row in platform.metrics.demographics.audience_city|slice:':4' %}<li>{{ row.label }} — {{ row.value }}</li>{% empty %}<li class="text-muted">Unavailable</li>{% endfor %}</ul></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    <section class="social-card card-pad span-6">
+                      <h4 class="mini-title">Engagement metrics</h4>
+                      <div class="compact-metrics">
+                        <div class="compact-metric"><span>Likes</span><strong>{{ platform.metrics.engagement.likes|default:"-" }}</strong></div>
+                        <div class="compact-metric"><span>Comments</span><strong>{{ platform.metrics.engagement.comments|default:"-" }}</strong></div>
+                        <div class="compact-metric"><span>Saves</span><strong>{{ platform.metrics.engagement.saves|default:"-" }}</strong></div>
+                        <div class="compact-metric"><span>Shares</span><strong>{{ platform.metrics.engagement.shares|default:"-" }}</strong></div>
+                        <div class="compact-metric"><span>Views</span><strong>{{ platform.metrics.engagement.views|default:"-" }}</strong></div>
+                        <div class="compact-metric"><span>Engagement rate</span><strong>{{ platform.metrics.engagement.engagement_rate|pct_sigfigs:4 }}</strong></div>
+                      </div>
+                    </section>
 
-              {% if platform.slug == 'youtube' %}
-              {# ── YouTube: Watch Time & Reach + Subscriber Growth ── #}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Watch Time &amp; Reach <span class="text-muted fw-normal small">(28 days)</span></h3>
-                    <ul class="list-group list-group-flush small">
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.performance.insights.views|default:platform.metrics.engagement.views }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Engaged Views</span><strong>{{ platform.metrics.performance.insights.engagedViews|default:'-' }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Watch Time (mins)</span><strong>{{ platform.metrics.performance.insights.estimatedMinutesWatched|default:'-' }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Avg View Duration (s)</span><strong>{{ platform.metrics.performance.insights.averageViewDuration|default:'-' }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Avg % Viewed</span><strong>{{ platform.metrics.performance.insights.averageViewPercentage|default:'-' }}{% if platform.metrics.performance.insights.averageViewPercentage %}%{% endif %}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Impressions</span><strong>{{ platform.metrics.reach_analytics.impressions|default:'-' }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Impression CTR</span><strong>{% if platform.metrics.reach_analytics.impressionClickThroughRate %}{{ platform.metrics.reach_analytics.impressionClickThroughRate }}%{% else %}-{% endif %}</strong></li>
-                    </ul>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Subscriber Growth <span class="text-muted fw-normal small">(28 days)</span></h3>
-                    <ul class="list-group list-group-flush small mb-2">
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Gained</span><strong class="text-success">+{{ platform.metrics.performance.insights.subscribersGained|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Lost</span><strong class="text-danger">-{{ platform.metrics.performance.insights.subscribersLost|default:0 }}</strong></li>
-                      <li class="list-group-item d-flex justify-content-between px-0"><span>Net</span>
-                        {% with gained=platform.metrics.performance.insights.subscribersGained|default:0 lost=platform.metrics.performance.insights.subscribersLost|default:0 %}
-                        <strong>{% if gained or lost %}+{{ gained }} / -{{ lost }}{% else %}-{% endif %}</strong>
-                        {% endwith %}
-                      </li>
-                    </ul>
-                    {% if platform.metrics.subscriber_sources %}
-                      <h4 class="h6 text-muted small mt-2 mb-1">Sources</h4>
-                      <ul class="list-group list-group-flush small">
-                        {% for src in platform.metrics.subscriber_sources|slice:':6' %}
-                          <li class="list-group-item d-flex justify-content-between px-0">
-                            <span>
-                              {% if src.label == 'YT_SEARCH' %}YouTube Search
-                              {% elif src.label == 'EXT_URL' %}External
-                              {% elif src.label == 'RELATED_VIDEO' %}Suggested Videos
-                              {% elif src.label == 'BROWSE' %}Browse Features
-                              {% elif src.label == 'NOTIFICATION' %}Notifications
-                              {% elif src.label == 'NO_LINK_OTHER' %}Direct / Unknown
-                              {% elif src.label == 'PLAYLIST' %}Playlists
-                              {% else %}{{ src.label }}{% endif %}
-                            </span>
-                            <strong>{{ src.value }}</strong>
-                          </li>
-                        {% endfor %}
-                      </ul>
-                    {% else %}
-                      <p class="small text-muted mb-0">No subscriber source data yet.</p>
+                    {% if platform.slug == 'youtube' %}
+                      <section class="social-card card-pad span-4">
+                        <h4 class="mini-title">Traffic sources</h4>
+                        {% if platform.metrics.traffic_sources %}
+                          <div class="rank-list">
+                            {% for src in platform.metrics.traffic_sources|slice:":6" %}
+                              <div class="rank-row"><span class="rank-label">{{ src.label }}</span><strong class="rank-value">{{ src.value }}</strong></div>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="empty-state"><strong>No traffic source data yet.</strong> YouTube source analytics will appear after the next sync.</div>
+                        {% endif %}
+                      </section>
+                      <section class="social-card card-pad span-4">
+                        <h4 class="mini-title">Device analytics</h4>
+                        {% if platform.metrics.device_analytics %}
+                          <div class="rank-list">
+                            {% for dev in platform.metrics.device_analytics|slice:":6" %}
+                              <div class="rank-row"><span class="rank-label">{{ dev.label }}</span><strong class="rank-value">{{ dev.value }}</strong></div>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="empty-state"><strong>No device data yet.</strong> Device analytics are still syncing or unavailable for this range.</div>
+                        {% endif %}
+                      </section>
+                      <section class="social-card card-pad span-4">
+                        <h4 class="mini-title">Subscriber sources</h4>
+                        {% if platform.metrics.subscriber_sources %}
+                          <div class="rank-list">
+                            {% for src in platform.metrics.subscriber_sources|slice:":6" %}
+                              <div class="rank-row"><span class="rank-label">{{ src.label }}</span><strong class="rank-value">{{ src.value }}</strong></div>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="empty-state"><strong>Subscriber source data is pending.</strong> Growth sources will appear once YouTube returns enough data.</div>
+                        {% endif %}
+                      </section>
                     {% endif %}
+
+                    <section class="social-card card-pad span-12">
+                      <div class="table-toolbar">
+                        <div>
+                          <h4 class="mini-title mb-1">Content performance</h4>
+                          <p class="section-note mb-0">Post-level insights ranked by standardized performance score.</p>
+                        </div>
+                        <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="table-search" placeholder="Search content" aria-label="Search {{ platform.name }} content">
+                      </div>
+
+                      <div class="table-responsive">
+                        {% if platform.slug == 'youtube' %}
+                          <table class="table social-table align-middle" id="content-table-{{ platform.slug }}">
+                            <thead>
+                              <tr><th>Thumbnail</th><th>Title</th><th>Type</th><th>Date</th><th>Views</th><th>Watch Time</th><th>Avg %</th><th>Eng. Rate</th><th>Subs</th></tr>
+                            </thead>
+                            <tbody>
+                              {% for row in platform.metrics.content_performance %}
+                                <tr>
+                                  <td>{% if row.thumbnail_url %}<img src="{{ row.thumbnail_url }}" alt="{{ row.title|default:row.media_id }} thumbnail" class="media-thumb">{% else %}<span class="text-muted">No preview</span>{% endif %}</td>
+                                  <td>{% if row.permalink %}<a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer">{{ row.title|default:row.media_id }}</a>{% else %}{{ row.title|default:row.media_id }}{% endif %}</td>
+                                  <td><span class="badge-soft">{{ row.media_type|default:"VIDEO" }}</span></td>
+                                  <td>{% if row.timestamp or row.post_date %}<time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>{% else %}<span class="text-muted">Pending</span>{% endif %}</td>
+                                  <td>{{ row.views|default:"-" }}</td>
+                                  <td>{{ row.watch_time_minutes|default:"-" }}</td>
+                                  <td>{% if row.avg_view_percentage %}{{ row.avg_view_percentage|floatformat:1 }}%{% else %}-{% endif %}</td>
+                                  <td>{{ row.engagement_rate|percent_sigfigs:4 }}</td>
+                                  <td>{{ row.subscribers_gained|default:"0" }}</td>
+                                </tr>
+                              {% empty %}
+                                <tr><td colspan="9"><div class="empty-state"><strong>No recent content found for this time range.</strong> Refresh analytics to fetch post-level YouTube insights.</div></td></tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        {% else %}
+                          <table class="table social-table align-middle" id="content-table-{{ platform.slug }}">
+                            <thead>
+                              <tr><th>Preview</th><th>Media ID</th><th>Type</th><th>Post Date</th><th>Views</th><th>Reach</th><th>Eng. Rate</th><th>Save Rate</th><th>Share Rate</th></tr>
+                            </thead>
+                            <tbody>
+                              {% for row in platform.metrics.content_performance %}
+                                <tr>
+                                  <td>{% if row.thumbnail_url %}<img src="{{ row.thumbnail_url }}" alt="Media {{ row.media_id }} thumbnail" class="media-thumb square">{% else %}<span class="text-muted">No preview</span>{% endif %}</td>
+                                  <td>{% if row.permalink %}<a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer"><code>{{ row.media_id }}</code></a>{% else %}<code>{{ row.media_id }}</code>{% endif %}</td>
+                                  <td><span class="badge-soft">{{ row.media_type|default:"Media" }}</span></td>
+                                  <td>{% if row.timestamp or row.post_date %}<time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>{% else %}<span class="text-muted">Pending</span>{% endif %}</td>
+                                  <td>{{ row.views|default:"-" }}</td>
+                                  <td>{{ row.reach|default:"-" }}</td>
+                                  <td>{{ row.engagement_rate|percent_sigfigs:4 }}</td>
+                                  <td>{{ row.save_rate|percent_sigfigs:4 }}</td>
+                                  <td>{{ row.share_rate|percent_sigfigs:4 }}</td>
+                                </tr>
+                              {% empty %}
+                                <tr><td colspan="9"><div class="empty-state"><strong>No recent content found for this time range.</strong> Analytics are still syncing in the background or no media was returned.</div></td></tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        {% endif %}
+                      </div>
+                    </section>
                   </div>
-                </div>
-              </div>
 
-              {# ── YouTube: Traffic Sources & Device Analytics ── #}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Traffic Sources <span class="text-muted fw-normal small">(views, 28 days)</span></h3>
-                    {% if platform.metrics.traffic_sources %}
-                      <ul class="list-group list-group-flush small">
-                        {% for src in platform.metrics.traffic_sources %}
-                          <li class="list-group-item d-flex justify-content-between px-0">
-                            <span>
-                              {% if src.label == 'YT_SEARCH' %}YouTube Search
-                              {% elif src.label == 'EXT_URL' %}External
-                              {% elif src.label == 'RELATED_VIDEO' %}Suggested Videos
-                              {% elif src.label == 'BROWSE' %}Browse Features
-                              {% elif src.label == 'NOTIFICATION' %}Notifications
-                              {% elif src.label == 'NO_LINK_OTHER' %}Direct / Unknown
-                              {% elif src.label == 'PLAYLIST' %}Playlists
-                              {% else %}{{ src.label }}{% endif %}
-                            </span>
-                            <strong>{{ src.value }}</strong>
-                          </li>
-                        {% endfor %}
-                      </ul>
-                    {% else %}
-                      <p class="small text-muted mb-0">No traffic source data yet.</p>
-                    {% endif %}
+                  <div class="section-note mt-3">
+                    Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Never{% endif %}
                   </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="metric-card p-3 h-100">
-                    <h3 class="h6">Device Analytics <span class="text-muted fw-normal small">(views, 28 days)</span></h3>
-                    {% if platform.metrics.device_analytics %}
-                      <ul class="list-group list-group-flush small">
-                        {% for dev in platform.metrics.device_analytics %}
-                          <li class="list-group-item d-flex justify-content-between px-0">
-                            <span>
-                              {% if dev.label == 'MOBILE' %}Mobile
-                              {% elif dev.label == 'COMPUTER' %}Computer
-                              {% elif dev.label == 'TABLET' %}Tablet
-                              {% elif dev.label == 'TV' %}TV
-                              {% elif dev.label == 'GAME_CONSOLE' %}Game Console
-                              {% else %}{{ dev.label }}{% endif %}
-                            </span>
-                            <strong>{{ dev.value }}</strong>
-                          </li>
-                        {% endfor %}
-                      </ul>
-                    {% else %}
-                      <p class="small text-muted mb-0">No device data yet.</p>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-
-              {% else %}
-              {# ── Instagram: Performance & Engagement ── #}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Performance Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Reach</span><strong>{{ platform.metrics.performance.reach }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Reach/Follower Ratio</span><strong>{{ platform.metrics.performance.reach_ratio }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Profile Visits</span><strong>{{ platform.metrics.performance.profile_visits }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Website Clicks</span><strong>{{ platform.metrics.performance.website_clicks }}</strong></li></ul></div></div>
-                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Saves</span><strong>{{ platform.metrics.engagement.saves }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
-              </div>
-              {% endif %}
-
-              {# ── YouTube: Engagement summary (below reach/traffic rows) ── #}
-              {% if platform.slug == 'youtube' %}
-              <div class="row g-3 mb-3">
-                <div class="col-lg-6"><div class="metric-card p-3 h-100"><h3 class="h6">Engagement Metrics</h3><ul class="list-group list-group-flush small"><li class="list-group-item d-flex justify-content-between px-0"><span>Likes</span><strong>{{ platform.metrics.engagement.likes }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Comments</span><strong>{{ platform.metrics.engagement.comments }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Shares</span><strong>{{ platform.metrics.engagement.shares }}</strong></li><li class="list-group-item d-flex justify-content-between px-0"><span>Views</span><strong>{{ platform.metrics.engagement.views }}</strong></li></ul><div class="mt-2 small text-muted">Engagement rate: {{ platform.metrics.engagement.engagement_rate }}%</div></div></div>
-              </div>
-              {% endif %}
-
-              {# ── Post Performance Explorer ── #}
-              <div class="metric-card p-3 mb-3">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                  <h3 class="h6 mb-0">Post Performance Explorer</h3>
-                  <div class="d-flex gap-2 align-items-center">
-                    <label class="small text-muted" for="content-search-{{ platform.slug }}">Find media</label>
-                    <input id="content-search-{{ platform.slug }}" data-search-target="content-table-{{ platform.slug }}" class="form-control form-control-sm w-auto" style="min-width: 160px;" placeholder="Search by title or type">
-                  </div>
-                </div>
-                <p class="small text-muted mb-3">Standardized post analytics ranked by standardized performance score.</p>
-
-                {% if platform.slug == 'youtube' %}
-                {# ── YouTube video table ── #}
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
-                    <thead>
-                      <tr>
-                        <th>Thumbnail</th>
-                        <th>Title</th>
-                        <th>Type</th>
-                        <th>Date</th>
-                        <th>Views</th>
-                        <th>Watch Time (m)</th>
-                        <th>Avg Duration (s)</th>
-                        <th>Avg %</th>
-                        <th>Likes</th>
-                        <th>Comments</th>
-                        <th>Eng. Rate</th>
-                        <th>Subs Gained</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for row in platform.metrics.content_performance %}
-                        <tr>
-                          <td>
-                            {% if row.thumbnail_url %}
-                              {% if row.permalink %}
-                                <a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer">
-                                  <img src="{{ row.thumbnail_url }}" alt="{{ row.title|default:row.media_id }} thumbnail" class="rounded border" style="width: 72px; height: 52px; object-fit: cover;">
-                                </a>
-                              {% else %}
-                                <img src="{{ row.thumbnail_url }}" alt="{{ row.title|default:row.media_id }} thumbnail" class="rounded border" style="width: 72px; height: 52px; object-fit: cover;">
-                              {% endif %}
-                            {% else %}
-                              <span class="text-muted small">N/A</span>
-                            {% endif %}
-                          </td>
-                          <td style="max-width:200px;">
-                            {% if row.permalink %}
-                              <a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer" class="text-truncate d-block" style="max-width:190px;" title="{{ row.title }}">{{ row.title|default:row.media_id }}</a>
-                            {% else %}
-                              <span class="text-truncate d-block" style="max-width:190px;" title="{{ row.title }}">{{ row.title|default:row.media_id }}</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            {% if row.media_type == 'SHORTS' %}
-                              <span class="badge text-bg-danger rounded-pill">SHORTS</span>
-                            {% else %}
-                              <span class="badge rounded-pill text-bg-light border">VIDEO</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            {% if row.timestamp or row.post_date %}
-                              <time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>
-                            {% else %}
-                              <span class="text-muted small">N/A</span>
-                            {% endif %}
-                          </td>
-                          <td>{{ row.views }}</td>
-                          <td>{{ row.watch_time_minutes|default:'-' }}</td>
-                          <td>{{ row.avg_view_duration|default:'-' }}</td>
-                          <td>{% if row.avg_view_percentage %}{{ row.avg_view_percentage|floatformat:1 }}%{% else %}-{% endif %}</td>
-                          <td>{{ row.likes }}</td>
-                          <td>{{ row.comments }}</td>
-                          <td style="white-space:nowrap">{{ row.engagement_rate|percent_sigfigs:4 }}</td>
-                          <td>{{ row.subscribers_gained|default:'0' }}</td>
-                        </tr>
-                      {% empty %}
-                        <tr><td colspan="12" class="text-muted">No video data yet. Refresh to fetch insights.</td></tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-
-                {% else %}
-                {# ── Instagram / generic table ── #}
-                <div class="table-responsive">
-                  <table class="table table-sm align-middle mb-0" id="content-table-{{ platform.slug }}">
-                    <thead>
-                      <tr>
-                        <th>Preview</th>
-                        <th>Media ID</th>
-                        <th>Type</th>
-                        <th>Post Date</th>
-                        <th>Views</th>
-                        <th>Reach</th>
-                        <th>Engagement Rate</th>
-                        <th>Save Rate</th>
-                        <th>Share Rate</th>
-                        <th>Profile Visit Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for row in platform.metrics.content_performance %}
-                        <tr>
-                          <td>
-                            {% if row.thumbnail_url %}
-                              {% if row.permalink %}
-                                <a href="{{ row.permalink }}" target="_blank" rel="noopener noreferrer">
-                                  <img src="{{ row.thumbnail_url }}" alt="Media {{ row.media_id }} thumbnail" class="rounded border" style="width: 52px; height: 52px; object-fit: cover;">
-                                </a>
-                              {% else %}
-                                <img src="{{ row.thumbnail_url }}" alt="Media {{ row.media_id }} thumbnail" class="rounded border" style="width: 52px; height: 52px; object-fit: cover;">
-                              {% endif %}
-                            {% else %}
-                              <span class="text-muted small">N/A</span>
-                            {% endif %}
-                          </td>
-                          <td><code>{{ row.media_id }}</code></td>
-                          <td><span class="badge rounded-pill text-bg-light border">{{ row.media_type }}</span></td>
-                          <td>
-                            {% if row.timestamp or row.post_date %}
-                              <time class="local-time" datetime="{{ row.timestamp|default:row.post_date }}">{{ row.timestamp|default:row.post_date }}</time>
-                            {% else %}
-                              <span class="text-muted small">N/A</span>
-                            {% endif %}
-                          </td>
-                          <td>{{ row.views }}</td>
-                          <td>{{ row.reach }}</td>
-                          <td style="white-space:nowrap">{{ row.engagement_rate|percent_sigfigs:4 }}</td>
-                          <td style="white-space:nowrap">{{ row.save_rate|percent_sigfigs:4 }}</td>
-                          <td style="white-space:nowrap">{{ row.share_rate|percent_sigfigs:4 }}</td>
-                          <td style="white-space:nowrap">{{ row.profile_visit_rate|percent_sigfigs:4 }}</td>
-                        </tr>
-                      {% empty %}
-                        <tr><td colspan="9" class="text-muted">No media-level data yet. Refresh to fetch post insights.</td></tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
                 {% endif %}
               </div>
-
-              <div class="metric-card p-3 mb-3">
-                <h3 class="h6 mb-2">Audience</h3>
-                <div class="row g-2 small">
-                  <div class="col-md-4"><span class="text-muted d-block">Top city</span><strong>{{ platform.metrics.dashboard.audience.top_city|default:'-' }}</strong></div>
-                  <div class="col-md-4"><span class="text-muted d-block">Top country</span><strong>{{ platform.metrics.dashboard.audience.top_country|default:'-' }}</strong></div>
-                  <div class="col-md-4"><span class="text-muted d-block">Top age group</span><strong>{{ platform.metrics.dashboard.audience.top_age_group|default:'-' }}</strong></div>
-                  <div class="col-md-4"><span class="text-muted d-block">% US followers</span><strong>{{ platform.metrics.dashboard.audience.percent_us_followers|default:'-' }}</strong></div>
-                  <div class="col-md-4"><span class="text-muted d-block">% 18-34 followers</span><strong>{{ platform.metrics.dashboard.audience.percent_18_34_followers|default:'-' }}</strong></div>
-                </div>
-              </div>
-
-              <div class="text-muted small mt-3">
-                Last synced: {% if platform.last_synced_at %}<time class="local-time" datetime="{{ platform.last_synced_at|date:'c' }}">{{ platform.last_synced_at }}</time>{% else %}Never{% endif %}
-              </div>
-            {% else %}
-              <p class="text-muted">Platform module scaffolded and ready for future analytics integration.</p>
-            {% endif %}
-          </div>
-        </div>
+            </div>
+          </article>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
-  </section>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -934,19 +1182,20 @@
     var progressEl = banner.querySelector('[data-social-refresh-progress]');
     var reloadButton = banner.querySelector('[data-social-refresh-reload]');
     var progressByStep = {
-      queued: 25,
-      fetching_social: 45,
-      refreshing_metrics: 72,
+      queued: 18,
+      fetching_social: 42,
+      refreshing_metrics: 68,
+      running_ai: 86,
       complete: 100,
       failed: 100
     };
 
     function setActiveStep(step) {
-      var seenActive = true;
+      var passed = true;
       document.querySelectorAll('[data-refresh-step]').forEach(function(el){
         var stepName = el.getAttribute('data-refresh-step');
-        if (stepName === step) seenActive = false;
-        el.classList.toggle('is-active', stepName === step || (seenActive && step !== 'failed'));
+        if (stepName === step) passed = false;
+        el.classList.toggle('is-active', stepName === step || (passed && step !== 'failed'));
       });
     }
 
@@ -974,6 +1223,7 @@
         if (data.status === 'failed') {
           banner.classList.add('border-danger');
           if (progressEl) progressEl.classList.remove('progress-bar-animated');
+          if (messageEl) messageEl.textContent = data.error || 'The refresh did not finish. Cached analytics are still available.';
           return;
         }
       } catch (error) {
@@ -984,5 +1234,11 @@
 
     poll();
   })();
+
+  document.querySelectorAll('.analyzer-copy p').forEach(function(el){
+    el.textContent = el.textContent
+      .replace(/very weak creator profile/ig, 'early-stage profile with limited analytics signals')
+      .replace(/weak creator profile/ig, 'developing creator profile');
+  });
 </script>
 {% endblock %}
